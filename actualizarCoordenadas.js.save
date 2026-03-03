@@ -1,0 +1,127 @@
+
+// --- 1. CONFIGURACIÓN ---
+// !! REEMPLAZA ESTOS VALORES CON LOS TUYOS !!
+const SPREADSHEET_ID = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU'; // El ID de tu hoja "coordenadas"
+const CREDENTIALS_PATH = './credentials.json'; // Ruta al JSON de tu cuenta de servicio
+const SHEET_NAME = 'coordenadas'; // Nombre de tu hoja
+
+// --- 2. IMPORTACIONES (CommonJS) ---
+const { google } = require('googleapis');
+const fetch = require('node-fetch');
+
+// --- 3. DATOS DE LOS BARRIOS Y TARIFAS ---
+const TARIFAS = {
+  5000:  ['ASUNCION','FÁTIMA','MIRADOR AZUL','AZULITA PARTE BAJA','CRISTO REY ABAJO DE LA PISCINA','HORIZONTES','MIRAFLORES','MISERICORDIA HASTA PRINCESS','MOJÓN','OBRERO','PEDREGAL PARTE BAJA','PEDRERA','SAN FRANCISCO','SHANGAY','SIMÓN BOLÍVAR','TOBÓN QUINTERO','VEGAS PARTE BAJA','MONTE VERDE','REMANSO','DE LA ASUNCIÓN A LA ASUNCIÓN','YARUMITO PARTE BAJA','CANOAS HASTA LA TIENDA DEL CUSCO','PIEDRAS BLANCAS','PORVENIR','RECREO','DE LA PEDRERA A LA PEDRERA'],
+  6000:  ['CALORCOL','AZULITA PARTE ALTA','VILLAS DE COPACABANA','TABLAZO','CANOAS DESPUÉS DE LA TIENDA DEL CUSCO','CRISTO REY DE LA PISCINA HACIA ARRIBA','PEDREGAL PARTE ALTA','COLINAS DEL PEDREGAL','VEGAS INTERIORES IGLESIA MANANTIALES','YARUMITO DESPUÉS DEL EMPEDRADO','YARUMITO INTERIOR CANCHA NUEVA','VEGAS PARTE ALTA','EDIFICIOS AMARILLOS','MONTESION','JARDÍN DE LA MARGARITA','RESERVAS DE SAN JUAN 1','POSADA DEL VIENTO','ROSA DE LOS VIENTOS','VICENZA','RESERVAS DE SAN JUAN 2'],
+  7000:  ['BARRIO MARIA','PORTERIA PARCELACIÓN EL PARAISO','TORRE DEL BOSQUE','EDIFICIO POBLADO NORTE','SAN JUAN CAMPESTRE'],
+  8000:  ['VIA MACHADO','CANTERAS','VILLANUEVA PARTE BAJA Y ALTA','VILLA ROCA','SAN JUAN'],
+  10000: ['GUASIMALITO','MACHADO'],
+  11000: ['UNIDADES DE MACHADO','ARBOLEDA DEL CAMPO'],
+  13000: ['FONTIDUEÑO'],
+  14000: ['NAVARRA','NIQUIA PARTE BAJA','UNIDADES DE NAVARRA'],
+  17000: ['PARQUE DE GIRARDOTA','TOLEDO CAMPESTRE'],
+  18000: ['PARQUE DE BELLO'],
+  19000: ['FABRICATO'],
+  20000: ['UNIDADES DE MADERA']
+};
+
+// --- 4. FUNCIÓN PARA PREPARAR LISTA DE BARRIOS ---
+function prepararListaDeBarrios() {
+    const barrios = [];
+    for (const [tarifa, lista] of Object.entries(TARIFAS)) {
+        lista.forEach(nombre => {
+            barrios.push({ nombre: nombre.trim(), tarifa: parseInt(tarifa) });
+        });
+    }
+    return barrios;
+}
+
+// --- 5. FUNCIÓN PARA OBTENER COORDENADAS ---
+async function obtenerCoordenadas(nombreBarrio) {
+    const municipio = 'Copacabana, Antioquia, Colombia';
+    const query = `${nombreBarrio}, ${municipio}`;
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
+
+    console.log(`   🔍 Buscando: ${query}`);
+
+    try {
+        const response = await fetch(url, {
+            headers: {
+                'User-Agent': 'MiAppDeBarrios/1.0 (tu-email@ejemplo.com)'
+            }
+        });
+        const data = await response.json();
+
+        if (data && data.length > 0) {
+            const { lat, lon } = data[0];
+            console.log(`   ✅ Encontrado: (${lat}, ${lon})`);
+            return { lat: parseFloat(lat), lon: parseFloat(lon) };
+        } else {
+            console.log(`   ⚠️  No encontrado`);
+            return { lat: 'NO_ENCONTRADO', lon: 'NO_ENCONTRADO' };
+        }
+    } catch (error) {
+        console.error(`   ❌ Error en la búsqueda:`, error.message);
+        return { lat: 'ERROR', lon: 'ERROR' };
+    }
+}
+
+// --- 6. FUNCIÓN PARA ESCRIBIR EN GOOGLE SHEETS ---
+async function escribirEnGoogleSheets(auth, filas) {
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    try {
+        const response = await sheets.spreadsheets.values.append({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_NAME}!A:D`,
+            valueInputOption: 'USER_ENTERED',
+            resource: { values: filas },
+        });
+        console.log(`✅ ${response.data.updates.updatedCells} celdas actualizadas en Google Sheets.`);
+    } catch (err) {
+        console.error('❌ Error al escribir en Google Sheets:', err.message);
+    }
+}
+
+// --- 7. FUNCIÓN PRINCIPAL ---
+async function main() {
+    console.log('🚀 Iniciando proceso de actualización de coordenadas...');
+
+    const barrios = prepararListaDeBarrios();
+    console.log(`📋 Se procesarán ${barrios.length} barrios.\n`);
+
+    const filasParaSheets = [['BARRIO', 'LAT', 'LONG', 'TARIFA']];
+
+    for (let i = 0; i < barrios.length; i++) {
+        const barrio = barrios[i];
+        console.log(`Procesando (${i + 1}/${barrios.length}): ${barrio.nombre}`);
+        
+        const { lat, lon } = await obtenerCoordenadas(barrio.nombre);
+        filasParaSheets.push([barrio.nombre, lat, lon, barrio.tarifa]);
+
+        // Pausa para no sobrecargar la API
+        await new Promise(resolve => setTimeout(resolve, 1100));
+    }
+
+    console.log(`\n📦 Lista de ${filasParaSheets.length - 1} barrios preparada.`);
+
+    try {
+        const auth = new google.auth.GoogleAuth({
+            keyFile: CREDENTIALS_PATH,
+            scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+        });
+        const client = await auth.getClient();
+        console.log('🔑 Autenticación con Google exitosa.');
+
+        await escribirEnGoogleSheets(client, filasParaSheets);
+    } catch (error) {
+        console.error('❌ Error en la autenticación con Google:', error.message);
+    }
+
+    console.log('🏁 Proceso finalizado.');
+}
+
+// --- 8. EJECUCIÓN ---
+main();
+X
+
