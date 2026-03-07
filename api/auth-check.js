@@ -22,6 +22,7 @@ module.exports = async (req, res) => {
     const email   = payload.email;
 
     // Lista de admins en variable de entorno, separados por coma
+    console.log('ADMIN_EMAILS:', process.env.ADMIN_EMAILS);
     const admins = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase());
     if (!admins.includes(email.toLowerCase())) {
       return res.status(403).json({ ok: false, error: `${email} no está autorizado` });
