@@ -1,355 +1,432 @@
 <!DOCTYPE html>
-<html class="light" lang="es">
+<html lang="es">
 <head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>Admin | Farma Expertos</title>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Admin · Farma Expertos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <script src="https://accounts.google.com/gsi/client" async></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script id="tailwind-config">
-  tailwind.config = {
-    darkMode: "class",
-    theme: {
-      extend: {
-        colors: {
-          "primary": "#ec5b13",
-          "background-light": "#f8f6f6",
-          "background-dark": "#221610",
-        },
-        fontFamily: { "display": ["Public Sans"] },
-        borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
-      },
-    },
-  }
-</script>
 <style>
-  /* Login background pattern — doc 1 exacto */
-  .bg-medical-pattern {
-    background-color: #f8fafc;
-    background-image: radial-gradient(#cbd5e1 0.5px, transparent 0.5px), radial-gradient(#cbd5e1 0.5px, #f8fafc 0.5px);
-    background-size: 20px 20px;
-    background-position: 0 0, 10px 10px;
-  }
-  body { font-family: 'Public Sans', sans-serif; }
-  /* Toast */
-  .toast {
-    position:fixed;bottom:20px;right:20px;z-index:9999;
-    padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;
-    transform:translateY(60px);opacity:0;transition:.3s;pointer-events:none;
-    max-width:300px;box-shadow:0 8px 24px rgba(0,0,0,.15);
-  }
-  .toast.ok  { background:#052e16;color:#86efac;border:1px solid #166534; }
-  .toast.err { background:#450a0a;color:#fca5a5;border:1px solid #7f1d1d; }
-  .toast.show { transform:translateY(0);opacity:1; }
-  @keyframes pop { from{transform:scale(.95);opacity:0} to{transform:scale(1);opacity:1} }
-  .animate-pop { animation: pop .2s ease; }
+:root {
+  --bg:#f0f4f0; --s:#fff; --s2:#f5f8f5; --s3:#e8f0e8;
+  --border:#d4e0d4; --accent:#16a34a; --a2:#0d9488;
+  --danger:#dc2626; --warn:#b45309;
+  --text:#0f1f0f; --muted:#5a7060;
+  --r:12px;
+  --sh:0 1px 4px rgba(0,40,0,.07),0 4px 20px rgba(0,40,0,.05);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;min-height:100vh}
+
+/* ═══ LOGIN ═══ */
+#loginWrap {
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(145deg,#0a1a0e 0%,#0f2d20 40%,#061018 100%);
+  position:relative; overflow:hidden;
+}
+#loginWrap::before {
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:
+    radial-gradient(ellipse 600px 500px at 20% 30%, rgba(22,163,74,.18) 0%, transparent 60%),
+    radial-gradient(ellipse 500px 400px at 80% 70%, rgba(13,148,136,.12) 0%, transparent 60%);
+}
+/* Decorative cross pattern */
+#loginWrap::after {
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background-image:
+    linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+  background-size:48px 48px;
+}
+.login-box {
+  position:relative; z-index:1;
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.1);
+  backdrop-filter:blur(28px);
+  border-radius:24px; padding:52px 44px;
+  width:min(420px,92vw); text-align:center;
+}
+.lbox-cross {
+  width:72px; height:72px; margin:0 auto 24px;
+  border-radius:20px; font-size:36px;
+  background:linear-gradient(135deg,#16a34a,#0d9488);
+  display:grid; place-items:center;
+  box-shadow:0 0 40px rgba(22,163,74,.35);
+}
+.lbox-title {
+  font-family:'Fraunces',serif; font-size:28px; font-weight:900;
+  color:#fff; margin-bottom:4px;
+}
+.lbox-sub { font-size:14px; color:rgba(255,255,255,.45); margin-bottom:40px }
+.g-btn {
+  width:100%; padding:15px 20px;
+  display:flex; align-items:center; justify-content:center; gap:12px;
+  background:#fff; border:none; border-radius:12px;
+  font-size:15px; font-weight:700; color:#1a1a1a; cursor:pointer;
+  transition:.2s; font-family:'Plus Jakarta Sans',sans-serif;
+}
+.g-btn:hover { transform:translateY(-2px); box-shadow:0 10px 28px rgba(0,0,0,.3) }
+.g-btn img { width:22px }
+.lbox-note { font-size:11px; color:rgba(255,255,255,.3); margin-top:20px; line-height:1.5 }
+
+/* ═══ APP ═══ */
+#app { display:none }
+.wrap { display:flex; min-height:100vh }
+
+/* SIDEBAR */
+.sb {
+  width:230px; flex-shrink:0;
+  background:var(--s); border-right:1px solid var(--border);
+  display:flex; flex-direction:column;
+  position:sticky; top:0; height:100vh; overflow-y:auto;
+}
+.sb-top {
+  padding:18px 16px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:10px;
+}
+.sb-icon {
+  width:38px; height:38px; border-radius:10px; flex-shrink:0;
+  background:linear-gradient(135deg,#16a34a,#0d9488);
+  display:grid; place-items:center; font-size:20px;
+}
+.sb-name { font-family:'Fraunces',serif; font-size:13px; font-weight:700; line-height:1.2 }
+.sb-tag  { font-size:10px; color:var(--accent); letter-spacing:1.5px; text-transform:uppercase }
+
+.sb-nav { flex:1; padding:10px 8px }
+.nv {
+  display:flex; align-items:center; gap:9px;
+  padding:10px 10px; border-radius:8px;
+  font-size:13px; font-weight:600; color:var(--muted); cursor:pointer;
+  transition:.15s; margin-bottom:2px;
+}
+.nv:hover { background:var(--s2); color:var(--text) }
+.nv.on { background:rgba(22,163,74,.1); color:var(--accent) }
+.nv-ico { font-size:17px; width:22px; text-align:center }
+
+.sb-bot {
+  padding:14px; border-top:1px solid var(--border);
+  display:flex; align-items:center; gap:10px;
+}
+.av { width:36px; height:36px; border-radius:50%; object-fit:cover; background:var(--s3); flex-shrink:0 }
+.av-info { flex:1; min-width:0 }
+.av-nm  { font-size:12px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.av-rl  { font-size:10px; color:var(--muted) }
+.sign-out {
+  background:none; border:none; color:var(--muted); cursor:pointer;
+  font-size:18px; padding:4px; transition:.15s; flex-shrink:0;
+}
+.sign-out:hover { color:var(--danger) }
+
+/* MAIN */
+.main { flex:1; display:flex; flex-direction:column; min-width:0 }
+.tbar {
+  padding:14px 24px; background:var(--s); border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  position:sticky; top:0; z-index:10;
+}
+.pg-title { font-family:'Fraunces',serif; font-size:22px; font-weight:900 }
+.tbar-acts { display:flex; gap:8px }
+
+.content { padding:24px; flex:1 }
+
+/* STATS ROW */
+.kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:14px; margin-bottom:24px }
+.kpi {
+  background:var(--s); border:1px solid var(--border); border-radius:var(--r);
+  padding:18px 20px; position:relative; overflow:hidden;
+}
+.kpi::before {
+  content:attr(data-ico); position:absolute; right:14px; bottom:10px;
+  font-size:36px; opacity:.12;
+}
+.kpi-lbl { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--muted) }
+.kpi-val { font-family:'Fraunces',serif; font-size:30px; font-weight:900; margin-top:4px }
+.kpi-sub { font-size:11px; color:var(--muted); margin-top:2px }
+
+/* TOOLBAR */
+.toolbar {
+  background:var(--s); border:1px solid var(--border); border-radius:var(--r);
+  padding:14px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+  margin-bottom:16px;
+}
+.sf { position:relative; flex:1; min-width:180px }
+.sf input {
+  width:100%; padding:9px 12px 9px 36px;
+  background:var(--s2); border:1.5px solid var(--border);
+  border-radius:8px; font-size:13px; color:var(--text);
+  font-family:'Plus Jakarta Sans',sans-serif; outline:none; transition:.2s;
+}
+.sf input:focus { border-color:var(--accent) }
+.sf::before { content:'🔍'; position:absolute; left:10px; top:50%; transform:translateY(-50%); font-size:13px; pointer-events:none }
+.sel {
+  padding:9px 12px; background:var(--s2); border:1.5px solid var(--border);
+  border-radius:8px; font-size:13px; color:var(--text);
+  font-family:'Plus Jakarta Sans',sans-serif; cursor:pointer; outline:none; transition:.2s;
+}
+.sel:focus { border-color:var(--accent) }
+.btn {
+  padding:9px 16px; border-radius:8px; border:none;
+  font-size:13px; font-weight:700; font-family:'Plus Jakarta Sans',sans-serif;
+  cursor:pointer; transition:.15s; display:flex; align-items:center; gap:6px; white-space:nowrap;
+}
+.btn-g  { background:var(--accent); color:#fff }
+.btn-g:hover { background:#15803d }
+.btn-b  { background:#0284c7; color:#fff }
+.btn-b:hover { background:#0369a1 }
+.btn-o  { background:var(--s); border:1.5px solid var(--border); color:var(--text) }
+.btn-o:hover { border-color:var(--accent); color:var(--accent) }
+
+/* TABLE */
+.tbl-wrap {
+  background:var(--s); border:1px solid var(--border);
+  border-radius:var(--r); overflow:hidden;
+}
+.tbl-scroll { overflow-x:auto }
+table { width:100%; border-collapse:collapse; font-size:13px }
+thead th {
+  background:var(--s2); padding:11px 16px; text-align:left;
+  font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px;
+  color:var(--muted); border-bottom:1px solid var(--border);
+  cursor:pointer; user-select:none; white-space:nowrap;
+}
+thead th:hover { color:var(--text) }
+thead th.asc::after  { content:' ↑' }
+thead th.desc::after { content:' ↓' }
+tbody tr { border-bottom:1px solid var(--border); transition:.1s }
+tbody tr:last-child  { border-bottom:none }
+tbody tr:hover { background:var(--s2) }
+td { padding:11px 16px; vertical-align:middle }
+.td-nm { font-weight:600; max-width:280px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.td-lab { color:var(--muted); font-size:12px }
+.td-p { font-weight:700; color:var(--accent) }
+.td-ps { font-size:11px; color:var(--muted) }
+.pill {
+  display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600;
+  background:rgba(22,163,74,.1); color:var(--accent);
+}
+
+.pag {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 16px; border-top:1px solid var(--border);
+  font-size:12px; color:var(--muted);
+}
+.pg-btns { display:flex; gap:4px }
+.pg-btn {
+  width:30px; height:30px; border-radius:6px;
+  background:var(--s); border:1px solid var(--border);
+  cursor:pointer; font-size:12px; display:grid; place-items:center; transition:.15s;
+}
+.pg-btn:hover { border-color:var(--accent); color:var(--accent) }
+.pg-btn.cur { background:var(--accent); color:#fff; border-color:var(--accent) }
+
+/* ═══ IMPORT MODAL ═══ */
+.modal-bg {
+  position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:300;
+  display:none; align-items:center; justify-content:center;
+  backdrop-filter:blur(4px);
+}
+.modal-bg.open { display:flex }
+.modal {
+  background:var(--s); border-radius:20px; padding:36px;
+  width:min(520px,92vw); box-shadow:0 24px 64px rgba(0,0,0,.18);
+  animation:pop .2s ease;
+}
+@keyframes pop { from{transform:scale(.95);opacity:0} to{transform:scale(1);opacity:1} }
+.modal-h { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:6px }
+.modal-h h3 { font-family:'Fraunces',serif; font-size:22px; font-weight:900 }
+.modal-close { background:none; border:none; font-size:22px; color:var(--muted); cursor:pointer }
+.modal p { font-size:13px; color:var(--muted); margin-bottom:24px; line-height:1.5 }
+.drop {
+  border:2px dashed var(--border); border-radius:12px; padding:44px 20px;
+  text-align:center; cursor:pointer; transition:.2s;
+}
+.drop:hover,.drop.drag { border-color:var(--accent); background:rgba(22,163,74,.04) }
+.drop-ico { font-size:44px; margin-bottom:10px }
+.drop p { font-size:14px; color:var(--muted) }
+.drop strong { color:var(--accent); cursor:pointer }
+#fIn { display:none }
+.imp-prev {
+  margin-top:14px; background:var(--s2); border:1px solid var(--border);
+  border-radius:8px; padding:12px 16px; font-size:13px; display:none; color:var(--text);
+}
+.modal-acts { display:flex; gap:10px; margin-top:20px; justify-content:flex-end }
+
+/* TOAST */
+.toast {
+  position:fixed; bottom:20px; right:20px; z-index:500;
+  padding:12px 20px; border-radius:10px; font-size:13px; font-weight:600;
+  transform:translateY(60px); opacity:0; transition:.3s; pointer-events:none;
+  max-width:300px; box-shadow:0 8px 24px rgba(0,0,0,.15);
+}
+.toast.ok  { background:#052e16; color:#86efac; border:1px solid #166534 }
+.toast.err { background:#450a0a; color:#fca5a5; border:1px solid #7f1d1d }
+.toast.show { transform:translateY(0); opacity:1 }
+
+@media(max-width:700px){
+  .sb { display:none }
+  .kpis { grid-template-columns:repeat(2,1fr) }
+}
 </style>
 </head>
-<body class="bg-medical-pattern min-h-screen font-display text-slate-900">
+<body>
 
-<!-- ════════════════════════════════════════
-     LOGIN  —  doc 1 exacto
-     Solo se reemplaza el <form> por botón Google
-════════════════════════════════════════ -->
-<div id="loginWrap" class="bg-medical-pattern min-h-screen flex items-center justify-center p-4">
-  <main class="w-full max-w-md relative">
-
-    <!-- Branding (doc 1) -->
-    <div class="text-center mb-8">
-      <div class="inline-flex items-center justify-center w-20 h-20 bg-white rounded-2xl shadow-sm border border-slate-100 mb-4 overflow-hidden">
-        <img alt="Pharmacy Logo" class="w-full h-full object-cover"
-          src="https://lh3.googleusercontent.com/aida-public/AB6AXuDeIaw1blSQWSrmsZ8yShEm2KtAERDXAHIVeX7RkPf2fpOsMzGdwgwEYs5dtIg60atwNx91bs5e6h1GrukKZJklr8GukxNbREpOCPE7eCfhtCwyk4b60_j4uSxZz7d-kk8OFrcz3aJie1Fuap7K0FnEo9Nct55leEUjcbnL3330HW5yh_m-SYX4xoaWD_PToon4_d5Q3ECMFyZhHX4zyIWzUfQp_wFkaWhCF6-Wwdz38FjytdbPpscTp81YHlDSc3rF9gY6gVDQs3E"/>
-      </div>
-      <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Pharmacy Admin</h1>
-      <p class="text-slate-500 text-sm mt-1">Panel de Administración · Farma Expertos</p>
-    </div>
-
-    <!-- Card (doc 1) -->
-    <section class="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-      <div class="h-1.5 w-full bg-blue-900"></div>
-      <div class="p-8 md:p-10">
-        <!-- Google sign-in button (reemplaza form usuario/pass) -->
-        <button onclick="doLogin()"
-          class="w-full flex justify-center items-center gap-3 py-3 px-4 border border-slate-300 rounded-lg shadow-sm text-sm font-bold text-slate-700 bg-white hover:border-blue-900 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-900 transition-all duration-200">
-          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5 h-5" alt="Google"/>
-          Continuar con Google
-        </button>
-        <p class="text-xs text-slate-400 text-center mt-5 leading-relaxed">
-          Solo correos autorizados por el administrador<br/>pueden acceder a este panel.
-        </p>
-      </div>
-      <!-- Footer card (doc 1) -->
-      <div class="bg-slate-50 px-8 py-4 border-t border-slate-100 flex items-center justify-center space-x-2 text-slate-400">
-        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
-        </svg>
-        <span class="text-xs uppercase font-medium tracking-widest">Secure Admin Access</span>
-      </div>
-    </section>
-
-    <footer class="mt-8 text-center text-slate-400 text-xs">
-      © 2026 Farma Expertos · Copacabana, Antioquia.<br/>Authorized personnel only.
-    </footer>
-  </main>
+<!-- ═══ LOGIN ═══ -->
+<div id="loginWrap">
+  <div class="login-box">
+    <div class="lbox-cross">💊</div>
+    <div class="lbox-title">Panel Admin</div>
+    <div class="lbox-sub">Droguería Farma Expertos · Copacabana</div>
+    <button class="g-btn" onclick="doLogin()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G"/>
+      Continuar con Google
+    </button>
+    <div class="lbox-note">Solo correos autorizados por el administrador<br>pueden acceder a este panel.</div>
+  </div>
 </div>
 
-
-<!-- ════════════════════════════════════════
-     APP  —  doc 2 exacto con lógica real
-════════════════════════════════════════ -->
-<div id="app" style="display:none"
-  class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100">
-<div class="flex h-screen overflow-hidden">
-
-  <!-- SIDEBAR (doc 2 exacto) -->
-  <aside class="w-64 bg-background-dark text-slate-100 flex flex-col shrink-0 border-r border-slate-800">
-    <div class="p-6 flex items-center gap-3">
-      <div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
-        <span class="text-white font-bold text-lg">💊</span>
-      </div>
-      <div class="flex flex-col">
-        <h1 class="text-lg font-bold leading-tight">Farma Expertos</h1>
-        <p class="text-xs text-slate-400">Pharmacy Admin</p>
-      </div>
-    </div>
-
-    <nav class="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
-      <button id="nv-inv" onclick="navTo('inv',this)"
-        class="nv w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-primary text-white shadow-lg shadow-primary/20 transition-colors text-sm font-medium">
-        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
-        </svg>
-        Inventario
-      </button>
-      <button id="nv-ped" onclick="navTo('ped',this)"
-        class="nv w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-400 transition-colors text-sm font-medium">
-        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
-        </svg>
-        Pedidos web
-      </button>
-    </nav>
-
-    <div class="p-4 border-t border-slate-800 flex items-center gap-3">
-      <img id="avImg" class="w-9 h-9 rounded-full object-cover border-2 border-primary shrink-0" src="" alt=""/>
-      <div class="flex-1 min-w-0">
-        <div id="avNm" class="text-sm font-bold truncate">—</div>
-        <div class="text-xs text-slate-400">Administrador</div>
-      </div>
-      <button onclick="logout()"
-        class="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-red-500/10 hover:text-red-500 text-slate-400 transition-colors text-sm font-medium">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
-        </svg>
-      </button>
-    </div>
-  </aside>
-
-  <!-- MAIN -->
-  <main class="flex-1 flex flex-col overflow-hidden">
-
-    <!-- ══ INVENTARIO ══ -->
-    <div id="pgInv" class="flex flex-col flex-1 overflow-hidden">
-
-      <!-- Header (doc 2 exacto) -->
-      <header class="h-20 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 shrink-0">
-        <div class="flex items-center gap-4">
-          <h2 class="text-2xl font-bold tracking-tight">Inventory Management</h2>
+<!-- ═══ APP ═══ -->
+<div id="app">
+  <div class="wrap">
+    <!-- sidebar -->
+    <aside class="sb">
+      <div class="sb-top">
+        <div class="sb-icon">💊</div>
+        <div>
+          <div class="sb-name">Farma Expertos</div>
+          <div class="sb-tag">Admin</div>
         </div>
-        <div class="flex items-center gap-6">
-          <div class="relative group">
-            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
-            </svg>
-            <input id="srch" oninput="filt()"
-              class="pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-xl w-64 focus:ring-2 focus:ring-primary text-sm transition-all font-display"
-              placeholder="Search medicines..." type="text"/>
-          </div>
-          <!-- Import Excel (extra, no en doc 2 original) -->
-          <button onclick="openImp()"
-            class="bg-blue-700 hover:bg-blue-800 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-transform active:scale-95 shadow-lg">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
-            </svg>
-            Importar Excel
-          </button>
-          <!-- Add / Actualizar (doc 2 style) -->
-          <button onclick="reload()"
-            class="bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-transform active:scale-95 shadow-lg shadow-primary/20">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
-            </svg>
-            Actualizar
-          </button>
-          <div class="h-10 w-10 rounded-full border-2 border-primary overflow-hidden">
-            <img id="avImgTop" class="w-full h-full object-cover" src="" alt=""/>
+      </div>
+      <nav class="sb-nav">
+        <div class="nv on" id="nv-inv" onclick="navTo('inv',this)">
+          <span class="nv-ico">📦</span> Inventario
+        </div>
+        <div class="nv" id="nv-ped" onclick="navTo('ped',this)">
+          <span class="nv-ico">🛒</span> Pedidos web
+        </div>
+      </nav>
+      <div class="sb-bot">
+        <img class="av" id="avImg" src="" alt=""/>
+        <div class="av-info">
+          <div class="av-nm" id="avNm">—</div>
+          <div class="av-rl">Administrador</div>
+        </div>
+        <button class="sign-out" onclick="logout()" title="Salir">⏻</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <!-- INVENTARIO -->
+      <div id="pgInv">
+        <div class="tbar">
+          <span class="pg-title">📦 Inventario Farma Expertos</span>
+          <div class="tbar-acts">
+            <button class="btn btn-b" onclick="openImp()">⬆ Importar Excel</button>
+            <button class="btn btn-g" onclick="reload()">↻ Actualizar</button>
           </div>
         </div>
-      </header>
-
-      <!-- Scrollable content (doc 2 exacto) -->
-      <div class="flex-1 overflow-y-auto p-8 bg-background-light dark:bg-background-dark">
-
-        <!-- Summary Cards (doc 2) -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          <div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col gap-2">
-            <div class="flex justify-between items-start">
-              <span class="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-lg">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/></svg>
-              </span>
-              <span class="text-xs font-bold text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-full">+2.5%</span>
-            </div>
-            <p class="text-slate-500 dark:text-slate-400 text-sm font-medium mt-2">Total Products</p>
-            <h3 class="text-2xl font-bold" id="kTotal">—</h3>
+        <div class="content">
+          <div class="kpis">
+            <div class="kpi" data-ico="📦"><div class="kpi-lbl">Total productos</div>
+              <div class="kpi-val" id="kTotal">—</div></div>
+            <div class="kpi" data-ico="🏭"><div class="kpi-lbl">Laboratorios</div>
+              <div class="kpi-val" id="kLabs">—</div></div>
+            <div class="kpi" data-ico="💰"><div class="kpi-lbl">Con precio unid.</div>
+              <div class="kpi-val" id="kPr">—</div></div>
           </div>
-          <div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col gap-2">
-            <div class="flex justify-between items-start">
-              <span class="p-2 bg-orange-50 dark:bg-orange-900/20 text-orange-600 rounded-lg">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/></svg>
-              </span>
-              <span class="text-xs font-bold text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-full">Labs</span>
+          <div class="toolbar">
+            <div class="sf">
+              <input type="text" id="srch" placeholder="Buscar producto o laboratorio…" oninput="filt()"/>
             </div>
-            <p class="text-slate-500 dark:text-slate-400 text-sm font-medium mt-2">Laboratorios</p>
-            <h3 class="text-2xl font-bold" id="kLabs">—</h3>
-          </div>
-          <div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col gap-2">
-            <div class="flex justify-between items-start">
-              <span class="p-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 rounded-lg">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/></svg>
-              </span>
-              <span class="text-xs font-bold text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-full">+5.8%</span>
-            </div>
-            <p class="text-slate-500 dark:text-slate-400 text-sm font-medium mt-2">Con precio unitario</p>
-            <h3 class="text-2xl font-bold" id="kPr">—</h3>
-          </div>
-        </div>
-
-        <!-- Filters (doc 2 exacto) -->
-        <div class="flex flex-wrap gap-4 mb-6 items-center">
-          <div class="relative">
-            <select id="selLab" onchange="filt()"
-              class="appearance-none bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 pr-10 text-sm font-medium focus:ring-2 focus:ring-primary focus:border-primary outline-none min-w-[160px] font-display">
-              <option value="">All Laboratories</option>
+            <select class="sel" id="selLab" onchange="filt()">
+              <option value="">Todos los laboratorios</option>
             </select>
-            <svg class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/></svg>
-          </div>
-          <div class="relative">
-            <select id="selSort" onchange="filt()"
-              class="appearance-none bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 pr-10 text-sm font-medium focus:ring-2 focus:ring-primary focus:border-primary outline-none min-w-[160px] font-display">
+            <select class="sel" id="selSort" onchange="filt()">
               <option value="desc">Nombre A→Z</option>
               <option value="lab">Laboratorio A→Z</option>
               <option value="pa">Precio unitario ↑</option>
               <option value="pd">Precio unitario ↓</option>
             </select>
-            <svg class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/></svg>
           </div>
-          <button onclick="document.getElementById('srch').value='';document.getElementById('selLab').value='';filt()"
-            class="text-primary text-sm font-semibold ml-auto hover:underline">Reset Filters</button>
-        </div>
-
-        <!-- Table (doc 2 exacto) -->
-        <div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
-              <thead>
-                <tr class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
-                  <th onclick="thSort('descripcion',this)" class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-800">Descripción</th>
-                  <th onclick="thSort('laboratorio',this)" class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-800">Laboratorio</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Unidad</th>
-                  <th onclick="thSort('_p',this)" class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-800">Precio caja</th>
-                  <th onclick="thSort('_pu',this)" class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-800">Precio unitario</th>
-                </tr>
-              </thead>
-              <tbody id="tbody" class="divide-y divide-slate-200 dark:divide-slate-800">
-                <tr><td colspan="5" class="px-6 py-16 text-center text-slate-400">
-                  <div class="text-4xl mb-3">⏳</div>Cargando inventario…
-                </td></tr>
-              </tbody>
-            </table>
-          </div>
-          <!-- Pagination (doc 2 exacto) -->
-          <div class="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between border-t border-slate-200 dark:border-slate-800">
-            <span id="pagInfo" class="text-xs text-slate-500 font-medium">Showing — results</span>
-            <div id="pgBtns" class="flex gap-1"></div>
+          <div class="tbl-wrap">
+            <div class="tbl-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th id="th-desc" onclick="thSort('descripcion',this)">Descripción</th>
+                    <th id="th-lab"  onclick="thSort('laboratorio',this)">Laboratorio</th>
+                    <th>Unidad</th>
+                    <th id="th-p"   onclick="thSort('_p',this)">Precio caja</th>
+                    <th id="th-pu"  onclick="thSort('_pu',this)">Precio unitario</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody">
+                  <tr><td colspan="5" style="text-align:center;padding:48px;color:var(--muted)">
+                    <div style="font-size:36px;margin-bottom:10px">⏳</div>Cargando inventario…
+                  </td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="pag">
+              <span id="pagInfo">—</span>
+              <div class="pg-btns" id="pgBtns"></div>
+            </div>
           </div>
         </div>
+      </div><!-- /pgInv -->
 
-      </div>
-    </div><!-- /pgInv -->
-
-    <!-- ══ PEDIDOS ══ -->
-    <div id="pgPed" style="display:none" class="flex flex-col flex-1 overflow-hidden">
-      <header class="h-20 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 shrink-0">
-        <h2 class="text-2xl font-bold tracking-tight">Pedidos Web</h2>
-        <button onclick="loadPedidos()"
-          class="bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-transform active:scale-95 shadow-lg shadow-primary/20">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/></svg>
-          Actualizar
-        </button>
-      </header>
-      <div class="flex-1 overflow-y-auto p-8 bg-background-light dark:bg-background-dark">
-        <div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
-              <thead>
-                <tr class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">ID</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Cliente</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Teléfono</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Productos</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Total</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Hora</th>
-                </tr>
-              </thead>
-              <tbody id="pedTbody" class="divide-y divide-slate-200 dark:divide-slate-800">
-                <tr><td colspan="7" class="px-6 py-16 text-center text-slate-400">Cargando pedidos…</td></tr>
-              </tbody>
-            </table>
+      <!-- PEDIDOS WEB -->
+      <div id="pgPed" style="display:none">
+        <div class="tbar">
+          <span class="pg-title">🛒 Pedidos web</span>
+          <button class="btn btn-g" onclick="loadPedidos()">↻ Actualizar</button>
+        </div>
+        <div class="content">
+          <div class="tbl-wrap">
+            <div class="tbl-scroll">
+              <table>
+                <thead><tr>
+                  <th>ID</th><th>Cliente</th><th>Teléfono</th>
+                  <th>Productos</th><th>Total</th><th>Estado</th><th>Hora</th>
+                </tr></thead>
+                <tbody id="pedTbody">
+                  <tr><td colspan="7" style="text-align:center;padding:48px;color:var(--muted)">
+                    Cargando pedidos…
+                  </td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
-    </div><!-- /pgPed -->
-
-  </main>
+    </main>
+  </div>
 </div>
-</div><!-- /app -->
 
-
-<!-- ══ MODAL IMPORTAR EXCEL ══ -->
-<div id="impModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
-  <div class="bg-white rounded-2xl shadow-2xl p-9 w-full max-w-lg animate-pop">
-    <div class="flex items-start justify-between mb-2">
-      <h3 class="text-xl font-black">⬆ Importar stock</h3>
-      <button onclick="closeImp()" class="text-slate-400 hover:text-slate-600 text-2xl leading-none font-bold">✕</button>
+<!-- IMPORT MODAL -->
+<div class="modal-bg" id="impModal">
+  <div class="modal">
+    <div class="modal-h">
+      <h3>⬆ Importar stock</h3>
+      <button class="modal-close" onclick="closeImp()">✕</button>
     </div>
-    <p class="text-sm text-slate-500 mb-6 leading-relaxed">
-      Sube el archivo Excel de tu sistema.<br/>
-      Columnas requeridas: <strong>Descripción · Laboratorio · Unidad · Precio · Precio Unitario</strong>
-    </p>
-    <div id="dropZ"
-      onclick="document.getElementById('fIn').click()"
-      ondragover="event.preventDefault();this.classList.add('border-primary','bg-orange-50')"
-      ondragleave="this.classList.remove('border-primary','bg-orange-50')"
-      ondrop="onDrop(event)"
-      class="border-2 border-dashed border-slate-200 rounded-xl p-12 text-center cursor-pointer hover:border-primary hover:bg-orange-50/40 transition-colors">
-      <div class="text-5xl mb-3">📂</div>
-      <p class="text-sm text-slate-500">Arrastra aquí o <strong class="text-primary cursor-pointer">selecciona el archivo</strong></p>
-      <p class="text-xs text-slate-400 mt-1">.xlsx · .xls</p>
+    <p>Sube el archivo Excel descargado de tu sistema.<br>
+       Columnas requeridas: <strong>Descripción · Laboratorio · Unidad · Precio · Precio Unitario</strong></p>
+    <div class="drop" id="dropZ"
+         onclick="document.getElementById('fIn').click()"
+         ondragover="event.preventDefault();this.classList.add('drag')"
+         ondragleave="this.classList.remove('drag')"
+         ondrop="onDrop(event)">
+      <div class="drop-ico">📂</div>
+      <p>Arrastra aquí o <strong>selecciona el archivo</strong></p>
+      <p style="font-size:11px;margin-top:4px">.xlsx · .xls</p>
     </div>
-    <input type="file" id="fIn" accept=".xlsx,.xls" class="hidden" onchange="onFile(this.files[0])"/>
-    <div id="impPrev" class="hidden mt-4 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 text-sm text-emerald-700"></div>
-    <div class="flex gap-3 mt-6 justify-end">
-      <button onclick="closeImp()"
-        class="px-5 py-2.5 rounded-xl border border-slate-200 text-sm font-bold hover:border-primary hover:text-primary transition-colors bg-white">
-        Cancelar
-      </button>
-      <button id="btnImp" onclick="doImport()" disabled
-        class="bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-800 transition-colors">
-        Subir a Sheets
-      </button>
+    <input type="file" id="fIn" accept=".xlsx,.xls" onchange="onFile(this.files[0])"/>
+    <div class="imp-prev" id="impPrev"></div>
+    <div class="modal-acts">
+      <button class="btn btn-o" onclick="closeImp()">Cancelar</button>
+      <button class="btn btn-b" id="btnImp" onclick="doImport()" disabled>Subir a Sheets</button>
     </div>
   </div>
 </div>
@@ -357,234 +434,216 @@
 <div class="toast" id="toast"></div>
 
 <script>
-/* ════════════════════════════════════
-   CONFIG  —  lógica original intacta
-════════════════════════════════════ */
+/* ═══ CONFIG — CAMBIA ESTOS VALORES ═══ */
 const GOOGLE_CLIENT_ID = '699856885526-55fqgn6qdr116rige5dcrsg4f3jdu1kp.apps.googleusercontent.com';
-const TIENDA    = 'EXPERTOS';
-const API_PRODS = `/api/productos?tienda=${TIENDA}&all=1`;
-const API_IMP   = `/api/import-stock`;
-const API_CHECK = `/api/auth-check`;
-const API_PEDS  = `/api/pedidos?tienda=${TIENDA}`;
+const TIENDA  = 'EXPERTOS';
+/* ═══════════════════════════════════ */
+
+const API_PRODS  = `/api/productos?tienda=${TIENDA}&all=1`;
+const API_IMP    = `/api/import-stock`;
+const API_CHECK  = `/api/auth-check`;
+const API_PEDS   = `/api/pedidos?tienda=${TIENDA}`;
 
 let token='', prods=[], shown=[], impRows=[];
 let curPage=1; const PER=50;
 let sortK='descripcion', sortAsc=true;
 
-/* ── GOOGLE AUTH (original exacto) ── */
+/* ── GOOGLE AUTH ────────────────────── */
 window.onload = () => {
-  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogle });
+  if (!GOOGLE_CLIENT_ID.includes('TU_CLIENT')) {
+    google.accounts.id.initialize({ client_id:GOOGLE_CLIENT_ID, callback:onGoogle });
+    google.accounts.id.renderButton(document.querySelector('.g-btn'), {});
+  }
 };
 function doLogin() {
-  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogle });
+  google.accounts.id.initialize({ client_id:GOOGLE_CLIENT_ID, callback:onGoogle });
   google.accounts.id.prompt();
 }
 async function onGoogle(resp) {
   try {
     const r = await fetch(API_CHECK, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ credential: resp.credential, tienda: TIENDA })
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ credential:resp.credential, tienda:TIENDA })
     });
     const d = await r.json();
-    if (!d.ok) { toastMsg('❌ ' + (d.error || 'Sin acceso'), 'err'); return; }
+    if (!d.ok) { toastMsg('❌ '+(d.error||'Sin acceso'), 'err'); return; }
     token = resp.credential;
     const pl = JSON.parse(atob(resp.credential.split('.')[1]));
-    document.getElementById('avNm').textContent    = pl.name;
-    document.getElementById('avImg').src           = pl.picture;
-    document.getElementById('avImgTop').src        = pl.picture;
+    document.getElementById('avNm').textContent = pl.name;
+    document.getElementById('avImg').src = pl.picture;
     document.getElementById('loginWrap').style.display = 'none';
-    document.getElementById('app').style.display       = 'block';
+    document.getElementById('app').style.display = 'block';
     loadProds();
   } catch(e) { toastMsg('❌ Error de autenticación', 'err'); }
 }
 function logout() {
   token = '';
   document.getElementById('loginWrap').style.display = 'flex';
-  document.getElementById('app').style.display       = 'none';
+  document.getElementById('app').style.display = 'none';
   google.accounts.id.disableAutoSelect();
 }
 
-/* ── NAV ── */
+/* ── NAV ────────────────────────────── */
 function navTo(page, el) {
-  document.querySelectorAll('.nv').forEach(n => {
-    n.classList.remove('bg-primary','text-white','shadow-lg','shadow-primary/20');
-    n.classList.add('hover:bg-slate-800','text-slate-400');
-  });
-  el.classList.remove('hover:bg-slate-800','text-slate-400');
-  el.classList.add('bg-primary','text-white','shadow-lg','shadow-primary/20');
-  document.getElementById('pgInv').style.display = page === 'inv' ? 'flex' : 'none';
-  document.getElementById('pgPed').style.display = page === 'ped' ? 'flex' : 'none';
-  if (page === 'ped') loadPedidos();
+  document.querySelectorAll('.nv').forEach(n=>n.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('pgInv').style.display = page==='inv' ? 'block' : 'none';
+  document.getElementById('pgPed').style.display = page==='ped' ? 'block' : 'none';
+  if (page==='ped') loadPedidos();
 }
 
-/* ── PRODUCTOS ── */
+/* ── PRODUCTOS ──────────────────────── */
 async function loadProds() {
   try {
-    const r = await fetch(API_PRODS, { headers: { Authorization: 'Bearer ' + token } });
+    const r = await fetch(API_PRODS, { headers:{Authorization:'Bearer '+token} });
     prods = await r.json();
     shown = [...prods];
-    buildLabSel(); kpis(); filt();
-  } catch(e) { toastMsg('❌ Error cargando productos', 'err'); }
+    buildLabSel();
+    kpis();
+    filt();
+  } catch(e) { toastMsg('❌ Error cargando productos','err') }
 }
-function reload() { loadProds(); toastMsg('🔄 Actualizando…', 'ok'); }
+function reload() { loadProds(); toastMsg('🔄 Actualizando…','ok') }
 
 function buildLabSel() {
-  const labs = [...new Set(prods.map(p => p.laboratorio).filter(Boolean))].sort();
-  const sel  = document.getElementById('selLab');
-  sel.innerHTML = '<option value="">All Laboratories</option>' +
-    labs.map(l => `<option>${l}</option>`).join('');
+  const labs = [...new Set(prods.map(p=>p.laboratorio).filter(Boolean))].sort();
+  const sel = document.getElementById('selLab');
+  sel.innerHTML = '<option value="">Todos los laboratorios</option>' +
+    labs.map(l=>`<option>${l}</option>`).join('');
 }
 
 function kpis() {
   document.getElementById('kTotal').textContent = prods.length.toLocaleString('es-CO');
   document.getElementById('kLabs').textContent  =
-    new Set(prods.map(p => p.laboratorio).filter(Boolean)).size;
+    new Set(prods.map(p=>p.laboratorio).filter(Boolean)).size;
   document.getElementById('kPr').textContent    =
-    prods.filter(p => p.precioUnitario).length.toLocaleString('es-CO');
+    prods.filter(p=>p.precioUnitario).length.toLocaleString('es-CO');
 }
 
-function pn(v) { return parseInt((v||'0').toString().replace(/[^0-9]/g,''))||0; }
-function cop(v) { const n=pn(v); return n ? '$'+n.toLocaleString('es-CO') : '—'; }
+function pn(v){ return parseInt((v||'0').toString().replace(/[^0-9]/g,''))||0 }
+function cop(v){ const n=pn(v); return n?'$'+n.toLocaleString('es-CO'):'—' }
 
 function filt() {
   const q   = document.getElementById('srch').value.toLowerCase().trim();
   const lab = document.getElementById('selLab').value;
   const s   = document.getElementById('selSort').value;
   shown = prods
-    .filter(p =>
-      (!q   || p.descripcion.toLowerCase().includes(q) || (p.laboratorio||'').toLowerCase().includes(q)) &&
-      (!lab || p.laboratorio === lab))
+    .filter(p => (!q  || p.descripcion.toLowerCase().includes(q) || (p.laboratorio||'').toLowerCase().includes(q))
+              && (!lab || p.laboratorio===lab))
     .map(p => ({ ...p, _p: pn(p.precio), _pu: pn(p.precioUnitario||p.precio) }));
-  shown.sort((a,b) => {
-    if (s === 'lab') return (a.laboratorio||'').localeCompare(b.laboratorio||'');
-    if (s === 'pa')  return a._pu - b._pu;
-    if (s === 'pd')  return b._pu - a._pu;
+  shown.sort((a,b)=>{
+    if (s==='lab') return (a.laboratorio||'').localeCompare(b.laboratorio||'');
+    if (s==='pa')  return a._pu - b._pu;
+    if (s==='pd')  return b._pu - a._pu;
     return a.descripcion.localeCompare(b.descripcion);
   });
-  curPage = 1; renderTbl();
+  curPage=1; renderTbl();
 }
 
 function thSort(col, th) {
-  if (sortK === col) sortAsc = !sortAsc; else { sortK = col; sortAsc = true; }
-  shown.sort((a,b) => {
+  if (sortK===col) sortAsc=!sortAsc; else { sortK=col; sortAsc=true; }
+  document.querySelectorAll('thead th').forEach(t=>t.className='');
+  th.className = sortAsc ? 'asc' : 'desc';
+  shown.sort((a,b)=>{
     const va=a[col]||'', vb=b[col]||'';
-    const r = typeof va === 'number' ? va-vb : va.toString().localeCompare(vb.toString());
+    const r = typeof va==='number' ? va-vb : va.toString().localeCompare(vb.toString());
     return sortAsc ? r : -r;
   });
-  curPage = 1; renderTbl();
+  curPage=1; renderTbl();
 }
 
 function renderTbl() {
-  const start = (curPage-1) * PER;
-  const page  = shown.slice(start, start+PER);
-  const body  = document.getElementById('tbody');
+  const start  = (curPage-1)*PER;
+  const page   = shown.slice(start, start+PER);
+  const body   = document.getElementById('tbody');
   if (!shown.length) {
-    body.innerHTML = `<tr><td colspan="5" class="px-6 py-16 text-center text-slate-400">
-      <div class="text-4xl mb-3">🔍</div>Sin resultados</td></tr>`;
-    document.getElementById('pagInfo').textContent = 'Showing 0 results';
-    document.getElementById('pgBtns').innerHTML = '';
+    body.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:48px;color:var(--muted)">
+      <div style="font-size:36px;margin-bottom:10px">🔍</div>Sin resultados</td></tr>`;
+    document.getElementById('pagInfo').textContent='0 productos';
+    document.getElementById('pgBtns').innerHTML='';
     return;
   }
-  body.innerHTML = page.map(p => `
-    <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
-      <td class="px-6 py-4">
-        <div class="text-sm font-bold max-w-xs truncate" title="${p.descripcion}">${p.descripcion}</div>
-        <div class="text-xs text-slate-500">${p.laboratorio||''}</div>
-      </td>
-      <td class="px-6 py-4 text-sm text-slate-500">${p.laboratorio||'—'}</td>
-      <td class="px-6 py-4">
-        <span class="px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full">${p.unidad||'—'}</span>
-      </td>
-      <td class="px-6 py-4 text-sm font-bold text-primary">${cop(p.precio)}</td>
-      <td class="px-6 py-4">
-        <span class="text-sm font-bold text-primary">${cop(p.precioUnitario)}</span>
-        ${p.precioUnitario && p.precio && p.precioUnitario !== p.precio
-          ? `<div class="text-xs text-slate-400">caja ${cop(p.precio)}</div>` : ''}
+  body.innerHTML = page.map(p=>`
+    <tr>
+      <td class="td-nm" title="${p.descripcion}">${p.descripcion}</td>
+      <td class="td-lab">${p.laboratorio||'—'}</td>
+      <td><span class="pill">${p.unidad||'—'}</span></td>
+      <td class="td-p">${cop(p.precio)}</td>
+      <td>
+        <div class="td-p">${cop(p.precioUnitario)}</div>
+        ${p.precioUnitario&&p.precio&&p.precioUnitario!==p.precio
+          ? `<div class="td-ps">caja ${cop(p.precio)}</div>` : ''}
       </td>
     </tr>`).join('');
 
   const tot   = shown.length;
-  const pages = Math.ceil(tot / PER);
+  const pages = Math.ceil(tot/PER);
   document.getElementById('pagInfo').textContent =
-    `Showing ${start+1}-${Math.min(start+PER,tot)} of ${tot.toLocaleString('es-CO')} results`;
+    `${start+1}–${Math.min(start+PER,tot)} de ${tot.toLocaleString('es-CO')} productos`;
 
   const pgB = document.getElementById('pgBtns');
   pgB.innerHTML = '';
-  const mkBtn = (label, disabled, onclick, active=false) => {
-    const b = document.createElement('button');
-    b.textContent = label; b.disabled = disabled; b.onclick = onclick;
-    b.className = active
-      ? 'w-8 h-8 flex items-center justify-center rounded-lg bg-primary text-white text-xs font-bold'
-      : 'w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 text-xs font-bold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed';
-    return b;
-  };
-  pgB.appendChild(mkBtn('‹', curPage===1, ()=>{curPage--;renderTbl();}));
-  const from=Math.max(1,curPage-2), to=Math.min(pages,from+4);
-  for(let i=from;i<=to;i++){
-    const pg=i;
-    pgB.appendChild(mkBtn(i, false, ()=>{curPage=pg;renderTbl();}, i===curPage));
+  let from=Math.max(1,curPage-2), to=Math.min(pages,from+4);
+  for (let i=from;i<=to;i++){
+    const b=document.createElement('button');
+    b.className='pg-btn'+(i===curPage?' cur':'');
+    b.textContent=i; const pg=i;
+    b.onclick=()=>{curPage=pg;renderTbl();};
+    pgB.appendChild(b);
   }
-  pgB.appendChild(mkBtn('›', curPage===pages, ()=>{curPage++;renderTbl();}));
 }
 
-/* ── PEDIDOS ── */
+/* ── PEDIDOS ────────────────────────── */
 async function loadPedidos() {
   try {
-    const r = await fetch(API_PEDS, { headers: { Authorization: 'Bearer ' + token } });
+    const r = await fetch(API_PEDS, { headers:{Authorization:'Bearer '+token} });
     const d = await r.json();
     const body = document.getElementById('pedTbody');
     if (!d.length) {
-      body.innerHTML = `<tr><td colspan="7" class="px-6 py-16 text-center text-slate-400">Sin pedidos aún</td></tr>`;
+      body.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:48px;color:var(--muted)">Sin pedidos aún</td></tr>`;
       return;
     }
-    body.innerHTML = d.map(p => `
-      <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
-        <td class="px-6 py-4 text-xs font-mono text-slate-400">${p.id}</td>
-        <td class="px-6 py-4 text-sm font-bold">${p.cliente}</td>
-        <td class="px-6 py-4 text-sm">${p.telefono}</td>
-        <td class="px-6 py-4 text-sm max-w-xs truncate">${p.productos}</td>
-        <td class="px-6 py-4 text-sm font-bold text-primary">${cop(p.total)}</td>
-        <td class="px-6 py-4">
-          <span class="px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full">${p.estado}</span>
-        </td>
-        <td class="px-6 py-4 text-xs text-slate-400">${p.hora}</td>
+    body.innerHTML = d.map(p=>`
+      <tr>
+        <td style="font-size:11px;color:var(--muted)">${p.id}</td>
+        <td style="font-weight:600">${p.cliente}</td>
+        <td>${p.telefono}</td>
+        <td style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.productos}</td>
+        <td class="td-p">${cop(p.total)}</td>
+        <td><span class="pill">${p.estado}</span></td>
+        <td style="color:var(--muted);font-size:12px">${p.hora}</td>
       </tr>`).join('');
-  } catch(e) { toastMsg('❌ Error cargando pedidos', 'err'); }
+  } catch(e) { toastMsg('❌ Error cargando pedidos','err') }
 }
 
-/* ── IMPORT EXCEL ── */
-function openImp()  {
-  const m = document.getElementById('impModal');
-  m.classList.remove('hidden'); m.classList.add('flex');
-}
+/* ── IMPORT EXCEL ───────────────────── */
+function openImp()  { document.getElementById('impModal').classList.add('open') }
 function closeImp() {
-  const m = document.getElementById('impModal');
-  m.classList.add('hidden'); m.classList.remove('flex');
-  document.getElementById('impPrev').classList.add('hidden');
-  document.getElementById('btnImp').disabled = true;
-  impRows = [];
+  document.getElementById('impModal').classList.remove('open');
+  document.getElementById('impPrev').style.display='none';
+  document.getElementById('btnImp').disabled=true;
+  impRows=[];
 }
 function onDrop(ev) {
   ev.preventDefault();
-  document.getElementById('dropZ').classList.remove('border-primary','bg-orange-50');
+  document.getElementById('dropZ').classList.remove('drag');
   if (ev.dataTransfer.files[0]) onFile(ev.dataTransfer.files[0]);
 }
 function onFile(file) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = e => {
-    const wb   = XLSX.read(e.target.result, { type: 'binary' });
+    const wb   = XLSX.read(e.target.result,{type:'binary'});
     const ws   = wb.Sheets[wb.SheetNames[0]];
-    const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
-    const get  = (row, keys, ...names) => {
+    const data = XLSX.utils.sheet_to_json(ws,{defval:''});
+    const get  = (row,keys,...names) => {
       for (const n of names) {
-        const k = keys.find(k => k.toLowerCase().replace(/[^a-z]/g,'').includes(n));
+        const k = keys.find(k=>k.toLowerCase().replace(/[^a-z]/g,'').includes(n));
         if (k) return (row[k]||'').toString().trim();
       }
       return '';
     };
-    impRows = data.map(row => {
+    impRows = data.map(row=>{
       const keys = Object.keys(row);
       return {
         descripcion:    get(row,keys,'descripci','descrip','nombre','produc'),
@@ -593,38 +652,38 @@ function onFile(file) {
         precio:         get(row,keys,'precio','price','valor','vta','venta'),
         precioUnitario: get(row,keys,'unitario','unitprice','xunidad','porunit'),
       };
-    }).filter(r => r.descripcion);
+    }).filter(r=>r.descripcion);
     const prev = document.getElementById('impPrev');
-    prev.classList.remove('hidden');
-    prev.innerHTML = `✅ <strong>${impRows.length}</strong> productos listos de <em>${file.name}</em>`;
-    document.getElementById('btnImp').disabled = impRows.length === 0;
+    prev.style.display='block';
+    prev.innerHTML=`✅ <strong>${impRows.length}</strong> productos listos de <em>${file.name}</em>`;
+    document.getElementById('btnImp').disabled = impRows.length===0;
   };
   reader.readAsBinaryString(file);
 }
 async function doImport() {
   if (!impRows.length) return;
-  const b = document.getElementById('btnImp');
-  b.disabled = true; b.textContent = 'Importando…';
+  const btn=document.getElementById('btnImp');
+  btn.disabled=true; btn.textContent='Importando…';
   try {
-    const r = await fetch(API_IMP, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-      body: JSON.stringify({ tienda: TIENDA, productos: impRows })
+    const r = await fetch(API_IMP,{
+      method:'POST',
+      headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+      body:JSON.stringify({tienda:TIENDA,productos:impRows})
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error);
-    toastMsg('✅ ' + d.count + ' productos importados', 'ok');
+    toastMsg('✅ '+d.count+' productos importados','ok');
     closeImp(); reload();
-  } catch(e) { toastMsg('❌ ' + e.message, 'err'); }
-  finally { b.disabled = false; b.textContent = 'Subir a Sheets'; }
+  } catch(e) { toastMsg('❌ '+e.message,'err') }
+  finally { btn.disabled=false; btn.textContent='Subir a Sheets' }
 }
 
-/* ── TOAST ── */
+/* ── TOAST ──────────────────────────── */
 let tt;
-function toastMsg(msg, type='ok') {
-  const el = document.getElementById('toast');
-  el.textContent = msg; el.className = 'toast ' + type + ' show';
-  clearTimeout(tt); tt = setTimeout(() => el.className = 'toast ' + type, 3200);
+function toastMsg(msg,type='ok'){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className='toast '+type+' show';
+  clearTimeout(tt); tt=setTimeout(()=>el.className='toast '+type,3200);
 }
 </script>
 </body>
