@@ -1,195 +1,509 @@
+// ══════════════════════════════════════════════════════════════════════════════
+// distancia.js
+//
+// SEDE (punto de partida de TODOS los domicilios normales):
+//   Cra. 50 #50-15, Copacabana, Antioquia
+//
+// PAQUETES: origen = dirección de recogida (donde el cliente dice), destino = entrega
+//
+// Hoja coordenadas: A=BARRIO  B=TARIFA  C=PAQ_PEQUEÑO  D=PAQ_MEDIANO
+//                   E=PAQ_GRANDE  F=DIRECCION  G=ZONA
+//
+// COLUMNA F = dirección real de un punto de esa zona (ej: "Cra 68 #97-95, Castilla, Medellín")
+//   → NO es el destino del cliente
+//   → Se usa como CONTEXTO DE ZONA para que LocationIQ busque en el área correcta
+//   → LocationIQ geocodifica la dirección REAL del cliente usando esa zona como ancla
+//
+// FLUJO DE GEOCODIFICACIÓN:
+//   1. textoCliente = lo que escribió el usuario (ej: "Cra 50 #30-10 Castilla")
+//   2. dirRefSheet  = col F del sheet (ej: "Cra 68 #97-95, Castilla, Medellín")
+//   3. Se extrae municipio/zona de dirRefSheet → se construye query con ese contexto
+//   4. LocationIQ geocodifica textoCliente en esa zona → coords reales del cliente
+//   5. Con esas coords: haversine(SEDE → coords) × 1.35 × $1.800 = precio
+//
+// REGLA DE COBRO:
+//   precio = MAX( $1.800 × distanciaRuta, $5.000 mínimo )
+//   Copacabana local: tarifa ya está guardada en el sheet (calculada igual por km)
+// ══════════════════════════════════════════════════════════════════════════════
+const https = require('https');
 
-const axios  = require('axios');
-const { google } = require('googleapis');
-const { obtenerPrecio } = require('../data/tarifas');
+function getLocationIQKey() { return process.env.LOCATIONIQ_KEY || null; }
 
-// ─── Sede WIL — actualiza con coords reales del Parque de Copacabana ─────────
-const SEDE = { lat: 6.3536, lng: -75.4832 };
+// SEDE — punto de partida de todos los domicilios normales
+const SEDE_LAT  = parseFloat(process.env.SEDE_LAT  || '6.35112');
+const SEDE_LNG  = parseFloat(process.env.SEDE_LNG  || '-75.49190');
+const SEDE_DIR  = 'Cra. 50 #50-15, Copacabana, Antioquia, Colombia';
 
-// ─── Cache en memoria para no consultar Sheets en cada pedido ─────────────────
-let cacheCoords   = null;   // { 'ASUNCIÓN': { lat, lng, tarifa }, ... }
-let cacheTimestamp = 0;
-const CACHE_TTL   = 1000 * 60 * 30; // 30 minutos
+const PRECIO_KM   = 1800;
+const FACTOR_RUTA = 1.35;
+const TARIFA_MIN  = 5000;
 
-const auth = new google.auth.GoogleAuth({
-  keyFile: './credentials.json',
-  scopes:  ['https://www.googleapis.com/auth/spreadsheets']
-});
+// ── Coordenadas de referencia por municipio (fallback sin LocationIQ) ─────────
+const MUNICIPIOS_COORDS = {
+  'copacabana':           { lat: 6.35112, lng: -75.49190 },
+  'bello':                { lat: 6.33670, lng: -75.55720 },
+  'medellín':             { lat: 6.24420, lng: -75.58120 },
+  'medellin':             { lat: 6.24420, lng: -75.58120 },
+  'envigado':             { lat: 6.17520, lng: -75.59280 },
+  'itagüí':               { lat: 6.18430, lng: -75.59900 },
+  'itagui':               { lat: 6.18430, lng: -75.59900 },
+  'sabaneta':             { lat: 6.15140, lng: -75.61750 },
+  'la estrella':          { lat: 6.15720, lng: -75.64270 },
+  'caldas':               { lat: 6.09300, lng: -75.63800 },
+  'girardota':            { lat: 6.37830, lng: -75.44480 },
+  'barbosa':              { lat: 6.43790, lng: -75.33160 },
+  'rionegro':             { lat: 6.15530, lng: -75.37410 },
+  'guarne':               { lat: 6.27780, lng: -75.45030 },
+  'marinilla':            { lat: 6.17640, lng: -75.34360 },
+  'el peñol':             { lat: 6.21570, lng: -75.23690 },
+  'la ceja':              { lat: 6.02570, lng: -75.43320 },
+  'retiro':               { lat: 6.06370, lng: -75.50700 },
+  'el carmen de viboral': { lat: 6.08910, lng: -75.31840 },
+  'san vicente ferrer':   { lat: 6.30870, lng: -75.33100 },
+};
 
-// ─────────────────────────────────────────────────────────────────────────────
-// LEER COORDENADAS DESDE SHEETS
-// Hoja: coordenadas | Columnas: A=BARRIO B=LAT C=LNG D=TARIFA E=NOTAS
-// ─────────────────────────────────────────────────────────────────────────────
-async function cargarCoordenadas() {
-  const ahora = Date.now();
+// ── Barrios conocidos con coords aproximadas (fallback) ───────────────────────
+const BARRIOS_CONOCIDOS = {
+  'castilla':        { lat: 6.29300, lng: -75.59900, municipio: 'Medellín' },
+  'laureles':        { lat: 6.24370, lng: -75.60350, municipio: 'Medellín' },
+  'el poblado':      { lat: 6.20990, lng: -75.56860, municipio: 'Medellín' },
+  'poblado':         { lat: 6.20990, lng: -75.56860, municipio: 'Medellín' },
+  'belén':           { lat: 6.22140, lng: -75.61360, municipio: 'Medellín' },
+  'belen':           { lat: 6.22140, lng: -75.61360, municipio: 'Medellín' },
+  'robledo':         { lat: 6.28200, lng: -75.60560, municipio: 'Medellín' },
+  'aranjuez':        { lat: 6.27900, lng: -75.56050, municipio: 'Medellín' },
+  'manrique':        { lat: 6.27300, lng: -75.55120, municipio: 'Medellín' },
+  'boston':          { lat: 6.25200, lng: -75.55980, municipio: 'Medellín' },
+  'la america':      { lat: 6.24600, lng: -75.60820, municipio: 'Medellín' },
+  'la candelaria':   { lat: 6.25180, lng: -75.56360, municipio: 'Medellín' },
+  'centro':          { lat: 6.25180, lng: -75.56360, municipio: 'Medellín' },
+  'buenos aires':    { lat: 6.23900, lng: -75.55800, municipio: 'Medellín' },
+  'floresta':        { lat: 6.25400, lng: -75.61200, municipio: 'Medellín' },
+  'calasanz':        { lat: 6.25900, lng: -75.60600, municipio: 'Medellín' },
+  'doce de octubre': { lat: 6.28500, lng: -75.57800, municipio: 'Medellín' },
+  'campo amor':      { lat: 6.22700, lng: -75.59400, municipio: 'Medellín' },
+  'san javier':      { lat: 6.24800, lng: -75.62400, municipio: 'Medellín' },
+  'guayabal':        { lat: 6.22000, lng: -75.58900, municipio: 'Medellín' },
+  'niquía':          { lat: 6.31850, lng: -75.52150, municipio: 'Bello' },
+  'niquia':          { lat: 6.31850, lng: -75.52150, municipio: 'Bello' },
+  'la madera':       { lat: 6.34500, lng: -75.55000, municipio: 'Bello' },
+  'paris':           { lat: 6.34100, lng: -75.56200, municipio: 'Bello' },
+  'zamora':          { lat: 6.33200, lng: -75.56800, municipio: 'Bello' },
+  'girardota':       { lat: 6.37830, lng: -75.44480, municipio: 'Girardota' },
+  'barbosa':         { lat: 6.43790, lng: -75.33160, municipio: 'Barbosa' },
+  'envigado':        { lat: 6.17520, lng: -75.59280, municipio: 'Envigado' },
+  'sabaneta':        { lat: 6.15140, lng: -75.61750, municipio: 'Sabaneta' },
+  'itagüí':          { lat: 6.18430, lng: -75.59900, municipio: 'Itagüí' },
+  'itagui':          { lat: 6.18430, lng: -75.59900, municipio: 'Itagüí' },
+};
 
-  // Retornar cache si está fresco
-  if (cacheCoords && (ahora - cacheTimestamp) < CACHE_TTL) {
-    return cacheCoords;
-  }
-
-  try {
-    const client = await auth.getClient();
-    const sheets = google.sheets({ version: 'v4', auth: client });
-
-    const res  = await sheets.spreadsheets.values.get({
-      spreadsheetId: process.env.GOOGLE_SHEETS_ID,
-      range: 'coordenadas!A:E'
-    });
-
-    const rows  = (res.data.values || []).slice(1); // saltar encabezado
-    const mapa  = {};
-
-    for (const row of rows) {
-      const barrio  = (row[0] || '').toString().trim().toUpperCase();
-      const lat     = parseFloat(row[1]);
-      const lng     = parseFloat(row[2]);
-      const tarifa  = parseInt((row[3] || '').toString().replace(/[^0-9]/g, '')) || null;
-
-      if (barrio && !isNaN(lat) && !isNaN(lng)) {
-        mapa[barrio] = { lat, lng, tarifa };
-      }
-    }
-
-    cacheCoords    = mapa;
-    cacheTimestamp = ahora;
-
-    console.log(`📍 Coordenadas cargadas: ${Object.keys(mapa).length} barrios`);
-    return mapa;
-
-  } catch(e) {
-    console.error('Error cargando coordenadas:', e.message);
-    return cacheCoords || {}; // retornar cache viejo si hay error
-  }
+// ── Haversine ─────────────────────────────────────────────────────────────────
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R  = 6371;
+  const dL = (lat2 - lat1) * Math.PI / 180;
+  const dG = (lng2 - lng1) * Math.PI / 180;
+  const a  = Math.sin(dL/2)**2 +
+    Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dG/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DETECTAR BARRIO en texto del cliente
-// ─────────────────────────────────────────────────────────────────────────────
-async function detectarBarrio(texto) {
-  const coords = await cargarCoordenadas();
-  const t      = (texto || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-  let mejorBarrio = null;
-  let mejorLen    = 0;
-
-  for (const barrio of Object.keys(coords)) {
-    const bn = barrio.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    if (t.includes(bn) && bn.length > mejorLen) {
-      mejorBarrio = barrio;
-      mejorLen    = bn.length;
-    }
-  }
-
-  return mejorBarrio;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CALCULAR RUTA REAL con OSRM (gratis)
-// ─────────────────────────────────────────────────────────────────────────────
-async function calcularRutaOSRM(latD, lngD) {
-  try {
-    const url = `http://router.project-osrm.org/route/v1/driving/${SEDE.lng},${SEDE.lat};${lngD},${latD}?overview=false`;
-    const res = await axios.get(url, { timeout: 10000 });
-
-    if (res.data?.code !== 'Ok') return null;
-
-    const r = res.data.routes[0];
-    return {
-      distancia: `${(r.distance / 1000).toFixed(1)} km`,
-      moto:      `${Math.ceil(r.duration / 60 * 0.65)} min`,
-      carro:     `${Math.ceil(r.duration / 60)} min`
-    };
-  } catch(e) {
-    console.error('OSRM error:', e.message);
-    return null;
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// FUNCIÓN PRINCIPAL
-// ─────────────────────────────────────────────────────────────────────────────
-async function calcularDistancia(texto) {
-  const coordsMap = await cargarCoordenadas();
-  const barrio    = await detectarBarrio(texto);
-  const tarifa    = obtenerPrecio(texto) || (barrio && coordsMap[barrio]?.tarifa) || null;
-
-  let coords = null;
-
-  // ── Prioridad 1: coordenadas desde Sheets ────────────────────────────────
-  if (barrio && coordsMap[barrio]) {
-    coords = coordsMap[barrio];
-    console.log(`📍 Barrio encontrado en Sheets: ${barrio}`);
-  }
-
-  // ── Prioridad 2: Nominatim para direcciones completas ────────────────────
-  if (!coords) {
-    try {
-      const q   = encodeURIComponent(`${texto}, Copacabana, Antioquia, Colombia`);
-      const geo = await axios.get(
-        `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&countrycodes=co`,
-        { headers: { 'User-Agent': 'DomiciliosWIL/1.0' }, timeout: 8000 }
-      );
-      if (geo.data?.length) {
-        coords = { lat: parseFloat(geo.data[0].lat), lng: parseFloat(geo.data[0].lon) };
-        console.log(`📍 Geocodificado con Nominatim: ${texto}`);
-      }
-    } catch(e) {
-      console.error('Nominatim error:', e.message);
-    }
-  }
-
-  // ── Sin coordenadas ───────────────────────────────────────────────────────
-  if (!coords) {
-    return {
-      error: true,
-      msg:
-        `⚠️ No encontré ese barrio.\n\n` +
-        `Escribe el nombre del barrio exacto:\n` +
-        `<i>Ej: "Asunción", "Fátima", "Tablazo"</i>\n\n` +
-        `O una dirección completa:\n` +
-        `<i>Ej: "Cra 50 #30-10, Barrio Asunción"</i>`
-    };
-  }
-
-  // ── Calcular ruta REAL con OSRM ───────────────────────────────────────────
-  const ruta = await calcularRutaOSRM(coords.lat, coords.lng);
-
-  if (!ruta) {
-    if (barrio && tarifa) {
-      return { error:false, parcial:true, barrio, tarifa, distancia:'—', moto:'—', carro:'—' };
-    }
-    return { error: true, msg: '❌ No pude calcular la ruta. Intenta de nuevo.' };
-  }
-
+// ── Precio desde la SEDE hasta un destino ────────────────────────────────────
+function calcularTarifaKm(latDest, lngDest) {
+  const lineal = haversineKm(SEDE_LAT, SEDE_LNG, latDest, lngDest);
+  const ruta   = Math.round(lineal * FACTOR_RUTA * 10) / 10;
+  const precio = Math.max(Math.round(ruta * PRECIO_KM / 500) * 500, TARIFA_MIN);
   return {
-    error:     false,
-    parcial:   false,
-    distancia: ruta.distancia,
-    moto:      ruta.moto,
-    carro:     ruta.carro,
-    barrio:    barrio || null,
-    tarifa:    tarifa || null
+    precio,
+    distRutaKm:   ruta,
+    distLinealKm: Math.round(lineal * 10) / 10,
+    formula:      `${Math.round(lineal*10)/10}km × ${FACTOR_RUTA} = ${ruta}km × $${PRECIO_KM} = $${precio}`
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TARIFA RÁPIDA (sin calcular ruta) para el flujo del pedido
-// ─────────────────────────────────────────────────────────────────────────────
-async function obtenerTarifaRapida(texto) {
-  const coordsMap = await cargarCoordenadas();
-  const barrio    = await detectarBarrio(texto);
-  const tarifa    = obtenerPrecio(texto) || (barrio && coordsMap[barrio]?.tarifa) || null;
-  return { barrio, tarifa };
+// ── Precio entre dos puntos (paquetes: origen→destino) ────────────────────────
+function calcularPrecioPorKm(latO, lngO, latD, lngD) {
+  const lineal = haversineKm(latO, lngO, latD, lngD);
+  const ruta   = Math.round(lineal * FACTOR_RUTA * 10) / 10;
+  const precio = Math.max(Math.round(ruta * PRECIO_KM / 500) * 500, TARIFA_MIN);
+  return {
+    distanciaLinealKm: Math.round(lineal * 10) / 10,
+    distanciaRutaKm:   ruta,
+    precioCOP:         precio,
+    formula:           `${Math.round(lineal*10)/10}km × ${FACTOR_RUTA} = ${ruta}km × $${PRECIO_KM} = $${precio}`
+  };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// REFRESCAR CACHE manualmente (para admin)
-// ─────────────────────────────────────────────────────────────────────────────
-function limpiarCache() {
-  cacheCoords    = null;
-  cacheTimestamp = 0;
-  console.log('🔄 Cache de coordenadas limpiado');
+function calcularPreciosPaquete(tarifaBase) {
+  if (!tarifaBase) return { paqPeq: null, paqMed: null, paqGran: null };
+  return { paqPeq: tarifaBase, paqMed: tarifaBase, paqGran: tarifaBase };
 }
 
-module.exports = { calcularDistancia, obtenerTarifaRapida, detectarBarrio, limpiarCache };
+// ── Zona Copacabana (tarifa ya en sheet) ──────────────────────────────────────
+function esZonaCopacabana(municipio, barrio) {
+  const m = (municipio || '').toLowerCase().trim();
+  const b = (barrio    || '').toLowerCase().trim();
+  if (m.includes('copacabana')) return true;
+  if (m.includes('bello') && (b.includes('niquía') || b.includes('niquia'))) return true;
+  return false;
+}
+
+function zonaLegible(municipio, barrio) {
+  if (!municipio) return 'Área Metropolitana';
+  const m = municipio.toLowerCase();
+  const b = (barrio || '').toLowerCase();
+  if (m.includes('copacabana'))   return 'Copacabana';
+  if (m.includes('bello')) {
+    if (b.includes('niquía') || b.includes('niquia')) return 'Copacabana / Niquía';
+    return 'Bello';
+  }
+  if (m.includes('girardota'))    return 'Girardota';
+  if (m.includes('barbosa'))      return 'Barbosa';
+  if (m.includes('itagüí') || m.includes('itagui')) return 'Itagüí';
+  if (m.includes('envigado'))     return 'Envigado';
+  if (m.includes('sabaneta'))     return 'Sabaneta';
+  if (m.includes('la estrella'))  return 'La Estrella';
+  if (m.includes('caldas'))       return 'Caldas';
+  if (m.includes('rionegro')  || m.includes('guarne')   || m.includes('marinilla') ||
+      m.includes('carmen')    || m.includes('peñol')    || m.includes('santuario') ||
+      m.includes('retiro')    || m.includes('la ceja')  || m.includes('san vicente')) {
+    return 'Oriente Antioqueño';
+  }
+  if (m.includes('medellín') || m.includes('medellin')) return 'Medellín';
+  return municipio;
+}
+
+function detectarMunicipioEnTexto(texto) {
+  if (!texto) return null;
+  const t = texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const orden = [
+    'el carmen de viboral','carmen de viboral','san vicente ferrer','san vicente',
+    'el santuario','el penol','la estrella','la ceja','la union',
+    'copacabana','girardota','barbosa','rionegro','marinilla','guarne',
+    'envigado','sabaneta','itagui','retiro','caldas','bello','medellin'
+  ];
+  for (const mun of orden) {
+    if (t.includes(mun))
+      return mun.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  }
+  return null;
+}
+
+function detectarBarrioEnTexto(texto) {
+  if (!texto) return null;
+  const t = texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const orden = Object.keys(BARRIOS_CONOCIDOS).sort((a, b) => b.length - a.length);
+  for (const barrio of orden) {
+    const bn = barrio.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (t.includes(bn)) return { barrio, ...BARRIOS_CONOCIDOS[barrio] };
+  }
+  return null;
+}
+
+function _enZonaCobertura(lat, lng) {
+  return lat >= 5.80 && lat <= 6.70 && lng >= -76.00 && lng <= -74.80;
+}
+
+function httpsGet(url, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const opts = {
+      timeout: 8000,
+      headers: { 'Accept': 'application/json', ...headers }
+    };
+    const req = https.get(url, opts, res => {
+      let data = '';
+      res.on('data', c => { data += c; });
+      res.on('end', () => {
+        try   { resolve(JSON.parse(data)); }
+        catch (e) { reject(new Error('JSON inválido')); }
+      });
+    });
+    req.on('error',   reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('Timeout Nominatim')); });
+  });
+}
+
+// ── Nominatim (OpenStreetMap) — gratuito, sin límite con 1req/s ──────────────
+//
+// FLUJO:
+//   textoCliente = dirección completa del cliente
+//   dirRefSheet  = col F = dirección ancla del barrio en el sheet
+//
+//   1. Si dirRefSheet tiene coords en col H/I del sheet → usar como viewbox directo
+//   2. Si no, geocodificar dirRefSheet con Nominatim → obtener coords ancla → viewbox
+//   3. Buscar textoCliente dentro del viewbox (bounded=1) → resultado preciso al predio
+//   4. Fallback sin viewbox: textoCliente + municipio + Colombia
+//
+// Nominatim requiere User-Agent identificador y respetar 1 req/segundo.
+// Para +30 paquetes/día el cache del sheet reduce llamadas al mínimo.
+
+const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org/search';
+const NOMINATIM_UA   = 'DomiciliosWIL/1.0 (copacabana.antioquia@gmail.com)';
+
+// Throttle simple: mínimo 1.1s entre llamadas a Nominatim
+let _lastNominatimCall = 0;
+async function nominatimGet(url) {
+  const ahora = Date.now();
+  const espera = 1100 - (ahora - _lastNominatimCall);
+  if (espera > 0) await new Promise(r => setTimeout(r, espera));
+  _lastNominatimCall = Date.now();
+  return httpsGet(url, { 'User-Agent': NOMINATIM_UA, 'Accept-Language': 'es' });
+}
+
+// Geocodificar una dirección con Nominatim → devuelve {lat, lng} o null
+async function _nominatimGeocodificar(query) {
+  try {
+    const url  = `${NOMINATIM_BASE}?q=${encodeURIComponent(query)}&format=json&limit=3&countrycodes=co&addressdetails=1`;
+    const data = await nominatimGet(url);
+    if (!Array.isArray(data) || !data.length) return null;
+    for (const r of data) {
+      const lat = parseFloat(r.lat);
+      const lng = parseFloat(r.lon);
+      if (_enZonaCobertura(lat, lng)) return { lat, lng, raw: r };
+    }
+  } catch(e) { console.warn('Nominatim error:', e.message); }
+  return null;
+}
+
+async function geocodificarNominatim(textoCliente, dirRefSheet, coordsAncla) {
+  // coordsAncla: { lat, lng } del sheet cache (col H/I) o de geocodificar col F
+  const municipioDeRef   = detectarMunicipioEnTexto(dirRefSheet  || '');
+  const municipioDeTexto = detectarMunicipioEnTexto(textoCliente || '');
+  const municipio        = municipioDeRef || municipioDeTexto;
+
+  // ─── Obtener coords ancla si no vienen del cache ──────────────────────────
+  let ancla = coordsAncla || null;
+  if (!ancla && dirRefSheet) {
+    console.log(`🌐 Geocodificando ancla col F: "${dirRefSheet}"`);
+    const r = await _nominatimGeocodificar(`${dirRefSheet}, Antioquia, Colombia`);
+    if (r) {
+      ancla = { lat: r.lat, lng: r.lng };
+      console.log(`   Ancla: ${ancla.lat.toFixed(5)}, ${ancla.lng.toFixed(5)}`);
+    }
+  }
+
+  // ─── Construir queries en orden de precisión ──────────────────────────────
+  const queries = [];
+
+  // Q1: con viewbox del ancla + bounded → resultado en el barrio exacto
+  if (ancla) {
+    const delta = 0.025; // ~2.8km
+    const vbox  = `${ancla.lng-delta},${ancla.lat+delta},${ancla.lng+delta},${ancla.lat-delta}`;
+    queries.push({
+      url:    `${NOMINATIM_BASE}?q=${encodeURIComponent(textoCliente)}&format=json&limit=5&countrycodes=co&addressdetails=1&viewbox=${vbox}&bounded=1`,
+      fuente: 'viewbox_bounded',
+      ancla
+    });
+    queries.push({
+      url:    `${NOMINATIM_BASE}?q=${encodeURIComponent(textoCliente)}&format=json&limit=5&countrycodes=co&addressdetails=1&viewbox=${vbox}`,
+      fuente: 'viewbox_soft',
+      ancla
+    });
+  }
+
+  // Q2: texto + municipio de col F
+  if (municipioDeRef) {
+    queries.push({
+      url:    `${NOMINATIM_BASE}?q=${encodeURIComponent(`${textoCliente}, ${municipioDeRef}, Antioquia, Colombia`)}&format=json&limit=5&countrycodes=co&addressdetails=1`,
+      fuente: 'municipio_colF'
+    });
+  }
+
+  // Q3: texto + municipio del texto del cliente
+  if (municipioDeTexto && municipioDeTexto !== municipioDeRef) {
+    queries.push({
+      url:    `${NOMINATIM_BASE}?q=${encodeURIComponent(`${textoCliente}, ${municipioDeTexto}, Antioquia, Colombia`)}&format=json&limit=5&countrycodes=co&addressdetails=1`,
+      fuente: 'municipio_texto'
+    });
+  }
+
+  // Q4: fallback Antioquia
+  queries.push({
+    url:    `${NOMINATIM_BASE}?q=${encodeURIComponent(`${textoCliente}, Antioquia, Colombia`)}&format=json&limit=5&countrycodes=co&addressdetails=1`,
+    fuente: 'antioquia'
+  });
+
+  // ─── Ejecutar queries hasta encontrar resultado válido ────────────────────
+  for (const { url, fuente, ancla: anc } of queries) {
+    try {
+      const data = await nominatimGet(url);
+      if (!Array.isArray(data) || !data.length) continue;
+
+      for (const r of data) {
+        const lat = parseFloat(r.lat);
+        const lng = parseFloat(r.lon);
+        if (!_enZonaCobertura(lat, lng)) continue;
+
+        // Si hay ancla, descartar resultados a más de 12km
+        if (anc) {
+          const dist = haversineKm(anc.lat, anc.lng, lat, lng);
+          if (dist > 12) {
+            console.log(`  ⚠️  Descartado [${fuente}]: ${dist.toFixed(1)}km del ancla`);
+            continue;
+          }
+        }
+
+        const addr       = r.address || {};
+        const munGeo     = addr.city || addr.town || addr.municipality ||
+                           detectarMunicipioEnTexto(r.display_name) || municipio || '';
+        if (!munGeo) continue;
+
+        const barrio = addr.neighbourhood || addr.suburb || addr.quarter ||
+                       addr.village       || munGeo;
+        const calc   = calcularTarifaKm(lat, lng);
+        const zona   = zonaLegible(munGeo, barrio);
+        const esCopa = esZonaCopacabana(munGeo, barrio);
+
+        console.log(`✅ Nominatim [${fuente}]: "${barrio}", ${munGeo}`);
+        console.log(`   📍 ${lat.toFixed(5)}, ${lng.toFixed(5)} | ${calc.formula}`);
+        console.log(`   🗺️  https://www.google.com/maps?q=${lat},${lng}`);
+
+        return {
+          lat, lng,
+          barrio, municipio: munGeo, zona,
+          tarifa:              esCopa ? null : calc.precio,
+          tarifaCalculada:     calc.precio,
+          distRutaKm:          calc.distRutaKm,
+          distLinealKm:        calc.distLinealKm,
+          formula:             calc.formula,
+          esCoherente:         true,
+          confianzaGeo:        fuente.startsWith('viewbox') ? 'alta' : 'media',
+          direccionFormateada: r.display_name,
+          fuenteGeo:           fuente
+        };
+      }
+    } catch(e) {
+      console.error(`Nominatim [${fuente}] error:`, e.message);
+    }
+  }
+  return null;
+}
+
+// ── calcularDistancia — función principal ─────────────────────────────────────
+// textoCliente: dirección que escribió el usuario ("Cra 53 #32-86 barrio obrero bello")
+// dirRefSheet:  col F del sheet = dirección ancla de la zona (NO el destino del cliente)
+// coordsAncla:  { lat, lng } del cache del sheet (col H/I) — si existen, 0 llamadas extra
+//
+// FLUJO:
+//   0. Si el sheet tiene coords cacheadas (col H/I) → usarlas como viewbox directo
+//   1. Nominatim geocodifica textoCliente con viewbox del ancla → coords exactas del predio
+//   2. Fallback: barrio conocido hardcodeado en texto
+//   3. Fallback: municipio detectado en texto
+//   Distancia SIEMPRE desde SEDE Copacabana al destino.
+async function calcularDistancia(textoCliente, dirRefSheet, coordsAncla) {
+  const txt = (textoCliente || '').trim();
+  if (txt.length < 3) return _fallback(txt, 'Texto muy corto');
+
+  console.log(`\n🔍 calcularDistancia: "${txt}"`);
+  if (dirRefSheet)  console.log(`   📌 Ancla col F: "${dirRefSheet}"`);
+  if (coordsAncla) console.log(`   💾 Cache H/I: ${coordsAncla.lat}, ${coordsAncla.lng}`);
+
+  // ── 1. Nominatim con ancla (cache o geocodificada de col F) ───────────────
+  const geo = await geocodificarNominatim(txt, dirRefSheet, coordsAncla || null);
+  if (geo) {
+    return {
+      ...geo,
+      esCobertura:   true,
+      observaciones: 'Dirección verificada ✅'
+    };
+  }
+
+  // ── 2. Barrio conocido detectado en el texto del cliente
+  const barrioDetect = detectarBarrioEnTexto(txt);
+  if (barrioDetect) {
+    const { lat, lng, municipio, barrio } = barrioDetect;
+    const esCopa = esZonaCopacabana(municipio, barrio);
+    const calc   = calcularTarifaKm(lat, lng);
+    const zona   = zonaLegible(municipio, barrio);
+    console.log(`📍 Barrio conocido [fallback]: "${barrio}", ${municipio} → ${calc.formula}`);
+    return {
+      lat, lng, barrio, municipio, zona,
+      tarifa:           esCopa ? null : calc.precio,
+      tarifaCalculada:  calc.precio,
+      distRutaKm:       calc.distRutaKm,
+      distLinealKm:     calc.distLinealKm,
+      formula:          calc.formula,
+      esCobertura:      true,
+      esCoherente:      true,
+      confianzaGeo:     'media',
+      direccionFormateada: txt,
+      fuenteGeo:        'barrio_conocido',
+      observaciones:    'Coordenadas aproximadas — confirmar con el cliente ⚠️'
+    };
+  }
+
+  // ── 3. Municipio detectado en el texto
+  const municipioDetect = detectarMunicipioEnTexto(txt);
+  if (municipioDetect) {
+    const key    = municipioDetect.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const coords = MUNICIPIOS_COORDS[key];
+    if (coords) {
+      const esCopa = esZonaCopacabana(municipioDetect, '');
+      const calc   = calcularTarifaKm(coords.lat, coords.lng);
+      const zona   = zonaLegible(municipioDetect, '');
+      console.log(`🗺️  Municipio [fallback]: "${municipioDetect}" → ${calc.formula}`);
+      return {
+        lat: coords.lat, lng: coords.lng,
+        barrio: txt, municipio: municipioDetect, zona,
+        tarifa:           esCopa ? null : calc.precio,
+        tarifaCalculada:  calc.precio,
+        distRutaKm:       calc.distRutaKm,
+        distLinealKm:     calc.distLinealKm,
+        formula:          calc.formula,
+        esCobertura:      true,
+        esCoherente:      true,
+        confianzaGeo:     'baja',
+        direccionFormateada: txt,
+        fuenteGeo:        'municipio_detectado',
+        observaciones:    'Coordenada aproximada al municipio ⚠️'
+      };
+    }
+  }
+
+  return _fallback(txt, 'No encontrado — el domiciliario confirmará');
+}
+
+function _fallback(texto, motivo) {
+  return {
+    lat: null, lng: null,
+    barrio: texto || 'Desconocido', municipio: null,
+    zona: 'Por confirmar', tarifa: null, tarifaCalculada: null,
+    distRutaKm: null, distLinealKm: null, formula: null,
+    esCobertura:         false,
+    esCoherente:         false,
+    confianzaGeo:        'baja',
+    fuenteGeo:           'fallback',
+    direccionFormateada: texto || '',
+    observaciones:       motivo
+  };
+}
+
+function normalizarDireccion(dir) {
+  if (!dir) return '';
+  return dir
+    .replace(/\bCr\.?\s*/gi,  'Carrera ')
+    .replace(/\bCra\.?\s*/gi, 'Carrera ')
+    .replace(/\bCl\.?\s*/gi,  'Calle ')
+    .replace(/\bTv\.?\s*/gi,  'Transversal ')
+    .replace(/\bAv\.?\s*/gi,  'Avenida ')
+    .replace(/\s*#\s*/g,      ' # ')
+    .replace(/\s{2,}/g,       ' ').trim();
+}
+
+function detectarZonaFija() { return null; } // compatibilidad
+
+module.exports = {
+  calcularDistancia,
+  calcularPrecioPorKm,
+  calcularPreciosPaquete,
+  calcularTarifaKm,
+  normalizarDireccion,
+  zonaLegible,
+  detectarMunicipioEnTexto,
+  detectarBarrioEnTexto,
+  detectarZonaFija,
+  esZonaCopacabana,
+  haversineKm,
+  SEDE_LAT,
+  SEDE_LNG,
+  SEDE_DIR
+};

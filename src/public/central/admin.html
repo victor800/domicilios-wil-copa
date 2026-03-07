@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Admin · La Central</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#f5f5f0;--s:#ffffff;--s2:#f0ede8;--s3:#e8e4de;
+  --border:#d0c8bc;--red:#b91c1c;--teal:#0f766e;
+  --text:#1a1200;--muted:#6b6050;
+  --r:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh}
+
+/* LOGIN */
+#loginWrap{
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(160deg,#1a0a00 0%,#3b0d0d 50%,#0d1f1a 100%);
+  position:relative;overflow:hidden;
+}
+#loginWrap::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse 600px 400px at 30% 50%,rgba(185,28,28,.2) 0%,transparent 60%),
+             radial-gradient(ellipse 500px 400px at 75% 60%,rgba(15,118,110,.15) 0%,transparent 60%);
+}
+.lbox{
+  position:relative;z-index:1;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+  backdrop-filter:blur(24px);border-radius:20px;
+  padding:48px 40px;width:min(400px,92vw);text-align:center;
+}
+.lbox-ico{
+  width:68px;height:68px;border-radius:16px;margin:0 auto 20px;
+  background:linear-gradient(135deg,var(--red),var(--teal));
+  display:grid;place-items:center;font-size:34px;
+}
+.lbox-h{font-family:'Libre Baskerville',serif;font-size:26px;color:#fff;margin-bottom:4px}
+.lbox-s{font-size:13px;color:rgba(255,255,255,.4);margin-bottom:36px}
+.g-btn{
+  width:100%;padding:14px 20px;border-radius:10px;border:none;
+  background:#fff;font-size:14px;font-weight:700;color:#111;
+  display:flex;align-items:center;justify-content:center;gap:12px;
+  cursor:pointer;transition:.2s;font-family:'DM Sans',sans-serif;
+}
+.g-btn:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(0,0,0,.3)}
+.g-btn img{width:20px}
+.lbox-n{font-size:11px;color:rgba(255,255,255,.25);margin-top:18px}
+
+/* APP */
+#app{display:none}
+.layout{display:flex;min-height:100vh}
+
+/* SIDEBAR */
+.sb{
+  width:220px;flex-shrink:0;
+  background:var(--s);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  position:sticky;top:0;height:100vh;
+}
+.sb-top{
+  padding:16px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;
+}
+.sb-ico{
+  width:36px;height:36px;border-radius:8px;
+  background:linear-gradient(135deg,var(--red),var(--teal));
+  display:grid;place-items:center;font-size:18px;flex-shrink:0;
+}
+.sb-nm{font-family:'Libre Baskerville',serif;font-size:13px;line-height:1.2}
+.sb-tg{font-size:9px;color:var(--red);letter-spacing:1.5px;text-transform:uppercase}
+.sb-nav{flex:1;padding:8px}
+.nv{
+  display:flex;align-items:center;gap:8px;
+  padding:9px 10px;border-radius:7px;
+  font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;transition:.15s;
+  margin-bottom:2px;
+}
+.nv:hover{background:var(--s2);color:var(--text)}
+.nv.on{background:rgba(185,28,28,.08);color:var(--red)}
+.nv-i{font-size:16px;width:20px;text-align:center}
+.sb-bot{
+  padding:12px;border-top:1px solid var(--border);
+  display:flex;align-items:center;gap:8px;
+}
+.av{width:34px;height:34px;border-radius:50%;object-fit:cover;background:var(--s3);flex-shrink:0}
+.av-i{flex:1;min-width:0}
+.av-n{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.av-r{font-size:10px;color:var(--muted)}
+.so{background:none;border:none;color:var(--muted);cursor:pointer;font-size:17px;padding:3px;transition:.15s;flex-shrink:0}
+.so:hover{color:var(--red)}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.tbar{
+  padding:13px 22px;background:var(--s);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  position:sticky;top:0;z-index:10;
+}
+.pg-h{font-family:'Libre Baskerville',serif;font-size:20px}
+.ta{display:flex;gap:8px}
+.content{padding:22px;flex:1}
+
+/* KPIS */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:22px}
+.kpi{background:var(--s);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;position:relative;overflow:hidden}
+.kpi::after{content:attr(data-i);position:absolute;right:12px;bottom:8px;font-size:32px;opacity:.1}
+.kpi-l{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.kpi-v{font-family:'Libre Baskerville',serif;font-size:28px;font-weight:700;margin-top:4px}
+
+/* TOOLBAR */
+.tb2{
+  background:var(--s);border:1px solid var(--border);border-radius:var(--r);
+  padding:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;
+}
+.sf{position:relative;flex:1;min-width:180px}
+.sf input{
+  width:100%;padding:8px 12px 8px 34px;
+  background:var(--s2);border:1.5px solid var(--border);
+  border-radius:7px;font-size:13px;color:var(--text);
+  font-family:'DM Sans',sans-serif;outline:none;transition:.2s;
+}
+.sf input:focus{border-color:var(--red)}
+.sf::before{content:'🔍';position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none}
+.sel{
+  padding:8px 12px;background:var(--s2);border:1.5px solid var(--border);
+  border-radius:7px;font-size:13px;color:var(--text);
+  font-family:'DM Sans',sans-serif;cursor:pointer;outline:none;transition:.2s;
+}
+.sel:focus{border-color:var(--red)}
+.btn{
+  padding:8px 14px;border-radius:7px;border:none;
+  font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;
+  cursor:pointer;transition:.15s;display:flex;align-items:center;gap:5px;white-space:nowrap;
+}
+.btn-r{background:var(--red);color:#fff}.btn-r:hover{background:#991b1b}
+.btn-t{background:var(--teal);color:#fff}.btn-t:hover{background:#0d6b63}
+.btn-o{background:var(--s);border:1.5px solid var(--border);color:var(--text)}.btn-o:hover{border-color:var(--red);color:var(--red)}
+
+/* TABLE */
+.tw{background:var(--s);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.ts{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{
+  background:var(--s2);padding:10px 15px;text-align:left;
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
+  color:var(--muted);border-bottom:1px solid var(--border);
+  cursor:pointer;user-select:none;white-space:nowrap;
+}
+thead th:hover{color:var(--text)}
+thead th.asc::after{content:' ↑'}
+thead th.desc::after{content:' ↓'}
+tbody tr{border-bottom:1px solid var(--border);transition:.1s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--s2)}
+td{padding:10px 15px;vertical-align:middle}
+.tnm{font-weight:600;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tl{color:var(--muted);font-size:12px}
+.tp{font-weight:700;color:var(--red)}
+.tps{font-size:11px;color:var(--muted)}
+.pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(185,28,28,.08);color:var(--red)}
+
+.pag{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
+.pgb{display:flex;gap:3px}
+.pb{width:28px;height:28px;border-radius:5px;background:var(--s);border:1px solid var(--border);cursor:pointer;font-size:12px;display:grid;place-items:center;transition:.15s}
+.pb:hover{border-color:var(--red);color:var(--red)}
+.pb.cur{background:var(--red);color:#fff;border-color:var(--red)}
+
+/* MODAL */
+.mbg{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.mbg.open{display:flex}
+.modal{background:var(--s);border-radius:16px;padding:32px;width:min(500px,92vw);box-shadow:0 24px 60px rgba(0,0,0,.15);animation:pop .2s ease}
+@keyframes pop{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
+.mh{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px}
+.mh h3{font-family:'Libre Baskerville',serif;font-size:20px}
+.mx{background:none;border:none;font-size:20px;color:var(--muted);cursor:pointer}
+.mp{font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.5}
+.dz{border:2px dashed var(--border);border-radius:10px;padding:40px 20px;text-align:center;cursor:pointer;transition:.2s}
+.dz:hover,.dz.dr{border-color:var(--red);background:rgba(185,28,28,.03)}
+.dz .di{font-size:40px;margin-bottom:10px}
+.dz p{font-size:13px;color:var(--muted)}
+.dz strong{color:var(--red);cursor:pointer}
+#fin{display:none}
+.prev{margin-top:12px;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:11px 14px;font-size:13px;display:none}
+.ma{display:flex;gap:8px;margin-top:18px;justify-content:flex-end}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;right:20px;z-index:500;padding:11px 18px;border-radius:8px;font-size:13px;font-weight:600;transform:translateY(50px);opacity:0;transition:.3s;pointer-events:none;max-width:280px}
+.toast.ok{background:#0a1f12;color:#86efac;border:1px solid #166534}
+.toast.er{background:#450a0a;color:#fca5a5;border:1px solid #7f1d1d}
+.toast.show{transform:translateY(0);opacity:1}
+
+@media(max-width:680px){.sb{display:none}.kpis{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+
+<div id="loginWrap">
+  <div class="lbox">
+    <div class="lbox-ico">✚</div>
+    <div class="lbox-h">Panel Admin</div>
+    <div class="lbox-s">Droguería La Central · Copacabana</div>
+    <button class="g-btn" onclick="doLogin()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G"/>
+      Continuar con Google
+    </button>
+    <div class="lbox-n">Acceso exclusivo para administradores autorizados</div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="layout">
+    <aside class="sb">
+      <div class="sb-top">
+        <div class="sb-ico">✚</div>
+        <div><div class="sb-nm">La Central</div><div class="sb-tg">Admin</div></div>
+      </div>
+      <nav class="sb-nav">
+        <div class="nv on" id="nv-i" onclick="navTo('inv',this)"><span class="nv-i">📦</span> Inventario</div>
+        <div class="nv" id="nv-p" onclick="navTo('ped',this)"><span class="nv-i">🛒</span> Pedidos web</div>
+      </nav>
+      <div class="sb-bot">
+        <img class="av" id="avImg" src="" alt=""/>
+        <div class="av-i"><div class="av-n" id="avNm">—</div><div class="av-r">Administrador</div></div>
+        <button class="so" onclick="logout()" title="Salir">⏻</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <!-- INVENTARIO -->
+      <div id="pgInv">
+        <div class="tbar">
+          <span class="pg-h">📦 Inventario La Central</span>
+          <div class="ta">
+            <button class="btn btn-t" onclick="openImp()">⬆ Importar Excel</button>
+            <button class="btn btn-r" onclick="reload()">↻ Actualizar</button>
+          </div>
+        </div>
+        <div class="content">
+          <div class="kpis">
+            <div class="kpi" data-i="📦"><div class="kpi-l">Productos</div><div class="kpi-v" id="kT">—</div></div>
+            <div class="kpi" data-i="🏭"><div class="kpi-l">Laboratorios</div><div class="kpi-v" id="kL">—</div></div>
+            <div class="kpi" data-i="💰"><div class="kpi-l">Con precio unit.</div><div class="kpi-v" id="kP">—</div></div>
+          </div>
+          <div class="tb2">
+            <div class="sf"><input type="text" id="srch" placeholder="Buscar…" oninput="filt()"/></div>
+            <select class="sel" id="sLab" onchange="filt()"><option value="">Todos los laboratorios</option></select>
+            <select class="sel" id="sOrd" onchange="filt()">
+              <option value="d">Nombre A→Z</option>
+              <option value="l">Laboratorio A→Z</option>
+              <option value="pa">Precio ↑</option>
+              <option value="pd">Precio ↓</option>
+            </select>
+          </div>
+          <div class="tw">
+            <div class="ts">
+              <table>
+                <thead>
+                  <tr>
+                    <th onclick="thS('descripcion',this)">Descripción</th>
+                    <th onclick="thS('laboratorio',this)">Laboratorio</th>
+                    <th>Unidad</th>
+                    <th onclick="thS('_p',this)">Precio caja</th>
+                    <th onclick="thS('_pu',this)">Precio unitario</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody">
+                  <tr><td colspan="5" style="text-align:center;padding:48px;color:var(--muted)"><div style="font-size:36px;margin-bottom:10px">⏳</div>Cargando…</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="pag">
+              <span id="pgInf">—</span>
+              <div class="pgb" id="pgBtns"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PEDIDOS -->
+      <div id="pgPed" style="display:none">
+        <div class="tbar">
+          <span class="pg-h">🛒 Pedidos web — La Central</span>
+          <button class="btn btn-r" onclick="loadPeds()">↻ Actualizar</button>
+        </div>
+        <div class="content">
+          <div class="tw">
+            <div class="ts">
+              <table>
+                <thead><tr><th>ID</th><th>Cliente</th><th>Teléfono</th><th>Productos</th><th>Total</th><th>Estado</th><th>Hora</th></tr></thead>
+                <tbody id="pedBody"><tr><td colspan="7" style="text-align:center;padding:48px;color:var(--muted)">Cargando…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- IMPORT MODAL -->
+<div class="mbg" id="impM">
+  <div class="modal">
+    <div class="mh"><h3>⬆ Importar stock</h3><button class="mx" onclick="closeImp()">✕</button></div>
+    <p class="mp">Sube el archivo Excel de tu sistema. Columnas: <strong>Descripción · Laboratorio · Unidad · Precio · Precio Unitario</strong></p>
+    <div class="dz" id="dz" onclick="document.getElementById('fin').click()"
+         ondragover="event.preventDefault();this.classList.add('dr')"
+         ondragleave="this.classList.remove('dr')"
+         ondrop="onDrop(event)">
+      <div class="di">📂</div>
+      <p>Arrastra aquí o <strong>selecciona el archivo</strong></p>
+      <p style="font-size:11px;margin-top:4px">.xlsx · .xls</p>
+    </div>
+    <input type="file" id="fin" accept=".xlsx,.xls" onchange="onFile(this.files[0])"/>
+    <div class="prev" id="prev"></div>
+    <div class="ma">
+      <button class="btn btn-o" onclick="closeImp()">Cancelar</button>
+      <button class="btn btn-t" id="bImp" onclick="doImport()" disabled>Subir a Sheets</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="t"></div>
+
+<script>
+const GID   = 'TU_CLIENT_ID.apps.googleusercontent.com'; // ← Reemplaza
+const TIEN  = 'CENTRAL';
+const API_P = `/api/productos?tienda=${TIEN}&all=1`;
+const API_O = `/api/pedidos?tienda=${TIEN}`;
+const API_I = `/api/import-stock`;
+const API_A = `/api/auth-check`;
+
+let tok='', prods=[], shown=[], imp=[], cur=1, PER=50, sK='descripcion', sA=true;
+
+/* AUTH */
+function doLogin(){
+  google.accounts.id.initialize({client_id:GID,callback:onG});
+  google.accounts.id.prompt();
+}
+async function onG(resp){
+  try{
+    const r=await fetch(API_A,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({credential:resp.credential,tienda:TIEN})});
+    const d=await r.json();
+    if(!d.ok){msg('❌ '+(d.error||'Sin acceso'),'er');return;}
+    tok=resp.credential;
+    const pl=JSON.parse(atob(resp.credential.split('.')[1]));
+    document.getElementById('avNm').textContent=pl.name;
+    document.getElementById('avImg').src=pl.picture;
+    document.getElementById('loginWrap').style.display='none';
+    document.getElementById('app').style.display='block';
+    loadProds();
+  }catch(e){msg('❌ Error auth','er');}
+}
+function logout(){tok='';document.getElementById('loginWrap').style.display='flex';document.getElementById('app').style.display='none';google.accounts.id.disableAutoSelect();}
+
+/* NAV */
+function navTo(p,el){
+  document.querySelectorAll('.nv').forEach(n=>n.classList.remove('on'));el.classList.add('on');
+  document.getElementById('pgInv').style.display=p==='inv'?'block':'none';
+  document.getElementById('pgPed').style.display=p==='ped'?'block':'none';
+  if(p==='ped')loadPeds();
+}
+
+/* PRODS */
+async function loadProds(){
+  try{
+    const r=await fetch(API_P,{headers:{Authorization:'Bearer '+tok}});
+    prods=await r.json();shown=[...prods];
+    buildSel();setKpis();filt();
+  }catch(e){msg('❌ Error cargando','er');}
+}
+function reload(){loadProds();msg('🔄 Actualizando…','ok');}
+function buildSel(){
+  const labs=[...new Set(prods.map(p=>p.laboratorio).filter(Boolean))].sort();
+  const s=document.getElementById('sLab');
+  s.innerHTML='<option value="">Todos los laboratorios</option>'+labs.map(l=>`<option>${l}</option>`).join('');
+}
+function setKpis(){
+  document.getElementById('kT').textContent=prods.length.toLocaleString('es-CO');
+  document.getElementById('kL').textContent=new Set(prods.map(p=>p.laboratorio).filter(Boolean)).size;
+  document.getElementById('kP').textContent=prods.filter(p=>p.precioUnitario).length.toLocaleString('es-CO');
+}
+function pn(v){return parseInt((v||'0').toString().replace(/[^0-9]/g,''))||0}
+function cop(v){const n=pn(v);return n?'$'+n.toLocaleString('es-CO'):'—'}
+function filt(){
+  const q=document.getElementById('srch').value.toLowerCase().trim();
+  const lab=document.getElementById('sLab').value;
+  const ord=document.getElementById('sOrd').value;
+  shown=prods.filter(p=>(!q||p.descripcion.toLowerCase().includes(q)||(p.laboratorio||'').toLowerCase().includes(q))&&(!lab||p.laboratorio===lab))
+    .map(p=>({...p,_p:pn(p.precio),_pu:pn(p.precioUnitario||p.precio)}));
+  shown.sort((a,b)=>{
+    if(ord==='l')return(a.laboratorio||'').localeCompare(b.laboratorio||'');
+    if(ord==='pa')return a._pu-b._pu;
+    if(ord==='pd')return b._pu-a._pu;
+    return a.descripcion.localeCompare(b.descripcion);
+  });
+  cur=1;tbl();
+}
+function thS(col,th){
+  if(sK===col)sA=!sA;else{sK=col;sA=true;}
+  document.querySelectorAll('thead th').forEach(t=>t.className='');
+  th.className=sA?'asc':'desc';
+  shown.sort((a,b)=>{const va=a[col]||'',vb=b[col]||'';const r=typeof va==='number'?va-vb:va.toString().localeCompare(vb.toString());return sA?r:-r;});
+  cur=1;tbl();
+}
+function tbl(){
+  const st=(cur-1)*PER,pg=shown.slice(st,st+PER),body=document.getElementById('tbody');
+  if(!shown.length){body.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:48px;color:var(--muted)"><div style="font-size:36px;margin-bottom:10px">🔍</div>Sin resultados</td></tr>`;document.getElementById('pgInf').textContent='0';document.getElementById('pgBtns').innerHTML='';return;}
+  body.innerHTML=pg.map(p=>`
+    <tr>
+      <td class="tnm" title="${p.descripcion}">${p.descripcion}</td>
+      <td class="tl">${p.laboratorio||'—'}</td>
+      <td><span class="pill">${p.unidad||'—'}</span></td>
+      <td class="tp">${cop(p.precio)}</td>
+      <td><div class="tp">${cop(p.precioUnitario)}</div>${p.precioUnitario&&p.precio&&p.precioUnitario!==p.precio?`<div class="tps">caja ${cop(p.precio)}</div>`:''}</td>
+    </tr>`).join('');
+  const tot=shown.length,pages=Math.ceil(tot/PER);
+  document.getElementById('pgInf').textContent=`${st+1}–${Math.min(st+PER,tot)} de ${tot.toLocaleString('es-CO')}`;
+  const pgb=document.getElementById('pgBtns');pgb.innerHTML='';
+  let from=Math.max(1,cur-2),to=Math.min(pages,from+4);
+  for(let i=from;i<=to;i++){const b=document.createElement('button');b.className='pb'+(i===cur?' cur':'');b.textContent=i;const pg=i;b.onclick=()=>{cur=pg;tbl();};pgb.appendChild(b);}
+}
+
+/* PEDIDOS */
+async function loadPeds(){
+  try{
+    const r=await fetch(API_O,{headers:{Authorization:'Bearer '+tok}});
+    const d=await r.json();
+    const body=document.getElementById('pedBody');
+    if(!d.length){body.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:48px;color:var(--muted)">Sin pedidos aún</td></tr>`;return;}
+    body.innerHTML=d.map(p=>`<tr><td style="font-size:11px;color:var(--muted)">${p.id}</td><td style="font-weight:700">${p.cliente}</td><td>${p.telefono}</td><td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.productos}</td><td class="tp">${cop(p.total)}</td><td><span class="pill">${p.estado}</span></td><td style="font-size:12px;color:var(--muted)">${p.hora}</td></tr>`).join('');
+  }catch(e){msg('❌ Error pedidos','er');}
+}
+
+/* IMPORT */
+function openImp(){document.getElementById('impM').classList.add('open')}
+function closeImp(){document.getElementById('impM').classList.remove('open');document.getElementById('prev').style.display='none';document.getElementById('bImp').disabled=true;imp=[];}
+function onDrop(ev){ev.preventDefault();document.getElementById('dz').classList.remove('dr');if(ev.dataTransfer.files[0])onFile(ev.dataTransfer.files[0]);}
+function onFile(file){
+  if(!file)return;
+  const rd=new FileReader();
+  rd.onload=e=>{
+    const wb=XLSX.read(e.target.result,{type:'binary'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const data=XLSX.utils.sheet_to_json(ws,{defval:''});
+    const get=(row,keys,...ns)=>{for(const n of ns){const k=keys.find(k=>k.toLowerCase().replace(/[^a-z]/g,'').includes(n));if(k)return(row[k]||'').toString().trim();}return'';};
+    imp=data.map(row=>{const keys=Object.keys(row);return{
+      descripcion:get(row,keys,'descripci','descrip','nombre','produc'),
+      laboratorio:get(row,keys,'laborator','lab','marca'),
+      unidad:get(row,keys,'unidad','unit','presentac'),
+      precio:get(row,keys,'precio','price','valor','vta'),
+      precioUnitario:get(row,keys,'unitario','unitprice','porunit'),
+    };}).filter(r=>r.descripcion);
+    const prev=document.getElementById('prev');
+    prev.style.display='block';prev.innerHTML=`✅ <strong>${imp.length}</strong> productos de <em>${file.name}</em>`;
+    document.getElementById('bImp').disabled=imp.length===0;
+  };
+  rd.readAsBinaryString(file);
+}
+async function doImport(){
+  const btn=document.getElementById('bImp');btn.disabled=true;btn.textContent='Importando…';
+  try{
+    const r=await fetch(API_I,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok},body:JSON.stringify({tienda:TIEN,productos:imp})});
+    const d=await r.json();if(!r.ok)throw new Error(d.error);
+    msg('✅ '+d.count+' productos importados','ok');closeImp();reload();
+  }catch(e){msg('❌ '+e.message,'er');}
+  finally{btn.disabled=false;btn.textContent='Subir a Sheets';}
+}
+
+/* TOAST */
+let tt;
+function msg(m,t='ok'){const el=document.getElementById('t');el.textContent=m;el.className='toast '+t+' show';clearTimeout(tt);tt=setTimeout(()=>el.className='toast '+t,3200);}
+</script>
+</body>
+</html>

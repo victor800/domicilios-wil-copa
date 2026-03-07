@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="theme-color" content="#050d1a"/>
+<title>Droguería Farma Expertos · Copacabana</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;0,9..144,900;1,9..144,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+/* ═══════════════════════════════════════════════
+   TOKENS
+═══════════════════════════════════════════════ */
+:root {
+  --ink:      #e8f0e9;
+  --ink2:     #a0b4a2;
+  --bg:       #050d1a;
+  --bg2:      #0c1828;
+  --bg3:      #142030;
+  --glass:    rgba(20,32,48,0.85);
+  --green:    #4ade80;
+  --teal:     #2dd4bf;
+  --gold:     #fbbf24;
+  --red:      #f87171;
+  --border:   rgba(255,255,255,0.06);
+  --r:        14px;
+}
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0 }
+html { scroll-behavior:smooth }
+
+body {
+  font-family:'Plus Jakarta Sans', sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* AMBIENT GLOW */
+body::before {
+  content:'';
+  position:fixed; inset:0; pointer-events:none; z-index:0;
+  background:
+    radial-gradient(ellipse 70% 50% at 15% -10%, rgba(74,222,128,0.09) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 40% at 85% 110%, rgba(45,212,191,0.07) 0%, transparent 55%);
+}
+
+/* ═══ HEADER ═══ */
+header {
+  position:sticky; top:0; z-index:100;
+  background:rgba(5,13,26,0.8);
+  backdrop-filter:blur(24px) saturate(1.4);
+  border-bottom:1px solid var(--border);
+}
+.hdr {
+  max-width:1200px; margin:0 auto;
+  padding:0 20px;
+  height:64px;
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+}
+.logo { display:flex; align-items:center; gap:10px; text-decoration:none }
+.logo-mark {
+  width:40px; height:40px; border-radius:10px; flex-shrink:0;
+  background:linear-gradient(135deg, #16a34a, #0d9488);
+  display:grid; place-items:center; font-size:20px;
+  box-shadow:0 0 16px rgba(74,222,128,0.3);
+}
+.logo-words { line-height:1.15 }
+.logo-name {
+  font-family:'Fraunces', serif; font-size:14px; font-weight:700; color:var(--ink);
+  display:block;
+}
+.logo-city { font-size:10px; color:var(--green); letter-spacing:2px; text-transform:uppercase }
+.cart-pill {
+  display:flex; align-items:center; gap:8px;
+  padding:8px 16px; border-radius:50px;
+  background:var(--bg3); border:1px solid var(--border);
+  color:var(--ink); font-size:13px; font-weight:600; cursor:pointer;
+  transition:all .2s; position:relative;
+}
+.cart-pill:hover { border-color:var(--green); color:var(--green) }
+.cart-badge {
+  position:absolute; top:-5px; right:-5px;
+  width:18px; height:18px; border-radius:50%;
+  background:var(--green); color:#000; font-size:10px; font-weight:800;
+  display:grid; place-items:center;
+  opacity:0; transform:scale(.4); transition:.2s;
+}
+.cart-badge.on { opacity:1; transform:scale(1) }
+
+/* ═══ HERO ═══ */
+.hero {
+  position:relative; z-index:1;
+  padding:64px 20px 40px;
+  text-align:center;
+}
+.hero-tag {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:5px 16px; border-radius:50px;
+  background:rgba(74,222,128,0.08); border:1px solid rgba(74,222,128,0.2);
+  color:var(--green); font-size:11px; font-weight:700; letter-spacing:2px;
+  text-transform:uppercase; margin-bottom:20px;
+}
+.hero h1 {
+  font-family:'Fraunces', serif;
+  font-size:clamp(32px,7vw,64px); font-weight:900; line-height:1.0;
+  margin-bottom:10px;
+}
+.hero h1 em {
+  font-style:italic; font-weight:300;
+  background:linear-gradient(90deg,var(--green) 0%, var(--teal) 100%);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.hero p { color:var(--ink2); font-size:15px; margin-bottom:32px }
+
+/* SEARCH */
+.search-box {
+  max-width:560px; margin:0 auto; position:relative;
+}
+.search-box input {
+  width:100%;
+  padding:15px 50px 15px 50px;
+  background:var(--bg2); border:1.5px solid var(--border);
+  border-radius:50px; color:var(--ink);
+  font-size:15px; font-family:'Plus Jakarta Sans',sans-serif;
+  outline:none; transition:.25s;
+}
+.search-box input:focus { border-color:var(--green); background:var(--bg3) }
+.search-box input::placeholder { color:var(--ink2) }
+.s-icon { position:absolute; left:18px; top:50%; transform:translateY(-50%); font-size:18px; pointer-events:none }
+.s-clear {
+  position:absolute; right:16px; top:50%; transform:translateY(-50%);
+  background:none; border:none; color:var(--ink2); cursor:pointer;
+  font-size:18px; display:none; padding:2px;
+}
+
+/* ═══ FILTER BAR ═══ */
+.filters {
+  position:relative; z-index:1;
+  max-width:1200px; margin:0 auto;
+  padding:0 20px 20px;
+  display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+}
+.chip {
+  padding:6px 16px; border-radius:50px;
+  background:var(--bg3); border:1px solid var(--border);
+  color:var(--ink2); font-size:12px; font-weight:600; cursor:pointer;
+  transition:.2s; white-space:nowrap;
+}
+.chip:hover { border-color:rgba(74,222,128,0.4); color:var(--green) }
+.chip.on { background:rgba(74,222,128,0.12); border-color:var(--green); color:var(--green) }
+.count-tag { margin-left:auto; font-size:12px; color:var(--ink2); white-space:nowrap }
+
+/* ═══ GRID ═══ */
+.grid {
+  position:relative; z-index:1;
+  max-width:1200px; margin:0 auto;
+  padding:0 20px 120px;
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(180px,1fr));
+  gap:14px;
+}
+
+/* ═══ CARD ═══ */
+.card {
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:var(--r); overflow:hidden;
+  display:flex; flex-direction:column;
+  cursor:pointer; position:relative;
+  transition:transform .25s, border-color .25s, box-shadow .25s;
+}
+.card::after {
+  content:''; position:absolute; inset:0; border-radius:var(--r);
+  background:linear-gradient(135deg,rgba(74,222,128,0.04),transparent);
+  opacity:0; transition:.25s; pointer-events:none;
+}
+.card:hover { transform:translateY(-5px); border-color:rgba(74,222,128,0.25); box-shadow:0 20px 48px rgba(0,0,0,.5) }
+.card:hover::after { opacity:1 }
+
+.card-pic {
+  height:100px; flex-shrink:0;
+  display:grid; place-items:center; font-size:42px;
+  background:linear-gradient(135deg,var(--bg3),rgba(74,222,128,0.04));
+  border-bottom:1px solid var(--border);
+}
+.card-body { padding:14px; flex:1; display:flex; flex-direction:column; gap:5px }
+.card-name {
+  font-size:13px; font-weight:600; line-height:1.35;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+.card-lab { font-size:11px; color:var(--ink2); text-transform:uppercase; letter-spacing:.5px }
+.card-unit { font-size:11px; color:var(--ink2) }
+.card-foot {
+  margin-top:auto; padding-top:12px;
+  display:flex; align-items:center; justify-content:space-between; gap:6px;
+}
+.card-price {
+  font-family:'Fraunces',serif; font-size:20px; font-weight:700; color:var(--green);
+}
+.card-price-unit { font-size:10px; color:var(--ink2); margin-top:1px }
+.add-btn {
+  width:34px; height:34px; flex-shrink:0; border-radius:9px;
+  background:rgba(74,222,128,0.12); border:1px solid rgba(74,222,128,0.25);
+  color:var(--green); font-size:22px; display:grid; place-items:center;
+  cursor:pointer; transition:.2s;
+}
+.add-btn:hover { background:var(--green); color:#000; border-color:var(--green) }
+.add-btn:active { transform:scale(.9) }
+
+/* STATES */
+.state { grid-column:1/-1; text-align:center; padding:80px 20px; color:var(--ink2) }
+.spin {
+  width:40px; height:40px; margin:0 auto 16px;
+  border:3px solid var(--border); border-top-color:var(--green);
+  border-radius:50%; animation:turn .7s linear infinite;
+}
+@keyframes turn { to { transform:rotate(360deg) } }
+
+/* ═══ DRAWER ═══ */
+.shade {
+  position:fixed; inset:0; z-index:200;
+  background:rgba(0,0,0,.65); opacity:0; pointer-events:none; transition:.3s;
+}
+.shade.open { opacity:1; pointer-events:all }
+
+.drawer {
+  position:fixed; right:0; top:0; bottom:0; z-index:201;
+  width:min(440px,100vw);
+  background:var(--bg2); border-left:1px solid var(--border);
+  display:flex; flex-direction:column;
+  transform:translateX(110%); transition:.35s cubic-bezier(.4,0,.2,1);
+}
+.drawer.open { transform:translateX(0) }
+
+.drw-head {
+  padding:20px 20px 16px;
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+}
+.drw-title { font-family:'Fraunces',serif; font-size:22px; font-weight:700 }
+.drw-close {
+  width:34px; height:34px; border-radius:8px;
+  background:var(--bg3); border:1px solid var(--border);
+  color:var(--ink2); cursor:pointer; font-size:20px;
+  display:grid; place-items:center; transition:.15s;
+}
+.drw-close:hover { color:var(--red); border-color:rgba(248,113,113,0.3) }
+
+.drw-body { flex:1; overflow-y:auto; padding:16px }
+.drw-empty { text-align:center; padding:60px 20px; color:var(--ink2) }
+.drw-empty .big { font-size:48px; margin-bottom:12px }
+
+.ci {
+  display:flex; align-items:center; gap:12px;
+  padding:12px 0; border-bottom:1px solid var(--border);
+}
+.ci:last-child { border-bottom:none }
+.ci-ico {
+  width:46px; height:46px; flex-shrink:0; border-radius:10px;
+  background:var(--bg3); display:grid; place-items:center; font-size:22px;
+}
+.ci-inf { flex:1; min-width:0 }
+.ci-nm { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.ci-pr { font-size:12px; color:var(--green); margin-top:2px }
+.qty {
+  display:flex; align-items:center; gap:6px; flex-shrink:0;
+}
+.q-btn {
+  width:28px; height:28px; border-radius:7px;
+  background:var(--bg3); border:1px solid var(--border);
+  color:var(--ink); cursor:pointer; font-size:17px;
+  display:grid; place-items:center; transition:.15s;
+}
+.q-btn:hover { background:var(--green); color:#000; border-color:var(--green) }
+.q-num { font-size:14px; font-weight:700; min-width:22px; text-align:center }
+.ci-del {
+  background:none; border:none; color:var(--ink2); cursor:pointer;
+  font-size:17px; padding:4px; transition:.15s;
+}
+.ci-del:hover { color:var(--red) }
+
+.drw-foot { padding:16px; border-top:1px solid var(--border) }
+.tot-row {
+  display:flex; justify-content:space-between; align-items:baseline;
+  margin-bottom:16px;
+}
+.tot-lbl { font-size:13px; color:var(--ink2) }
+.tot-val { font-family:'Fraunces',serif; font-size:28px; color:var(--green); font-weight:700 }
+
+/* FORM */
+.form { display:flex; flex-direction:column; gap:10px }
+.row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px }
+.fld { display:flex; flex-direction:column; gap:4px }
+.fld label { font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--ink2) }
+.fld input, .fld select {
+  padding:11px 14px;
+  background:var(--bg3); border:1.5px solid var(--border);
+  border-radius:10px; color:var(--ink);
+  font-size:14px; font-family:'Plus Jakarta Sans',sans-serif;
+  outline:none; transition:.2s;
+}
+.fld input:focus, .fld select:focus { border-color:var(--green) }
+.fld input::placeholder { color:var(--ink2) }
+.fld select option { background:var(--bg2) }
+.send-btn {
+  padding:15px; border-radius:12px; border:none;
+  background:linear-gradient(135deg,#16a34a,#0d9488);
+  color:#fff; font-size:15px; font-weight:700;
+  font-family:'Plus Jakarta Sans',sans-serif;
+  cursor:pointer; letter-spacing:.3px;
+  transition:.2s; box-shadow:0 4px 20px rgba(74,222,128,0.2);
+}
+.send-btn:hover { transform:translateY(-2px); box-shadow:0 8px 28px rgba(74,222,128,0.3) }
+.send-btn:disabled { opacity:.5; cursor:not-allowed; transform:none }
+
+/* TOAST */
+.toast {
+  position:fixed; bottom:24px; left:50%;
+  transform:translateX(-50%) translateY(70px);
+  z-index:400; pointer-events:none;
+  background:var(--bg3); border:1px solid var(--border);
+  color:var(--ink); padding:12px 22px; border-radius:50px;
+  font-size:13px; font-weight:600;
+  transition:.3s cubic-bezier(.4,0,.2,1); white-space:nowrap;
+  box-shadow:0 8px 32px rgba(0,0,0,.4);
+}
+.toast.show { transform:translateX(-50%) translateY(0) }
+
+/* MOBILE */
+@media(max-width:580px) {
+  .grid { grid-template-columns:repeat(2,1fr); gap:10px }
+  .card-pic { height:82px; font-size:34px }
+  .row2 { grid-template-columns:1fr }
+  .hero { padding:40px 20px 28px }
+}
+
+/* ANIM */
+@keyframes up { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:none} }
+.card { animation:up .35s ease both }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hdr">
+    <a class="logo" href="#">
+      <div class="logo-mark">💊</div>
+      <div class="logo-words">
+        <span class="logo-name">Farma Expertos</span>
+        <span class="logo-city">Copacabana · Antioquia</span>
+      </div>
+    </a>
+    <button class="cart-pill" id="cartBtn" onclick="toggleDrawer()">
+      🛒 <span id="cartLabel">Carrito</span>
+      <span class="cart-badge" id="cartBadge">0</span>
+    </button>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="hero-tag">⚡ Domicilio express</div>
+  <h1>Tu farmacia,<br/><em>a domicilio</em></h1>
+  <p>Medicamentos y productos de salud · Copacabana, Antioquia</p>
+  <div class="search-box">
+    <span class="s-icon">🔍</span>
+    <input id="q" type="text" placeholder="Buscar por nombre o laboratorio…"
+           oninput="onSearch(this.value)"/>
+    <button class="s-clear" id="clrBtn" onclick="clearQ()">✕</button>
+  </div>
+</section>
+
+<div class="filters" id="filterBar">
+  <button class="chip on" onclick="setLab('',this)">Todo</button>
+  <span class="count-tag" id="cntTag"></span>
+</div>
+
+<div class="grid" id="grid">
+  <div class="state"><div class="spin"></div><p>Cargando productos…</p></div>
+</div>
+
+<!-- shade + drawer -->
+<div class="shade" id="shade" onclick="toggleDrawer()"></div>
+<aside class="drawer" id="drawer">
+  <div class="drw-head">
+    <span class="drw-title">Tu pedido 🛒</span>
+    <button class="drw-close" onclick="toggleDrawer()">✕</button>
+  </div>
+  <div class="drw-body" id="drwBody">
+    <div class="drw-empty"><div class="big">🛍️</div><p>Tu carrito está vacío</p></div>
+  </div>
+  <div class="drw-foot" id="drwFoot" style="display:none">
+    <div class="tot-row">
+      <span class="tot-lbl">Total estimado</span>
+      <span class="tot-val" id="totVal">$0</span>
+    </div>
+    <div class="form" id="checkForm">
+      <div class="row2">
+        <div class="fld"><label>Nombre</label>
+          <input id="fNm" type="text" placeholder="Tu nombre"/></div>
+        <div class="fld"><label>Teléfono</label>
+          <input id="fTel" type="tel" placeholder="300 000 0000"/></div>
+      </div>
+      <div class="fld"><label>Dirección de entrega</label>
+        <input id="fDir" type="text" placeholder="Cra 50 #30-20 · Barrio…"/></div>
+      <div class="fld"><label>Pago</label>
+        <select id="fPago">
+          <option value="EFECTIVO">💵 Efectivo</option>
+          <option value="NEQUI">📱 Nequi</option>
+          <option value="DAVIPLATA">💙 Daviplata</option>
+          <option value="TRANSFERENCIA">🏦 Transferencia bancaria</option>
+        </select>
+      </div>
+      <button class="send-btn" id="sendBtn" onclick="enviar()">Enviar pedido →</button>
+    </div>
+  </div>
+</aside>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ── CONFIG ───────────────────────────────────── */
+const TIENDA   = 'EXPERTOS';
+const API_PRODS = `/api/productos?tienda=${TIENDA}`;
+const API_PED   = `/api/pedido`;
+
+/* ── STATE ───────────────────────────────────── */
+let all = [], shown = [], cart = [], labActive = '';
+
+/* ── LOAD ────────────────────────────────────── */
+async function load() {
+  try {
+    const r = await fetch(API_PRODS);
+    if (!r.ok) throw new Error(r.status);
+    all = await r.json();
+    shown = [...all];
+    buildLabChips();
+    render(shown);
+  } catch(e) {
+    document.getElementById('grid').innerHTML =
+      `<div class="state">
+         <div style="font-size:52px;margin-bottom:12px">⚠️</div>
+         <p style="font-size:15px">No pudimos cargar los productos.<br>Intenta de nuevo más tarde.</p>
+       </div>`;
+  }
+}
+
+function buildLabChips() {
+  const labs = [...new Set(all.map(p=>p.laboratorio).filter(Boolean))].sort();
+  const bar = document.getElementById('filterBar');
+  labs.slice(0,14).forEach(l => {
+    const b = document.createElement('button');
+    b.className = 'chip'; b.textContent = l;
+    b.onclick = () => setLab(l, b);
+    bar.insertBefore(b, document.getElementById('cntTag'));
+  });
+}
+
+function setLab(lab, el) {
+  labActive = lab;
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+  el.classList.add('on');
+  applyFilters();
+}
+
+function onSearch(v) {
+  document.getElementById('clrBtn').style.display = v ? 'block' : 'none';
+  applyFilters();
+}
+function clearQ() {
+  document.getElementById('q').value = '';
+  document.getElementById('clrBtn').style.display = 'none';
+  applyFilters();
+}
+
+function applyFilters() {
+  const q = document.getElementById('q').value.toLowerCase().trim();
+  shown = all.filter(p => {
+    const mL = !labActive || p.laboratorio === labActive;
+    const mQ = !q || p.descripcion.toLowerCase().includes(q)
+                  || (p.laboratorio||'').toLowerCase().includes(q);
+    return mL && mQ;
+  });
+  render(shown);
+}
+
+/* ── RENDER ──────────────────────────────────── */
+function ico(d) {
+  d = d.toLowerCase();
+  if (/jarabe|suspens|soluci/.test(d))      return '🍯';
+  if (/crema|gel|ungüento|pomada/.test(d))  return '🧴';
+  if (/gotas|colirio|nasal/.test(d))        return '💧';
+  if (/inyect|ampolla|vial/.test(d))        return '💉';
+  if (/vitamina|mineral|suplemento/.test(d))return '🌿';
+  if (/antibió|antibio/.test(d))            return '🔬';
+  if (/analg|dolor|ibupro|acetamin/.test(d))return '🩹';
+  if (/preserv|condon/.test(d))             return '🛡️';
+  return '💊';
+}
+function cop(v) {
+  const n = parseInt((v||'0').toString().replace(/[^0-9]/g,''))||0;
+  return n ? '$'+n.toLocaleString('es-CO') : '—';
+}
+function pn(v) { return parseInt((v||'0').toString().replace(/[^0-9]/g,''))||0; }
+
+function render(list) {
+  document.getElementById('cntTag').textContent =
+    list.length + ' producto' + (list.length!==1?'s':'');
+  const g = document.getElementById('grid');
+  if (!list.length) {
+    g.innerHTML = `<div class="state">
+      <div style="font-size:48px;margin-bottom:12px">🔍</div>
+      <p>Sin resultados para esa búsqueda.</p></div>`;
+    return;
+  }
+  g.innerHTML = list.map((p,i) => `
+    <div class="card" style="animation-delay:${(i%16)*.035}s">
+      <div class="card-pic">${ico(p.descripcion)}</div>
+      <div class="card-body">
+        <div class="card-name" title="${p.descripcion}">${p.descripcion}</div>
+        <div class="card-lab">${p.laboratorio||'—'}</div>
+        <div class="card-unit">${p.unidad||''}</div>
+        <div class="card-foot">
+          <div>
+            <div class="card-price">${cop(p.precioUnitario||p.precio)}</div>
+            ${p.precioUnitario && p.precio && p.precioUnitario!==p.precio
+              ? `<div class="card-price-unit">caja ${cop(p.precio)}</div>` : ''}
+          </div>
+          <button class="add-btn" onclick="addCart(${i})" title="Agregar al carrito">+</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+/* ── CART ────────────────────────────────────── */
+function addCart(idx) {
+  const p = shown[idx];
+  const e = cart.find(c => c.descripcion===p.descripcion);
+  if (e) e.qty++; else cart.push({...p, qty:1, unit: pn(p.precioUnitario||p.precio)});
+  syncCart();
+  toast('➕ '+p.descripcion.slice(0,28)+'…');
+}
+function adjQty(i, d) {
+  cart[i].qty += d;
+  if (cart[i].qty < 1) cart.splice(i,1);
+  syncCart();
+}
+function delItem(i) { cart.splice(i,1); syncCart(); }
+
+function syncCart() {
+  const n   = cart.reduce((s,c)=>s+c.qty, 0);
+  const tot = cart.reduce((s,c)=>s+c.unit*c.qty, 0);
+
+  const badge = document.getElementById('cartBadge');
+  badge.textContent = n;
+  badge.classList.toggle('on', n>0);
+  document.getElementById('cartLabel').textContent = n>0 ? `Carrito (${n})` : 'Carrito';
+  document.getElementById('totVal').textContent = '$'+tot.toLocaleString('es-CO');
+
+  const body = document.getElementById('drwBody');
+  const foot = document.getElementById('drwFoot');
+  if (!cart.length) {
+    body.innerHTML = `<div class="drw-empty"><div class="big">🛍️</div><p>Tu carrito está vacío</p></div>`;
+    foot.style.display = 'none';
+    return;
+  }
+  foot.style.display = 'flex';
+  body.innerHTML = cart.map((c,i)=>`
+    <div class="ci">
+      <div class="ci-ico">${ico(c.descripcion)}</div>
+      <div class="ci-inf">
+        <div class="ci-nm">${c.descripcion}</div>
+        <div class="ci-pr">${cop(c.unit)} c/u</div>
+      </div>
+      <div class="qty">
+        <button class="q-btn" onclick="adjQty(${i},-1)">−</button>
+        <span class="q-num">${c.qty}</span>
+        <button class="q-btn" onclick="adjQty(${i},+1)">+</button>
+      </div>
+      <button class="ci-del" onclick="delItem(${i})">🗑</button>
+    </div>`).join('');
+}
+
+/* ── TOGGLE DRAWER ───────────────────────────── */
+function toggleDrawer() {
+  document.getElementById('drawer').classList.toggle('open');
+  document.getElementById('shade').classList.toggle('open');
+}
+
+/* ── ENVIAR ──────────────────────────────────── */
+async function enviar() {
+  const nm  = document.getElementById('fNm').value.trim();
+  const tel = document.getElementById('fTel').value.trim();
+  const dir = document.getElementById('fDir').value.trim();
+  const pg  = document.getElementById('fPago').value;
+  if (!nm||!tel||!dir) { toast('⚠️ Completa todos los campos'); return; }
+  if (!cart.length)    { toast('⚠️ El carrito está vacío'); return; }
+  const btn = document.getElementById('sendBtn');
+  btn.disabled = true; btn.textContent = 'Enviando…';
+  try {
+    const tot = cart.reduce((s,c)=>s+c.unit*c.qty,0);
+    const res = await fetch(API_PED, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        tienda:TIENDA, nombre:nm, telefono:tel, direccion:dir, metodoPago:pg, total:tot,
+        negocioNombre: 'Droguería Farma Expertos',
+        carrito: cart.map(c=>({
+          descripcion:c.descripcion, laboratorio:c.laboratorio, unidad:c.unidad,
+          cantidad:c.qty, precioUnitario:c.unit, subtotal:c.unit*c.qty
+        }))
+      })
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error||'Error al enviar');
+    toast('✅ ¡Pedido enviado! ID: '+d.id);
+    cart = []; syncCart(); toggleDrawer();
+    ['fNm','fTel','fDir'].forEach(id=>document.getElementById(id).value='');
+  } catch(e) { toast('❌ '+e.message); }
+  finally { btn.disabled=false; btn.textContent='Enviar pedido →'; }
+}
+
+/* ── TOAST ───────────────────────────────────── */
+let tt;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(tt); tt = setTimeout(()=>el.classList.remove('show'), 2800);
+}
+
+load();
+</script>
+</body>
+</html>
