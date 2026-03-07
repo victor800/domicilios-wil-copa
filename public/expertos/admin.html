@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Admin · Farma Expertos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg:#f0f4f0; --s:#fff; --s2:#f5f8f5; --s3:#e8f0e8;
+  --border:#d4e0d4; --accent:#16a34a; --a2:#0d9488;
+  --danger:#dc2626; --warn:#b45309;
+  --text:#0f1f0f; --muted:#5a7060;
+  --r:12px;
+  --sh:0 1px 4px rgba(0,40,0,.07),0 4px 20px rgba(0,40,0,.05);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;min-height:100vh}
+
+/* ═══ LOGIN ═══ */
+#loginWrap {
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(145deg,#0a1a0e 0%,#0f2d20 40%,#061018 100%);
+  position:relative; overflow:hidden;
+}
+#loginWrap::before {
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:
+    radial-gradient(ellipse 600px 500px at 20% 30%, rgba(22,163,74,.18) 0%, transparent 60%),
+    radial-gradient(ellipse 500px 400px at 80% 70%, rgba(13,148,136,.12) 0%, transparent 60%);
+}
+/* Decorative cross pattern */
+#loginWrap::after {
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background-image:
+    linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+  background-size:48px 48px;
+}
+.login-box {
+  position:relative; z-index:1;
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.1);
+  backdrop-filter:blur(28px);
+  border-radius:24px; padding:52px 44px;
+  width:min(420px,92vw); text-align:center;
+}
+.lbox-cross {
+  width:72px; height:72px; margin:0 auto 24px;
+  border-radius:20px; font-size:36px;
+  background:linear-gradient(135deg,#16a34a,#0d9488);
+  display:grid; place-items:center;
+  box-shadow:0 0 40px rgba(22,163,74,.35);
+}
+.lbox-title {
+  font-family:'Fraunces',serif; font-size:28px; font-weight:900;
+  color:#fff; margin-bottom:4px;
+}
+.lbox-sub { font-size:14px; color:rgba(255,255,255,.45); margin-bottom:40px }
+.g-btn {
+  width:100%; padding:15px 20px;
+  display:flex; align-items:center; justify-content:center; gap:12px;
+  background:#fff; border:none; border-radius:12px;
+  font-size:15px; font-weight:700; color:#1a1a1a; cursor:pointer;
+  transition:.2s; font-family:'Plus Jakarta Sans',sans-serif;
+}
+.g-btn:hover { transform:translateY(-2px); box-shadow:0 10px 28px rgba(0,0,0,.3) }
+.g-btn img { width:22px }
+.lbox-note { font-size:11px; color:rgba(255,255,255,.3); margin-top:20px; line-height:1.5 }
+
+/* ═══ APP ═══ */
+#app { display:none }
+.wrap { display:flex; min-height:100vh }
+
+/* SIDEBAR */
+.sb {
+  width:230px; flex-shrink:0;
+  background:var(--s); border-right:1px solid var(--border);
+  display:flex; flex-direction:column;
+  position:sticky; top:0; height:100vh; overflow-y:auto;
+}
+.sb-top {
+  padding:18px 16px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:10px;
+}
+.sb-icon {
+  width:38px; height:38px; border-radius:10px; flex-shrink:0;
+  background:linear-gradient(135deg,#16a34a,#0d9488);
+  display:grid; place-items:center; font-size:20px;
+}
+.sb-name { font-family:'Fraunces',serif; font-size:13px; font-weight:700; line-height:1.2 }
+.sb-tag  { font-size:10px; color:var(--accent); letter-spacing:1.5px; text-transform:uppercase }
+
+.sb-nav { flex:1; padding:10px 8px }
+.nv {
+  display:flex; align-items:center; gap:9px;
+  padding:10px 10px; border-radius:8px;
+  font-size:13px; font-weight:600; color:var(--muted); cursor:pointer;
+  transition:.15s; margin-bottom:2px;
+}
+.nv:hover { background:var(--s2); color:var(--text) }
+.nv.on { background:rgba(22,163,74,.1); color:var(--accent) }
+.nv-ico { font-size:17px; width:22px; text-align:center }
+
+.sb-bot {
+  padding:14px; border-top:1px solid var(--border);
+  display:flex; align-items:center; gap:10px;
+}
+.av { width:36px; height:36px; border-radius:50%; object-fit:cover; background:var(--s3); flex-shrink:0 }
+.av-info { flex:1; min-width:0 }
+.av-nm  { font-size:12px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.av-rl  { font-size:10px; color:var(--muted) }
+.sign-out {
+  background:none; border:none; color:var(--muted); cursor:pointer;
+  font-size:18px; padding:4px; transition:.15s; flex-shrink:0;
+}
+.sign-out:hover { color:var(--danger) }
+
+/* MAIN */
+.main { flex:1; display:flex; flex-direction:column; min-width:0 }
+.tbar {
+  padding:14px 24px; background:var(--s); border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  position:sticky; top:0; z-index:10;
+}
+.pg-title { font-family:'Fraunces',serif; font-size:22px; font-weight:900 }
+.tbar-acts { display:flex; gap:8px }
+
+.content { padding:24px; flex:1 }
+
+/* STATS ROW */
+.kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:14px; margin-bottom:24px }
+.kpi {
+  background:var(--s); border:1px solid var(--border); border-radius:var(--r);
+  padding:18px 20px; position:relative; overflow:hidden;
+}
+.kpi::before {
+  content:attr(data-ico); position:absolute; right:14px; bottom:10px;
+  font-size:36px; opacity:.12;
+}
+.kpi-lbl { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--muted) }
+.kpi-val { font-family:'Fraunces',serif; font-size:30px; font-weight:900; margin-top:4px }
+.kpi-sub { font-size:11px; color:var(--muted); margin-top:2px }
+
+/* TOOLBAR */
+.toolbar {
+  background:var(--s); border:1px solid var(--border); border-radius:var(--r);
+  padding:14px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+  margin-bottom:16px;
+}
+.sf { position:relative; flex:1; min-width:180px }
+.sf input {
+  width:100%; padding:9px 12px 9px 36px;
+  background:var(--s2); border:1.5px solid var(--border);
+  border-radius:8px; font-size:13px; color:var(--text);
+  font-family:'Plus Jakarta Sans',sans-serif; outline:none; transition:.2s;
+}
+.sf input:focus { border-color:var(--accent) }
+.sf::before { content:'🔍'; position:absolute; left:10px; top:50%; transform:translateY(-50%); font-size:13px; pointer-events:none }
+.sel {
+  padding:9px 12px; background:var(--s2); border:1.5px solid var(--border);
+  border-radius:8px; font-size:13px; color:var(--text);
+  font-family:'Plus Jakarta Sans',sans-serif; cursor:pointer; outline:none; transition:.2s;
+}
+.sel:focus { border-color:var(--accent) }
+.btn {
+  padding:9px 16px; border-radius:8px; border:none;
+  font-size:13px; font-weight:700; font-family:'Plus Jakarta Sans',sans-serif;
+  cursor:pointer; transition:.15s; display:flex; align-items:center; gap:6px; white-space:nowrap;
+}
+.btn-g  { background:var(--accent); color:#fff }
+.btn-g:hover { background:#15803d }
+.btn-b  { background:#0284c7; color:#fff }
+.btn-b:hover { background:#0369a1 }
+.btn-o  { background:var(--s); border:1.5px solid var(--border); color:var(--text) }
+.btn-o:hover { border-color:var(--accent); color:var(--accent) }
+
+/* TABLE */
+.tbl-wrap {
+  background:var(--s); border:1px solid var(--border);
+  border-radius:var(--r); overflow:hidden;
+}
+.tbl-scroll { overflow-x:auto }
+table { width:100%; border-collapse:collapse; font-size:13px }
+thead th {
+  background:var(--s2); padding:11px 16px; text-align:left;
+  font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px;
+  color:var(--muted); border-bottom:1px solid var(--border);
+  cursor:pointer; user-select:none; white-space:nowrap;
+}
+thead th:hover { color:var(--text) }
+thead th.asc::after  { content:' ↑' }
+thead th.desc::after { content:' ↓' }
+tbody tr { border-bottom:1px solid var(--border); transition:.1s }
+tbody tr:last-child  { border-bottom:none }
+tbody tr:hover { background:var(--s2) }
+td { padding:11px 16px; vertical-align:middle }
+.td-nm { font-weight:600; max-width:280px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.td-lab { color:var(--muted); font-size:12px }
+.td-p { font-weight:700; color:var(--accent) }
+.td-ps { font-size:11px; color:var(--muted) }
+.pill {
+  display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600;
+  background:rgba(22,163,74,.1); color:var(--accent);
+}
+
+.pag {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 16px; border-top:1px solid var(--border);
+  font-size:12px; color:var(--muted);
+}
+.pg-btns { display:flex; gap:4px }
+.pg-btn {
+  width:30px; height:30px; border-radius:6px;
+  background:var(--s); border:1px solid var(--border);
+  cursor:pointer; font-size:12px; display:grid; place-items:center; transition:.15s;
+}
+.pg-btn:hover { border-color:var(--accent); color:var(--accent) }
+.pg-btn.cur { background:var(--accent); color:#fff; border-color:var(--accent) }
+
+/* ═══ IMPORT MODAL ═══ */
+.modal-bg {
+  position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:300;
+  display:none; align-items:center; justify-content:center;
+  backdrop-filter:blur(4px);
+}
+.modal-bg.open { display:flex }
+.modal {
+  background:var(--s); border-radius:20px; padding:36px;
+  width:min(520px,92vw); box-shadow:0 24px 64px rgba(0,0,0,.18);
+  animation:pop .2s ease;
+}
+@keyframes pop { from{transform:scale(.95);opacity:0} to{transform:scale(1);opacity:1} }
+.modal-h { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:6px }
+.modal-h h3 { font-family:'Fraunces',serif; font-size:22px; font-weight:900 }
+.modal-close { background:none; border:none; font-size:22px; color:var(--muted); cursor:pointer }
+.modal p { font-size:13px; color:var(--muted); margin-bottom:24px; line-height:1.5 }
+.drop {
+  border:2px dashed var(--border); border-radius:12px; padding:44px 20px;
+  text-align:center; cursor:pointer; transition:.2s;
+}
+.drop:hover,.drop.drag { border-color:var(--accent); background:rgba(22,163,74,.04) }
+.drop-ico { font-size:44px; margin-bottom:10px }
+.drop p { font-size:14px; color:var(--muted) }
+.drop strong { color:var(--accent); cursor:pointer }
+#fIn { display:none }
+.imp-prev {
+  margin-top:14px; background:var(--s2); border:1px solid var(--border);
+  border-radius:8px; padding:12px 16px; font-size:13px; display:none; color:var(--text);
+}
+.modal-acts { display:flex; gap:10px; margin-top:20px; justify-content:flex-end }
+
+/* TOAST */
+.toast {
+  position:fixed; bottom:20px; right:20px; z-index:500;
+  padding:12px 20px; border-radius:10px; font-size:13px; font-weight:600;
+  transform:translateY(60px); opacity:0; transition:.3s; pointer-events:none;
+  max-width:300px; box-shadow:0 8px 24px rgba(0,0,0,.15);
+}
+.toast.ok  { background:#052e16; color:#86efac; border:1px solid #166534 }
+.toast.err { background:#450a0a; color:#fca5a5; border:1px solid #7f1d1d }
+.toast.show { transform:translateY(0); opacity:1 }
+
+@media(max-width:700px){
+  .sb { display:none }
+  .kpis { grid-template-columns:repeat(2,1fr) }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ LOGIN ═══ -->
+<div id="loginWrap">
+  <div class="login-box">
+    <div class="lbox-cross">💊</div>
+    <div class="lbox-title">Panel Admin</div>
+    <div class="lbox-sub">Droguería Farma Expertos · Copacabana</div>
+    <button class="g-btn" onclick="doLogin()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G"/>
+      Continuar con Google
+    </button>
+    <div class="lbox-note">Solo correos autorizados por el administrador<br>pueden acceder a este panel.</div>
+  </div>
+</div>
+
+<!-- ═══ APP ═══ -->
+<div id="app">
+  <div class="wrap">
+    <!-- sidebar -->
+    <aside class="sb">
+      <div class="sb-top">
+        <div class="sb-icon">💊</div>
+        <div>
+          <div class="sb-name">Farma Expertos</div>
+          <div class="sb-tag">Admin</div>
+        </div>
+      </div>
+      <nav class="sb-nav">
+        <div class="nv on" id="nv-inv" onclick="navTo('inv',this)">
+          <span class="nv-ico">📦</span> Inventario
+        </div>
+        <div class="nv" id="nv-ped" onclick="navTo('ped',this)">
+          <span class="nv-ico">🛒</span> Pedidos web
+        </div>
+      </nav>
+      <div class="sb-bot">
+        <img class="av" id="avImg" src="" alt=""/>
+        <div class="av-info">
+          <div class="av-nm" id="avNm">—</div>
+          <div class="av-rl">Administrador</div>
+        </div>
+        <button class="sign-out" onclick="logout()" title="Salir">⏻</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <!-- INVENTARIO -->
+      <div id="pgInv">
+        <div class="tbar">
+          <span class="pg-title">📦 Inventario Farma Expertos</span>
+          <div class="tbar-acts">
+            <button class="btn btn-b" onclick="openImp()">⬆ Importar Excel</button>
+            <button class="btn btn-g" onclick="reload()">↻ Actualizar</button>
+          </div>
+        </div>
+        <div class="content">
+          <div class="kpis">
+            <div class="kpi" data-ico="📦"><div class="kpi-lbl">Total productos</div>
+              <div class="kpi-val" id="kTotal">—</div></div>
+            <div class="kpi" data-ico="🏭"><div class="kpi-lbl">Laboratorios</div>
+              <div class="kpi-val" id="kLabs">—</div></div>
+            <div class="kpi" data-ico="💰"><div class="kpi-lbl">Con precio unid.</div>
+              <div class="kpi-val" id="kPr">—</div></div>
+          </div>
+          <div class="toolbar">
+            <div class="sf">
+              <input type="text" id="srch" placeholder="Buscar producto o laboratorio…" oninput="filt()"/>
+            </div>
+            <select class="sel" id="selLab" onchange="filt()">
+              <option value="">Todos los laboratorios</option>
+            </select>
+            <select class="sel" id="selSort" onchange="filt()">
+              <option value="desc">Nombre A→Z</option>
+              <option value="lab">Laboratorio A→Z</option>
+              <option value="pa">Precio unitario ↑</option>
+              <option value="pd">Precio unitario ↓</option>
+            </select>
+          </div>
+          <div class="tbl-wrap">
+            <div class="tbl-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th id="th-desc" onclick="thSort('descripcion',this)">Descripción</th>
+                    <th id="th-lab"  onclick="thSort('laboratorio',this)">Laboratorio</th>
+                    <th>Unidad</th>
+                    <th id="th-p"   onclick="thSort('_p',this)">Precio caja</th>
+                    <th id="th-pu"  onclick="thSort('_pu',this)">Precio unitario</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody">
+                  <tr><td colspan="5" style="text-align:center;padding:48px;color:var(--muted)">
+                    <div style="font-size:36px;margin-bottom:10px">⏳</div>Cargando inventario…
+                  </td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="pag">
+              <span id="pagInfo">—</span>
+              <div class="pg-btns" id="pgBtns"></div>
+            </div>
+          </div>
+        </div>
+      </div><!-- /pgInv -->
+
+      <!-- PEDIDOS WEB -->
+      <div id="pgPed" style="display:none">
+        <div class="tbar">
+          <span class="pg-title">🛒 Pedidos web</span>
+          <button class="btn btn-g" onclick="loadPedidos()">↻ Actualizar</button>
+        </div>
+        <div class="content">
+          <div class="tbl-wrap">
+            <div class="tbl-scroll">
+              <table>
+                <thead><tr>
+                  <th>ID</th><th>Cliente</th><th>Teléfono</th>
+                  <th>Productos</th><th>Total</th><th>Estado</th><th>Hora</th>
+                </tr></thead>
+                <tbody id="pedTbody">
+                  <tr><td colspan="7" style="text-align:center;padding:48px;color:var(--muted)">
+                    Cargando pedidos…
+                  </td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- IMPORT MODAL -->
+<div class="modal-bg" id="impModal">
+  <div class="modal">
+    <div class="modal-h">
+      <h3>⬆ Importar stock</h3>
+      <button class="modal-close" onclick="closeImp()">✕</button>
+    </div>
+    <p>Sube el archivo Excel descargado de tu sistema.<br>
+       Columnas requeridas: <strong>Descripción · Laboratorio · Unidad · Precio · Precio Unitario</strong></p>
+    <div class="drop" id="dropZ"
+         onclick="document.getElementById('fIn').click()"
+         ondragover="event.preventDefault();this.classList.add('drag')"
+         ondragleave="this.classList.remove('drag')"
+         ondrop="onDrop(event)">
+      <div class="drop-ico">📂</div>
+      <p>Arrastra aquí o <strong>selecciona el archivo</strong></p>
+      <p style="font-size:11px;margin-top:4px">.xlsx · .xls</p>
+    </div>
+    <input type="file" id="fIn" accept=".xlsx,.xls" onchange="onFile(this.files[0])"/>
+    <div class="imp-prev" id="impPrev"></div>
+    <div class="modal-acts">
+      <button class="btn btn-o" onclick="closeImp()">Cancelar</button>
+      <button class="btn btn-b" id="btnImp" onclick="doImport()" disabled>Subir a Sheets</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══ CONFIG — CAMBIA ESTOS VALORES ═══ */
+const GOOGLE_CLIENT_ID = 'TU_CLIENT_ID.apps.googleusercontent.com';
+const TIENDA  = 'EXPERTOS';
+/* ═══════════════════════════════════ */
+
+const API_PRODS  = `/api/productos?tienda=${TIENDA}&all=1`;
+const API_IMP    = `/api/import-stock`;
+const API_CHECK  = `/api/auth-check`;
+const API_PEDS   = `/api/pedidos?tienda=${TIENDA}`;
+
+let token='', prods=[], shown=[], impRows=[];
+let curPage=1; const PER=50;
+let sortK='descripcion', sortAsc=true;
+
+/* ── GOOGLE AUTH ────────────────────── */
+window.onload = () => {
+  if (!GOOGLE_CLIENT_ID.includes('TU_CLIENT')) {
+    google.accounts.id.initialize({ client_id:GOOGLE_CLIENT_ID, callback:onGoogle });
+    google.accounts.id.renderButton(document.querySelector('.g-btn'), {});
+  }
+};
+function doLogin() {
+  google.accounts.id.initialize({ client_id:GOOGLE_CLIENT_ID, callback:onGoogle });
+  google.accounts.id.prompt();
+}
+async function onGoogle(resp) {
+  try {
+    const r = await fetch(API_CHECK, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ credential:resp.credential, tienda:TIENDA })
+    });
+    const d = await r.json();
+    if (!d.ok) { toastMsg('❌ '+(d.error||'Sin acceso'), 'err'); return; }
+    token = resp.credential;
+    const pl = JSON.parse(atob(resp.credential.split('.')[1]));
+    document.getElementById('avNm').textContent = pl.name;
+    document.getElementById('avImg').src = pl.picture;
+    document.getElementById('loginWrap').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    loadProds();
+  } catch(e) { toastMsg('❌ Error de autenticación', 'err'); }
+}
+function logout() {
+  token = '';
+  document.getElementById('loginWrap').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  google.accounts.id.disableAutoSelect();
+}
+
+/* ── NAV ────────────────────────────── */
+function navTo(page, el) {
+  document.querySelectorAll('.nv').forEach(n=>n.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('pgInv').style.display = page==='inv' ? 'block' : 'none';
+  document.getElementById('pgPed').style.display = page==='ped' ? 'block' : 'none';
+  if (page==='ped') loadPedidos();
+}
+
+/* ── PRODUCTOS ──────────────────────── */
+async function loadProds() {
+  try {
+    const r = await fetch(API_PRODS, { headers:{Authorization:'Bearer '+token} });
+    prods = await r.json();
+    shown = [...prods];
+    buildLabSel();
+    kpis();
+    filt();
+  } catch(e) { toastMsg('❌ Error cargando productos','err') }
+}
+function reload() { loadProds(); toastMsg('🔄 Actualizando…','ok') }
+
+function buildLabSel() {
+  const labs = [...new Set(prods.map(p=>p.laboratorio).filter(Boolean))].sort();
+  const sel = document.getElementById('selLab');
+  sel.innerHTML = '<option value="">Todos los laboratorios</option>' +
+    labs.map(l=>`<option>${l}</option>`).join('');
+}
+
+function kpis() {
+  document.getElementById('kTotal').textContent = prods.length.toLocaleString('es-CO');
+  document.getElementById('kLabs').textContent  =
+    new Set(prods.map(p=>p.laboratorio).filter(Boolean)).size;
+  document.getElementById('kPr').textContent    =
+    prods.filter(p=>p.precioUnitario).length.toLocaleString('es-CO');
+}
+
+function pn(v){ return parseInt((v||'0').toString().replace(/[^0-9]/g,''))||0 }
+function cop(v){ const n=pn(v); return n?'$'+n.toLocaleString('es-CO'):'—' }
+
+function filt() {
+  const q   = document.getElementById('srch').value.toLowerCase().trim();
+  const lab = document.getElementById('selLab').value;
+  const s   = document.getElementById('selSort').value;
+  shown = prods
+    .filter(p => (!q  || p.descripcion.toLowerCase().includes(q) || (p.laboratorio||'').toLowerCase().includes(q))
+              && (!lab || p.laboratorio===lab))
+    .map(p => ({ ...p, _p: pn(p.precio), _pu: pn(p.precioUnitario||p.precio) }));
+  shown.sort((a,b)=>{
+    if (s==='lab') return (a.laboratorio||'').localeCompare(b.laboratorio||'');
+    if (s==='pa')  return a._pu - b._pu;
+    if (s==='pd')  return b._pu - a._pu;
+    return a.descripcion.localeCompare(b.descripcion);
+  });
+  curPage=1; renderTbl();
+}
+
+function thSort(col, th) {
+  if (sortK===col) sortAsc=!sortAsc; else { sortK=col; sortAsc=true; }
+  document.querySelectorAll('thead th').forEach(t=>t.className='');
+  th.className = sortAsc ? 'asc' : 'desc';
+  shown.sort((a,b)=>{
+    const va=a[col]||'', vb=b[col]||'';
+    const r = typeof va==='number' ? va-vb : va.toString().localeCompare(vb.toString());
+    return sortAsc ? r : -r;
+  });
+  curPage=1; renderTbl();
+}
+
+function renderTbl() {
+  const start  = (curPage-1)*PER;
+  const page   = shown.slice(start, start+PER);
+  const body   = document.getElementById('tbody');
+  if (!shown.length) {
+    body.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:48px;color:var(--muted)">
+      <div style="font-size:36px;margin-bottom:10px">🔍</div>Sin resultados</td></tr>`;
+    document.getElementById('pagInfo').textContent='0 productos';
+    document.getElementById('pgBtns').innerHTML='';
+    return;
+  }
+  body.innerHTML = page.map(p=>`
+    <tr>
+      <td class="td-nm" title="${p.descripcion}">${p.descripcion}</td>
+      <td class="td-lab">${p.laboratorio||'—'}</td>
+      <td><span class="pill">${p.unidad||'—'}</span></td>
+      <td class="td-p">${cop(p.precio)}</td>
+      <td>
+        <div class="td-p">${cop(p.precioUnitario)}</div>
+        ${p.precioUnitario&&p.precio&&p.precioUnitario!==p.precio
+          ? `<div class="td-ps">caja ${cop(p.precio)}</div>` : ''}
+      </td>
+    </tr>`).join('');
+
+  const tot   = shown.length;
+  const pages = Math.ceil(tot/PER);
+  document.getElementById('pagInfo').textContent =
+    `${start+1}–${Math.min(start+PER,tot)} de ${tot.toLocaleString('es-CO')} productos`;
+
+  const pgB = document.getElementById('pgBtns');
+  pgB.innerHTML = '';
+  let from=Math.max(1,curPage-2), to=Math.min(pages,from+4);
+  for (let i=from;i<=to;i++){
+    const b=document.createElement('button');
+    b.className='pg-btn'+(i===curPage?' cur':'');
+    b.textContent=i; const pg=i;
+    b.onclick=()=>{curPage=pg;renderTbl();};
+    pgB.appendChild(b);
+  }
+}
+
+/* ── PEDIDOS ────────────────────────── */
+async function loadPedidos() {
+  try {
+    const r = await fetch(API_PEDS, { headers:{Authorization:'Bearer '+token} });
+    const d = await r.json();
+    const body = document.getElementById('pedTbody');
+    if (!d.length) {
+      body.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:48px;color:var(--muted)">Sin pedidos aún</td></tr>`;
+      return;
+    }
+    body.innerHTML = d.map(p=>`
+      <tr>
+        <td style="font-size:11px;color:var(--muted)">${p.id}</td>
+        <td style="font-weight:600">${p.cliente}</td>
+        <td>${p.telefono}</td>
+        <td style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.productos}</td>
+        <td class="td-p">${cop(p.total)}</td>
+        <td><span class="pill">${p.estado}</span></td>
+        <td style="color:var(--muted);font-size:12px">${p.hora}</td>
+      </tr>`).join('');
+  } catch(e) { toastMsg('❌ Error cargando pedidos','err') }
+}
+
+/* ── IMPORT EXCEL ───────────────────── */
+function openImp()  { document.getElementById('impModal').classList.add('open') }
+function closeImp() {
+  document.getElementById('impModal').classList.remove('open');
+  document.getElementById('impPrev').style.display='none';
+  document.getElementById('btnImp').disabled=true;
+  impRows=[];
+}
+function onDrop(ev) {
+  ev.preventDefault();
+  document.getElementById('dropZ').classList.remove('drag');
+  if (ev.dataTransfer.files[0]) onFile(ev.dataTransfer.files[0]);
+}
+function onFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb   = XLSX.read(e.target.result,{type:'binary'});
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_json(ws,{defval:''});
+    const get  = (row,keys,...names) => {
+      for (const n of names) {
+        const k = keys.find(k=>k.toLowerCase().replace(/[^a-z]/g,'').includes(n));
+        if (k) return (row[k]||'').toString().trim();
+      }
+      return '';
+    };
+    impRows = data.map(row=>{
+      const keys = Object.keys(row);
+      return {
+        descripcion:    get(row,keys,'descripci','descrip','nombre','produc'),
+        laboratorio:    get(row,keys,'laborator','lab','marca','fabrican'),
+        unidad:         get(row,keys,'unidad','unit','presentac','conten'),
+        precio:         get(row,keys,'precio','price','valor','vta','venta'),
+        precioUnitario: get(row,keys,'unitario','unitprice','xunidad','porunit'),
+      };
+    }).filter(r=>r.descripcion);
+    const prev = document.getElementById('impPrev');
+    prev.style.display='block';
+    prev.innerHTML=`✅ <strong>${impRows.length}</strong> productos listos de <em>${file.name}</em>`;
+    document.getElementById('btnImp').disabled = impRows.length===0;
+  };
+  reader.readAsBinaryString(file);
+}
+async function doImport() {
+  if (!impRows.length) return;
+  const btn=document.getElementById('btnImp');
+  btn.disabled=true; btn.textContent='Importando…';
+  try {
+    const r = await fetch(API_IMP,{
+      method:'POST',
+      headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+      body:JSON.stringify({tienda:TIENDA,productos:impRows})
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
+    toastMsg('✅ '+d.count+' productos importados','ok');
+    closeImp(); reload();
+  } catch(e) { toastMsg('❌ '+e.message,'err') }
+  finally { btn.disabled=false; btn.textContent='Subir a Sheets' }
+}
+
+/* ── TOAST ──────────────────────────── */
+let tt;
+function toastMsg(msg,type='ok'){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className='toast '+type+' show';
+  clearTimeout(tt); tt=setTimeout(()=>el.className='toast '+type,3200);
+}
+</script>
+</body>
+</html>
