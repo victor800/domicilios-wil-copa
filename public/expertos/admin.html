@@ -442,7 +442,7 @@ td { padding:11px 16px; vertical-align:middle }
    Lo encuentras en la URL:
    https://docs.google.com/spreadsheets/d/  →  ESTE_ID  ←  /edit
 ═══════════════════════════════════════════════════════ */
-const SPREADSHEET_ID = 'pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+const SPREADSHEET_ID = 'TU_SPREADSHEET_ID_AQUI';
 
 /* Nombre exacto de la hoja */
 const SHEET_NAME = 'STOCK_DROGUERIA_EXPERTOS';
@@ -464,46 +464,32 @@ const API_CHECK = `/api/auth-check`;
 const API_IMP   = `/api/import-stock`;
 const API_PEDS  = `/api/pedidos?tienda=${TIENDA}`;
 
-let accessToken = '';   // token OAuth2 con scope Sheets
-let gCredential = '';   // JWT original para API_CHECK
+let token = '';
 let prods = [], shown = [], impRows = [];
 let curPage = 1; const PER = 50;
 let sortK = 'descripcion', sortAsc = true;
 
-/* ── GOOGLE AUTH ─────────────────────────────────────── */
+/* ── GOOGLE AUTH — original exacto ──────────────────── */
 window.onload = () => {
-  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogle });
+  if (!GOOGLE_CLIENT_ID.includes('TU_CLIENT')) {
+    google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogle });
+    google.accounts.id.renderButton(document.querySelector('.g-btn'), {});
+  }
 };
-
 function doLogin() {
-  /* Paso 1: pedir token OAuth2 con scope de Sheets (para leer la hoja) */
-  const client = google.accounts.oauth2.initTokenClient({
-    client_id: GOOGLE_CLIENT_ID,
-    scope: 'https://www.googleapis.com/auth/spreadsheets.readonly',
-    callback: async (tokenResp) => {
-      if (tokenResp.error) { toastMsg('❌ Error al obtener acceso a Sheets', 'err'); return; }
-      accessToken = tokenResp.access_token;
-
-      /* Paso 2: pedir Sign-In para verificar identidad en tu backend */
-      google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogle });
-      google.accounts.id.prompt();
-    }
-  });
-  client.requestAccessToken();
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogle });
+  google.accounts.id.prompt();
 }
-
 async function onGoogle(resp) {
   try {
-    gCredential = resp.credential;
     const r = await fetch(API_CHECK, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ credential: gCredential, tienda: TIENDA })
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential: resp.credential, tienda: TIENDA })
     });
     const d = await r.json();
     if (!d.ok) { toastMsg('❌ ' + (d.error || 'Sin acceso'), 'err'); return; }
-
-    const pl = JSON.parse(atob(gCredential.split('.')[1]));
+    token = resp.credential;
+    const pl = JSON.parse(atob(resp.credential.split('.')[1]));
     document.getElementById('avNm').textContent = pl.name;
     document.getElementById('avImg').src = pl.picture;
     document.getElementById('loginWrap').style.display = 'none';
@@ -511,9 +497,8 @@ async function onGoogle(resp) {
     loadProds();
   } catch(e) { toastMsg('❌ Error de autenticación', 'err'); }
 }
-
 function logout() {
-  accessToken = ''; gCredential = '';
+  token = '';
   document.getElementById('loginWrap').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
   google.accounts.id.disableAutoSelect();
@@ -531,7 +516,9 @@ function navTo(page, el) {
 /* ── CARGAR PRODUCTOS DESDE GOOGLE SHEETS ────────────── */
 async function loadProds() {
   // Verificar que tenemos el spreadsheet ID configurado
-  if (SPREADSHEET_ID === 'TU_SPREADSHEET_ID_AQUI') {
+GOOGLE_SHEETS_ID=1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU
+GOOGLE_SHEETS_ID=1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU
+  if (SPREADSHEET_ID === 'pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU') {
     toastMsg('⚠️ Configura SPREADSHEET_ID en el código', 'err');
     document.getElementById('tbody').innerHTML = `
       <tr><td colspan="5" style="text-align:center;padding:48px;color:var(--muted)">
@@ -539,11 +526,6 @@ async function loadProds() {
         Falta configurar el ID del spreadsheet.<br>
         <small>Busca la línea <code>SPREADSHEET_ID</code> en el código y ponlo.</small>
       </td></tr>`;
-    return;
-  }
-
-  if (!accessToken) {
-    toastMsg('⚠️ Sin token de Sheets — vuelve a iniciar sesión', 'err');
     return;
   }
 
@@ -555,7 +537,7 @@ async function loadProds() {
 
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(RANGE)}`;
     const r = await fetch(url, {
-      headers: { Authorization: 'Bearer ' + accessToken }
+      headers: { Authorization: 'Bearer ' + token }
     });
 
     if (!r.ok) {
@@ -701,7 +683,7 @@ function renderTbl() {
 /* ── PEDIDOS ─────────────────────────────────────────── */
 async function loadPedidos() {
   try {
-    const r = await fetch(API_PEDS, { headers: { Authorization: 'Bearer ' + gCredential } });
+    const r = await fetch(API_PEDS, { headers: { Authorization: 'Bearer ' + token } });
     const d = await r.json();
     const body = document.getElementById('pedTbody');
     if (!d.length) {
@@ -772,7 +754,7 @@ async function doImport() {
   try {
     const r = await fetch(API_IMP, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + gCredential },
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
       body: JSON.stringify({ tienda: TIENDA, productos: impRows })
     });
     const d = await r.json();
