@@ -32,7 +32,6 @@ body{background:var(--bg);color:var(--text);font-family:'Plus Jakarta Sans',sans
     radial-gradient(ellipse 600px 500px at 20% 30%, rgba(22,163,74,.18) 0%, transparent 60%),
     radial-gradient(ellipse 500px 400px at 80% 70%, rgba(13,148,136,.12) 0%, transparent 60%);
 }
-/* Decorative cross pattern */
 #loginWrap::after {
   content:''; position:absolute; inset:0; pointer-events:none;
   background-image:
@@ -99,7 +98,7 @@ body{background:var(--bg);color:var(--text);font-family:'Plus Jakarta Sans',sans
   display:flex; align-items:center; gap:9px;
   padding:10px 10px; border-radius:8px;
   font-size:13px; font-weight:600; color:var(--muted); cursor:pointer;
-  transition:.15s; margin-bottom:2px;
+  transition:.15s; margin-bottom:2px; border:none; background:none; width:100%; text-align:left;
 }
 .nv:hover { background:var(--s2); color:var(--text) }
 .nv.on { background:rgba(22,163,74,.1); color:var(--accent) }
@@ -221,11 +220,10 @@ td { padding:11px 16px; vertical-align:middle }
 .pg-btn:hover { border-color:var(--accent); color:var(--accent) }
 .pg-btn.cur { background:var(--accent); color:#fff; border-color:var(--accent) }
 
-/* ═══ IMPORT MODAL ═══ */
+/* IMPORT MODAL */
 .modal-bg {
   position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:300;
-  display:none; align-items:center; justify-content:center;
-  backdrop-filter:blur(4px);
+  display:none; align-items:center; justify-content:center; backdrop-filter:blur(4px);
 }
 .modal-bg.open { display:flex }
 .modal {
@@ -289,7 +287,6 @@ td { padding:11px 16px; vertical-align:middle }
 <!-- ═══ APP ═══ -->
 <div id="app">
   <div class="wrap">
-    <!-- sidebar -->
     <aside class="sb">
       <div class="sb-top">
         <div class="sb-icon">💊</div>
@@ -299,12 +296,12 @@ td { padding:11px 16px; vertical-align:middle }
         </div>
       </div>
       <nav class="sb-nav">
-        <div class="nv on" id="nv-inv" onclick="navTo('inv',this)">
+        <button class="nv on" id="nv-inv" onclick="navTo('inv',this)">
           <span class="nv-ico">📦</span> Inventario
-        </div>
-        <div class="nv" id="nv-ped" onclick="navTo('ped',this)">
+        </button>
+        <button class="nv" id="nv-ped" onclick="navTo('ped',this)">
           <span class="nv-ico">🛒</span> Pedidos web
-        </div>
+        </button>
       </nav>
       <div class="sb-bot">
         <img class="av" id="avImg" src="" alt=""/>
@@ -328,13 +325,20 @@ td { padding:11px 16px; vertical-align:middle }
         </div>
         <div class="content">
           <div class="kpis">
-            <div class="kpi" data-ico="📦"><div class="kpi-lbl">Total productos</div>
-              <div class="kpi-val" id="kTotal">—</div></div>
-            <div class="kpi" data-ico="🏭"><div class="kpi-lbl">Laboratorios</div>
-              <div class="kpi-val" id="kLabs">—</div></div>
-            <div class="kpi" data-ico="💰"><div class="kpi-lbl">Con precio unid.</div>
-              <div class="kpi-val" id="kPr">—</div></div>
+            <div class="kpi" data-ico="📦">
+              <div class="kpi-lbl">Total productos</div>
+              <div class="kpi-val" id="kTotal">—</div>
+            </div>
+            <div class="kpi" data-ico="🏭">
+              <div class="kpi-lbl">Laboratorios</div>
+              <div class="kpi-val" id="kLabs">—</div>
+            </div>
+            <div class="kpi" data-ico="💰">
+              <div class="kpi-lbl">Con precio unid.</div>
+              <div class="kpi-val" id="kPr">—</div>
+            </div>
           </div>
+
           <div class="toolbar">
             <div class="sf">
               <input type="text" id="srch" placeholder="Buscar producto o laboratorio…" oninput="filt()"/>
@@ -349,16 +353,17 @@ td { padding:11px 16px; vertical-align:middle }
               <option value="pd">Precio unitario ↓</option>
             </select>
           </div>
+
           <div class="tbl-wrap">
             <div class="tbl-scroll">
               <table>
                 <thead>
                   <tr>
-                    <th id="th-desc" onclick="thSort('descripcion',this)">Descripción</th>
-                    <th id="th-lab"  onclick="thSort('laboratorio',this)">Laboratorio</th>
+                    <th onclick="thSort('descripcion',this)">Descripción</th>
+                    <th onclick="thSort('laboratorio',this)">Laboratorio</th>
                     <th>Unidad</th>
-                    <th id="th-p"   onclick="thSort('_p',this)">Precio caja</th>
-                    <th id="th-pu"  onclick="thSort('_pu',this)">Precio unitario</th>
+                    <th onclick="thSort('_p',this)">Precio Caja</th>
+                    <th onclick="thSort('_pu',this)">Precio Unitario</th>
                   </tr>
                 </thead>
                 <tbody id="tbody">
@@ -391,9 +396,7 @@ td { padding:11px 16px; vertical-align:middle }
                   <th>Productos</th><th>Total</th><th>Estado</th><th>Hora</th>
                 </tr></thead>
                 <tbody id="pedTbody">
-                  <tr><td colspan="7" style="text-align:center;padding:48px;color:var(--muted)">
-                    Cargando pedidos…
-                  </td></tr>
+                  <tr><td colspan="7" style="text-align:center;padding:48px;color:var(--muted)">Cargando pedidos…</td></tr>
                 </tbody>
               </table>
             </div>
@@ -434,41 +437,73 @@ td { padding:11px 16px; vertical-align:middle }
 <div class="toast" id="toast"></div>
 
 <script>
-/* ═══ CONFIG — CAMBIA ESTOS VALORES ═══ */
+/* ═══════════════════════════════════════════════════════
+   CONFIG  — pon el ID de tu Google Spreadsheet aquí
+   Lo encuentras en la URL:
+   https://docs.google.com/spreadsheets/d/  →  ESTE_ID  ←  /edit
+═══════════════════════════════════════════════════════ */
+const SPREADSHEET_ID = 'pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+
+/* Nombre exacto de la hoja */
+const SHEET_NAME = 'STOCK_DROGUERIA_EXPERTOS';
+
+/* Columnas H,I,K,L,M  (J vacía se omite en el mapeo)
+   H = Descripción   → índice 0
+   I = Laboratorio   → índice 1
+   J = (vacía)       → índice 2  ← ignorada
+   K = Unidad        → índice 3
+   L = Precio caja   → índice 4
+   M = Precio unit.  → índice 5
+   El rango H:M trae 6 columnas; la fila 1 es el encabezado */
+const RANGE = `${SHEET_NAME}!H:M`;
+
+/* ═══════════════════════════════════════════════════════ */
 const GOOGLE_CLIENT_ID = '699856885526-55fqgn6qdr116rige5dcrsg4f3jdu1kp.apps.googleusercontent.com';
-const TIENDA  = 'EXPERTOS';
-/* ═══════════════════════════════════ */
+const TIENDA   = 'EXPERTOS';
+const API_CHECK = `/api/auth-check`;
+const API_IMP   = `/api/import-stock`;
+const API_PEDS  = `/api/pedidos?tienda=${TIENDA}`;
 
-const API_PRODS  = `/api/productos?tienda=${TIENDA}&all=1`;
-const API_IMP    = `/api/import-stock`;
-const API_CHECK  = `/api/auth-check`;
-const API_PEDS   = `/api/pedidos?tienda=${TIENDA}`;
+let accessToken = '';   // token OAuth2 con scope Sheets
+let gCredential = '';   // JWT original para API_CHECK
+let prods = [], shown = [], impRows = [];
+let curPage = 1; const PER = 50;
+let sortK = 'descripcion', sortAsc = true;
 
-let token='', prods=[], shown=[], impRows=[];
-let curPage=1; const PER=50;
-let sortK='descripcion', sortAsc=true;
-
-/* ── GOOGLE AUTH ────────────────────── */
+/* ── GOOGLE AUTH ─────────────────────────────────────── */
 window.onload = () => {
-  if (!GOOGLE_CLIENT_ID.includes('TU_CLIENT')) {
-    google.accounts.id.initialize({ client_id:GOOGLE_CLIENT_ID, callback:onGoogle });
-    google.accounts.id.renderButton(document.querySelector('.g-btn'), {});
-  }
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogle });
 };
+
 function doLogin() {
-  google.accounts.id.initialize({ client_id:GOOGLE_CLIENT_ID, callback:onGoogle });
-  google.accounts.id.prompt();
+  /* Paso 1: pedir token OAuth2 con scope de Sheets (para leer la hoja) */
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/spreadsheets.readonly',
+    callback: async (tokenResp) => {
+      if (tokenResp.error) { toastMsg('❌ Error al obtener acceso a Sheets', 'err'); return; }
+      accessToken = tokenResp.access_token;
+
+      /* Paso 2: pedir Sign-In para verificar identidad en tu backend */
+      google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogle });
+      google.accounts.id.prompt();
+    }
+  });
+  client.requestAccessToken();
 }
+
 async function onGoogle(resp) {
   try {
+    gCredential = resp.credential;
     const r = await fetch(API_CHECK, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ credential:resp.credential, tienda:TIENDA })
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential: gCredential, tienda: TIENDA })
     });
     const d = await r.json();
-    if (!d.ok) { toastMsg('❌ '+(d.error||'Sin acceso'), 'err'); return; }
-    token = resp.credential;
-    const pl = JSON.parse(atob(resp.credential.split('.')[1]));
+    if (!d.ok) { toastMsg('❌ ' + (d.error || 'Sin acceso'), 'err'); return; }
+
+    const pl = JSON.parse(atob(gCredential.split('.')[1]));
     document.getElementById('avNm').textContent = pl.name;
     document.getElementById('avImg').src = pl.picture;
     document.getElementById('loginWrap').style.display = 'none';
@@ -476,134 +511,204 @@ async function onGoogle(resp) {
     loadProds();
   } catch(e) { toastMsg('❌ Error de autenticación', 'err'); }
 }
+
 function logout() {
-  token = '';
+  accessToken = ''; gCredential = '';
   document.getElementById('loginWrap').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
   google.accounts.id.disableAutoSelect();
 }
 
-/* ── NAV ────────────────────────────── */
+/* ── NAV ─────────────────────────────────────────────── */
 function navTo(page, el) {
-  document.querySelectorAll('.nv').forEach(n=>n.classList.remove('on'));
+  document.querySelectorAll('.nv').forEach(n => n.classList.remove('on'));
   el.classList.add('on');
-  document.getElementById('pgInv').style.display = page==='inv' ? 'block' : 'none';
-  document.getElementById('pgPed').style.display = page==='ped' ? 'block' : 'none';
-  if (page==='ped') loadPedidos();
+  document.getElementById('pgInv').style.display = page === 'inv' ? 'block' : 'none';
+  document.getElementById('pgPed').style.display = page === 'ped' ? 'block' : 'none';
+  if (page === 'ped') loadPedidos();
 }
 
-/* ── PRODUCTOS ──────────────────────── */
+/* ── CARGAR PRODUCTOS DESDE GOOGLE SHEETS ────────────── */
 async function loadProds() {
+  // Verificar que tenemos el spreadsheet ID configurado
+  if (SPREADSHEET_ID === 'TU_SPREADSHEET_ID_AQUI') {
+    toastMsg('⚠️ Configura SPREADSHEET_ID en el código', 'err');
+    document.getElementById('tbody').innerHTML = `
+      <tr><td colspan="5" style="text-align:center;padding:48px;color:var(--muted)">
+        <div style="font-size:36px;margin-bottom:10px">⚙️</div>
+        Falta configurar el ID del spreadsheet.<br>
+        <small>Busca la línea <code>SPREADSHEET_ID</code> en el código y ponlo.</small>
+      </td></tr>`;
+    return;
+  }
+
+  if (!accessToken) {
+    toastMsg('⚠️ Sin token de Sheets — vuelve a iniciar sesión', 'err');
+    return;
+  }
+
   try {
-    const r = await fetch(API_PRODS, { headers:{Authorization:'Bearer '+token} });
-    prods = await r.json();
+    document.getElementById('tbody').innerHTML = `
+      <tr><td colspan="5" style="text-align:center;padding:48px;color:var(--muted)">
+        <div style="font-size:36px;margin-bottom:10px">⏳</div>Cargando inventario…
+      </td></tr>`;
+
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(RANGE)}`;
+    const r = await fetch(url, {
+      headers: { Authorization: 'Bearer ' + accessToken }
+    });
+
+    if (!r.ok) {
+      const err = await r.json();
+      throw new Error(err.error?.message || 'Error Sheets API');
+    }
+
+    const data = await r.json();
+    const rows = data.values || [];
+
+    if (rows.length < 2) {
+      toastMsg('⚠️ La hoja está vacía o sin datos', 'err');
+      prods = [];
+    } else {
+      /* Fila 0 = encabezados, ignorar
+         H[0]=Descripción  I[1]=Laboratorio  J[2]=vacía(omitir)
+         K[3]=Unidad       L[4]=Precio caja  M[5]=Precio unit. */
+      prods = rows.slice(1)                        // saltar encabezados
+        .filter(row => row[0]?.toString().trim())   // descartar filas vacías
+        .map(row => ({
+          descripcion:    (row[0] || '').toString().trim(),
+          laboratorio:    (row[1] || '').toString().trim(),
+          // row[2] = J vacía — omitida
+          unidad:         (row[3] || '').toString().trim(),
+          precio:         (row[4] || '').toString().trim(),
+          precioUnitario: (row[5] || '').toString().trim(),
+        }));
+    }
+
     shown = [...prods];
     buildLabSel();
     kpis();
     filt();
-  } catch(e) { toastMsg('❌ Error cargando productos','err') }
-}
-function reload() { loadProds(); toastMsg('🔄 Actualizando…','ok') }
+    toastMsg(`✅ ${prods.length} productos cargados`, 'ok');
 
+  } catch(e) {
+    toastMsg('❌ ' + e.message, 'err');
+    document.getElementById('tbody').innerHTML = `
+      <tr><td colspan="5" style="text-align:center;padding:48px;color:var(--muted)">
+        <div style="font-size:36px;margin-bottom:10px">❌</div>
+        Error al cargar: ${e.message}
+      </td></tr>`;
+  }
+}
+
+function reload() { loadProds(); }
+
+/* ── HELPERS ─────────────────────────────────────────── */
 function buildLabSel() {
-  const labs = [...new Set(prods.map(p=>p.laboratorio).filter(Boolean))].sort();
-  const sel = document.getElementById('selLab');
+  const labs = [...new Set(prods.map(p => p.laboratorio).filter(Boolean))].sort();
+  const sel  = document.getElementById('selLab');
   sel.innerHTML = '<option value="">Todos los laboratorios</option>' +
-    labs.map(l=>`<option>${l}</option>`).join('');
+    labs.map(l => `<option>${l}</option>`).join('');
 }
 
 function kpis() {
   document.getElementById('kTotal').textContent = prods.length.toLocaleString('es-CO');
   document.getElementById('kLabs').textContent  =
-    new Set(prods.map(p=>p.laboratorio).filter(Boolean)).size;
+    new Set(prods.map(p => p.laboratorio).filter(Boolean)).size;
   document.getElementById('kPr').textContent    =
-    prods.filter(p=>p.precioUnitario).length.toLocaleString('es-CO');
+    prods.filter(p => p.precioUnitario).length.toLocaleString('es-CO');
 }
 
-function pn(v){ return parseInt((v||'0').toString().replace(/[^0-9]/g,''))||0 }
-function cop(v){ const n=pn(v); return n?'$'+n.toLocaleString('es-CO'):'—' }
+function pn(v) { return parseInt((v || '0').toString().replace(/[^0-9]/g, '')) || 0; }
+function cop(v) { const n = pn(v); return n ? '$' + n.toLocaleString('es-CO') : '—'; }
 
 function filt() {
   const q   = document.getElementById('srch').value.toLowerCase().trim();
   const lab = document.getElementById('selLab').value;
   const s   = document.getElementById('selSort').value;
   shown = prods
-    .filter(p => (!q  || p.descripcion.toLowerCase().includes(q) || (p.laboratorio||'').toLowerCase().includes(q))
-              && (!lab || p.laboratorio===lab))
-    .map(p => ({ ...p, _p: pn(p.precio), _pu: pn(p.precioUnitario||p.precio) }));
-  shown.sort((a,b)=>{
-    if (s==='lab') return (a.laboratorio||'').localeCompare(b.laboratorio||'');
-    if (s==='pa')  return a._pu - b._pu;
-    if (s==='pd')  return b._pu - a._pu;
+    .filter(p =>
+      (!q   || p.descripcion.toLowerCase().includes(q) || (p.laboratorio || '').toLowerCase().includes(q)) &&
+      (!lab || p.laboratorio === lab))
+    .map(p => ({ ...p, _p: pn(p.precio), _pu: pn(p.precioUnitario || p.precio) }));
+  shown.sort((a, b) => {
+    if (s === 'lab') return (a.laboratorio || '').localeCompare(b.laboratorio || '');
+    if (s === 'pa')  return a._pu - b._pu;
+    if (s === 'pd')  return b._pu - a._pu;
     return a.descripcion.localeCompare(b.descripcion);
   });
-  curPage=1; renderTbl();
+  curPage = 1;
+  renderTbl();
 }
 
 function thSort(col, th) {
-  if (sortK===col) sortAsc=!sortAsc; else { sortK=col; sortAsc=true; }
-  document.querySelectorAll('thead th').forEach(t=>t.className='');
+  if (sortK === col) sortAsc = !sortAsc; else { sortK = col; sortAsc = true; }
+  document.querySelectorAll('thead th').forEach(t => t.className = '');
   th.className = sortAsc ? 'asc' : 'desc';
-  shown.sort((a,b)=>{
-    const va=a[col]||'', vb=b[col]||'';
-    const r = typeof va==='number' ? va-vb : va.toString().localeCompare(vb.toString());
+  shown.sort((a, b) => {
+    const va = a[col] || '', vb = b[col] || '';
+    const r  = typeof va === 'number' ? va - vb : va.toString().localeCompare(vb.toString());
     return sortAsc ? r : -r;
   });
-  curPage=1; renderTbl();
+  curPage = 1;
+  renderTbl();
 }
 
 function renderTbl() {
-  const start  = (curPage-1)*PER;
-  const page   = shown.slice(start, start+PER);
-  const body   = document.getElementById('tbody');
+  const start = (curPage - 1) * PER;
+  const page  = shown.slice(start, start + PER);
+  const body  = document.getElementById('tbody');
+
   if (!shown.length) {
     body.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:48px;color:var(--muted)">
       <div style="font-size:36px;margin-bottom:10px">🔍</div>Sin resultados</td></tr>`;
-    document.getElementById('pagInfo').textContent='0 productos';
-    document.getElementById('pgBtns').innerHTML='';
+    document.getElementById('pagInfo').textContent = '0 productos';
+    document.getElementById('pgBtns').innerHTML = '';
     return;
   }
-  body.innerHTML = page.map(p=>`
+
+  body.innerHTML = page.map(p => `
     <tr>
       <td class="td-nm" title="${p.descripcion}">${p.descripcion}</td>
-      <td class="td-lab">${p.laboratorio||'—'}</td>
-      <td><span class="pill">${p.unidad||'—'}</span></td>
+      <td class="td-lab">${p.laboratorio || '—'}</td>
+      <td><span class="pill">${p.unidad || '—'}</span></td>
       <td class="td-p">${cop(p.precio)}</td>
       <td>
         <div class="td-p">${cop(p.precioUnitario)}</div>
-        ${p.precioUnitario&&p.precio&&p.precioUnitario!==p.precio
+        ${p.precioUnitario && p.precio && p.precioUnitario !== p.precio
           ? `<div class="td-ps">caja ${cop(p.precio)}</div>` : ''}
       </td>
     </tr>`).join('');
 
   const tot   = shown.length;
-  const pages = Math.ceil(tot/PER);
+  const pages = Math.ceil(tot / PER);
   document.getElementById('pagInfo').textContent =
-    `${start+1}–${Math.min(start+PER,tot)} de ${tot.toLocaleString('es-CO')} productos`;
+    `${start + 1}–${Math.min(start + PER, tot)} de ${tot.toLocaleString('es-CO')} productos`;
 
   const pgB = document.getElementById('pgBtns');
   pgB.innerHTML = '';
-  let from=Math.max(1,curPage-2), to=Math.min(pages,from+4);
-  for (let i=from;i<=to;i++){
-    const b=document.createElement('button');
-    b.className='pg-btn'+(i===curPage?' cur':'');
-    b.textContent=i; const pg=i;
-    b.onclick=()=>{curPage=pg;renderTbl();};
+  const from = Math.max(1, curPage - 2), to = Math.min(pages, from + 4);
+  for (let i = from; i <= to; i++) {
+    const b = document.createElement('button');
+    b.className = 'pg-btn' + (i === curPage ? ' cur' : '');
+    b.textContent = i;
+    const pg = i;
+    b.onclick = () => { curPage = pg; renderTbl(); };
     pgB.appendChild(b);
   }
 }
 
-/* ── PEDIDOS ────────────────────────── */
+/* ── PEDIDOS ─────────────────────────────────────────── */
 async function loadPedidos() {
   try {
-    const r = await fetch(API_PEDS, { headers:{Authorization:'Bearer '+token} });
+    const r = await fetch(API_PEDS, { headers: { Authorization: 'Bearer ' + gCredential } });
     const d = await r.json();
     const body = document.getElementById('pedTbody');
     if (!d.length) {
-      body.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:48px;color:var(--muted)">Sin pedidos aún</td></tr>`;
+      body.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:48px;color:var(--muted)">Sin pedidos aún</td></tr>`;
       return;
     }
-    body.innerHTML = d.map(p=>`
+    body.innerHTML = d.map(p => `
       <tr>
         <td style="font-size:11px;color:var(--muted)">${p.id}</td>
         <td style="font-weight:600">${p.cliente}</td>
@@ -613,16 +718,16 @@ async function loadPedidos() {
         <td><span class="pill">${p.estado}</span></td>
         <td style="color:var(--muted);font-size:12px">${p.hora}</td>
       </tr>`).join('');
-  } catch(e) { toastMsg('❌ Error cargando pedidos','err') }
+  } catch(e) { toastMsg('❌ Error cargando pedidos', 'err'); }
 }
 
-/* ── IMPORT EXCEL ───────────────────── */
-function openImp()  { document.getElementById('impModal').classList.add('open') }
+/* ── IMPORT EXCEL ────────────────────────────────────── */
+function openImp()  { document.getElementById('impModal').classList.add('open'); }
 function closeImp() {
   document.getElementById('impModal').classList.remove('open');
-  document.getElementById('impPrev').style.display='none';
-  document.getElementById('btnImp').disabled=true;
-  impRows=[];
+  document.getElementById('impPrev').style.display = 'none';
+  document.getElementById('btnImp').disabled = true;
+  impRows = [];
 }
 function onDrop(ev) {
   ev.preventDefault();
@@ -633,57 +738,60 @@ function onFile(file) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = e => {
-    const wb   = XLSX.read(e.target.result,{type:'binary'});
+    const wb   = XLSX.read(e.target.result, { type: 'binary' });
     const ws   = wb.Sheets[wb.SheetNames[0]];
-    const data = XLSX.utils.sheet_to_json(ws,{defval:''});
-    const get  = (row,keys,...names) => {
+    const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    const get  = (row, keys, ...names) => {
       for (const n of names) {
-        const k = keys.find(k=>k.toLowerCase().replace(/[^a-z]/g,'').includes(n));
-        if (k) return (row[k]||'').toString().trim();
+        const k = keys.find(k => k.toLowerCase().replace(/[^a-z]/g, '').includes(n));
+        if (k) return (row[k] || '').toString().trim();
       }
       return '';
     };
-    impRows = data.map(row=>{
+    impRows = data.map(row => {
       const keys = Object.keys(row);
       return {
-        descripcion:    get(row,keys,'descripci','descrip','nombre','produc'),
-        laboratorio:    get(row,keys,'laborator','lab','marca','fabrican'),
-        unidad:         get(row,keys,'unidad','unit','presentac','conten'),
-        precio:         get(row,keys,'precio','price','valor','vta','venta'),
-        precioUnitario: get(row,keys,'unitario','unitprice','xunidad','porunit'),
+        descripcion:    get(row, keys, 'descripci', 'descrip', 'nombre', 'produc'),
+        laboratorio:    get(row, keys, 'laborator', 'lab', 'marca', 'fabrican'),
+        unidad:         get(row, keys, 'unidad', 'unit', 'presentac', 'conten'),
+        precio:         get(row, keys, 'precio', 'price', 'valor', 'vta', 'venta'),
+        precioUnitario: get(row, keys, 'unitario', 'unitprice', 'xunidad', 'porunit'),
       };
-    }).filter(r=>r.descripcion);
+    }).filter(r => r.descripcion);
     const prev = document.getElementById('impPrev');
-    prev.style.display='block';
-    prev.innerHTML=`✅ <strong>${impRows.length}</strong> productos listos de <em>${file.name}</em>`;
-    document.getElementById('btnImp').disabled = impRows.length===0;
+    prev.style.display = 'block';
+    prev.innerHTML = `✅ <strong>${impRows.length}</strong> productos listos de <em>${file.name}</em>`;
+    document.getElementById('btnImp').disabled = impRows.length === 0;
   };
   reader.readAsBinaryString(file);
 }
 async function doImport() {
   if (!impRows.length) return;
-  const btn=document.getElementById('btnImp');
-  btn.disabled=true; btn.textContent='Importando…';
+  const btn = document.getElementById('btnImp');
+  btn.disabled = true; btn.textContent = 'Importando…';
   try {
-    const r = await fetch(API_IMP,{
-      method:'POST',
-      headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
-      body:JSON.stringify({tienda:TIENDA,productos:impRows})
+    const r = await fetch(API_IMP, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + gCredential },
+      body: JSON.stringify({ tienda: TIENDA, productos: impRows })
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error);
-    toastMsg('✅ '+d.count+' productos importados','ok');
-    closeImp(); reload();
-  } catch(e) { toastMsg('❌ '+e.message,'err') }
-  finally { btn.disabled=false; btn.textContent='Subir a Sheets' }
+    toastMsg('✅ ' + d.count + ' productos importados', 'ok');
+    closeImp();
+    reload();
+  } catch(e) { toastMsg('❌ ' + e.message, 'err'); }
+  finally { btn.disabled = false; btn.textContent = 'Subir a Sheets'; }
 }
 
-/* ── TOAST ──────────────────────────── */
+/* ── TOAST ───────────────────────────────────────────── */
 let tt;
-function toastMsg(msg,type='ok'){
-  const el=document.getElementById('toast');
-  el.textContent=msg; el.className='toast '+type+' show';
-  clearTimeout(tt); tt=setTimeout(()=>el.className='toast '+type,3200);
+function toastMsg(msg, type = 'ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast ' + type + ' show';
+  clearTimeout(tt);
+  tt = setTimeout(() => el.className = 'toast ' + type, 3200);
 }
 </script>
 </body>
