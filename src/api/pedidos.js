@@ -1,8 +1,7 @@
 // api/pedidos.js
 // Columnas A-R:
 // A=ID_PEDIDO B=NOMBRE_CLI C=TELEFONO D=METODO_PAGO E=ESTADO F=IMAGEN_TRANSFERENCIA
-// G=PRODUCTOS H=MARCA I=CANTIDAD J=V/U K=V/TOTAL L=DIRECCION M=HORA N=FECHA
-// O=TOTAL P=NOMBRE_DOMI Q=HORA_TOMO_PEDIDO R=HORA_ENTREGO
+// G=PRODUCTOS H=MARCA I=CANTIDAD J=V/U K=V/TOTAL L=DIRECCION M=HORA N=FECHA O=TOTAL
 
 const { google }       = require('googleapis');
 const { OAuth2Client } = require('google-auth-library');
@@ -17,7 +16,6 @@ async function verificarAdmin(token) {
 }
 
 function pn(v) { return parseInt((v||'0').toString().replace(/[^0-9]/g,'')) || 0; }
-function cop(n) { return n ? '$' + n.toLocaleString('es-CO') : '—'; }
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -50,24 +48,24 @@ module.exports = async (req, res) => {
       .filter(row => {
         const marca = (row[7] || '').toUpperCase();
         if (tienda === 'CENTRAL')  return marca.includes('CENTRAL');
-        if (tienda === 'EXPERTOS') return marca.includes('EXPERTOS') || !marca.includes('CENTRAL');
+        if (tienda === 'EXPERTOS') return marca.includes('EXPERTOS');
         return true;
       })
       .map(row => ({
-        id:           (row[0]  || '').toString().trim(),
-        cliente:      (row[1]  || '').toString().trim(),
-        telefono:     (row[2]  || '').toString().trim(),
-        metodoPago:   (row[3]  || '').toString().trim(),
-        estado:       (row[4]  || '').toString().trim(),
-        productos:    (row[6]  || '').toString().trim(),
-        marca:        (row[7]  || '').toString().trim(),
-        direccion:    (row[11] || '').toString().trim(),
-        hora:         (row[12] || '').toString().trim(),
-        fecha:        (row[13] || '').toString().trim(),
-        total:        pn(row[14]),
-        domiciliario: (row[15] || '').toString().trim(),
-        horaTomo:     (row[16] || '').toString().trim(),
-        horaEntrego:  (row[17] || '').toString().trim(),
+        id:          (row[0]  || '').toString().trim(),
+        cliente:     (row[1]  || '').toString().trim(),
+        telefono:    (row[2]  || '').toString().trim(),
+        metodoPago:  (row[3]  || '').toString().trim(),
+        estado:      (row[4]  || '').toString().trim(),
+        productos:   (row[6]  || '').toString().trim(),
+        marca:       (row[7]  || '').toString().trim(),
+        direccion:   (row[11] || '').toString().trim(),
+        hora:        (row[12] || '').toString().trim(),
+        fecha:       (row[13] || '').toString().trim(),
+        total:       pn(row[14]),
+        domiciliario:(row[15] || '').toString().trim(),
+        horaTomo:    (row[16] || '').toString().trim(),
+        horaEntrego: (row[17] || '').toString().trim(),
       }))
       .reverse();
 
