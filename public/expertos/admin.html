@@ -643,7 +643,7 @@ async function doImport(){
       const reader=new FileReader();
       reader.onload=()=>resolve(reader.result.split(',')[1]);
       reader.onerror=()=>reject(new Error('Error leyendo archivo'));
-      reader.readAsDataURL(selectedFile);
+      reader.readAsArrayBuffer(selectedFile);
     });
 
     setProgress(50,'Enviando a servidor…');
@@ -656,7 +656,7 @@ async function doImport(){
         'Content-Type':'text/plain',
         'Authorization':'Bearer '+token
       },
-      body: base64,
+      body: new Uint8Array(base64),
     });
 
     setProgress(85,'Procesando en Sheets…');
