@@ -405,23 +405,53 @@ td{padding:11px 16px;vertical-align:middle}
       <div id="pgPed" style="display:none">
         <div class="tbar">
           <span class="pg-title">🛒 Pedidos web</span>
-          <button class="btn btn-g" onclick="loadPedidos()">↻ Actualizar</button>
+          <div class="tbar-acts">
+            <button class="btn btn-o" onclick="loadPedidos()">↻ Actualizar</button>
+            <button class="btn btn-g" onclick="toggleAutoPed()" id="btnAuto">⏱ Auto OFF</button>
+          </div>
         </div>
         <div class="content">
+          <div class="kpis" style="margin-bottom:16px">
+            <div class="kpi" data-ico="🛒"><div class="kpi-lbl">Total pedidos</div><div class="kpi-val" id="pkTotal">—</div></div>
+            <div class="kpi" data-ico="⏳"><div class="kpi-lbl">Pendientes</div><div class="kpi-val" id="pkPend">—</div></div>
+            <div class="kpi" data-ico="✅"><div class="kpi-lbl">Entregados</div><div class="kpi-val" id="pkEnt">—</div></div>
+            <div class="kpi" data-ico="💰"><div class="kpi-lbl">Total ventas</div><div class="kpi-val" id="pkVentas">—</div></div>
+          </div>
           <div class="tbl-wrap"><div class="tbl-scroll">
             <table>
               <thead><tr>
-                <th>ID</th><th>Cliente</th><th>Teléfono</th>
-                <th>Productos</th><th>Total</th><th>Estado</th><th>Hora</th>
+                <th>ID</th>
+                <th>Cliente</th>
+                <th>Teléfono</th>
+                <th>Dirección</th>
+                <th>Total</th>
+                <th>Estado</th>
+                <th>Hora pedido</th>
+                <th>Entrega</th>
+                <th></th>
               </tr></thead>
               <tbody id="pedTbody">
-                <tr><td colspan="7" style="text-align:center;padding:48px;color:var(--muted)">Cargando pedidos…</td></tr>
+                <tr><td colspan="9" style="text-align:center;padding:48px;color:var(--muted)">
+                  <div style="font-size:36px;margin-bottom:10px">⏳</div>Cargando pedidos…
+                </td></tr>
               </tbody>
             </table>
           </div></div>
         </div>
       </div>
     </main>
+  </div>
+</div>
+
+
+<!-- MODAL DETALLE PEDIDO -->
+<div class="modal-bg" id="pedModal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-h">
+      <h3>📦 Detalle del pedido</h3>
+      <button class="modal-close" onclick="document.getElementById('pedModal').classList.remove('open')">✕</button>
+    </div>
+    <div id="pedModalBody"></div>
   </div>
 </div>
 
@@ -563,6 +593,8 @@ function enterFarm() {
   document.getElementById('avNm').textContent        = userInfo.name;
   document.getElementById('avImg').src               = userInfo.picture;
   document.getElementById('tbarTitle').textContent   = `📦 Inventario · ${f.nombre}`;
+  // Actualizar título del navegador
+  document.title = `Admin · ${f.nombre}`;
   // Mostrar app
   document.getElementById('pickWrap').classList.remove('show');
   document.getElementById('app').style.display      = 'block';
@@ -750,26 +782,113 @@ function mk(label, disabled, onclick, active = false) {
 }
 
 /* ══ PEDIDOS ══ */
+/* ══ PEDIDOS ══ */
+let pedidos      = [];
+let autoRefIv    = null;
+let autoRefOn    = false;
+
+function estadoPill(e) {
+  const m = {
+    'ENTREGADO':  'background:rgba(22,163,74,.15);color:#16a34a',
+    'PENDIENTE':  'background:rgba(234,179,8,.15);color:#a16207',
+    'EN CAMINO':  'background:rgba(59,130,246,.15);color:#1d4ed8',
+    'CANCELADO':  'background:rgba(220,38,38,.15);color:#dc2626',
+  };
+  const st = (e||'').toUpperCase();
+  const style = m[st] || 'background:rgba(100,100,100,.1);color:var(--muted)';
+  return `<span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;${style}">${e||'—'}</span>`;
+}
+
+function pedKpis(data) {
+  document.getElementById('pkTotal').textContent   = data.length;
+  document.getElementById('pkPend').textContent    = data.filter(p => (p.estado||'').toUpperCase() === 'PENDIENTE').length;
+  document.getElementById('pkEnt').textContent     = data.filter(p => (p.estado||'').toUpperCase() === 'ENTREGADO').length;
+  const tot = data.reduce((s,p) => s + (p.total||0), 0);
+  document.getElementById('pkVentas').textContent  = '$' + tot.toLocaleString('es-CO');
+}
+
+function verPedido(idx) {
+  const p   = pedidos[idx];
+  if (!p) return;
+  const prods = (p.productos || '').split('\n').filter(Boolean);
+  document.getElementById('pedModalBody').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:3px">ID Pedido</div>
+           <div style="font-weight:700">${p.id}</div></div>
+      <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:3px">Estado</div>
+           <div>${estadoPill(p.estado)}</div></div>
+      <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:3px">Cliente</div>
+           <div style="font-weight:600">${p.cliente||'—'}</div></div>
+      <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:3px">Teléfono</div>
+           <div>${p.telefono||'—'}</div></div>
+      <div style="grid-column:1/-1"><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:3px">Dirección</div>
+           <div>${p.direccion||'—'}</div></div>
+      <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:3px">Método pago</div>
+           <div>${p.metodoPago||'—'}</div></div>
+      <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:3px">Domiciliario</div>
+           <div>${p.domiciliario||'—'}</div></div>
+      <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:3px">Hora pedido</div>
+           <div>${p.horaTomo||p.hora||'—'}</div></div>
+      <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:3px">Hora entrega</div>
+           <div>${p.horaEntrego||'—'}</div></div>
+    </div>
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:8px">🛍 Productos</div>
+    <div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px;max-height:220px;overflow-y:auto">
+      ${prods.length
+        ? prods.map(pr => `<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">${pr}</div>`).join('')
+        : `<div style="color:var(--muted);font-size:13px">${p.productos||'Sin detalle'}</div>`}
+    </div>
+    <div style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;
+                background:rgba(22,163,74,.08);border:1px solid rgba(22,163,74,.2);border-radius:8px;padding:12px 16px">
+      <span style="font-size:13px;font-weight:700">Total</span>
+      <span style="font-family:'Fraunces',serif;font-size:22px;font-weight:900;color:var(--accent)">
+        $${(p.total||0).toLocaleString('es-CO')}
+      </span>
+    </div>
+  `;
+  document.getElementById('pedModal').classList.add('open');
+}
+
 async function loadPedidos() {
   try {
-    const r    = await fetch(`/api/pedidos?tienda=${tienda}`, { headers: { Authorization: 'Bearer ' + token } });
-    const d    = await r.json();
+    const r = await fetch(`/api/pedidos?tienda=${tienda}`, { headers: { Authorization: 'Bearer ' + token } });
+    const d = await r.json();
+    pedidos  = Array.isArray(d) ? d : [];
     const body = document.getElementById('pedTbody');
-    if (!d.length) {
-      body.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:48px;color:var(--muted)">Sin pedidos aún</td></tr>`;
+    pedKpis(pedidos);
+    if (!pedidos.length) {
+      body.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:48px;color:var(--muted)">
+        <div style="font-size:36px;margin-bottom:10px">📭</div>Sin pedidos aún</td></tr>`;
       return;
     }
-    body.innerHTML = d.map(p => `
-      <tr>
-        <td style="font-size:11px;color:var(--muted)">${p.id}</td>
-        <td style="font-weight:600">${p.cliente}</td>
-        <td>${p.telefono}</td>
-        <td style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.productos}</td>
-        <td class="td-p">${cop(p.total)}</td>
-        <td><span class="pill">${p.estado}</span></td>
-        <td style="color:var(--muted);font-size:12px">${p.hora}</td>
+    body.innerHTML = pedidos.map((p, i) => `
+      <tr style="cursor:pointer" onclick="verPedido(${i})">
+        <td style="font-size:11px;color:var(--muted);font-weight:600">${p.id}</td>
+        <td style="font-weight:700">${p.cliente||'—'}</td>
+        <td style="color:var(--muted)">${p.telefono||'—'}</td>
+        <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted);font-size:12px">${p.direccion||'—'}</td>
+        <td class="td-p">$${(p.total||0).toLocaleString('es-CO')}</td>
+        <td>${estadoPill(p.estado)}</td>
+        <td style="color:var(--muted);font-size:12px">${p.horaTomo||p.hora||'—'}</td>
+        <td style="color:${p.horaEntrego ? 'var(--accent)' : 'var(--muted)'};font-size:12px;font-weight:${p.horaEntrego ? '700' : '400'}">${p.horaEntrego||'—'}</td>
+        <td style="font-size:18px;color:var(--muted)">›</td>
       </tr>`).join('');
-  } catch(e) { toastMsg('❌ Error cargando pedidos', 'err'); }
+  } catch(e) { toastMsg('❌ Error cargando pedidos: ' + e.message, 'err'); }
+}
+
+function toggleAutoPed() {
+  autoRefOn = !autoRefOn;
+  const btn = document.getElementById('btnAuto');
+  if (autoRefOn) {
+    btn.textContent = '⏱ Auto ON';
+    btn.style.background = '#16a34a';
+    autoRefIv = setInterval(loadPedidos, 30000);
+    toastMsg('🔄 Auto-refresh cada 30s activado', 'ok');
+  } else {
+    btn.textContent = '⏱ Auto OFF';
+    btn.style.background = '';
+    clearInterval(autoRefIv);
+  }
 }
 
 /* ══ IMPORTAR EXCEL ══ */
