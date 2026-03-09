@@ -326,7 +326,7 @@ td{padding:11px 16px;vertical-align:middle}
    ▶  PON AQUÍ EL ID DE TU GOOGLE SPREADSHEET
    URL: https://docs.google.com/spreadsheets/d/ → ESTE_ID ← /edit
 ══════════════════════════════════════════════════ */
-const SPREADSHEET_ID = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+const SPREADSHEET_ID = 'PON_AQUI_TU_SPREADSHEET_ID';
 
 /* ══ CONFIG (no tocar) ══ */
 const SHEET_NAME     = 'STOCK_DROGUERIA_EXPERTOS';
@@ -341,41 +341,67 @@ const TIENDA   = 'EXPERTOS';
 const API_CHECK = '/api/auth-check';
 const API_PEDS  = `/api/pedidos?tienda=${TIENDA}`;
 
-let token = '';
+let token = '';        // JWT de identidad → para /api/auth-check y /api/pedidos
+let sheetsToken = ''; // OAuth2 access token → para Sheets API
 let prods = [], shown = [], impRows = [];
 let curPage = 1;
 let sortK = 'descripcion', sortAsc = true;
 
-/* ══ GOOGLE AUTH — original exacto ══ */
+/* ══ GOOGLE AUTH ══
+   Flujo:
+   1. doLogin() → pide Sign-In JWT (identidad)
+   2. onGoogle() → valida en backend → si OK, pide silenciosamente el access token de Sheets
+   3. Con ambos tokens → entra al dashboard y carga productos
+══ */
 window.onload = () => {
-  if (!GOOGLE_CLIENT_ID.includes('TU_CLIENT')) {
-    google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogle });
-    google.accounts.id.renderButton(document.querySelector('.g-btn'), {});
-  }
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogle });
+  google.accounts.id.renderButton(document.querySelector('.g-btn'), {});
 };
+
 function doLogin() {
   google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogle });
   google.accounts.id.prompt();
 }
+
 async function onGoogle(resp) {
   try {
+    // 1. Verificar identidad en el backend
     const r = await fetch(API_CHECK, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ credential: resp.credential, tienda: TIENDA })
     });
     const d = await r.json();
     if (!d.ok) { toastMsg('❌ ' + (d.error || 'Sin acceso'), 'err'); return; }
+
     token = resp.credential;
     const pl = JSON.parse(atob(resp.credential.split('.')[1]));
     document.getElementById('avNm').textContent = pl.name;
     document.getElementById('avImg').src = pl.picture;
-    document.getElementById('loginWrap').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    loadProds();
+
+    // 2. Pedir access token OAuth2 para Sheets (sin popup — usa sesión activa)
+    const tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: 'https://www.googleapis.com/auth/spreadsheets',
+      prompt: '',   // silencioso si ya hay sesión activa
+      callback: (tokenResp) => {
+        if (tokenResp.error) {
+          toastMsg('⚠️ No se pudo obtener acceso a Sheets: ' + tokenResp.error, 'err');
+          return;
+        }
+        sheetsToken = tokenResp.access_token;
+        // 3. Entrar al dashboard
+        document.getElementById('loginWrap').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        loadProds();
+      }
+    });
+    tokenClient.requestAccessToken();
+
   } catch(e) { toastMsg('❌ Error de autenticación', 'err'); }
 }
+
 function logout() {
-  token = '';
+  token = ''; sheetsToken = '';
   document.getElementById('loginWrap').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
   google.accounts.id.disableAutoSelect();
@@ -392,14 +418,14 @@ function navTo(page, el) {
 
 /* ══ LEER PRODUCTOS — Sheets API directa (columnas A:E) ══ */
 async function loadProds() {
-  if (SPREADSHEET_ID === '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU') {
+  if (SPREADSHEET_ID === 'PON_AQUI_TU_SPREADSHEET_ID') {
     showTblMsg('⚙️', 'Falta configurar el <code>SPREADSHEET_ID</code> en el código.');
     return;
   }
   showTblMsg('⏳', 'Cargando inventario…');
   try {
     const url = `${SHEETS_API}/${SPREADSHEET_ID}/values/${encodeURIComponent(READ_RANGE)}`;
-    const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+    const r = await fetch(url, { headers: { Authorization: 'Bearer ' + sheetsToken } });
     if (!r.ok) {
       const e = await r.json();
       throw new Error(e.error?.message || `HTTP ${r.status}`);
@@ -618,7 +644,7 @@ function onFile(file) {
 
 async function doImport() {
   if (!impRows.length) return;
-  if (SPREADSHEET_ID === '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU') {
+  if (SPREADSHEET_ID === 'PON_AQUI_TU_SPREADSHEET_ID') {
     toastMsg('⚙️ Configura SPREADSHEET_ID primero', 'err'); return;
   }
 
@@ -686,7 +712,7 @@ async function sheetsReq(method, path, body) {
     method,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: 'Bearer ' + token,
+      Authorization: 'Bearer ' + sheetsToken,
     },
     body: JSON.stringify(body),
   });
