@@ -43,6 +43,72 @@ body{background:var(--bg);color:var(--text);font-family:'Plus Jakarta Sans',sans
 .g-btn img{width:22px}
 .lbox-note{font-size:11px;color:rgba(255,255,255,.3);margin-top:20px;line-height:1.5}
 
+/* ══ WELCOME SCREEN ══ */
+#welcomeWrap{
+  position:fixed;inset:0;z-index:200;
+  background:linear-gradient(145deg,#0a1a0e 0%,#0f2d20 50%,#061018 100%);
+  display:none;align-items:center;justify-content:center;flex-direction:column;
+  overflow:hidden;
+}
+#welcomeWrap::before{content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse 700px 600px at 50% 40%,rgba(22,163,74,.22) 0%,transparent 65%)}
+#welcomeWrap::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
+  background-size:48px 48px}
+.wlc-inner{position:relative;z-index:1;text-align:center;animation:wlcIn .6s ease both}
+@keyframes wlcIn{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+.wlc-avatar{width:72px;height:72px;border-radius:50%;border:3px solid rgba(22,163,74,.6);
+  box-shadow:0 0 28px rgba(22,163,74,.3);margin:0 auto 18px;display:block}
+.wlc-greeting{font-size:13px;font-weight:600;letter-spacing:3px;text-transform:uppercase;
+  color:rgba(134,239,172,.65);margin-bottom:8px}
+.wlc-name{font-family:'Fraunces',serif;font-size:clamp(28px,4vw,46px);font-weight:900;color:#fff;
+  margin-bottom:4px;line-height:1.15}
+.wlc-role{font-size:13px;color:rgba(255,255,255,.38);margin-bottom:36px;letter-spacing:.5px}
+.wlc-clock{
+  font-family:'Fraunces',serif;
+  font-size:clamp(68px,13vw,124px);
+  font-weight:900;
+  color:#fff;
+  letter-spacing:-3px;
+  line-height:1;
+  margin-bottom:8px;
+  text-shadow:0 0 50px rgba(22,163,74,.55),0 0 100px rgba(22,163,74,.2);
+}
+.wlc-clock .sep{color:rgba(22,163,74,.85);animation:blink 1s step-end infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+.wlc-date{font-size:15px;color:rgba(255,255,255,.45);margin-bottom:40px;letter-spacing:.3px}
+.wlc-info{
+  display:inline-flex;align-items:center;gap:0;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+  border-radius:14px;padding:16px 28px;margin-bottom:36px;
+}
+.wlc-info-item{text-align:center;padding:0 20px}
+.wlc-info-item:not(:last-child){border-right:1px solid rgba(255,255,255,.1)}
+.wlc-info-label{font-size:10px;text-transform:uppercase;letter-spacing:2px;
+  color:rgba(255,255,255,.3);margin-bottom:5px}
+.wlc-info-val{font-size:13px;font-weight:700;color:rgba(255,255,255,.82)}
+.wlc-enter{font-size:11px;color:rgba(255,255,255,.28);letter-spacing:2.5px;text-transform:uppercase;
+  animation:pulse 1.8s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.28}50%{opacity:.75}}
+
+/* ══ LOGOUT CONFIRM ══ */
+#logoutModal{
+  position:fixed;inset:0;z-index:400;
+  background:rgba(0,0,0,.55);backdrop-filter:blur(8px);
+  display:none;align-items:center;justify-content:center;
+}
+#logoutModal.open{display:flex}
+.logout-box{
+  background:var(--s);border-radius:20px;padding:40px 36px;
+  width:min(360px,88vw);text-align:center;
+  animation:pop .2s ease;box-shadow:0 24px 64px rgba(0,0,0,.22);
+}
+.logout-ico{font-size:44px;margin-bottom:14px}
+.logout-box h3{font-family:'Fraunces',serif;font-size:21px;font-weight:900;margin-bottom:8px}
+.logout-box p{font-size:13px;color:var(--muted);margin-bottom:26px;line-height:1.6}
+.logout-acts{display:flex;gap:10px;justify-content:center}
+
 /* APP */
 #app{display:none}
 .wrap{display:flex;min-height:100vh}
@@ -67,7 +133,6 @@ body{background:var(--bg);color:var(--text);font-family:'Plus Jakarta Sans',sans
 .av-rl{font-size:10px;color:var(--muted)}
 .sign-out{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:4px;transition:.15s;flex-shrink:0}
 .sign-out:hover{color:var(--danger)}
-
 .main{flex:1;display:flex;flex-direction:column;min-width:0}
 .tbar{padding:14px 24px;background:var(--s);border-bottom:1px solid var(--border);
   display:flex;align-items:center;justify-content:space-between;gap:12px;
@@ -75,14 +140,12 @@ body{background:var(--bg);color:var(--text);font-family:'Plus Jakarta Sans',sans
 .pg-title{font-family:'Fraunces',serif;font-size:22px;font-weight:900}
 .tbar-acts{display:flex;gap:8px}
 .content{padding:24px;flex:1}
-
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:24px}
 .kpi{background:var(--s);border:1px solid var(--border);border-radius:var(--r);
   padding:18px 20px;position:relative;overflow:hidden}
 .kpi::before{content:attr(data-ico);position:absolute;right:14px;bottom:10px;font-size:36px;opacity:.12}
 .kpi-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
 .kpi-val{font-family:'Fraunces',serif;font-size:30px;font-weight:900;margin-top:4px}
-
 .toolbar{background:var(--s);border:1px solid var(--border);border-radius:var(--r);
   padding:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
 .sf{position:relative;flex:1;min-width:180px}
@@ -98,9 +161,9 @@ body{background:var(--bg);color:var(--text);font-family:'Plus Jakarta Sans',sans
   display:flex;align-items:center;gap:6px;white-space:nowrap}
 .btn-g{background:var(--accent);color:#fff}.btn-g:hover{background:#15803d}
 .btn-b{background:#0284c7;color:#fff}.btn-b:hover{background:#0369a1}
+.btn-r{background:var(--danger);color:#fff}.btn-r:hover{background:#b91c1c}
 .btn-o{background:var(--s);border:1.5px solid var(--border);color:var(--text)}.btn-o:hover{border-color:var(--accent);color:var(--accent)}
 .btn:disabled{opacity:.45;cursor:not-allowed}
-
 .tbl-wrap{background:var(--s);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
 .tbl-scroll{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:13px}
@@ -127,8 +190,6 @@ td{padding:11px 16px;vertical-align:middle}
   cursor:pointer;font-size:12px;display:grid;place-items:center;transition:.15s;font-family:'Plus Jakarta Sans',sans-serif}
 .pg-btn:hover{border-color:var(--accent);color:var(--accent)}
 .pg-btn.cur{background:var(--accent);color:#fff;border-color:var(--accent)}
-
-/* MODAL */
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;
   display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
 .modal-bg.open{display:flex}
@@ -153,8 +214,6 @@ td{padding:11px 16px;vertical-align:middle}
 .prog-fill{height:100%;background:var(--accent);border-radius:4px;transition:width .3s;width:0%}
 .prog-txt{font-size:12px;color:var(--muted);margin-top:4px}
 .modal-acts{display:flex;gap:10px;margin-top:20px;justify-content:flex-end}
-
-/* TOAST */
 .toast{position:fixed;bottom:20px;right:20px;z-index:500;padding:12px 20px;border-radius:10px;
   font-size:13px;font-weight:600;transform:translateY(60px);opacity:0;transition:.3s;pointer-events:none;
   max-width:320px;box-shadow:0 8px 24px rgba(0,0,0,.15)}
@@ -177,6 +236,46 @@ td{padding:11px 16px;vertical-align:middle}
       Continuar con Google
     </button>
     <div class="lbox-note">Solo correos autorizados por el administrador<br>pueden acceder a este panel.</div>
+  </div>
+</div>
+
+<!-- ══ WELCOME SCREEN ══ -->
+<div id="welcomeWrap">
+  <div class="wlc-inner">
+    <img class="wlc-avatar" id="wlcAvatar" src="" alt=""/>
+    <div class="wlc-greeting">Bienvenido de nuevo</div>
+    <div class="wlc-name" id="wlcName">Administrador</div>
+    <div class="wlc-role">Droguería Farma Expertos &nbsp;·&nbsp; Panel Admin</div>
+    <div class="wlc-clock" id="wlcClock">00<span class="sep">:</span>00<span class="sep">:</span>00</div>
+    <div class="wlc-date" id="wlcDate">—</div>
+    <div class="wlc-info">
+      <div class="wlc-info-item">
+        <div class="wlc-info-label">Hora de acceso</div>
+        <div class="wlc-info-val" id="wlcLoginTime">—</div>
+      </div>
+      <div class="wlc-info-item">
+        <div class="wlc-info-label">Correo</div>
+        <div class="wlc-info-val" id="wlcEmail">—</div>
+      </div>
+      <div class="wlc-info-item">
+        <div class="wlc-info-label">Rol</div>
+        <div class="wlc-info-val">Administrador</div>
+      </div>
+    </div>
+    <div class="wlc-enter">Ingresando al panel…</div>
+  </div>
+</div>
+
+<!-- ══ LOGOUT CONFIRM ══ -->
+<div id="logoutModal">
+  <div class="logout-box">
+    <div class="logout-ico">👋</div>
+    <h3>¿Cerrar sesión?</h3>
+    <p>Tu sesión actual será cerrada.<br>Necesitarás iniciar sesión nuevamente para acceder al panel.</p>
+    <div class="logout-acts">
+      <button class="btn btn-o" onclick="cancelLogout()">Cancelar</button>
+      <button class="btn btn-r" onclick="confirmLogout()">Sí, cerrar sesión</button>
+    </div>
   </div>
 </div>
 
@@ -295,7 +394,7 @@ td{padding:11px 16px;vertical-align:middle}
     <p>
       Sube el Excel con el stock actualizado.<br>
       Columnas requeridas: <strong>Descripción · Laboratorio · Unidad · Precio · Precio Unitario</strong><br>
-      <small style="color:var(--muted)">Se sobreescribirá la hoja <strong>STOCK_DROGUERIA_EXPERTOS</strong> columnas A–E. Celdas vacías serán omitidas.</small>
+      <small style="color:var(--muted)">Se sobreescribirá la hoja <strong>STOCK_DROGUERIA_EXPERTOS</strong> columnas A–E. Otras columnas serán ignoradas.</small>
     </p>
     <div class="drop" id="dropZ"
          onclick="document.getElementById('fIn').click()"
@@ -322,27 +421,65 @@ td{padding:11px 16px;vertical-align:middle}
 <div class="toast" id="toast"></div>
 
 <script>
-/* ══════════════════════════════════════════════════
-   El SPREADSHEET_ID vive en el backend (.env de Vercel)
-   El frontend solo habla con /api/productos e /api/import-stock
-══════════════════════════════════════════════════ */
-
-/* ══ CONFIG (no tocar) ══ */
-const SHEET_NAME  = 'STOCK_DROGUERIA_EXPERTOS';
-const CHUNK       = 100;  // productos por página en tabla
-const PER         = 100;
-
+/* ══ CONFIG ══ */
+const SHEET_NAME       = 'STOCK_DROGUERIA_EXPERTOS';
+const PER              = 100;   // productos por página
+const IMPORT_CHUNK     = 500;   // filas por request al importar
 const GOOGLE_CLIENT_ID = '699856885526-55fqgn6qdr116rige5dcrsg4f3jdu1kp.apps.googleusercontent.com';
-const TIENDA   = 'EXPERTOS';
-const API_CHECK = '/api/auth-check';
-const API_PEDS  = `/api/pedidos?tienda=${TIENDA}`;
+const TIENDA           = 'EXPERTOS';
+const API_CHECK        = '/api/auth-check';
+const API_PEDS         = `/api/pedidos?tienda=${TIENDA}`;
 
 let token = '';
 let prods = [], shown = [], impRows = [];
 let curPage = 1;
 let sortK = 'descripcion', sortAsc = true;
+let clockIv = null;
 
-/* ══ GOOGLE AUTH — login original, sin tocar ══ */
+/* ══ WELCOME SCREEN ══ */
+const DIAS  = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+function tickClock() {
+  const n = new Date();
+  const hh = String(n.getHours()).padStart(2,'0');
+  const mm = String(n.getMinutes()).padStart(2,'0');
+  const ss = String(n.getSeconds()).padStart(2,'0');
+  document.getElementById('wlcClock').innerHTML =
+    `${hh}<span class="sep">:</span>${mm}<span class="sep">:</span>${ss}`;
+  document.getElementById('wlcDate').textContent =
+    `${DIAS[n.getDay()]}, ${n.getDate()} de ${MESES[n.getMonth()]} de ${n.getFullYear()}`;
+}
+
+function showWelcome(name, email, picture) {
+  document.getElementById('wlcName').textContent  = name;
+  document.getElementById('wlcEmail').textContent = email;
+  document.getElementById('wlcAvatar').src        = picture;
+  const now = new Date();
+  document.getElementById('wlcLoginTime').textContent =
+    now.toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+
+  const wrap = document.getElementById('welcomeWrap');
+  wrap.style.display = 'flex';
+  tickClock();
+  clockIv = setInterval(tickClock, 1000);
+
+  setTimeout(() => {
+    wrap.style.transition = 'opacity .5s ease';
+    wrap.style.opacity    = '0';
+    setTimeout(() => {
+      wrap.style.display    = 'none';
+      wrap.style.opacity    = '1';
+      wrap.style.transition = '';
+      clearInterval(clockIv); clockIv = null;
+      document.getElementById('loginWrap').style.display = 'none';
+      document.getElementById('app').style.display       = 'block';
+      loadProds();
+    }, 500);
+  }, 3500);
+}
+
+/* ══ GOOGLE AUTH ══ */
 window.onload = () => {
   google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogle });
   google.accounts.id.renderButton(document.querySelector('.g-btn'), {});
@@ -354,7 +491,7 @@ function doLogin() {
 async function onGoogle(resp) {
   try {
     const r = await fetch(API_CHECK, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ credential: resp.credential, tienda: TIENDA })
     });
     const d = await r.json();
@@ -362,17 +499,25 @@ async function onGoogle(resp) {
     token = resp.credential;
     const pl = JSON.parse(atob(resp.credential.split('.')[1]));
     document.getElementById('avNm').textContent = pl.name;
-    document.getElementById('avImg').src = pl.picture;
-    document.getElementById('loginWrap').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    loadProds();
+    document.getElementById('avImg').src        = pl.picture;
+    showWelcome(pl.name, pl.email, pl.picture);
   } catch(e) { toastMsg('❌ Error de autenticación', 'err'); }
 }
+
+/* ══ LOGOUT con confirmación ══ */
 function logout() {
-  token = '';
+  document.getElementById('logoutModal').classList.add('open');
+}
+function cancelLogout() {
+  document.getElementById('logoutModal').classList.remove('open');
+}
+function confirmLogout() {
+  document.getElementById('logoutModal').classList.remove('open');
+  token = ''; prods = []; shown = [];
   document.getElementById('loginWrap').style.display = 'flex';
-  document.getElementById('app').style.display = 'none';
+  document.getElementById('app').style.display       = 'none';
   google.accounts.id.disableAutoSelect();
+  toastMsg('👋 Sesión cerrada correctamente', 'ok');
 }
 
 /* ══ NAV ══ */
@@ -384,12 +529,10 @@ function navTo(page, el) {
   if (page === 'ped') loadPedidos();
 }
 
-/* ══ LEER PRODUCTOS — vía backend /api/productos (service account) ══ */
+/* ══ LEER PRODUCTOS — todos, sin límite, omitir filas/celdas vacías ══ */
 async function loadProds() {
   showTblMsg('⏳', 'Cargando inventario…');
   try {
-    /* El backend lee STOCK_DROGUERIA_EXPERTOS!A:E con la service account
-       y devuelve array de objetos {descripcion,laboratorio,unidad,precio,precioUnitario} */
     const r = await fetch(`/api/productos?tienda=${TIENDA}`, {
       headers: { Authorization: 'Bearer ' + token }
     });
@@ -399,24 +542,22 @@ async function loadProds() {
     }
     const data = await r.json();
 
-    /* Soporta dos formatos que puede devolver el backend:
-       A) Array de objetos  [{descripcion,laboratorio,...}, ...]   ← formato nuevo
-       B) {values: [[row],[row],...]}                               ← formato Sheets raw */
+    /* Formato A: array de objetos {descripcion,...} */
     if (Array.isArray(data) && data.length && typeof data[0] === 'object' && !Array.isArray(data[0])) {
-      // Formato A: array de objetos
       prods = data.filter(p => p.descripcion?.toString().trim());
     } else {
-      // Formato B: array de arrays (valores raw de Sheets)
+      /* Formato B: array de arrays raw de Sheets */
       const rows = (Array.isArray(data) ? data : data.values || []).slice(1);
       prods = rows
-        .filter(row => row[0]?.toString().trim())
+        .filter(row => row[0]?.toString().trim())          // omitir fila vacía
         .map(row => ({
           descripcion:    (row[0] || '').toString().trim(),
           laboratorio:    (row[1] || '').toString().trim(),
           unidad:         (row[2] || '').toString().trim(),
           precio:         (row[3] || '').toString().trim(),
           precioUnitario: (row[4] || '').toString().trim(),
-        }));
+        }))
+        .filter(p => p.descripcion.length > 0);
     }
 
     shown = [...prods];
@@ -452,8 +593,22 @@ function kpis() {
   document.getElementById('kPr').textContent    =
     prods.filter(p => p.precioUnitario).length.toLocaleString('es-CO');
 }
-function pn(v)  { return parseInt((v || '0').toString().replace(/[^0-9]/g, '')) || 0; }
-function cop(v) { const n = pn(v); return n ? '$' + n.toLocaleString('es-CO') : '—'; }
+
+/* ══ FORMATO PRECIO COP ══
+   Hoja puede traer: "42.100,00"  "42100,00"  "42100"  "42.100"
+   → mostrar "$42.100" (entero, sin decimales, sin ceros extra)
+*/
+function pn(v) {
+  if (!v) return 0;
+  let s = v.toString().trim();
+  s = s.replace(/,\d*$/, '');          // quitar parte decimal  ",00" o ",5"
+  s = s.replace(/\./g, '');            // quitar puntos de miles
+  return parseInt(s.replace(/[^0-9]/g, '')) || 0;
+}
+function cop(v) {
+  const n = pn(v);
+  return n ? '$' + n.toLocaleString('es-CO') : '—';
+}
 
 /* ══ FILTRAR Y ORDENAR ══ */
 function filt() {
@@ -479,7 +634,7 @@ function thSort(col, th) {
   document.querySelectorAll('thead th').forEach(t => t.className = '');
   th.className = sortAsc ? 'asc' : 'desc';
   shown.sort((a, b) => {
-    const va = a[col] || '', vb = b[col] || '';
+    const va = a[col] ?? '', vb = b[col] ?? '';
     const r  = typeof va === 'number' ? va - vb : va.toString().localeCompare(vb.toString());
     return sortAsc ? r : -r;
   });
@@ -516,22 +671,18 @@ function renderTbl() {
 
   const pgB = document.getElementById('pgBtns');
   pgB.innerHTML = '';
-  // ← prev
-  const prev = mk('‹', curPage === 1, () => { curPage--; renderTbl(); });
-  pgB.appendChild(prev);
-  // páginas numéricas
+  pgB.appendChild(mk('‹', curPage === 1,     () => { curPage--; renderTbl(); }));
   const from = Math.max(1, curPage - 2), to = Math.min(pages, from + 4);
   for (let i = from; i <= to; i++) {
     const pg = i;
     pgB.appendChild(mk(i, false, () => { curPage = pg; renderTbl(); }, i === curPage));
   }
-  // next →
   pgB.appendChild(mk('›', curPage === pages, () => { curPage++; renderTbl(); }));
 }
 
 function mk(label, disabled, onclick, active = false) {
   const b = document.createElement('button');
-  b.className = 'pg-btn' + (active ? ' cur' : '');
+  b.className   = 'pg-btn' + (active ? ' cur' : '');
   b.textContent = label; b.disabled = disabled; b.onclick = onclick;
   return b;
 }
@@ -539,8 +690,8 @@ function mk(label, disabled, onclick, active = false) {
 /* ══ PEDIDOS ══ */
 async function loadPedidos() {
   try {
-    const r = await fetch(API_PEDS, { headers: { Authorization: 'Bearer ' + token } });
-    const d = await r.json();
+    const r    = await fetch(API_PEDS, { headers: { Authorization: 'Bearer ' + token } });
+    const d    = await r.json();
     const body = document.getElementById('pedTbody');
     if (!d.length) {
       body.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:48px;color:var(--muted)">Sin pedidos aún</td></tr>`;
@@ -559,21 +710,19 @@ async function loadPedidos() {
   } catch(e) { toastMsg('❌ Error cargando pedidos', 'err'); }
 }
 
-/* ══════════════════════════════════════════════════
-   IMPORTAR EXCEL → GOOGLE SHEETS  (chunks de 100)
-   Flujo:
-   1. Parsear Excel con XLSX.js → impRows[]
-   2. Limpiar la hoja entera (clearValues)
-   3. Escribir encabezados en A1
-   4. Subir impRows en lotes de CHUNK filas via batchUpdate
-══════════════════════════════════════════════════ */
+/* ══ IMPORTAR EXCEL ══
+   Solo las 5 columnas exactas: Descripción · Laboratorio · Unidad · Precio · Precio Unitario
+   Cualquier otra columna del Excel se ignora.
+   Filas con Descripción vacía se omiten.
+══ */
 function openImp()  { document.getElementById('impModal').classList.add('open'); }
 function closeImp() {
   document.getElementById('impModal').classList.remove('open');
-  document.getElementById('impPrev').style.display = 'none';
-  document.getElementById('progWrap').style.display = 'none';
-  document.getElementById('progFill').style.width = '0%';
-  document.getElementById('btnImp').disabled = true;
+  document.getElementById('impPrev').style.display   = 'none';
+  document.getElementById('progWrap').style.display  = 'none';
+  document.getElementById('progFill').style.width    = '0%';
+  document.getElementById('btnImp').disabled         = true;
+  document.getElementById('fIn').value               = '';
   impRows = [];
 }
 function onDrop(ev) {
@@ -590,79 +739,79 @@ function onFile(file) {
     const ws   = wb.Sheets[wb.SheetNames[0]];
     const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
-    // Mapeo flexible de columnas por nombre aproximado
-    const get = (row, keys, ...names) => {
-      for (const n of names) {
-        const k = keys.find(k => k.toLowerCase().replace(/[^a-záéíóúñ]/gi, '').includes(n));
-        if (k) return (row[k] || '').toString().trim();
-      }
-      return '';
-    };
-
-    impRows = data.map(row => {
-      const keys = Object.keys(row);
-      return {
-        descripcion:    get(row, keys, 'descrip', 'nombre', 'produc'),
-        laboratorio:    get(row, keys, 'laborat', 'lab', 'marca', 'fabrican'),
-        unidad:         get(row, keys, 'unidad', 'unit', 'present', 'conten'),
-        precio:         get(row, keys, 'precio', 'price', 'valor', 'venta'),
-        precioUnitario: get(row, keys, 'unitario', 'xunidad', 'porunit', 'unitprice'),
-      };
-    }).filter(r => r.descripcion.length > 0);  // omitir filas sin descripción
-
     const prev = document.getElementById('impPrev');
     prev.style.display = 'block';
-    prev.innerHTML = `✅ <strong>${impRows.length}</strong> productos listos de <em>${file.name}</em>`;
-    document.getElementById('btnImp').disabled = impRows.length === 0;
+
+    if (!data.length) {
+      prev.innerHTML = '⚠️ El archivo está vacío o no tiene datos.';
+      document.getElementById('btnImp').disabled = true;
+      return;
+    }
+
+    /* Mapeo flexible: busca la columna por nombre aproximado (ignora tildes/mayúsculas).
+       Solo se usan las 5 columnas requeridas; el resto del Excel se descarta. */
+    const norm = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'');
+    const keys = Object.keys(data[0]);
+    const col  = (...terms) => keys.find(k => terms.some(t => norm(k).includes(t)));
+
+    const cDesc = col('descrip','nombre','produc');
+    const cLab  = col('laborat','lab','marca','fabrican');
+    const cUnid = col('unidad','unit','present','conten');
+    const cPrecio = col('precio','price','valor','venta');
+    // Precio unitario: debe contener "unitario" o "xunidad" etc, y NO ser igual a cPrecio
+    const cPU = keys.find(k => {
+      const n = norm(k);
+      return (n.includes('unitario') || n.includes('xunidad') || n.includes('porunit')) && k !== cPrecio;
+    });
+
+    impRows = data
+      .map(row => ({
+        descripcion:    cDesc   ? (row[cDesc]   || '').toString().trim() : '',
+        laboratorio:    cLab    ? (row[cLab]    || '').toString().trim() : '',
+        unidad:         cUnid   ? (row[cUnid]   || '').toString().trim() : '',
+        precio:         cPrecio ? (row[cPrecio] || '').toString().trim() : '',
+        precioUnitario: cPU     ? (row[cPU]     || '').toString().trim() : '',
+      }))
+      .filter(r => r.descripcion.length > 0);  // omite filas vacías
+
+    if (impRows.length === 0) {
+      prev.innerHTML = '⚠️ No se encontraron productos con descripción. Verifica los encabezados del archivo.';
+      document.getElementById('btnImp').disabled = true;
+    } else {
+      prev.innerHTML = `✅ <strong>${impRows.length}</strong> productos listos de <em>${file.name}</em>`;
+      document.getElementById('btnImp').disabled = false;
+    }
   };
   reader.readAsBinaryString(file);
 }
 
 async function doImport() {
   if (!impRows.length) return;
-
   const btnImp = document.getElementById('btnImp');
   btnImp.disabled = true; btnImp.textContent = 'Subiendo…';
   document.getElementById('progWrap').style.display = 'block';
   setProgress(0, 'Enviando al servidor…');
-
   try {
-    /* Enviar todos los productos al backend de una sola vez.
-       El backend (/api/import-stock) tiene la service account y
-       escribe en STOCK_DROGUERIA_EXPERTOS columnas A:E */
     const total = impRows.length;
-    const CHUNK = 500; // chunks solo para la barra de progreso visual
     let sent = 0;
-
-    // Subir en chunks para mostrar progreso real
-    for (let start = 0; start < total; start += CHUNK) {
-      const slice = impRows.slice(start, start + CHUNK);
-      const isFirst = start === 0; // primer chunk limpia la hoja
-
+    for (let start = 0; start < total; start += IMPORT_CHUNK) {
+      const slice   = impRows.slice(start, start + IMPORT_CHUNK);
+      const isFirst = start === 0;
       const r = await fetch('/api/import-stock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-        body: JSON.stringify({
-          tienda: TIENDA,
-          productos: slice,
-          offset: start,       // fila de inicio (0 = desde A2)
-          clear: isFirst,      // solo el primer chunk limpia la hoja
-        })
+        body: JSON.stringify({ tienda: TIENDA, productos: slice, offset: start, clear: isFirst })
       });
-
       if (!r.ok) {
-        const e = await r.json().catch(() => ({}));
-        throw new Error(e.error || `HTTP ${r.status}`);
+        const er = await r.json().catch(() => ({}));
+        throw new Error(er.error || `HTTP ${r.status}`);
       }
-
       sent += slice.length;
       setProgress(Math.round((sent / total) * 100), `${sent} / ${total} productos…`);
     }
-
     setProgress(100, '¡Listo!');
     toastMsg(`✅ ${total} productos importados`, 'ok');
     setTimeout(() => { closeImp(); reload(); }, 800);
-
   } catch(e) {
     toastMsg('❌ ' + e.message, 'err');
     setProgress(0, 'Error: ' + e.message);
