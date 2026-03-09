@@ -19,16 +19,17 @@ module.exports = async (req, res) => {
         client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
         private_key:  (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
       },
-      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
+      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
     });
     const sheets = google.sheets({ version: 'v4', auth: await auth.getClient() });
 
+    // La hoja destino YA tiene columnas limpias: A=Descripción B=Lab C=Unidad D=Precio E=PrecioUnitario
     const r = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEETS_ID,
-      range: `${hoja}!A:E`
+      range: `${hoja}!A:E`,
     });
 
-    const rows = (r.data.values || []).slice(1);
+    const rows = (r.data.values || []).slice(1); // skip encabezado
 
     const productos = rows
       .filter(row => row[0]?.toString().trim())
@@ -47,7 +48,6 @@ module.exports = async (req, res) => {
           p.laboratorio.toUpperCase().includes(q)
         );
       });
-    // Sin .slice() — devuelve TODOS sin límite
 
     res.status(200).json(productos);
   } catch (e) {

@@ -630,7 +630,6 @@ function onFile(file){
   document.getElementById('btnImp').disabled=false;
 }
 
-// ✅ Envía base64 directo a Google Apps Script — sin pasar por Vercel
 async function doImport(){
   if(!selectedFile) return;
   const btnImp=document.getElementById('btnImp');
@@ -647,24 +646,25 @@ async function doImport(){
       reader.readAsDataURL(selectedFile);
     });
 
-    setProgress(50,'Enviando a Google…');
+    setProgress(50,'Enviando a servidor…');
     btnImp.textContent='Subiendo…';
 
-    const url=`${APPS_SCRIPT_URL}?tienda=${tienda}`;
-    const r=await fetch(url,{
+    // ✅ Llama a tu propia API en Vercel — sin Apps Script
+    const r=await fetch(`/api/import?tienda=${tienda}`,{
       method:'POST',
-      body:base64,
+      headers:{
+        'Content-Type':'text/plain',
+        'Authorization':'Bearer '+token
+      },
+      body: base64,
     });
 
-    setProgress(85,'Procesando…');
-    const text=await r.text();
-    let data;
-    try{ data=JSON.parse(text); }
-    catch(e){ throw new Error('Respuesta inválida del servidor: '+text.substring(0,100)); }
+    setProgress(85,'Procesando en Sheets…');
+    const data=await r.json();
 
-    if(data.error) throw new Error(data.error);
+    if(!r.ok || data.error) throw new Error(data.error||`HTTP ${r.status}`);
 
-    setProgress(100,`✅ ${data.count} productos guardados`);
+    setProgress(100,`✅ ${data.count} productos guardados en ${data.hoja}`);
     toastMsg(`✅ ${data.count} productos importados`,'ok');
     setTimeout(()=>{closeImp();reload();},900);
 
@@ -674,17 +674,6 @@ async function doImport(){
     btnImp.disabled=false;
     btnImp.textContent='⬆ Subir a Sheets';
   }
-}
-
-function setProgress(pct,txt){
-  document.getElementById('progFill').style.width=pct+'%';
-  document.getElementById('progTxt').textContent=txt;
-}
-let tt;
-function toastMsg(msg,type='ok'){
-  const el=document.getElementById('toast');
-  el.textContent=msg;el.className='toast '+type+' show';
-  clearTimeout(tt);tt=setTimeout(()=>el.className='toast '+type,3200);
 }
 </script>
 </body>
