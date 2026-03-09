@@ -3,231 +3,259 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Admin · La Central</title>
+<title>Admin · Farmacia Central</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <script src="https://accounts.google.com/gsi/client" async></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-:root{
-  --bg:#f5f5f0;--s:#ffffff;--s2:#f0ede8;--s3:#e8e4de;
-  --border:#d0c8bc;--red:#b91c1c;--teal:#0f766e;
-  --text:#1a1200;--muted:#6b6050;
-  --r:10px;
+:root {
+  --bg:#f0f4f0;--s:#fff;--s2:#f5f8f5;--s3:#e8f0e8;
+  --border:#d4e0d4;--accent:#16a34a;--a2:#0d9488;
+  --danger:#dc2626;--warn:#b45309;
+  --text:#0f1f0f;--muted:#5a7060;--r:12px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh}
+body{background:var(--bg);color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;min-height:100vh}
 
 /* LOGIN */
-#loginWrap{
-  min-height:100vh;display:flex;align-items:center;justify-content:center;
-  background:linear-gradient(160deg,#1a0a00 0%,#3b0d0d 50%,#0d1f1a 100%);
-  position:relative;overflow:hidden;
-}
-#loginWrap::before{
-  content:'';position:absolute;inset:0;pointer-events:none;
-  background:radial-gradient(ellipse 600px 400px at 30% 50%,rgba(185,28,28,.2) 0%,transparent 60%),
-             radial-gradient(ellipse 500px 400px at 75% 60%,rgba(15,118,110,.15) 0%,transparent 60%);
-}
-.lbox{
-  position:relative;z-index:1;
-  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
-  backdrop-filter:blur(24px);border-radius:20px;
-  padding:48px 40px;width:min(400px,92vw);text-align:center;
-}
-.lbox-ico{
-  width:68px;height:68px;border-radius:16px;margin:0 auto 20px;
-  background:linear-gradient(135deg,var(--red),var(--teal));
-  display:grid;place-items:center;font-size:34px;
-}
-.lbox-h{font-family:'Libre Baskerville',serif;font-size:26px;color:#fff;margin-bottom:4px}
-.lbox-s{font-size:13px;color:rgba(255,255,255,.4);margin-bottom:36px}
-.g-btn{
-  width:100%;padding:14px 20px;border-radius:10px;border:none;
-  background:#fff;font-size:14px;font-weight:700;color:#111;
-  display:flex;align-items:center;justify-content:center;gap:12px;
-  cursor:pointer;transition:.2s;font-family:'DM Sans',sans-serif;
-}
+#loginWrap{min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(145deg,#0a1a0e 0%,#0f2d20 40%,#061018 100%);position:relative;overflow:hidden}
+#loginWrap::before{content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse 600px 500px at 20% 30%,rgba(22,163,74,.18) 0%,transparent 60%),
+             radial-gradient(ellipse 500px 400px at 80% 70%,rgba(13,148,136,.12) 0%,transparent 60%)}
+#loginWrap::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);
+  background-size:48px 48px}
+.login-box{position:relative;z-index:1;background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.1);backdrop-filter:blur(28px);
+  border-radius:24px;padding:52px 44px;width:min(420px,92vw);text-align:center}
+.lbox-cross{width:72px;height:72px;margin:0 auto 24px;border-radius:20px;font-size:36px;
+  background:linear-gradient(135deg,#16a34a,#0d9488);display:grid;place-items:center;
+  box-shadow:0 0 40px rgba(22,163,74,.35)}
+.lbox-title{font-family:'Fraunces',serif;font-size:28px;font-weight:900;color:#fff;margin-bottom:4px}
+.lbox-sub{font-size:14px;color:rgba(255,255,255,.45);margin-bottom:40px}
+.g-btn{width:100%;padding:15px 20px;display:flex;align-items:center;justify-content:center;gap:12px;
+  background:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;color:#1a1a1a;
+  cursor:pointer;transition:.2s;font-family:'Plus Jakarta Sans',sans-serif}
 .g-btn:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(0,0,0,.3)}
-.g-btn img{width:20px}
-.lbox-n{font-size:11px;color:rgba(255,255,255,.25);margin-top:18px}
+.g-btn img{width:22px}
+.lbox-note{font-size:11px;color:rgba(255,255,255,.3);margin-top:20px;line-height:1.5}
+
+/* ══ WELCOME BANNER (dentro del dashboard) ══ */
+#wlcBanner{
+  background:linear-gradient(120deg,#0f2d20 0%,#0a1a0e 60%,#061018 100%);
+  border-radius:var(--r);border:1px solid rgba(22,163,74,.25);
+  padding:20px 24px;margin-bottom:24px;
+  display:none;align-items:center;gap:20px;
+  position:relative;overflow:hidden;
+  animation:bannerIn .4s ease both;
+}
+@keyframes bannerIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+#wlcBanner::before{content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse 400px 200px at 80% 50%,rgba(22,163,74,.12) 0%,transparent 70%)}
+.wb-avatar{width:44px;height:44px;border-radius:50%;border:2px solid rgba(22,163,74,.5);flex-shrink:0}
+.wb-text{flex:1;min-width:0}
+.wb-hi{font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;
+  color:rgba(134,239,172,.6);margin-bottom:2px}
+.wb-name{font-family:'Fraunces',serif;font-size:18px;font-weight:900;color:#fff;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wb-meta{font-size:11px;color:rgba(255,255,255,.35);margin-top:2px}
+.wb-clock{text-align:right;flex-shrink:0}
+.wb-time{font-family:'Fraunces',serif;font-size:36px;font-weight:900;color:#fff;
+  letter-spacing:-1px;line-height:1;
+  text-shadow:0 0 30px rgba(22,163,74,.5);}
+.wb-time .sep{color:rgba(22,163,74,.9);animation:blink 1s step-end infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.wb-date{font-size:11px;color:rgba(255,255,255,.38);margin-top:2px;text-align:right}
+.wb-close{position:absolute;top:10px;right:12px;background:none;border:none;
+  color:rgba(255,255,255,.3);cursor:pointer;font-size:16px;line-height:1;padding:2px}
+.wb-close:hover{color:rgba(255,255,255,.7)}
+
+/* ══ LOGOUT CONFIRM ══ */
+#logoutModal{
+  position:fixed;inset:0;z-index:400;
+  background:rgba(0,0,0,.55);backdrop-filter:blur(8px);
+  display:none;align-items:center;justify-content:center;
+}
+#logoutModal.open{display:flex}
+.logout-box{
+  background:var(--s);border-radius:20px;padding:40px 36px;
+  width:min(360px,88vw);text-align:center;
+  animation:pop .2s ease;box-shadow:0 24px 64px rgba(0,0,0,.22);
+}
+.logout-ico{font-size:44px;margin-bottom:14px}
+.logout-box h3{font-family:'Fraunces',serif;font-size:21px;font-weight:900;margin-bottom:8px}
+.logout-box p{font-size:13px;color:var(--muted);margin-bottom:26px;line-height:1.6}
+.logout-acts{display:flex;gap:10px;justify-content:center}
 
 /* APP */
 #app{display:none}
-.layout{display:flex;min-height:100vh}
-
-/* SIDEBAR */
-.sb{
-  width:220px;flex-shrink:0;
-  background:var(--s);border-right:1px solid var(--border);
-  display:flex;flex-direction:column;
-  position:sticky;top:0;height:100vh;
-}
-.sb-top{
-  padding:16px;border-bottom:1px solid var(--border);
-  display:flex;align-items:center;gap:10px;
-}
-.sb-ico{
-  width:36px;height:36px;border-radius:8px;
-  background:linear-gradient(135deg,var(--red),var(--teal));
-  display:grid;place-items:center;font-size:18px;flex-shrink:0;
-}
-.sb-nm{font-family:'Libre Baskerville',serif;font-size:13px;line-height:1.2}
-.sb-tg{font-size:9px;color:var(--red);letter-spacing:1.5px;text-transform:uppercase}
-.sb-nav{flex:1;padding:8px}
-.nv{
-  display:flex;align-items:center;gap:8px;
-  padding:9px 10px;border-radius:7px;
+.wrap{display:flex;min-height:100vh}
+.sb{width:230px;flex-shrink:0;background:var(--s);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+.sb-top{padding:18px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.sb-icon{width:38px;height:38px;border-radius:10px;flex-shrink:0;
+  background:linear-gradient(135deg,#16a34a,#0d9488);display:grid;place-items:center;font-size:20px}
+.sb-name{font-family:'Fraunces',serif;font-size:13px;font-weight:700;line-height:1.2}
+.sb-tag{font-size:10px;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase}
+.sb-nav{flex:1;padding:10px 8px}
+.nv{display:flex;align-items:center;gap:9px;padding:10px;border-radius:8px;
   font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;transition:.15s;
-  margin-bottom:2px;
-}
+  margin-bottom:2px;border:none;background:none;width:100%;text-align:left}
 .nv:hover{background:var(--s2);color:var(--text)}
-.nv.on{background:rgba(185,28,28,.08);color:var(--red)}
-.nv-i{font-size:16px;width:20px;text-align:center}
-.sb-bot{
-  padding:12px;border-top:1px solid var(--border);
-  display:flex;align-items:center;gap:8px;
-}
-.av{width:34px;height:34px;border-radius:50%;object-fit:cover;background:var(--s3);flex-shrink:0}
-.av-i{flex:1;min-width:0}
-.av-n{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.av-r{font-size:10px;color:var(--muted)}
-.so{background:none;border:none;color:var(--muted);cursor:pointer;font-size:17px;padding:3px;transition:.15s;flex-shrink:0}
-.so:hover{color:var(--red)}
-
-/* MAIN */
+.nv.on{background:rgba(22,163,74,.1);color:var(--accent)}
+.nv-ico{font-size:17px;width:22px;text-align:center}
+.sb-bot{padding:14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.av{width:36px;height:36px;border-radius:50%;object-fit:cover;background:var(--s3);flex-shrink:0}
+.av-info{flex:1;min-width:0}
+.av-nm{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.av-rl{font-size:10px;color:var(--muted)}
+.sign-out{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:4px;transition:.15s;flex-shrink:0}
+.sign-out:hover{color:var(--danger)}
 .main{flex:1;display:flex;flex-direction:column;min-width:0}
-.tbar{
-  padding:13px 22px;background:var(--s);border-bottom:1px solid var(--border);
+.tbar{padding:14px 24px;background:var(--s);border-bottom:1px solid var(--border);
   display:flex;align-items:center;justify-content:space-between;gap:12px;
-  position:sticky;top:0;z-index:10;
-}
-.pg-h{font-family:'Libre Baskerville',serif;font-size:20px}
-.ta{display:flex;gap:8px}
-.content{padding:22px;flex:1}
-
-/* KPIS */
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:22px}
-.kpi{background:var(--s);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;position:relative;overflow:hidden}
-.kpi::after{content:attr(data-i);position:absolute;right:12px;bottom:8px;font-size:32px;opacity:.1}
-.kpi-l{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
-.kpi-v{font-family:'Libre Baskerville',serif;font-size:28px;font-weight:700;margin-top:4px}
-
-/* TOOLBAR */
-.tb2{
-  background:var(--s);border:1px solid var(--border);border-radius:var(--r);
-  padding:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;
-}
+  position:sticky;top:0;z-index:10}
+.pg-title{font-family:'Fraunces',serif;font-size:22px;font-weight:900}
+.tbar-acts{display:flex;gap:8px}
+.content{padding:24px;flex:1}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:24px}
+.kpi{background:var(--s);border:1px solid var(--border);border-radius:var(--r);
+  padding:18px 20px;position:relative;overflow:hidden}
+.kpi::before{content:attr(data-ico);position:absolute;right:14px;bottom:10px;font-size:36px;opacity:.12}
+.kpi-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.kpi-val{font-family:'Fraunces',serif;font-size:30px;font-weight:900;margin-top:4px}
+.toolbar{background:var(--s);border:1px solid var(--border);border-radius:var(--r);
+  padding:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
 .sf{position:relative;flex:1;min-width:180px}
-.sf input{
-  width:100%;padding:8px 12px 8px 34px;
-  background:var(--s2);border:1.5px solid var(--border);
-  border-radius:7px;font-size:13px;color:var(--text);
-  font-family:'DM Sans',sans-serif;outline:none;transition:.2s;
-}
-.sf input:focus{border-color:var(--red)}
-.sf::before{content:'🔍';position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none}
-.sel{
-  padding:8px 12px;background:var(--s2);border:1.5px solid var(--border);
-  border-radius:7px;font-size:13px;color:var(--text);
-  font-family:'DM Sans',sans-serif;cursor:pointer;outline:none;transition:.2s;
-}
-.sel:focus{border-color:var(--red)}
-.btn{
-  padding:8px 14px;border-radius:7px;border:none;
-  font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;
-  cursor:pointer;transition:.15s;display:flex;align-items:center;gap:5px;white-space:nowrap;
-}
-.btn-r{background:var(--red);color:#fff}.btn-r:hover{background:#991b1b}
-.btn-t{background:var(--teal);color:#fff}.btn-t:hover{background:#0d6b63}
-.btn-o{background:var(--s);border:1.5px solid var(--border);color:var(--text)}.btn-o:hover{border-color:var(--red);color:var(--red)}
-
-/* TABLE */
-.tw{background:var(--s);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
-.ts{overflow-x:auto}
+.sf input{width:100%;padding:9px 12px 9px 36px;background:var(--s2);border:1.5px solid var(--border);
+  border-radius:8px;font-size:13px;color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;outline:none;transition:.2s}
+.sf input:focus{border-color:var(--accent)}
+.sf::before{content:'🔍';position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none}
+.sel{padding:9px 12px;background:var(--s2);border:1.5px solid var(--border);border-radius:8px;
+  font-size:13px;color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;outline:none;transition:.2s}
+.sel:focus{border-color:var(--accent)}
+.btn{padding:9px 16px;border-radius:8px;border:none;font-size:13px;font-weight:700;
+  font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;transition:.15s;
+  display:flex;align-items:center;gap:6px;white-space:nowrap}
+.btn-g{background:var(--accent);color:#fff}.btn-g:hover{background:#15803d}
+.btn-b{background:#0284c7;color:#fff}.btn-b:hover{background:#0369a1}
+.btn-r{background:var(--danger);color:#fff}.btn-r:hover{background:#b91c1c}
+.btn-o{background:var(--s);border:1.5px solid var(--border);color:var(--text)}.btn-o:hover{border-color:var(--accent);color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.tbl-wrap{background:var(--s);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.tbl-scroll{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:13px}
-thead th{
-  background:var(--s2);padding:10px 15px;text-align:left;
-  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
-  color:var(--muted);border-bottom:1px solid var(--border);
-  cursor:pointer;user-select:none;white-space:nowrap;
-}
+thead th{background:var(--s2);padding:11px 16px;text-align:left;font-size:10px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border-bottom:1px solid var(--border);
+  cursor:pointer;user-select:none;white-space:nowrap}
 thead th:hover{color:var(--text)}
 thead th.asc::after{content:' ↑'}
 thead th.desc::after{content:' ↓'}
 tbody tr{border-bottom:1px solid var(--border);transition:.1s}
 tbody tr:last-child{border-bottom:none}
 tbody tr:hover{background:var(--s2)}
-td{padding:10px 15px;vertical-align:middle}
-.tnm{font-weight:600;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tl{color:var(--muted);font-size:12px}
-.tp{font-weight:700;color:var(--red)}
-.tps{font-size:11px;color:var(--muted)}
-.pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(185,28,28,.08);color:var(--red)}
-
-.pag{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
-.pgb{display:flex;gap:3px}
-.pb{width:28px;height:28px;border-radius:5px;background:var(--s);border:1px solid var(--border);cursor:pointer;font-size:12px;display:grid;place-items:center;transition:.15s}
-.pb:hover{border-color:var(--red);color:var(--red)}
-.pb.cur{background:var(--red);color:#fff;border-color:var(--red)}
-
-/* MODAL */
-.mbg{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
-.mbg.open{display:flex}
-.modal{background:var(--s);border-radius:16px;padding:32px;width:min(500px,92vw);box-shadow:0 24px 60px rgba(0,0,0,.15);animation:pop .2s ease}
+td{padding:11px 16px;vertical-align:middle}
+.td-nm{font-weight:600;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.td-lab{color:var(--muted);font-size:12px}
+.td-p{font-weight:700;color:var(--accent)}
+.td-ps{font-size:11px;color:var(--muted)}
+.pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;
+  background:rgba(22,163,74,.1);color:var(--accent)}
+.pag{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;
+  border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
+.pg-btns{display:flex;gap:4px}
+.pg-btn{width:30px;height:30px;border-radius:6px;background:var(--s);border:1px solid var(--border);
+  cursor:pointer;font-size:12px;display:grid;place-items:center;transition:.15s;font-family:'Plus Jakarta Sans',sans-serif}
+.pg-btn:hover{border-color:var(--accent);color:var(--accent)}
+.pg-btn.cur{background:var(--accent);color:#fff;border-color:var(--accent)}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;
+  display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal-bg.open{display:flex}
+.modal{background:var(--s);border-radius:20px;padding:36px;width:min(540px,92vw);
+  box-shadow:0 24px 64px rgba(0,0,0,.18);animation:pop .2s ease}
 @keyframes pop{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
-.mh{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px}
-.mh h3{font-family:'Libre Baskerville',serif;font-size:20px}
-.mx{background:none;border:none;font-size:20px;color:var(--muted);cursor:pointer}
-.mp{font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.5}
-.dz{border:2px dashed var(--border);border-radius:10px;padding:40px 20px;text-align:center;cursor:pointer;transition:.2s}
-.dz:hover,.dz.dr{border-color:var(--red);background:rgba(185,28,28,.03)}
-.dz .di{font-size:40px;margin-bottom:10px}
-.dz p{font-size:13px;color:var(--muted)}
-.dz strong{color:var(--red);cursor:pointer}
-#fin{display:none}
-.prev{margin-top:12px;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:11px 14px;font-size:13px;display:none}
-.ma{display:flex;gap:8px;margin-top:18px;justify-content:flex-end}
-
-/* TOAST */
-.toast{position:fixed;bottom:20px;right:20px;z-index:500;padding:11px 18px;border-radius:8px;font-size:13px;font-weight:600;transform:translateY(50px);opacity:0;transition:.3s;pointer-events:none;max-width:280px}
-.toast.ok{background:#0a1f12;color:#86efac;border:1px solid #166534}
-.toast.er{background:#450a0a;color:#fca5a5;border:1px solid #7f1d1d}
+.modal-h{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px}
+.modal-h h3{font-family:'Fraunces',serif;font-size:22px;font-weight:900}
+.modal-close{background:none;border:none;font-size:22px;color:var(--muted);cursor:pointer}
+.modal p{font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.5}
+.drop{border:2px dashed var(--border);border-radius:12px;padding:36px 20px;
+  text-align:center;cursor:pointer;transition:.2s}
+.drop:hover,.drop.drag{border-color:var(--accent);background:rgba(22,163,74,.04)}
+.drop-ico{font-size:40px;margin-bottom:8px}
+.drop p{font-size:14px;color:var(--muted)}
+.drop strong{color:var(--accent)}
+#fIn{display:none}
+.imp-prev{margin-top:14px;background:var(--s2);border:1px solid var(--border);
+  border-radius:8px;padding:12px 16px;font-size:13px;display:none}
+.prog-wrap{margin-top:14px;display:none}
+.prog-bar{height:8px;background:var(--s3);border-radius:4px;overflow:hidden;margin-top:6px}
+.prog-fill{height:100%;background:var(--accent);border-radius:4px;transition:width .3s;width:0%}
+.prog-txt{font-size:12px;color:var(--muted);margin-top:4px}
+.modal-acts{display:flex;gap:10px;margin-top:20px;justify-content:flex-end}
+.toast{position:fixed;bottom:20px;right:20px;z-index:500;padding:12px 20px;border-radius:10px;
+  font-size:13px;font-weight:600;transform:translateY(60px);opacity:0;transition:.3s;pointer-events:none;
+  max-width:320px;box-shadow:0 8px 24px rgba(0,0,0,.15)}
+.toast.ok{background:#052e16;color:#86efac;border:1px solid #166534}
+.toast.err{background:#450a0a;color:#fca5a5;border:1px solid #7f1d1d}
 .toast.show{transform:translateY(0);opacity:1}
-
-@media(max-width:680px){.sb{display:none}.kpis{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){.sb{display:none}.kpis{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
 
+<!-- LOGIN -->
 <div id="loginWrap">
-  <div class="lbox">
-    <div class="lbox-ico">✚</div>
-    <div class="lbox-h">Panel Admin</div>
-    <div class="lbox-s">Droguería La Central · Copacabana</div>
+  <div class="login-box">
+    <div class="lbox-cross">💊</div>
+    <div class="lbox-title">Panel Admin</div>
+    <div class="lbox-sub">Droguería Central · Copacabana</div>
     <button class="g-btn" onclick="doLogin()">
       <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G"/>
       Continuar con Google
     </button>
-    <div class="lbox-n">Acceso exclusivo para administradores autorizados</div>
+    <div class="lbox-note">Solo correos autorizados por el administrador<br>pueden acceder a este panel.</div>
   </div>
 </div>
 
+<!-- ══ LOGOUT CONFIRM ══ -->
+<div id="logoutModal">
+  <div class="logout-box">
+    <div class="logout-ico">👋</div>
+    <h3>¿Cerrar sesión?</h3>
+    <p>Tu sesión actual será cerrada.<br>Necesitarás iniciar sesión nuevamente para acceder al panel.</p>
+    <div class="logout-acts">
+      <button class="btn btn-o" onclick="cancelLogout()">Cancelar</button>
+      <button class="btn btn-r" onclick="confirmLogout()">Sí, cerrar sesión</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
 <div id="app">
-  <div class="layout">
+  <div class="wrap">
     <aside class="sb">
       <div class="sb-top">
-        <div class="sb-ico">✚</div>
-        <div><div class="sb-nm">La Central</div><div class="sb-tg">Admin</div></div>
+        <div class="sb-icon">💊</div>
+        <div><div class="sb-name">Central</div><div class="sb-tag">Admin</div></div>
       </div>
       <nav class="sb-nav">
-        <div class="nv on" id="nv-i" onclick="navTo('inv',this)"><span class="nv-i">📦</span> Inventario</div>
-        <div class="nv" id="nv-p" onclick="navTo('ped',this)"><span class="nv-i">🛒</span> Pedidos web</div>
+        <button class="nv on" id="nv-inv" onclick="navTo('inv',this)">
+          <span class="nv-ico">📦</span> Inventario
+        </button>
+        <button class="nv" id="nv-ped" onclick="navTo('ped',this)">
+          <span class="nv-ico">🛒</span> Pedidos web
+        </button>
       </nav>
       <div class="sb-bot">
         <img class="av" id="avImg" src="" alt=""/>
-        <div class="av-i"><div class="av-n" id="avNm">—</div><div class="av-r">Administrador</div></div>
-        <button class="so" onclick="logout()" title="Salir">⏻</button>
+        <div class="av-info">
+          <div class="av-nm" id="avNm">—</div>
+          <div class="av-rl">Administrador</div>
+        </div>
+        <button class="sign-out" onclick="logout()" title="Salir">⏻</button>
       </div>
     </aside>
 
@@ -235,48 +263,66 @@ td{padding:10px 15px;vertical-align:middle}
       <!-- INVENTARIO -->
       <div id="pgInv">
         <div class="tbar">
-          <span class="pg-h">📦 Inventario La Central</span>
-          <div class="ta">
-            <button class="btn btn-t" onclick="openImp()">⬆ Importar Excel</button>
-            <button class="btn btn-r" onclick="reload()">↻ Actualizar</button>
+          <span class="pg-title">📦 Inventario Drogueria Central</span>
+          <div class="tbar-acts">
+            <button class="btn btn-b" onclick="openImp()">⬆ Importar Excel</button>
+            <button class="btn btn-g" onclick="reload()">↻ Actualizar</button>
           </div>
         </div>
         <div class="content">
-          <div class="kpis">
-            <div class="kpi" data-i="📦"><div class="kpi-l">Productos</div><div class="kpi-v" id="kT">—</div></div>
-            <div class="kpi" data-i="🏭"><div class="kpi-l">Laboratorios</div><div class="kpi-v" id="kL">—</div></div>
-            <div class="kpi" data-i="💰"><div class="kpi-l">Con precio unit.</div><div class="kpi-v" id="kP">—</div></div>
+          <!-- Banner bienvenida con reloj -->
+          <div id="wlcBanner">
+            <img class="wb-avatar" id="wlcAvatar" src="" alt=""/>
+            <div class="wb-text">
+              <div class="wb-hi">Bienvenido de nuevo</div>
+              <div class="wb-name" id="wlcName">Administrador</div>
+              <div class="wb-meta" id="wlcMeta">—</div>
+            </div>
+            <div class="wb-clock">
+              <div class="wb-time" id="wlcClock">00<span class="sep">:</span>00<span class="sep">:</span>00</div>
+              <div class="wb-date" id="wlcDate">—</div>
+            </div>
+            <button class="wb-close" onclick="closeBanner()" title="Cerrar">✕</button>
           </div>
-          <div class="tb2">
-            <div class="sf"><input type="text" id="srch" placeholder="Buscar…" oninput="filt()"/></div>
-            <select class="sel" id="sLab" onchange="filt()"><option value="">Todos los laboratorios</option></select>
-            <select class="sel" id="sOrd" onchange="filt()">
-              <option value="d">Nombre A→Z</option>
-              <option value="l">Laboratorio A→Z</option>
-              <option value="pa">Precio ↑</option>
-              <option value="pd">Precio ↓</option>
+          <div class="kpis">
+            <div class="kpi" data-ico="📦"><div class="kpi-lbl">Total productos</div><div class="kpi-val" id="kTotal">—</div></div>
+            <div class="kpi" data-ico="🏭"><div class="kpi-lbl">Laboratorios</div><div class="kpi-val" id="kLabs">—</div></div>
+            <div class="kpi" data-ico="💰"><div class="kpi-lbl">Con precio unid.</div><div class="kpi-val" id="kPr">—</div></div>
+          </div>
+          <div class="toolbar">
+            <div class="sf">
+              <input type="text" id="srch" placeholder="Buscar producto o laboratorio…" oninput="filt()"/>
+            </div>
+            <select class="sel" id="selLab" onchange="filt()">
+              <option value="">Todos los laboratorios</option>
+            </select>
+            <select class="sel" id="selSort" onchange="filt()">
+              <option value="desc">Nombre A→Z</option>
+              <option value="lab">Laboratorio A→Z</option>
+              <option value="pa">Precio unitario ↑</option>
+              <option value="pd">Precio unitario ↓</option>
             </select>
           </div>
-          <div class="tw">
-            <div class="ts">
+          <div class="tbl-wrap">
+            <div class="tbl-scroll">
               <table>
-                <thead>
-                  <tr>
-                    <th onclick="thS('descripcion',this)">Descripción</th>
-                    <th onclick="thS('laboratorio',this)">Laboratorio</th>
-                    <th>Unidad</th>
-                    <th onclick="thS('_p',this)">Precio caja</th>
-                    <th onclick="thS('_pu',this)">Precio unitario</th>
-                  </tr>
-                </thead>
+                <thead><tr>
+                  <th onclick="thSort('descripcion',this)">Descripción</th>
+                  <th onclick="thSort('laboratorio',this)">Laboratorio</th>
+                  <th>Unidad</th>
+                  <th onclick="thSort('_p',this)">Precio Caja</th>
+                  <th onclick="thSort('_pu',this)">Precio Unitario</th>
+                </tr></thead>
                 <tbody id="tbody">
-                  <tr><td colspan="5" style="text-align:center;padding:48px;color:var(--muted)"><div style="font-size:36px;margin-bottom:10px">⏳</div>Cargando…</td></tr>
+                  <tr><td colspan="5" style="text-align:center;padding:48px;color:var(--muted)">
+                    <div style="font-size:36px;margin-bottom:10px">⏳</div>Cargando inventario…
+                  </td></tr>
                 </tbody>
               </table>
             </div>
             <div class="pag">
-              <span id="pgInf">—</span>
-              <div class="pgb" id="pgBtns"></div>
+              <span id="pagInfo">—</span>
+              <div class="pg-btns" id="pgBtns"></div>
             </div>
           </div>
         </div>
@@ -285,196 +331,468 @@ td{padding:10px 15px;vertical-align:middle}
       <!-- PEDIDOS -->
       <div id="pgPed" style="display:none">
         <div class="tbar">
-          <span class="pg-h">🛒 Pedidos web — La Central</span>
-          <button class="btn btn-r" onclick="loadPeds()">↻ Actualizar</button>
+          <span class="pg-title">🛒 Pedidos web</span>
+          <button class="btn btn-g" onclick="loadPedidos()">↻ Actualizar</button>
         </div>
         <div class="content">
-          <div class="tw">
-            <div class="ts">
-              <table>
-                <thead><tr><th>ID</th><th>Cliente</th><th>Teléfono</th><th>Productos</th><th>Total</th><th>Estado</th><th>Hora</th></tr></thead>
-                <tbody id="pedBody"><tr><td colspan="7" style="text-align:center;padding:48px;color:var(--muted)">Cargando…</td></tr></tbody>
-              </table>
-            </div>
-          </div>
+          <div class="tbl-wrap"><div class="tbl-scroll">
+            <table>
+              <thead><tr>
+                <th>ID</th><th>Cliente</th><th>Teléfono</th>
+                <th>Productos</th><th>Total</th><th>Estado</th><th>Hora</th>
+              </tr></thead>
+              <tbody id="pedTbody">
+                <tr><td colspan="7" style="text-align:center;padding:48px;color:var(--muted)">Cargando pedidos…</td></tr>
+              </tbody>
+            </table>
+          </div></div>
         </div>
       </div>
     </main>
   </div>
 </div>
 
-<!-- IMPORT MODAL -->
-<div class="mbg" id="impM">
+<!-- MODAL IMPORTAR -->
+<div class="modal-bg" id="impModal">
   <div class="modal">
-    <div class="mh"><h3>⬆ Importar stock</h3><button class="mx" onclick="closeImp()">✕</button></div>
-    <p class="mp">Sube el archivo Excel de tu sistema. Columnas: <strong>Descripción · Laboratorio · Unidad · Precio · Precio Unitario</strong></p>
-    <div class="dz" id="dz" onclick="document.getElementById('fin').click()"
-         ondragover="event.preventDefault();this.classList.add('dr')"
-         ondragleave="this.classList.remove('dr')"
+    <div class="modal-h">
+      <h3>⬆ Importar / Actualizar Stock</h3>
+      <button class="modal-close" onclick="closeImp()">✕</button>
+    </div>
+    <p>
+      Sube el Excel con el stock actualizado.<br>
+      Columnas requeridas: <strong>Descripción · Laboratorio · Unidad · Precio · Precio Unitario</strong><br>
+      <small style="color:var(--muted)">Se sobreescribirá la hoja <strong>STOCK_DROGUERIA_EXPERTOS</strong> columnas A–E. Otras columnas serán ignoradas.</small>
+    </p>
+    <div class="drop" id="dropZ"
+         onclick="document.getElementById('fIn').click()"
+         ondragover="event.preventDefault();this.classList.add('drag')"
+         ondragleave="this.classList.remove('drag')"
          ondrop="onDrop(event)">
-      <div class="di">📂</div>
+      <div class="drop-ico">📂</div>
       <p>Arrastra aquí o <strong>selecciona el archivo</strong></p>
       <p style="font-size:11px;margin-top:4px">.xlsx · .xls</p>
     </div>
-    <input type="file" id="fin" accept=".xlsx,.xls" onchange="onFile(this.files[0])"/>
-    <div class="prev" id="prev"></div>
-    <div class="ma">
+    <input type="file" id="fIn" accept=".xlsx,.xls" onchange="onFile(this.files[0])"/>
+    <div class="imp-prev" id="impPrev"></div>
+    <div class="prog-wrap" id="progWrap">
+      <div class="prog-bar"><div class="prog-fill" id="progFill"></div></div>
+      <div class="prog-txt" id="progTxt">Preparando…</div>
+    </div>
+    <div class="modal-acts">
       <button class="btn btn-o" onclick="closeImp()">Cancelar</button>
-      <button class="btn btn-t" id="bImp" onclick="doImport()" disabled>Subir a Sheets</button>
+      <button class="btn btn-b" id="btnImp" onclick="doImport()" disabled>⬆ Subir a Sheets</button>
     </div>
   </div>
 </div>
 
-<div class="toast" id="t"></div>
+<div class="toast" id="toast"></div>
 
 <script>
-const GID   = '699856885526-55fqgn6qdr116rige5dcrsg4f3jdu1kp.apps.googleusercontent.com'; // ← Reemplaza
-const TIEN  = 'CENTRAL';
-const API_P = `/api/productos?tienda=${TIEN}&all=1`;
-const API_O = `/api/pedidos?tienda=${TIEN}`;
-const API_I = `/api/import-stock`;
-const API_A = `/api/auth-check`;
+/* ══ CONFIG ══ */
+const SHEET_NAME       = 'STOCK_DROGUERIA_CENTRAL';
+const PER              = 100;   // productos por página
+const IMPORT_CHUNK     = 500;   // filas por request al importar
+const GOOGLE_CLIENT_ID = '699856885526-55fqgn6qdr116rige5dcrsg4f3jdu1kp.apps.googleusercontent.com';
+const TIENDA           = 'CENTRAL';
+const API_CHECK        = '/api/auth-check';
+const API_PEDS         = `/api/pedidos?tienda=${TIENDA}`;
 
-let tok='', prods=[], shown=[], imp=[], cur=1, PER=50, sK='descripcion', sA=true;
+let token = '';
+let prods = [], shown = [], impRows = [];
+let curPage = 1;
+let sortK = 'descripcion', sortAsc = true;
+let clockIv = null;
 
-/* AUTH */
-function doLogin(){
-  google.accounts.id.initialize({client_id:GID,callback:onG});
+/* ══ WELCOME BANNER (dentro del inventario) ══ */
+const DIAS  = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+function tickClock() {
+  const n  = new Date();
+  const hh = String(n.getHours()).padStart(2,'0');
+  const mm = String(n.getMinutes()).padStart(2,'0');
+  const ss = String(n.getSeconds()).padStart(2,'0');
+  const el = document.getElementById('wlcClock');
+  if (el) el.innerHTML = `${hh}<span class="sep">:</span>${mm}<span class="sep">:</span>${ss}`;
+  const ed = document.getElementById('wlcDate');
+  if (ed) ed.textContent =
+    `${DIAS[n.getDay()]}, ${n.getDate()} de ${MESES[n.getMonth()]} de ${n.getFullYear()}`;
+}
+
+function showWelcome(name, email, picture) {
+  document.getElementById('wlcName').textContent   = name;
+  document.getElementById('wlcMeta').textContent   =
+    email + '  ·  Acceso: ' +
+    new Date().toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  document.getElementById('wlcAvatar').src = picture;
+  const banner = document.getElementById('wlcBanner');
+  banner.style.display = 'flex';
+  tickClock();
+  clockIv = setInterval(tickClock, 1000);
+}
+
+function closeBanner() {
+  document.getElementById('wlcBanner').style.display = 'none';
+  clearInterval(clockIv); clockIv = null;
+}
+
+/* ══ GOOGLE AUTH ══ */
+window.onload = () => {
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogle });
+  google.accounts.id.renderButton(document.querySelector('.g-btn'), {});
+};
+function doLogin() {
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogle });
   google.accounts.id.prompt();
 }
-async function onG(resp){
-  try{
-    const r=await fetch(API_A,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({credential:resp.credential,tienda:TIEN})});
-    const d=await r.json();
-    if(!d.ok){msg('❌ '+(d.error||'Sin acceso'),'er');return;}
-    tok=resp.credential;
-    const pl=JSON.parse(atob(resp.credential.split('.')[1]));
-    document.getElementById('avNm').textContent=pl.name;
-    document.getElementById('avImg').src=pl.picture;
-    document.getElementById('loginWrap').style.display='none';
-    document.getElementById('app').style.display='block';
+async function onGoogle(resp) {
+  try {
+    const r = await fetch(API_CHECK, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ credential: resp.credential, tienda: TIENDA })
+    });
+    const d = await r.json();
+    if (!d.ok) { toastMsg('❌ ' + (d.error || 'Sin acceso'), 'err'); return; }
+    token = resp.credential;
+    const pl = JSON.parse(atob(resp.credential.split('.')[1]));
+    document.getElementById('avNm').textContent = pl.name;
+    document.getElementById('avImg').src        = pl.picture;
+    document.getElementById('loginWrap').style.display = 'none';
+    document.getElementById('app').style.display       = 'block';
+    showWelcome(pl.name, pl.email, pl.picture);
     loadProds();
-  }catch(e){msg('❌ Error auth','er');}
-}
-function logout(){tok='';document.getElementById('loginWrap').style.display='flex';document.getElementById('app').style.display='none';google.accounts.id.disableAutoSelect();}
-
-/* NAV */
-function navTo(p,el){
-  document.querySelectorAll('.nv').forEach(n=>n.classList.remove('on'));el.classList.add('on');
-  document.getElementById('pgInv').style.display=p==='inv'?'block':'none';
-  document.getElementById('pgPed').style.display=p==='ped'?'block':'none';
-  if(p==='ped')loadPeds();
+  } catch(e) { toastMsg('❌ Error de autenticación', 'err'); }
 }
 
-/* PRODS */
-async function loadProds(){
-  try{
-    const r=await fetch(API_P,{headers:{Authorization:'Bearer '+tok}});
-    prods=await r.json();shown=[...prods];
-    buildSel();setKpis();filt();
-  }catch(e){msg('❌ Error cargando','er');}
+/* ══ LOGOUT con confirmación ══ */
+function logout() {
+  document.getElementById('logoutModal').classList.add('open');
 }
-function reload(){loadProds();msg('🔄 Actualizando…','ok');}
-function buildSel(){
-  const labs=[...new Set(prods.map(p=>p.laboratorio).filter(Boolean))].sort();
-  const s=document.getElementById('sLab');
-  s.innerHTML='<option value="">Todos los laboratorios</option>'+labs.map(l=>`<option>${l}</option>`).join('');
+function cancelLogout() {
+  document.getElementById('logoutModal').classList.remove('open');
 }
-function setKpis(){
-  document.getElementById('kT').textContent=prods.length.toLocaleString('es-CO');
-  document.getElementById('kL').textContent=new Set(prods.map(p=>p.laboratorio).filter(Boolean)).size;
-  document.getElementById('kP').textContent=prods.filter(p=>p.precioUnitario).length.toLocaleString('es-CO');
+function confirmLogout() {
+  document.getElementById('logoutModal').classList.remove('open');
+  token = ''; prods = []; shown = [];
+  document.getElementById('loginWrap').style.display = 'flex';
+  document.getElementById('app').style.display       = 'none';
+  google.accounts.id.disableAutoSelect();
+  toastMsg('👋 Sesión cerrada correctamente', 'ok');
 }
-function pn(v){return parseInt((v||'0').toString().replace(/[^0-9]/g,''))||0}
-function cop(v){const n=pn(v);return n?'$'+n.toLocaleString('es-CO'):'—'}
-function filt(){
-  const q=document.getElementById('srch').value.toLowerCase().trim();
-  const lab=document.getElementById('sLab').value;
-  const ord=document.getElementById('sOrd').value;
-  shown=prods.filter(p=>(!q||p.descripcion.toLowerCase().includes(q)||(p.laboratorio||'').toLowerCase().includes(q))&&(!lab||p.laboratorio===lab))
-    .map(p=>({...p,_p:pn(p.precio),_pu:pn(p.precioUnitario||p.precio)}));
-  shown.sort((a,b)=>{
-    if(ord==='l')return(a.laboratorio||'').localeCompare(b.laboratorio||'');
-    if(ord==='pa')return a._pu-b._pu;
-    if(ord==='pd')return b._pu-a._pu;
+
+/* ══ NAV ══ */
+function navTo(page, el) {
+  document.querySelectorAll('.nv').forEach(n => n.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('pgInv').style.display = page === 'inv' ? 'block' : 'none';
+  document.getElementById('pgPed').style.display = page === 'ped' ? 'block' : 'none';
+  if (page === 'ped') loadPedidos();
+}
+
+/* ══ LEER PRODUCTOS — todos, sin límite, omitir filas/celdas vacías ══ */
+async function loadProds() {
+  showTblMsg('⏳', 'Cargando inventario…');
+  try {
+    const r = await fetch(`/api/productos?tienda=${TIENDA}`, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.error || `HTTP ${r.status}`);
+    }
+    const data = await r.json();
+
+    /* Formato A: array de objetos {descripcion,...} */
+    if (Array.isArray(data) && data.length && typeof data[0] === 'object' && !Array.isArray(data[0])) {
+      prods = data.filter(p => p.descripcion?.toString().trim());
+    } else {
+      /* Formato B: array de arrays raw de Sheets */
+      const rows = (Array.isArray(data) ? data : data.values || []).slice(1);
+      prods = rows
+        .filter(row => row[0]?.toString().trim())          // omitir fila vacía
+        .map(row => ({
+          descripcion:    (row[0] || '').toString().trim(),
+          laboratorio:    (row[1] || '').toString().trim(),
+          unidad:         (row[2] || '').toString().trim(),
+          precio:         (row[3] || '').toString().trim(),
+          precioUnitario: (row[4] || '').toString().trim(),
+        }))
+        .filter(p => p.descripcion.length > 0);
+    }
+
+    shown = [...prods];
+    buildLabSel();
+    kpis();
+    filt();
+    toastMsg(`✅ ${prods.length} productos cargados`, 'ok');
+  } catch(e) {
+    showTblMsg('❌', `Error al cargar: ${e.message}`);
+    toastMsg('❌ ' + e.message, 'err');
+  }
+}
+function reload() { loadProds(); }
+
+function showTblMsg(ico, msg) {
+  document.getElementById('tbody').innerHTML =
+    `<tr><td colspan="5" style="text-align:center;padding:48px;color:var(--muted)">
+       <div style="font-size:36px;margin-bottom:10px">${ico}</div>${msg}
+     </td></tr>`;
+}
+
+/* ══ HELPERS ══ */
+function buildLabSel() {
+  const labs = [...new Set(prods.map(p => p.laboratorio).filter(Boolean))].sort();
+  document.getElementById('selLab').innerHTML =
+    '<option value="">Todos los laboratorios</option>' +
+    labs.map(l => `<option>${l}</option>`).join('');
+}
+function kpis() {
+  document.getElementById('kTotal').textContent = prods.length.toLocaleString('es-CO');
+  document.getElementById('kLabs').textContent  =
+    new Set(prods.map(p => p.laboratorio).filter(Boolean)).size;
+  document.getElementById('kPr').textContent    =
+    prods.filter(p => p.precioUnitario).length.toLocaleString('es-CO');
+}
+
+/* ══ FORMATO PRECIO COP ══
+   Hoja puede traer: "42.100,00"  "42100,00"  "42100"  "42.100"
+   → mostrar "$42.100" (entero, sin decimales, sin ceros extra)
+*/
+function pn(v) {
+  if (!v) return 0;
+  let s = v.toString().trim();
+  s = s.replace(/,\d*$/, '');          // quitar parte decimal  ",00" o ",5"
+  s = s.replace(/\./g, '');            // quitar puntos de miles
+  return parseInt(s.replace(/[^0-9]/g, '')) || 0;
+}
+function cop(v) {
+  const n = pn(v);
+  return n ? '$' + n.toLocaleString('es-CO') : '—';
+}
+
+/* ══ FILTRAR Y ORDENAR ══ */
+function filt() {
+  const q   = document.getElementById('srch').value.toLowerCase().trim();
+  const lab = document.getElementById('selLab').value;
+  const s   = document.getElementById('selSort').value;
+  shown = prods
+    .filter(p =>
+      (!q   || p.descripcion.toLowerCase().includes(q) || (p.laboratorio || '').toLowerCase().includes(q)) &&
+      (!lab || p.laboratorio === lab))
+    .map(p => ({ ...p, _p: pn(p.precio), _pu: pn(p.precioUnitario || p.precio) }));
+  shown.sort((a, b) => {
+    if (s === 'lab') return (a.laboratorio || '').localeCompare(b.laboratorio || '');
+    if (s === 'pa')  return a._pu - b._pu;
+    if (s === 'pd')  return b._pu - a._pu;
     return a.descripcion.localeCompare(b.descripcion);
   });
-  cur=1;tbl();
+  curPage = 1; renderTbl();
 }
-function thS(col,th){
-  if(sK===col)sA=!sA;else{sK=col;sA=true;}
-  document.querySelectorAll('thead th').forEach(t=>t.className='');
-  th.className=sA?'asc':'desc';
-  shown.sort((a,b)=>{const va=a[col]||'',vb=b[col]||'';const r=typeof va==='number'?va-vb:va.toString().localeCompare(vb.toString());return sA?r:-r;});
-  cur=1;tbl();
+
+function thSort(col, th) {
+  if (sortK === col) sortAsc = !sortAsc; else { sortK = col; sortAsc = true; }
+  document.querySelectorAll('thead th').forEach(t => t.className = '');
+  th.className = sortAsc ? 'asc' : 'desc';
+  shown.sort((a, b) => {
+    const va = a[col] ?? '', vb = b[col] ?? '';
+    const r  = typeof va === 'number' ? va - vb : va.toString().localeCompare(vb.toString());
+    return sortAsc ? r : -r;
+  });
+  curPage = 1; renderTbl();
 }
-function tbl(){
-  const st=(cur-1)*PER,pg=shown.slice(st,st+PER),body=document.getElementById('tbody');
-  if(!shown.length){body.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:48px;color:var(--muted)"><div style="font-size:36px;margin-bottom:10px">🔍</div>Sin resultados</td></tr>`;document.getElementById('pgInf').textContent='0';document.getElementById('pgBtns').innerHTML='';return;}
-  body.innerHTML=pg.map(p=>`
+
+function renderTbl() {
+  const start = (curPage - 1) * PER;
+  const page  = shown.slice(start, start + PER);
+  const body  = document.getElementById('tbody');
+  if (!shown.length) {
+    showTblMsg('🔍', 'Sin resultados');
+    document.getElementById('pagInfo').textContent = '0 productos';
+    document.getElementById('pgBtns').innerHTML = '';
+    return;
+  }
+  body.innerHTML = page.map(p => `
     <tr>
-      <td class="tnm" title="${p.descripcion}">${p.descripcion}</td>
-      <td class="tl">${p.laboratorio||'—'}</td>
-      <td><span class="pill">${p.unidad||'—'}</span></td>
-      <td class="tp">${cop(p.precio)}</td>
-      <td><div class="tp">${cop(p.precioUnitario)}</div>${p.precioUnitario&&p.precio&&p.precioUnitario!==p.precio?`<div class="tps">caja ${cop(p.precio)}</div>`:''}</td>
+      <td class="td-nm" title="${p.descripcion}">${p.descripcion}</td>
+      <td class="td-lab">${p.laboratorio || '—'}</td>
+      <td><span class="pill">${p.unidad || '—'}</span></td>
+      <td class="td-p">${cop(p.precio)}</td>
+      <td>
+        <div class="td-p">${cop(p.precioUnitario)}</div>
+        ${p.precioUnitario && p.precio && p.precioUnitario !== p.precio
+          ? `<div class="td-ps">caja ${cop(p.precio)}</div>` : ''}
+      </td>
     </tr>`).join('');
-  const tot=shown.length,pages=Math.ceil(tot/PER);
-  document.getElementById('pgInf').textContent=`${st+1}–${Math.min(st+PER,tot)} de ${tot.toLocaleString('es-CO')}`;
-  const pgb=document.getElementById('pgBtns');pgb.innerHTML='';
-  let from=Math.max(1,cur-2),to=Math.min(pages,from+4);
-  for(let i=from;i<=to;i++){const b=document.createElement('button');b.className='pb'+(i===cur?' cur':'');b.textContent=i;const pg=i;b.onclick=()=>{cur=pg;tbl();};pgb.appendChild(b);}
+
+  const tot   = shown.length;
+  const pages = Math.ceil(tot / PER);
+  document.getElementById('pagInfo').textContent =
+    `${start + 1}–${Math.min(start + PER, tot)} de ${tot.toLocaleString('es-CO')} productos`;
+
+  const pgB = document.getElementById('pgBtns');
+  pgB.innerHTML = '';
+  pgB.appendChild(mk('‹', curPage === 1,     () => { curPage--; renderTbl(); }));
+  const from = Math.max(1, curPage - 2), to = Math.min(pages, from + 4);
+  for (let i = from; i <= to; i++) {
+    const pg = i;
+    pgB.appendChild(mk(i, false, () => { curPage = pg; renderTbl(); }, i === curPage));
+  }
+  pgB.appendChild(mk('›', curPage === pages, () => { curPage++; renderTbl(); }));
 }
 
-/* PEDIDOS */
-async function loadPeds(){
-  try{
-    const r=await fetch(API_O,{headers:{Authorization:'Bearer '+tok}});
-    const d=await r.json();
-    const body=document.getElementById('pedBody');
-    if(!d.length){body.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:48px;color:var(--muted)">Sin pedidos aún</td></tr>`;return;}
-    body.innerHTML=d.map(p=>`<tr><td style="font-size:11px;color:var(--muted)">${p.id}</td><td style="font-weight:700">${p.cliente}</td><td>${p.telefono}</td><td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.productos}</td><td class="tp">${cop(p.total)}</td><td><span class="pill">${p.estado}</span></td><td style="font-size:12px;color:var(--muted)">${p.hora}</td></tr>`).join('');
-  }catch(e){msg('❌ Error pedidos','er');}
+function mk(label, disabled, onclick, active = false) {
+  const b = document.createElement('button');
+  b.className   = 'pg-btn' + (active ? ' cur' : '');
+  b.textContent = label; b.disabled = disabled; b.onclick = onclick;
+  return b;
 }
 
-/* IMPORT */
-function openImp(){document.getElementById('impM').classList.add('open')}
-function closeImp(){document.getElementById('impM').classList.remove('open');document.getElementById('prev').style.display='none';document.getElementById('bImp').disabled=true;imp=[];}
-function onDrop(ev){ev.preventDefault();document.getElementById('dz').classList.remove('dr');if(ev.dataTransfer.files[0])onFile(ev.dataTransfer.files[0]);}
-function onFile(file){
-  if(!file)return;
-  const rd=new FileReader();
-  rd.onload=e=>{
-    const wb=XLSX.read(e.target.result,{type:'binary'});
-    const ws=wb.Sheets[wb.SheetNames[0]];
-    const data=XLSX.utils.sheet_to_json(ws,{defval:''});
-    const get=(row,keys,...ns)=>{for(const n of ns){const k=keys.find(k=>k.toLowerCase().replace(/[^a-z]/g,'').includes(n));if(k)return(row[k]||'').toString().trim();}return'';};
-    imp=data.map(row=>{const keys=Object.keys(row);return{
-      descripcion:get(row,keys,'descripci','descrip','nombre','produc'),
-      laboratorio:get(row,keys,'laborator','lab','marca'),
-      unidad:get(row,keys,'unidad','unit','presentac'),
-      precio:get(row,keys,'precio','price','valor','vta'),
-      precioUnitario:get(row,keys,'unitario','unitprice','porunit'),
-    };}).filter(r=>r.descripcion);
-    const prev=document.getElementById('prev');
-    prev.style.display='block';prev.innerHTML=`✅ <strong>${imp.length}</strong> productos de <em>${file.name}</em>`;
-    document.getElementById('bImp').disabled=imp.length===0;
+/* ══ PEDIDOS ══ */
+async function loadPedidos() {
+  try {
+    const r    = await fetch(API_PEDS, { headers: { Authorization: 'Bearer ' + token } });
+    const d    = await r.json();
+    const body = document.getElementById('pedTbody');
+    if (!d.length) {
+      body.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:48px;color:var(--muted)">Sin pedidos aún</td></tr>`;
+      return;
+    }
+    body.innerHTML = d.map(p => `
+      <tr>
+        <td style="font-size:11px;color:var(--muted)">${p.id}</td>
+        <td style="font-weight:600">${p.cliente}</td>
+        <td>${p.telefono}</td>
+        <td style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.productos}</td>
+        <td class="td-p">${cop(p.total)}</td>
+        <td><span class="pill">${p.estado}</span></td>
+        <td style="color:var(--muted);font-size:12px">${p.hora}</td>
+      </tr>`).join('');
+  } catch(e) { toastMsg('❌ Error cargando pedidos', 'err'); }
+}
+
+/* ══ IMPORTAR EXCEL ══
+   Solo las 5 columnas exactas: Descripción · Laboratorio · Unidad · Precio · Precio Unitario
+   Cualquier otra columna del Excel se ignora.
+   Filas con Descripción vacía se omiten.
+══ */
+function openImp()  { document.getElementById('impModal').classList.add('open'); }
+function closeImp() {
+  document.getElementById('impModal').classList.remove('open');
+  document.getElementById('impPrev').style.display   = 'none';
+  document.getElementById('progWrap').style.display  = 'none';
+  document.getElementById('progFill').style.width    = '0%';
+  document.getElementById('btnImp').disabled         = true;
+  document.getElementById('fIn').value               = '';
+  impRows = [];
+}
+function onDrop(ev) {
+  ev.preventDefault();
+  document.getElementById('dropZ').classList.remove('drag');
+  if (ev.dataTransfer.files[0]) onFile(ev.dataTransfer.files[0]);
+}
+
+function onFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb   = XLSX.read(e.target.result, { type: 'binary' });
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+    const prev = document.getElementById('impPrev');
+    prev.style.display = 'block';
+
+    if (!data.length) {
+      prev.innerHTML = '⚠️ El archivo está vacío o no tiene datos.';
+      document.getElementById('btnImp').disabled = true;
+      return;
+    }
+
+    /* Mapeo flexible: busca la columna por nombre aproximado (ignora tildes/mayúsculas).
+       Solo se usan las 5 columnas requeridas; el resto del Excel se descarta. */
+    const norm = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'');
+    const keys = Object.keys(data[0]);
+    const col  = (...terms) => keys.find(k => terms.some(t => norm(k).includes(t)));
+
+    const cDesc = col('descrip','nombre','produc');
+    const cLab  = col('laborat','lab','marca','fabrican');
+    const cUnid = col('unidad','unit','present','conten');
+    const cPrecio = col('precio','price','valor','venta');
+    // Precio unitario: debe contener "unitario" o "xunidad" etc, y NO ser igual a cPrecio
+    const cPU = keys.find(k => {
+      const n = norm(k);
+      return (n.includes('unitario') || n.includes('xunidad') || n.includes('porunit')) && k !== cPrecio;
+    });
+
+    impRows = data
+      .map(row => ({
+        descripcion:    cDesc   ? (row[cDesc]   || '').toString().trim() : '',
+        laboratorio:    cLab    ? (row[cLab]    || '').toString().trim() : '',
+        unidad:         cUnid   ? (row[cUnid]   || '').toString().trim() : '',
+        precio:         cPrecio ? (row[cPrecio] || '').toString().trim() : '',
+        precioUnitario: cPU     ? (row[cPU]     || '').toString().trim() : '',
+      }))
+      .filter(r => r.descripcion.length > 0);  // omite filas vacías
+
+    if (impRows.length === 0) {
+      prev.innerHTML = '⚠️ No se encontraron productos con descripción. Verifica los encabezados del archivo.';
+      document.getElementById('btnImp').disabled = true;
+    } else {
+      prev.innerHTML = `✅ <strong>${impRows.length}</strong> productos listos de <em>${file.name}</em>`;
+      document.getElementById('btnImp').disabled = false;
+    }
   };
-  rd.readAsBinaryString(file);
-}
-async function doImport(){
-  const btn=document.getElementById('bImp');btn.disabled=true;btn.textContent='Importando…';
-  try{
-    const r=await fetch(API_I,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok},body:JSON.stringify({tienda:TIEN,productos:imp})});
-    const d=await r.json();if(!r.ok)throw new Error(d.error);
-    msg('✅ '+d.count+' productos importados','ok');closeImp();reload();
-  }catch(e){msg('❌ '+e.message,'er');}
-  finally{btn.disabled=false;btn.textContent='Subir a Sheets';}
+  reader.readAsBinaryString(file);
 }
 
-/* TOAST */
+async function doImport() {
+  if (!impRows.length) return;
+  const btnImp = document.getElementById('btnImp');
+  btnImp.disabled = true; btnImp.textContent = 'Subiendo…';
+  document.getElementById('progWrap').style.display = 'block';
+  setProgress(0, 'Enviando al servidor…');
+  try {
+    const total = impRows.length;
+    let sent = 0;
+    for (let start = 0; start < total; start += IMPORT_CHUNK) {
+      const slice   = impRows.slice(start, start + IMPORT_CHUNK);
+      const isFirst = start === 0;
+      const r = await fetch('/api/import-stock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ tienda: TIENDA, productos: slice, offset: start, clear: isFirst })
+      });
+      if (!r.ok) {
+        const er = await r.json().catch(() => ({}));
+        throw new Error(er.error || `HTTP ${r.status}`);
+      }
+      sent += slice.length;
+      setProgress(Math.round((sent / total) * 100), `${sent} / ${total} productos…`);
+    }
+    setProgress(100, '¡Listo!');
+    toastMsg(`✅ ${total} productos importados`, 'ok');
+    setTimeout(() => { closeImp(); reload(); }, 800);
+  } catch(e) {
+    toastMsg('❌ ' + e.message, 'err');
+    setProgress(0, 'Error: ' + e.message);
+  } finally {
+    btnImp.disabled = false; btnImp.textContent = '⬆ Subir a Sheets';
+  }
+}
+
+function setProgress(pct, txt) {
+  document.getElementById('progFill').style.width = pct + '%';
+  document.getElementById('progTxt').textContent  = txt;
+}
+
+/* ══ TOAST ══ */
 let tt;
-function msg(m,t='ok'){const el=document.getElementById('t');el.textContent=m;el.className='toast '+t+' show';clearTimeout(tt);tt=setTimeout(()=>el.className='toast '+t,3200);}
+function toastMsg(msg, type = 'ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = 'toast ' + type + ' show';
+  clearTimeout(tt); tt = setTimeout(() => el.className = 'toast ' + type, 3200);
+}
 </script>
 </body>
 </html>
