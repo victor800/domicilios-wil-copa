@@ -39,7 +39,8 @@ module.exports = async (req, res) => {
     }
 
     // ── 2. Parsear el Excel con xlsx ───────────────────────────────────────
-    const wb   = XLSX.read(buf, { type: 'buffer' });
+    console.log("buf size:", buf.length, "first4:", buf.slice(0,4).toString("hex"));
+    const wb   = XLSX.read(buf, { type: "buffer" });
     const ws   = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
