@@ -47,6 +47,7 @@ module.exports = async (req, res) => {
           p.laboratorio.toUpperCase().includes(q)
         );
       });
+    // Sin .slice() — devuelve TODOS sin límite
 
     res.status(200).json(productos);
   } catch (e) {

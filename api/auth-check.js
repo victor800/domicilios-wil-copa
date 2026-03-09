@@ -1,6 +1,4 @@
 // api/auth-check.js
-// POST /api/auth-check  — verifica token Google, valida que el email esté en ADMIN_EMAILS
-
 const { OAuth2Client } = require('google-auth-library');
 
 module.exports = async (req, res) => {
@@ -21,8 +19,6 @@ module.exports = async (req, res) => {
     const payload = ticket.getPayload();
     const email   = payload.email;
 
-    // Lista de admins en variable de entorno, separados por coma
-    console.log('ADMIN_EMAILS:', process.env.ADMIN_EMAILS);
     const admins = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase());
     if (!admins.includes(email.toLowerCase())) {
       return res.status(403).json({ ok: false, error: `${email} no está autorizado` });
