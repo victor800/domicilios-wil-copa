@@ -7,8 +7,9 @@ const { google }       = require('googleapis');
 const { OAuth2Client } = require('google-auth-library');
 
 async function verificarAdmin(token) {
-  const client  = new OAuth2Client(process.env.GOOGLE_OAUTH_CLIENT_ID);
-  const ticket  = await client.verifyIdToken({ idToken: token, audience: process.env.GOOGLE_OAUTH_CLIENT_ID });
+ const CLIENT_ID = '699856885526-55fqgn6qdr116rige5dcrsg4f3jdu1kp.apps.googleusercontent.com';
+const client  = new OAuth2Client(CLIENT_ID);
+const ticket  = await client.verifyIdToken({ idToken: token, audience: CLIENT_ID });
   const payload = ticket.getPayload();
   const admins  = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase());
   if (!admins.includes(payload.email.toLowerCase())) throw new Error('No autorizado');
