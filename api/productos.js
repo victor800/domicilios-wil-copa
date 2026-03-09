@@ -1,23 +1,5 @@
-// api/pedidos.js
-// Columnas A-R:
-// A=ID_PEDIDO B=NOMBRE_CLI C=TELEFONO D=METODO_PAGO E=ESTADO F=IMAGEN_TRANSFERENCIA
-// G=PRODUCTOS H=MARCA I=CANTIDAD J=V/U K=V/TOTAL L=DIRECCION M=HORA N=FECHA
-// O=TOTAL P=NOMBRE_DOMI Q=HORA_TOMO_PEDIDO R=HORA_ENTREGO
-
-const { google }       = require('googleapis');
-const { OAuth2Client } = require('google-auth-library');
-
-async function verificarAdmin(token) {
-  const client  = new OAuth2Client(process.env.GOOGLE_OAUTH_CLIENT_ID);
-  const ticket  = await client.verifyIdToken({ idToken: token, audience: process.env.GOOGLE_OAUTH_CLIENT_ID });
-  const payload = ticket.getPayload();
-  const admins  = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase());
-  if (!admins.includes(payload.email.toLowerCase())) throw new Error('No autorizado');
-  return payload;
-}
-
-function pn(v) { return parseInt((v||'0').toString().replace(/[^0-9]/g,'')) || 0; }
-function cop(n) { return n ? '$' + n.toLocaleString('es-CO') : '—'; }
+// api/productos.js
+const { google } = require('googleapis');
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -26,10 +8,11 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    const token = (req.headers.authorization || '').replace('Bearer ', '').trim();
-    await verificarAdmin(token);
-
     const tienda = (req.query.tienda || 'EXPERTOS').toUpperCase();
+    const hoja   = tienda === 'CENTRAL'
+      ? 'STOCK_DROGUERIA_CENTRAL'
+      : 'STOCK_DROGUERIA_EXPERTOS';
+    const q      = (req.query.q || '').toUpperCase().trim();
 
     const auth = new google.auth.GoogleAuth({
       credentials: {
@@ -42,39 +25,32 @@ module.exports = async (req, res) => {
 
     const r = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEETS_ID,
-      range: 'Pedidos!A:R'
+      range: `${hoja}!A:E`
     });
 
-    const rows = (r.data.values || []).slice(1)
-      .filter(row => row[0]?.toString().trim())
-      .filter(row => {
-        const marca = (row[7] || '').toUpperCase();
-        if (tienda === 'CENTRAL')  return marca.includes('CENTRAL');
-        if (tienda === 'EXPERTOS') return marca.includes('EXPERTOS') || !marca.includes('CENTRAL');
-        return true;
-      })
-      .map(row => ({
-        id:           (row[0]  || '').toString().trim(),
-        cliente:      (row[1]  || '').toString().trim(),
-        telefono:     (row[2]  || '').toString().trim(),
-        metodoPago:   (row[3]  || '').toString().trim(),
-        estado:       (row[4]  || '').toString().trim(),
-        productos:    (row[6]  || '').toString().trim(),
-        marca:        (row[7]  || '').toString().trim(),
-        direccion:    (row[11] || '').toString().trim(),
-        hora:         (row[12] || '').toString().trim(),
-        fecha:        (row[13] || '').toString().trim(),
-        total:        pn(row[14]),
-        domiciliario: (row[15] || '').toString().trim(),
-        horaTomo:     (row[16] || '').toString().trim(),
-        horaEntrego:  (row[17] || '').toString().trim(),
-      }))
-      .reverse();
+    const rows = (r.data.values || []).slice(1);
 
-    res.status(200).json(rows);
+    const productos = rows
+      .filter(row => row[0]?.toString().trim())
+      .map(row => ({
+        descripcion:    (row[0] || '').toString().trim(),
+        laboratorio:    (row[1] || '').toString().trim(),
+        unidad:         (row[2] || '').toString().trim(),
+        precio:         (row[3] || '').toString().trim(),
+        precioUnitario: (row[4] || '').toString().trim(),
+      }))
+      .filter(p => p.descripcion.length > 0)
+      .filter(p => {
+        if (!q) return true;
+        return (
+          p.descripcion.toUpperCase().includes(q) ||
+          p.laboratorio.toUpperCase().includes(q)
+        );
+      });
+
+    res.status(200).json(productos);
   } catch (e) {
-    const status = e.message === 'No autorizado' ? 403 : 500;
-    res.status(status).json({ error: e.message });
+    console.error('productos API error:', e.message);
+    res.status(500).json({ error: 'Error interno al obtener productos', detail: e.message });
   }
 };
- 
