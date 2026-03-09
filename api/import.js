@@ -21,12 +21,22 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST')   return res.status(405).json({ error: 'Método no permitido' });
 
   try {
-    // ── 1. Recibir el body (base64 del Excel) ──────────────────────────────
+    // ── 1. Recibir el body como buffer binario puro ────────────────────────
     const chunks = [];
-    for await (const chunk of req) chunks.push(chunk);
-    const raw    = Buffer.concat(chunks).toString('utf8').trim();
-    const b64    = raw.replace(/^data:[^;]+;base64,/, ''); // tolera prefijo data URI
-    const buf    = Buffer.from(b64, 'base64');
+    for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const raw = Buffer.concat(chunks);
+
+    // Detectar si viene como base64 string o como binario directo
+    let buf;
+    const rawStr = raw.toString('utf8').trim();
+    if (rawStr.startsWith('data:') || /^[A-Za-z0-9+/]+=*$/.test(rawStr.substring(0, 100))) {
+      // Viene como base64
+      const b64 = rawStr.replace(/^data:[^;]+;base64,/, '');
+      buf = Buffer.from(b64, 'base64');
+    } else {
+      // Viene como binario directo
+      buf = raw;
+    }
 
     // ── 2. Parsear el Excel con xlsx ───────────────────────────────────────
     const wb   = XLSX.read(buf, { type: 'buffer' });
