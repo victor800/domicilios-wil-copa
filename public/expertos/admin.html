@@ -654,79 +654,54 @@ function onDrop(ev){
   if(ev.dataTransfer.files[0]) onFile(ev.dataTransfer.files[0]);
 }
 
-/* ✅ INSTANTÁNEO: no procesa el Excel, solo muestra nombre */
-function onFile(file){
-  if(!file) return;
-  selectedFile=file;
-  const kb=(file.size/1024).toFixed(0);
-  const prev=document.getElementById('impPrev');
-  prev.style.display='block';
-  prev.innerHTML=`📄 <strong>${file.name}</strong> · ${kb} KB<br>
-    <span style="font-size:11px;color:var(--muted)">Listo · el servidor procesará las columnas automáticamente</span>`;
-  document.getElementById('btnImp').disabled=false;
+function onFile(file) {
+  if (!file) return;
+  selectedFile = file;
+  const kb = (file.size / 1024).toFixed(0);
+  const prev = document.getElementById('impPrev');
+  prev.style.display = 'block';
+  prev.innerHTML = `📄 <strong>${file.name}</strong> · ${kb} KB<br>
+    <span style="font-size:11px;color:var(--muted)">Listo · el servidor procesará las columnas</span>`;
+  document.getElementById('btnImp').disabled = false;
 }
 
-/* ✅ ENVÍA BASE64 como JSON — sin multer, sin FormData */
-async function doImport(){
-  if(!selectedFile) return;
-  const btnImp=document.getElementById('btnImp');
-  btnImp.disabled=true;
-  btnImp.textContent='Leyendo archivo…';
-  document.getElementById('progWrap').style.display='block';
-  setProgress(20,'Leyendo archivo…');
+async function doImport() {
+  if (!selectedFile) return;
+  const btnImp = document.getElementById('btnImp');
+  btnImp.disabled = true;
+  btnImp.textContent = 'Subiendo…';
+  document.getElementById('progWrap').style.display = 'block';
+  setProgress(30, 'Enviando archivo…');
 
-  try{
-    // Convertir archivo a base64 con FileReader (rápido, no bloquea UI)
-    const fileBase64=await new Promise((resolve,reject)=>{
-      const reader=new FileReader();
-      reader.onload=()=>resolve(reader.result.split(',')[1]);
-      reader.onerror=()=>reject(new Error('Error leyendo archivo'));
-      reader.readAsDataURL(selectedFile);
+  try {
+    const fd = new FormData();
+    fd.append('file', selectedFile);
+
+    const r = await fetch(`/api/import-stock?tienda=${tienda}`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      // SIN Content-Type — el browser lo pone automático con boundary
+      body: fd,
     });
 
-    setProgress(50,'Enviando al servidor…');
-    btnImp.textContent='Subiendo…';
+    setProgress(80, 'Actualizando Sheets…');
 
-    const r=await fetch(`/api/import-stock?tienda=${tienda}`,{
-      method:'POST',
-      headers:{
-        'Authorization':'Bearer '+token,
-        'Content-Type':'application/json',
-      },
-      body:JSON.stringify({fileBase64, fileName:selectedFile.name}),
-    });
-
-    setProgress(85,'Actualizando Sheets…');
-
-    if(!r.ok){
-      const er=await r.json().catch(()=>({}));
-      throw new Error(er.error||`HTTP ${r.status}`);
+    if (!r.ok) {
+      const er = await r.json().catch(() => ({}));
+      throw new Error(er.error || `HTTP ${r.status}`);
     }
 
-    const data=await r.json();
-    setProgress(100,`✅ ${data.count} productos guardados`);
-    toastMsg(`✅ ${data.count} productos importados correctamente`,'ok');
-    setTimeout(()=>{closeImp();reload();},900);
+    const data = await r.json();
+    setProgress(100, `✅ ${data.count} productos guardados`);
+    toastMsg(`✅ ${data.count} productos importados`, 'ok');
+    setTimeout(() => { closeImp(); reload(); }, 900);
 
-  }catch(e){
-    toastMsg('❌ '+e.message,'err');
-    setProgress(0,'Error: '+e.message);
-    btnImp.disabled=false;
-    btnImp.textContent='⬆ Subir a Sheets';
+  } catch (e) {
+    toastMsg('❌ ' + e.message, 'err');
+    setProgress(0, 'Error: ' + e.message);
+    btnImp.disabled = false;
+    btnImp.textContent = '⬆ Subir a Sheets';
   }
-}
-
-function setProgress(pct,txt){
-  document.getElementById('progFill').style.width=pct+'%';
-  document.getElementById('progTxt').textContent=txt;
-}
-
-/* TOAST */
-let tt;
-function toastMsg(msg,type='ok'){
-  const el=document.getElementById('toast');
-  el.textContent=msg;el.className='toast '+type+' show';
-  clearTimeout(tt);tt=setTimeout(()=>el.className='toast '+type,3200);
 }
 </script>
 </body>

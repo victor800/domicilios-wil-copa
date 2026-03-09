@@ -1,7 +1,8 @@
-// api/import-stock.js
-const { google } = require('googleapis');
+// api/import-stock.js — usa busboy para multipart/form-data (sin multer)
+const { google }      = require('googleapis');
 const { OAuth2Client } = require('google-auth-library');
-const XLSX = require('xlsx');
+const XLSX            = require('xlsx');
+const busboy          = require('busboy');
 
 async function verificarAdmin(token) {
   const client = new OAuth2Client(process.env.GOOGLE_OAUTH_CLIENT_ID);
@@ -30,7 +31,29 @@ function getAuth() {
   });
 }
 
-// Normaliza texto: minúsculas, sin tildes, sin espacios extra
+// Leer el archivo del stream multipart con busboy
+function leerArchivo(req) {
+  return new Promise((resolve, reject) => {
+    const bb = busboy({ headers: req.headers, limits: { fileSize: 20 * 1024 * 1024 } });
+    const chunks = [];
+    let encontrado = false;
+
+    bb.on('file', (_fieldname, stream) => {
+      encontrado = true;
+      stream.on('data', d => chunks.push(d));
+      stream.on('end', () => resolve(Buffer.concat(chunks)));
+      stream.on('error', reject);
+    });
+
+    bb.on('finish', () => {
+      if (!encontrado) reject(new Error('No se recibió ningún archivo'));
+    });
+    bb.on('error', reject);
+
+    req.pipe(bb);
+  });
+}
+
 function norm(t) {
   if (!t) return '';
   return t.toString().toLowerCase()
@@ -38,49 +61,41 @@ function norm(t) {
     .replace(/\s+/g, ' ').trim();
 }
 
-// SOLO coincidencia exacta — evita que "Precio" matchee "IVA%" o "Precio Unitario"
-function findColExact(headers, name) {
+// Solo coincidencia exacta para evitar confusión entre "Precio" y "Precio Unitario"
+function findCol(headers, name) {
   const n = norm(name);
-  for (let i = 0; i < headers.length; i++) {
+  for (let i = 0; i < headers.length; i++)
     if (norm(headers[i]) === n) return i;
-  }
   return -1;
 }
 
 function procesarExcel(buffer) {
-  const wb = XLSX.read(buffer, { type: 'buffer' });
-  const ws = wb.Sheets[wb.SheetNames[0]];
+  const wb   = XLSX.read(buffer, { type: 'buffer' });
+  const ws   = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
-  if (rows.length < 2) return [];
+  if (rows.length < 2) throw new Error('El archivo está vacío');
 
-  // Encontrar fila de encabezados (busca "descripcion" exacto)
-  let headerIdx = -1;
-  let headers = [];
+  // Buscar fila de encabezados
+  let headerIdx = -1, headers = [];
   for (let i = 0; i < Math.min(10, rows.length); i++) {
-    const row = rows[i];
-    if (!Array.isArray(row)) continue;
-    if (row.some(c => norm(c) === 'descripcion')) {
+    if (rows[i].some(c => norm(c) === 'descripcion')) {
       headerIdx = i;
-      headers = row.map(c => c !== undefined && c !== null ? c.toString().trim() : '');
+      headers = rows[i].map(c => c.toString().trim());
       break;
     }
   }
+  if (headerIdx === -1) throw new Error('No se encontró columna "Descripción" en el Excel');
 
-  if (headerIdx === -1) {
-    throw new Error('No se encontró columna con encabezado exacto "Descripción"');
-  }
+  console.log('Encabezados:', headers);
 
-  console.log('Encabezados detectados:', headers);
+  const cD  = findCol(headers, 'Descripción');
+  const cL  = findCol(headers, 'Laboratorio');
+  const cU  = findCol(headers, 'Unidad');
+  const cP  = findCol(headers, 'Precio');
+  const cPU = findCol(headers, 'Precio Unitario');
 
-  // Buscar columnas por coincidencia EXACTA únicamente
-  const cD  = findColExact(headers, 'Descripción');
-  const cL  = findColExact(headers, 'Laboratorio');
-  const cU  = findColExact(headers, 'Unidad');
-  const cP  = findColExact(headers, 'Precio');
-  const cPU = findColExact(headers, 'Precio Unitario');
-
-  console.log('Índices:', { Descripción: cD, Laboratorio: cL, Unidad: cU, Precio: cP, 'Precio Unitario': cPU });
+  console.log('Columnas:', { cD, cL, cU, cP, cPU });
 
   const faltantes = [];
   if (cD  === -1) faltantes.push('Descripción');
@@ -88,46 +103,27 @@ function procesarExcel(buffer) {
   if (cU  === -1) faltantes.push('Unidad');
   if (cP  === -1) faltantes.push('Precio');
   if (cPU === -1) faltantes.push('Precio Unitario');
-
-  if (faltantes.length) {
-    throw new Error(
-      `Columnas no encontradas: ${faltantes.join(', ')}. ` +
-      `Encabezados leídos: [${headers.filter(Boolean).join(' | ')}]`
-    );
-  }
-
-  if (cP === cPU) {
-    throw new Error('Error interno: "Precio" y "Precio Unitario" apuntan a la misma columna');
-  }
+  if (faltantes.length) throw new Error(`Columnas no encontradas: ${faltantes.join(', ')}`);
+  if (cP === cPU) throw new Error('Precio y Precio Unitario apuntan a la misma columna');
 
   const productos = [];
   for (let i = headerIdx + 1; i < rows.length; i++) {
-    const row = rows[i];
-    if (!Array.isArray(row)) continue;
+    const row  = rows[i];
+    const desc = row[cD] ? row[cD].toString().trim() : '';
+    if (!desc) continue;
 
-    const desc = row[cD] !== undefined ? row[cD].toString().trim() : '';
-    if (!desc) continue; // omitir filas sin descripción
-
-    // Extraer solo dígitos del precio
-    const precioRaw = row[cP] !== undefined ? row[cP].toString() : '';
-    const puRaw     = row[cPU] !== undefined ? row[cPU].toString() : '';
-
-    const precio = precioRaw.replace(/[^0-9]/g, '') || '';
-    let pu       = puRaw.replace(/[^0-9]/g, '') || '';
-
-    // Si precio unitario está vacío, usar precio de caja
+    const precio = row[cP].toString().replace(/[^0-9]/g, '') || '';
+    let   pu     = row[cPU].toString().replace(/[^0-9]/g, '') || '';
     if (!pu && precio) pu = precio;
-
-    // Omitir si ambos precios son 0 o vacíos (filas basura)
     if (!precio && !pu) continue;
 
-    productos.push({
-      descripcion: desc,
-      laboratorio: (row[cL] || '').toString().trim(),
-      unidad:      (row[cU] || '').toString().trim(),
+    productos.push([
+      desc,
+      (row[cL] || '').toString().trim(),
+      (row[cU] || '').toString().trim(),
       precio,
-      precioUnitario: pu,
-    });
+      pu,
+    ]);
   }
 
   return productos;
@@ -146,17 +142,13 @@ module.exports = async (req, res) => {
     await verificarAdmin(token);
 
     const tienda = (req.query.tienda || 'EXPERTOS').toUpperCase();
-    const { fileBase64, fileName } = req.body || {};
 
-    if (!fileBase64) return res.status(400).json({ error: 'No se recibió archivo (fileBase64 vacío)' });
+    // Leer archivo via stream (rápido, sin cargar todo en memoria)
+    const buffer = await leerArchivo(req);
+    console.log(`Archivo recibido: ${buffer.length} bytes`);
 
-    console.log(`Archivo: ${fileName} | b64: ${fileBase64.length} chars`);
-
-    const buffer    = Buffer.from(fileBase64, 'base64');
-    const productos = procesarExcel(buffer);
-
-    if (!productos.length)
-      return res.status(400).json({ error: 'No se encontraron productos válidos en el archivo' });
+    const filas = procesarExcel(buffer);
+    if (!filas.length) return res.status(400).json({ error: 'No se encontraron productos válidos' });
 
     const hoja = tienda === 'CENTRAL'
       ? 'STOCK_DROGUERIA_CENTRAL'
@@ -167,41 +159,25 @@ module.exports = async (req, res) => {
     const spreadsheetId = process.env.GOOGLE_SHEETS_ID;
     if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_ID no configurado');
 
-    // Limpiar hoja existente
+    // Limpiar y escribir de una sola vez
     await sheets.spreadsheets.values.clear({ spreadsheetId, range: `${hoja}!A2:E` });
-
-    // Escribir todos los productos de una sola vez
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `${hoja}!A2`,
       valueInputOption: 'USER_ENTERED',
-      resource: {
-        values: productos.map(p => [
-          p.descripcion,
-          p.laboratorio,
-          p.unidad,
-          p.precio,
-          p.precioUnitario,
-        ]),
-      },
+      resource: { values: filas },
     });
 
-    console.log(`✅ ${tienda}: ${productos.length} productos → ${hoja}`);
-    res.status(200).json({ ok: true, count: productos.length });
+    console.log(`✅ ${tienda}: ${filas.length} productos → ${hoja}`);
+    res.status(200).json({ ok: true, count: filas.length });
 
   } catch (e) {
     console.error('import-stock error:', e.message);
     if (e.message === 'No autorizado') return res.status(403).json({ error: e.message });
     res.status(500).json({ error: e.message });
   }
+};
+
 module.exports.config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
-  },
+  api: { bodyParser: false }, // necesario para que busboy lea el stream
 };
-
-
-};
-// Sin multer — bodyParser JSON activo por defecto en Vercel
