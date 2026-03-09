@@ -1,35 +1,24 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// distancia.js
+// distancia.js — Domicilios WIL  (Google Maps Geocoding — solución definitiva)
 //
-// SEDE (punto de partida de TODOS los domicilios normales):
-//   Cra. 50 #50-15, Copacabana, Antioquia
+// VARIABLE DE ENTORNO REQUERIDA:
+//   GOOGLE_MAPS_KEY=AIza...   (Google Maps Geocoding API)
 //
-// PAQUETES: origen = dirección de recogida (donde el cliente dice), destino = entrega
+// SEDE: Cra. 50 #50-15, Copacabana, Antioquia
 //
-// Hoja coordenadas: A=BARRIO  B=TARIFA  C=PAQ_PEQUEÑO  D=PAQ_MEDIANO
-//                   E=PAQ_GRANDE  F=DIRECCION  G=ZONA
-//
-// COLUMNA F = dirección real de un punto de esa zona (ej: "Cra 68 #97-95, Castilla, Medellín")
-//   → NO es el destino del cliente
-//   → Se usa como CONTEXTO DE ZONA para que LocationIQ busque en el área correcta
-//   → LocationIQ geocodifica la dirección REAL del cliente usando esa zona como ancla
-//
-// FLUJO DE GEOCODIFICACIÓN:
-//   1. textoCliente = lo que escribió el usuario (ej: "Cra 50 #30-10 Castilla")
-//   2. dirRefSheet  = col F del sheet (ej: "Cra 68 #97-95, Castilla, Medellín")
-//   3. Se extrae municipio/zona de dirRefSheet → se construye query con ese contexto
-//   4. LocationIQ geocodifica textoCliente en esa zona → coords reales del cliente
-//   5. Con esas coords: haversine(SEDE → coords) × 1.35 × $1.800 = precio
+// FLUJO DE GEOCODIFICACIÓN (prioridad):
+//   1. Cache sheet cols H/I  → 0 llamadas API
+//   2. Google Maps Geocoding con municipality bias → coord exacta del predio
+//   3. Fallback barrio conocido (hardcoded)
+//   4. Fallback municipio conocido
 //
 // REGLA DE COBRO:
-//   precio = MAX( $1.800 × distanciaRuta, $5.000 mínimo )
-//   Copacabana local: tarifa ya está guardada en el sheet (calculada igual por km)
+//   precio = MAX( $1.800 × kmRuta, $5.000 mínimo )
+//   Copacabana local: tarifa ya en el sheet (misma fórmula)
 // ══════════════════════════════════════════════════════════════════════════════
+
 const https = require('https');
 
-function getLocationIQKey() { return process.env.LOCATIONIQ_KEY || null; }
-
-// SEDE — punto de partida de todos los domicilios normales
 const SEDE_LAT  = parseFloat(process.env.SEDE_LAT  || '6.35112');
 const SEDE_LNG  = parseFloat(process.env.SEDE_LNG  || '-75.49190');
 const SEDE_DIR  = 'Cra. 50 #50-15, Copacabana, Antioquia, Colombia';
@@ -38,7 +27,7 @@ const PRECIO_KM   = 1800;
 const FACTOR_RUTA = 1.35;
 const TARIFA_MIN  = 5000;
 
-// ── Coordenadas de referencia por municipio (fallback sin LocationIQ) ─────────
+// ── Coordenadas de referencia por municipio (fallback sin API) ────────────────
 const MUNICIPIOS_COORDS = {
   'copacabana':           { lat: 6.35112, lng: -75.49190 },
   'bello':                { lat: 6.33670, lng: -75.55720 },
@@ -62,7 +51,7 @@ const MUNICIPIOS_COORDS = {
   'san vicente ferrer':   { lat: 6.30870, lng: -75.33100 },
 };
 
-// ── Barrios conocidos con coords aproximadas (fallback) ───────────────────────
+// ── Barrios conocidos con coords aproximadas (fallback sin API) ───────────────
 const BARRIOS_CONOCIDOS = {
   'castilla':        { lat: 6.29300, lng: -75.59900, municipio: 'Medellín' },
   'laureles':        { lat: 6.24370, lng: -75.60350, municipio: 'Medellín' },
@@ -84,6 +73,7 @@ const BARRIOS_CONOCIDOS = {
   'campo amor':      { lat: 6.22700, lng: -75.59400, municipio: 'Medellín' },
   'san javier':      { lat: 6.24800, lng: -75.62400, municipio: 'Medellín' },
   'guayabal':        { lat: 6.22000, lng: -75.58900, municipio: 'Medellín' },
+  'obrero':          { lat: 6.32400, lng: -75.56100, municipio: 'Bello' },
   'niquía':          { lat: 6.31850, lng: -75.52150, municipio: 'Bello' },
   'niquia':          { lat: 6.31850, lng: -75.52150, municipio: 'Bello' },
   'la madera':       { lat: 6.34500, lng: -75.55000, municipio: 'Bello' },
@@ -107,7 +97,7 @@ function haversineKm(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// ── Precio desde la SEDE hasta un destino ────────────────────────────────────
+// ── Precio SEDE → destino ─────────────────────────────────────────────────────
 function calcularTarifaKm(latDest, lngDest) {
   const lineal = haversineKm(SEDE_LAT, SEDE_LNG, latDest, lngDest);
   const ruta   = Math.round(lineal * FACTOR_RUTA * 10) / 10;
@@ -120,7 +110,7 @@ function calcularTarifaKm(latDest, lngDest) {
   };
 }
 
-// ── Precio entre dos puntos (paquetes: origen→destino) ────────────────────────
+// ── Precio entre dos puntos (paquetes) ────────────────────────────────────────
 function calcularPrecioPorKm(latO, lngO, latD, lngD) {
   const lineal = haversineKm(latO, lngO, latD, lngD);
   const ruta   = Math.round(lineal * FACTOR_RUTA * 10) / 10;
@@ -138,7 +128,7 @@ function calcularPreciosPaquete(tarifaBase) {
   return { paqPeq: tarifaBase, paqMed: tarifaBase, paqGran: tarifaBase };
 }
 
-// ── Zona Copacabana (tarifa ya en sheet) ──────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function esZonaCopacabana(municipio, barrio) {
   const m = (municipio || '').toLowerCase().trim();
   const b = (barrio    || '').toLowerCase().trim();
@@ -203,13 +193,23 @@ function _enZonaCobertura(lat, lng) {
   return lat >= 5.80 && lat <= 6.70 && lng >= -76.00 && lng <= -74.80;
 }
 
-function httpsGet(url, headers = {}) {
+// ══════════════════════════════════════════════════════════════════════════════
+// GOOGLE MAPS GEOCODING API
+// ══════════════════════════════════════════════════════════════════════════════
+// Una sola función: recibe la dirección del cliente, devuelve lat/lng real.
+//
+// Estrategia de queries (orden de precisión):
+//   Q1: texto completo + ", Antioquia, Colombia"
+//   Q2: Si el cliente no mencionó municipio → intentar con municipio detectado en barrio
+//   Q3: Solo el municipio/barrio detectado (fallback suave)
+//
+// El componente `bounds` restringe a Antioquia pero NO fuerza el resultado,
+// así Google puede geocodificar correctamente Bello, Medellín, Barbosa, etc.
+// ──────────────────────────────────────────────────────────────────────────────
+
+function httpsGet(url) {
   return new Promise((resolve, reject) => {
-    const opts = {
-      timeout: 8000,
-      headers: { 'Accept': 'application/json', ...headers }
-    };
-    const req = https.get(url, opts, res => {
+    const req = https.get(url, { timeout: 8000 }, res => {
       let data = '';
       res.on('data', c => { data += c; });
       res.on('end', () => {
@@ -218,196 +218,184 @@ function httpsGet(url, headers = {}) {
       });
     });
     req.on('error',   reject);
-    req.on('timeout', () => { req.destroy(); reject(new Error('Timeout Nominatim')); });
+    req.on('timeout', () => { req.destroy(); reject(new Error('Timeout Google Maps')); });
   });
 }
 
-// ── Nominatim (OpenStreetMap) — gratuito, sin límite con 1req/s ──────────────
-//
-// FLUJO:
-//   textoCliente = dirección completa del cliente
-//   dirRefSheet  = col F = dirección ancla del barrio en el sheet
-//
-//   1. Si dirRefSheet tiene coords en col H/I del sheet → usar como viewbox directo
-//   2. Si no, geocodificar dirRefSheet con Nominatim → obtener coords ancla → viewbox
-//   3. Buscar textoCliente dentro del viewbox (bounded=1) → resultado preciso al predio
-//   4. Fallback sin viewbox: textoCliente + municipio + Colombia
-//
-// Nominatim requiere User-Agent identificador y respetar 1 req/segundo.
-// Para +30 paquetes/día el cache del sheet reduce llamadas al mínimo.
+// Cache en memoria para no re-geocodificar la misma dirección en la misma sesión
+const _geoCache = new Map();
 
-const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org/search';
-const NOMINATIM_UA   = 'DomiciliosWIL/1.0 (copacabana.antioquia@gmail.com)';
-
-// Throttle simple: mínimo 1.1s entre llamadas a Nominatim
-let _lastNominatimCall = 0;
-async function nominatimGet(url) {
-  const ahora = Date.now();
-  const espera = 1100 - (ahora - _lastNominatimCall);
-  if (espera > 0) await new Promise(r => setTimeout(r, espera));
-  _lastNominatimCall = Date.now();
-  return httpsGet(url, { 'User-Agent': NOMINATIM_UA, 'Accept-Language': 'es' });
-}
-
-// Geocodificar una dirección con Nominatim → devuelve {lat, lng} o null
-async function _nominatimGeocodificar(query) {
-  try {
-    const url  = `${NOMINATIM_BASE}?q=${encodeURIComponent(query)}&format=json&limit=3&countrycodes=co&addressdetails=1`;
-    const data = await nominatimGet(url);
-    if (!Array.isArray(data) || !data.length) return null;
-    for (const r of data) {
-      const lat = parseFloat(r.lat);
-      const lng = parseFloat(r.lon);
-      if (_enZonaCobertura(lat, lng)) return { lat, lng, raw: r };
-    }
-  } catch(e) { console.warn('Nominatim error:', e.message); }
-  return null;
-}
-
-async function geocodificarNominatim(textoCliente, dirRefSheet, coordsAncla) {
-  // coordsAncla: { lat, lng } del sheet cache (col H/I) o de geocodificar col F
-  const municipioDeRef   = detectarMunicipioEnTexto(dirRefSheet  || '');
-  const municipioDeTexto = detectarMunicipioEnTexto(textoCliente || '');
-  const municipio        = municipioDeRef || municipioDeTexto;
-
-  // ─── Obtener coords ancla si no vienen del cache ──────────────────────────
-  let ancla = coordsAncla || null;
-  if (!ancla && dirRefSheet) {
-    console.log(`🌐 Geocodificando ancla col F: "${dirRefSheet}"`);
-    const r = await _nominatimGeocodificar(`${dirRefSheet}, Antioquia, Colombia`);
-    if (r) {
-      ancla = { lat: r.lat, lng: r.lng };
-      console.log(`   Ancla: ${ancla.lat.toFixed(5)}, ${ancla.lng.toFixed(5)}`);
-    }
+async function geocodificarGoogle(textoCliente) {
+  const key = process.env.GOOGLE_MAPS_KEY;
+  if (!key) {
+    console.warn('⚠️  GOOGLE_MAPS_KEY no configurada — usando fallback');
+    return null;
   }
 
-  // ─── Construir queries en orden de precisión ──────────────────────────────
+  // Cache en memoria (misma dirección dentro de la misma ejecución del proceso)
+  const cacheKey = textoCliente.toLowerCase().trim();
+  if (_geoCache.has(cacheKey)) {
+    console.log(`📦 Cache Google: "${textoCliente}"`);
+    return _geoCache.get(cacheKey);
+  }
+
+  // Construir queries en orden de precisión
   const queries = [];
 
-  // Q1: con viewbox del ancla + bounded → resultado en el barrio exacto
-  if (ancla) {
-    const delta = 0.025; // ~2.8km
-    const vbox  = `${ancla.lng-delta},${ancla.lat+delta},${ancla.lng+delta},${ancla.lat-delta}`;
-    queries.push({
-      url:    `${NOMINATIM_BASE}?q=${encodeURIComponent(textoCliente)}&format=json&limit=5&countrycodes=co&addressdetails=1&viewbox=${vbox}&bounded=1`,
-      fuente: 'viewbox_bounded',
-      ancla
-    });
-    queries.push({
-      url:    `${NOMINATIM_BASE}?q=${encodeURIComponent(textoCliente)}&format=json&limit=5&countrycodes=co&addressdetails=1&viewbox=${vbox}`,
-      fuente: 'viewbox_soft',
-      ancla
-    });
+  // Q1: Texto completo del cliente + Colombia
+  // Esto cubre "Cra 53 #32-86 barrio obrero bello" → Google Maps lo resuelve perfecto
+  queries.push(`${textoCliente}, Colombia`);
+
+  // Q2: Si no menciona municipio pero menciona barrio conocido → agregar municipio explícito
+  const municipioEnTexto = detectarMunicipioEnTexto(textoCliente);
+  if (!municipioEnTexto) {
+    const barrioDetect = detectarBarrioEnTexto(textoCliente);
+    if (barrioDetect?.municipio) {
+      queries.push(`${textoCliente}, ${barrioDetect.municipio}, Antioquia, Colombia`);
+    }
   }
 
-  // Q2: texto + municipio de col F
-  if (municipioDeRef) {
-    queries.push({
-      url:    `${NOMINATIM_BASE}?q=${encodeURIComponent(`${textoCliente}, ${municipioDeRef}, Antioquia, Colombia`)}&format=json&limit=5&countrycodes=co&addressdetails=1`,
-      fuente: 'municipio_colF'
-    });
+  // Q3: Solo municipio como fallback (si el usuario puso solo nombre de barrio sin dirección)
+  if (municipioEnTexto) {
+    queries.push(`${textoCliente}, ${municipioEnTexto}, Antioquia, Colombia`);
   }
 
-  // Q3: texto + municipio del texto del cliente
-  if (municipioDeTexto && municipioDeTexto !== municipioDeRef) {
-    queries.push({
-      url:    `${NOMINATIM_BASE}?q=${encodeURIComponent(`${textoCliente}, ${municipioDeTexto}, Antioquia, Colombia`)}&format=json&limit=5&countrycodes=co&addressdetails=1`,
-      fuente: 'municipio_texto'
-    });
-  }
+  // Bounds de Antioquia — le da prioridad a resultados en esta región
+  // pero NO bloquea resultados válidos fuera del bounds
+  const bounds = '5.5,−77.1|8.9,−73.8'; // SW|NE de Antioquia aproximado
 
-  // Q4: fallback Antioquia
-  queries.push({
-    url:    `${NOMINATIM_BASE}?q=${encodeURIComponent(`${textoCliente}, Antioquia, Colombia`)}&format=json&limit=5&countrycodes=co&addressdetails=1`,
-    fuente: 'antioquia'
-  });
-
-  // ─── Ejecutar queries hasta encontrar resultado válido ────────────────────
-  for (const { url, fuente, ancla: anc } of queries) {
+  for (const query of queries) {
     try {
-      const data = await nominatimGet(url);
-      if (!Array.isArray(data) || !data.length) continue;
+      const url = `https://maps.googleapis.com/maps/api/geocode/json` +
+        `?address=${encodeURIComponent(query)}` +
+        `&region=co` +
+        `&key=${key}`;
 
-      for (const r of data) {
-        const lat = parseFloat(r.lat);
-        const lng = parseFloat(r.lon);
-        if (!_enZonaCobertura(lat, lng)) continue;
+      console.log(`🌐 Google Maps: "${query}"`);
+      const data = await httpsGet(url);
 
-        // Si hay ancla, descartar resultados a más de 12km
-        if (anc) {
-          const dist = haversineKm(anc.lat, anc.lng, lat, lng);
-          if (dist > 12) {
-            console.log(`  ⚠️  Descartado [${fuente}]: ${dist.toFixed(1)}km del ancla`);
-            continue;
-          }
+      if (data.status !== 'OK' || !data.results?.length) {
+        console.log(`   Status: ${data.status}`);
+        continue;
+      }
+
+      for (const result of data.results) {
+        const lat = result.geometry.location.lat;
+        const lng = result.geometry.location.lng;
+
+        // Verificar que el resultado esté en zona de cobertura de Colombia
+        if (!_enZonaCobertura(lat, lng)) {
+          console.log(`   ⚠️ Fuera de cobertura: ${lat}, ${lng}`);
+          continue;
         }
 
-        const addr       = r.address || {};
-        const munGeo     = addr.city || addr.town || addr.municipality ||
-                           detectarMunicipioEnTexto(r.display_name) || municipio || '';
-        if (!munGeo) continue;
+        // Extraer municipio y barrio de los address_components
+        const comps       = result.address_components || [];
+        const getComp     = types => comps.find(c => types.some(t => c.types.includes(t)))?.long_name || '';
 
-        const barrio = addr.neighbourhood || addr.suburb || addr.quarter ||
-                       addr.village       || munGeo;
-        const calc   = calcularTarifaKm(lat, lng);
-        const zona   = zonaLegible(munGeo, barrio);
-        const esCopa = esZonaCopacabana(munGeo, barrio);
+        const barrio      = getComp(['neighborhood', 'sublocality_level_1', 'sublocality']) ||
+                            getComp(['locality']);
+        const municipio   = getComp(['locality', 'administrative_area_level_2']);
+        const dpto        = getComp(['administrative_area_level_1']);
+        const direccionFmt = result.formatted_address;
 
-        console.log(`✅ Nominatim [${fuente}]: "${barrio}", ${munGeo}`);
-        console.log(`   📍 ${lat.toFixed(5)}, ${lng.toFixed(5)} | ${calc.formula}`);
-        console.log(`   🗺️  https://www.google.com/maps?q=${lat},${lng}`);
+        // Confianza según el tipo de resultado
+        const tipo        = result.geometry.location_type; // ROOFTOP, RANGE_INTERPOLATED, GEOMETRIC_CENTER, APPROXIMATE
+        const confianza   = tipo === 'ROOFTOP' ? 'alta'
+                          : tipo === 'RANGE_INTERPOLATED' ? 'alta'
+                          : tipo === 'GEOMETRIC_CENTER' ? 'media'
+                          : 'baja';
 
-        return {
+        const esCopa      = esZonaCopacabana(municipio, barrio);
+        const calc        = calcularTarifaKm(lat, lng);
+        const zona        = zonaLegible(municipio, barrio);
+
+        const resultado = {
           lat, lng,
-          barrio, municipio: munGeo, zona,
+          barrio:              barrio || municipio,
+          municipio:           municipio || 'Colombia',
+          zona,
+          direccionFormateada: direccionFmt,
           tarifa:              esCopa ? null : calc.precio,
           tarifaCalculada:     calc.precio,
           distRutaKm:          calc.distRutaKm,
           distLinealKm:        calc.distLinealKm,
           formula:             calc.formula,
+          esCobertura:         true,
           esCoherente:         true,
-          confianzaGeo:        fuente.startsWith('viewbox') ? 'alta' : 'media',
-          direccionFormateada: r.display_name,
-          fuenteGeo:           fuente
+          confianzaGeo:        confianza,
+          fuenteGeo:           'google_maps',
+          observaciones:       confianza === 'alta'
+            ? 'Dirección verificada ✅'
+            : 'Dirección aproximada — confirmar con el cliente ⚠️'
         };
+
+        console.log(`✅ Google Maps [${tipo}]: "${barrio}", ${municipio}`);
+        console.log(`   📍 ${lat.toFixed(5)}, ${lng.toFixed(5)} | ${calc.formula}`);
+        console.log(`   🗺️  https://www.google.com/maps?q=${lat},${lng}`);
+
+        _geoCache.set(cacheKey, resultado);
+        return resultado;
       }
     } catch(e) {
-      console.error(`Nominatim [${fuente}] error:`, e.message);
+      console.error(`Google Maps error para "${query}":`, e.message);
     }
   }
+
   return null;
 }
 
-// ── calcularDistancia — función principal ─────────────────────────────────────
-// textoCliente: dirección que escribió el usuario ("Cra 53 #32-86 barrio obrero bello")
-// dirRefSheet:  col F del sheet = dirección ancla de la zona (NO el destino del cliente)
-// coordsAncla:  { lat, lng } del cache del sheet (col H/I) — si existen, 0 llamadas extra
-//
-// FLUJO:
-//   0. Si el sheet tiene coords cacheadas (col H/I) → usarlas como viewbox directo
-//   1. Nominatim geocodifica textoCliente con viewbox del ancla → coords exactas del predio
-//   2. Fallback: barrio conocido hardcodeado en texto
-//   3. Fallback: municipio detectado en texto
-//   Distancia SIEMPRE desde SEDE Copacabana al destino.
+// ══════════════════════════════════════════════════════════════════════════════
+// calcularDistancia — función principal exportada
+// textoCliente: dirección que escribió el usuario
+// dirRefSheet:  col F del sheet (ya no se usa como ancla, solo para extraer municipio)
+// coordsAncla:  { lat, lng } del cache del sheet (col H/I) — si existen, usar directo
+// ══════════════════════════════════════════════════════════════════════════════
 async function calcularDistancia(textoCliente, dirRefSheet, coordsAncla) {
   const txt = (textoCliente || '').trim();
   if (txt.length < 3) return _fallback(txt, 'Texto muy corto');
 
   console.log(`\n🔍 calcularDistancia: "${txt}"`);
-  if (dirRefSheet)  console.log(`   📌 Ancla col F: "${dirRefSheet}"`);
   if (coordsAncla) console.log(`   💾 Cache H/I: ${coordsAncla.lat}, ${coordsAncla.lng}`);
 
-  // ── 1. Nominatim con ancla (cache o geocodificada de col F) ───────────────
-  const geo = await geocodificarNominatim(txt, dirRefSheet, coordsAncla || null);
-  if (geo) {
-    return {
-      ...geo,
-      esCobertura:   true,
-      observaciones: 'Dirección verificada ✅'
-    };
+  // ── 1. Cache del sheet (col H/I) → 0 llamadas API ─────────────────────────
+  if (coordsAncla?.lat && coordsAncla?.lng) {
+    const { lat, lng } = coordsAncla;
+    if (_enZonaCobertura(lat, lng)) {
+      const esCopa = esZonaCopacabana('', '');
+      const calc   = calcularTarifaKm(lat, lng);
+
+      // Intentar obtener barrio/municipio del texto o del ref del sheet
+      const municipioRef = detectarMunicipioEnTexto(dirRefSheet || txt);
+      const barrioDetect = detectarBarrioEnTexto(txt);
+      const municipio    = municipioRef || barrioDetect?.municipio || '';
+      const barrio       = barrioDetect?.barrio || txt;
+      const zona         = zonaLegible(municipio, barrio);
+      const esCopa2      = esZonaCopacabana(municipio, barrio);
+
+      console.log(`💾 Usando cache: ${lat}, ${lng} → ${calc.formula}`);
+      return {
+        lat, lng, barrio, municipio, zona,
+        tarifa:           esCopa2 ? null : calc.precio,
+        tarifaCalculada:  calc.precio,
+        distRutaKm:       calc.distRutaKm,
+        distLinealKm:     calc.distLinealKm,
+        formula:          calc.formula,
+        esCobertura:      true,
+        esCoherente:      true,
+        confianzaGeo:     'alta',
+        fuenteGeo:        'cache_sheet',
+        direccionFormateada: txt,
+        observaciones:    'Dirección verificada ✅'
+      };
+    }
   }
 
-  // ── 2. Barrio conocido detectado en el texto del cliente
+  // ── 2. Google Maps Geocoding ───────────────────────────────────────────────
+  const geo = await geocodificarGoogle(txt);
+  if (geo) return geo;
+
+  // ── 3. Fallback: barrio conocido hardcodeado ───────────────────────────────
   const barrioDetect = detectarBarrioEnTexto(txt);
   if (barrioDetect) {
     const { lat, lng, municipio, barrio } = barrioDetect;
@@ -425,13 +413,13 @@ async function calcularDistancia(textoCliente, dirRefSheet, coordsAncla) {
       esCobertura:      true,
       esCoherente:      true,
       confianzaGeo:     'media',
-      direccionFormateada: txt,
       fuenteGeo:        'barrio_conocido',
-      observaciones:    'Coordenadas aproximadas — confirmar con el cliente ⚠️'
+      direccionFormateada: txt,
+      observaciones:    'Coordenadas aproximadas al barrio ⚠️'
     };
   }
 
-  // ── 3. Municipio detectado en el texto
+  // ── 4. Fallback: municipio detectado en el texto ──────────────────────────
   const municipioDetect = detectarMunicipioEnTexto(txt);
   if (municipioDetect) {
     const key    = municipioDetect.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -452,8 +440,8 @@ async function calcularDistancia(textoCliente, dirRefSheet, coordsAncla) {
         esCobertura:      true,
         esCoherente:      true,
         confianzaGeo:     'baja',
-        direccionFormateada: txt,
         fuenteGeo:        'municipio_detectado',
+        direccionFormateada: txt,
         observaciones:    'Coordenada aproximada al municipio ⚠️'
       };
     }
@@ -489,7 +477,7 @@ function normalizarDireccion(dir) {
     .replace(/\s{2,}/g,       ' ').trim();
 }
 
-function detectarZonaFija() { return null; } // compatibilidad
+function detectarZonaFija() { return null; }
 
 module.exports = {
   calcularDistancia,

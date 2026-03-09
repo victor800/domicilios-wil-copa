@@ -464,7 +464,6 @@ td{padding:11px 16px;vertical-align:middle}
 <script>
 /* ══ CONFIG ══ */
 const PER          = 100;
-const IMPORT_CHUNK = 500;
 const GOOGLE_CLIENT_ID = '699856885526-55fqgn6qdr116rige5dcrsg4f3jdu1kp.apps.googleusercontent.com';
 const API_CHECK    = '/api/auth-check';
 
@@ -790,76 +789,132 @@ function onDrop(ev) {
   document.getElementById('dropZ').classList.remove('drag');
   if (ev.dataTransfer.files[0]) onFile(ev.dataTransfer.files[0]);
 }
+
 function onFile(file) {
   if (!file) return;
+  const prev   = document.getElementById('impPrev');
+  const btnImp = document.getElementById('btnImp');
+  impRows = [];
+  prev.style.display  = 'block';
+  prev.innerHTML      = '⏳ Leyendo archivo…';
+  btnImp.disabled     = true;
+
+  // readAsArrayBuffer es ~3x más rápido que readAsBinaryString
   const reader = new FileReader();
   reader.onload = e => {
-    const wb   = XLSX.read(e.target.result, { type: 'binary' });
-    const ws   = wb.Sheets[wb.SheetNames[0]];
-    const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
-    const prev = document.getElementById('impPrev');
-    prev.style.display = 'block';
-    if (!data.length) {
-      prev.innerHTML = '⚠️ El archivo está vacío o no tiene datos.';
-      document.getElementById('btnImp').disabled = true; return;
-    }
-    const norm = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'');
-    const keys = Object.keys(data[0]);
-    const col  = (...terms) => keys.find(k => terms.some(t => norm(k).includes(t)));
-    const cDesc   = col('descrip','nombre','produc');
-    const cLab    = col('laborat','lab','marca','fabrican');
-    const cUnid   = col('unidad','unit','present','conten');
-    const cPrecio = col('precio','price','valor','venta');
-    const cPU     = keys.find(k => {
-      const n = norm(k);
-      return (n.includes('unitario') || n.includes('xunidad') || n.includes('porunit')) && k !== cPrecio;
-    });
-    impRows = data
-      .map(row => ({
-        descripcion:    cDesc   ? (row[cDesc]   || '').toString().trim() : '',
-        laboratorio:    cLab    ? (row[cLab]    || '').toString().trim() : '',
-        unidad:         cUnid   ? (row[cUnid]   || '').toString().trim() : '',
-        precio:         cPrecio ? (row[cPrecio] || '').toString().trim() : '',
-        precioUnitario: cPU     ? (row[cPU]     || '').toString().trim() : '',
-      }))
-      .filter(r => r.descripcion.length > 0);
-    if (impRows.length === 0) {
-      prev.innerHTML = '⚠️ No se encontraron productos. Verifica los encabezados del archivo.';
-      document.getElementById('btnImp').disabled = true;
-    } else {
-      prev.innerHTML = `✅ <strong>${impRows.length}</strong> productos listos de <em>${file.name}</em>`;
-      document.getElementById('btnImp').disabled = false;
+    try {
+      const wb   = XLSX.read(e.target.result, { type: 'array' });
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
+
+      if (!data.length) {
+        prev.innerHTML  = '⚠️ El archivo está vacío o no tiene datos.';
+        return;
+      }
+
+      // ── Detección flexible de columnas ──────────────────────────────────────
+      const norm  = s => s.toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, '');
+      const keys  = Object.keys(data[0]);
+      const find  = (...terms) => keys.find(k => terms.some(t => norm(k).includes(norm(t))));
+
+      const cDesc   = find('descrip', 'nombre', 'produc', 'articul', 'medicam');
+      const cLab    = find('laborat', 'lab', 'marca', 'fabrican', 'proveedor');
+      const cUnid   = find('unidad', 'unit', 'present', 'conten', 'fraccio');
+
+      // Precio unitario: columna con "unitario" | "xunidad" | "porunit"
+      const cPU = keys.find(k => {
+        const n = norm(k);
+        return n.includes('unitario') || n.includes('xunidad') || n.includes('porunit');
+      });
+
+      // Precio de caja: cualquier columna con "precio"/"price"/"valor"/"venta" que no sea cPU
+      const cPrecio = keys.find(k => {
+        if (k === cPU) return false;
+        const n = norm(k);
+        return n.includes('precio') || n.includes('price') || n.includes('valor') || n.includes('venta');
+      });
+
+      // ── Mapear filas ────────────────────────────────────────────────────────
+      impRows = data
+        .map(row => ({
+          descripcion:    cDesc   ? (row[cDesc]   || '').toString().trim() : '',
+          laboratorio:    cLab    ? (row[cLab]    || '').toString().trim() : '',
+          unidad:         cUnid   ? (row[cUnid]   || '').toString().trim() : '',
+          precio:         cPrecio ? (row[cPrecio] || '').toString().trim() : '',
+          precioUnitario: cPU     ? (row[cPU]     || '').toString().trim() : '',
+        }))
+        .filter(r => r.descripcion.length > 0);
+
+      if (!impRows.length) {
+        prev.innerHTML  = '⚠️ No se encontraron productos. Verifica los encabezados del archivo.';
+        return;
+      }
+
+      // Mostrar columnas detectadas para confirmación visual
+      const colInfo = [
+        cDesc   ? `✅ Descripción → <em>${cDesc}</em>`   : '❌ Descripción no detectada',
+        cLab    ? `✅ Laboratorio → <em>${cLab}</em>`    : '⚠️ Laboratorio no detectado',
+        cUnid   ? `✅ Unidad → <em>${cUnid}</em>`        : '⚠️ Unidad no detectada',
+        cPrecio ? `✅ Precio caja → <em>${cPrecio}</em>` : '⚠️ Precio caja no detectado',
+        cPU     ? `✅ Precio unit. → <em>${cPU}</em>`    : '⚠️ Precio unitario no detectado',
+      ].join('<br>');
+
+      prev.innerHTML =
+        `✅ <strong>${impRows.length}</strong> productos listos de <em>${file.name}</em><br>
+         <details style="margin-top:8px;font-size:11px;color:var(--muted)">
+           <summary style="cursor:pointer">Columnas detectadas ▾</summary>
+           <div style="margin-top:6px;line-height:1.9">${colInfo}</div>
+         </details>`;
+      btnImp.disabled = false;
+
+    } catch (err) {
+      prev.innerHTML  = '❌ Error al leer el archivo: ' + err.message;
+      btnImp.disabled = true;
     }
   };
-  reader.readAsBinaryString(file);
+  reader.onerror = () => {
+    prev.innerHTML  = '❌ No se pudo leer el archivo.';
+    btnImp.disabled = true;
+  };
+  reader.readAsArrayBuffer(file);   // ← más rápido que readAsBinaryString
 }
+
 async function doImport() {
   if (!impRows.length) return;
   const btnImp = document.getElementById('btnImp');
-  btnImp.disabled = true; btnImp.textContent = 'Subiendo…';
+  btnImp.disabled    = true;
+  btnImp.textContent = 'Subiendo…';
   document.getElementById('progWrap').style.display = 'block';
-  setProgress(0, 'Enviando al servidor…');
+  setProgress(10, 'Enviando al servidor…');
+
   try {
-    const total = impRows.length; let sent = 0;
-    for (let start = 0; start < total; start += IMPORT_CHUNK) {
-      const slice = impRows.slice(start, start + IMPORT_CHUNK);
-      const r = await fetch('/api/import-stock', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-        body: JSON.stringify({ tienda, productos: slice, offset: start, clear: start === 0 })
-      });
-      if (!r.ok) { const er = await r.json().catch(() => ({})); throw new Error(er.error || `HTTP ${r.status}`); }
-      sent += slice.length;
-      setProgress(Math.round((sent / total) * 100), `${sent} / ${total} productos…`);
+    // Un solo request sin chunks — el backend escribe todo de una vez
+    const r = await fetch('/api/import-stock', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body:    JSON.stringify({ tienda, productos: impRows }),
+    });
+
+    if (!r.ok) {
+      const er = await r.json().catch(() => ({}));
+      throw new Error(er.error || `HTTP ${r.status}`);
     }
-    setProgress(100, '¡Listo!');
-    toastMsg(`✅ ${total} productos importados`, 'ok');
+
+    const data = await r.json();
+    setProgress(100, `¡Listo! ${data.count} productos guardados`);
+    toastMsg(`✅ ${data.count} productos importados correctamente`, 'ok');
     setTimeout(() => { closeImp(); reload(); }, 800);
-  } catch(e) {
+
+  } catch (e) {
     toastMsg('❌ ' + e.message, 'err');
     setProgress(0, 'Error: ' + e.message);
-  } finally { btnImp.disabled = false; btnImp.textContent = '⬆ Subir a Sheets'; }
+    btnImp.disabled    = false;
+    btnImp.textContent = '⬆ Subir a Sheets';
+  }
 }
+
 function setProgress(pct, txt) {
   document.getElementById('progFill').style.width = pct + '%';
   document.getElementById('progTxt').textContent  = txt;
