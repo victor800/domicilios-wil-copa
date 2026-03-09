@@ -194,5 +194,14 @@ module.exports = async (req, res) => {
     if (e.message === 'No autorizado') return res.status(403).json({ error: e.message });
     res.status(500).json({ error: e.message });
   }
+module.exports.config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb',
+    },
+  },
+};
+
+
 };
 // Sin multer — bodyParser JSON activo por defecto en Vercel
