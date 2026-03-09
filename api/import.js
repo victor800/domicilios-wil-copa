@@ -11,7 +11,6 @@
 //   I: Precio Unitario ✅
 
 const { google } = require('googleapis');
-const XLSX        = require('xlsx');
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');

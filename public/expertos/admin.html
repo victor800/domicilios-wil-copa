@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <script src="https://accounts.google.com/gsi/client" async></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
 :root{--bg:#f0f4f0;--s:#fff;--s2:#f5f8f5;--s3:#e8f0e8;--border:#d4e0d4;--accent:#16a34a;--a2:#0d9488;--danger:#dc2626;--warn:#b45309;--text:#0f1f0f;--muted:#5a7060;--r:12px}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -370,7 +371,7 @@ const FARMACIAS = {
   CENTRAL:  { nombre:'Farmacia Central', ico:'🏥', tag:'Sede Central' }
 };
 
-let token='', tienda='', prods=[], shown=[], selectedFile=null;
+let token='', tienda='', parsedProducts=[], prods=[], shown=[], selectedFile=null;
 let curPage=1, sortK='descripcion', sortAsc=true, clockIv=null, userInfo={};
 
 const DIAS  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
@@ -625,54 +626,61 @@ function onFile(file){
   const kb=(file.size/1024).toFixed(0);
   const prev=document.getElementById('impPrev');
   prev.style.display='block';
-  prev.innerHTML=`📄 <strong>${file.name}</strong> · ${kb} KB<br>
-    <span style="font-size:11px;color:var(--muted)">Listo para subir</span>`;
-  document.getElementById('btnImp').disabled=false;
+  prev.innerHTML=`📄 <strong>${file.name}</strong> · ${kb} KB<br><span style="font-size:11px;color:var(--muted)">Procesando…</span>`;
+  document.getElementById('btnImp').disabled=true;
+
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const data=new Uint8Array(e.target.result);
+      const wb=XLSX.read(data,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      // Columnas: A=Código B=Desc C=Código D=Lab E=IVA F=Venta G=Unidad H=Precio I=PrecioUnit
+      parsedProducts=[];
+      for(let i=1;i<rows.length;i++){
+        const row=rows[i];
+        const desc=(row[1]||'').toString().trim();
+        if(!desc)continue;
+        parsedProducts.push([
+          desc,
+          (row[3]||'').toString().trim(),
+          (row[6]||'').toString().trim(),
+          (row[7]||'').toString().trim(),
+          (row[8]||'').toString().trim(),
+        ]);
+      }
+      prev.innerHTML=`✅ <strong>${parsedProducts.length} productos listos</strong> de <em>${file.name}</em>`;
+      document.getElementById('btnImp').disabled=parsedProducts.length===0;
+    }catch(err){
+      prev.innerHTML=`❌ Error leyendo Excel: ${err.message}`;
+    }
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 async function doImport(){
-  if(!selectedFile) return;
+  if(!parsedProducts||!parsedProducts.length)return;
   const btnImp=document.getElementById('btnImp');
-  btnImp.disabled=true;
-  btnImp.textContent='Leyendo…';
+  btnImp.disabled=true;btnImp.textContent='Subiendo…';
   document.getElementById('progWrap').style.display='block';
-  setProgress(20,'Leyendo archivo…');
-
+  setProgress(30,'Enviando a servidor…');
   try{
-    const base64=await new Promise((resolve,reject)=>{
-      const reader=new FileReader();
-      reader.onload=()=>resolve(reader.result.split(',')[1]);
-      reader.onerror=()=>reject(new Error('Error leyendo archivo'));
-      reader.readAsArrayBuffer(selectedFile);
-    });
-
-    setProgress(50,'Enviando a servidor…');
-    btnImp.textContent='Subiendo…';
-
-    // ✅ Llama a tu propia API en Vercel — sin Apps Script
     const r=await fetch(`/api/import?tienda=${tienda}`,{
       method:'POST',
-      headers:{
-        'Content-Type':'text/plain',
-        'Authorization':'Bearer '+token
-      },
-      body: new Uint8Array(base64),
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({productos:parsedProducts}),
     });
-
     setProgress(85,'Procesando en Sheets…');
     const data=await r.json();
-
-    if(!r.ok || data.error) throw new Error(data.error||`HTTP ${r.status}`);
-
-    setProgress(100,`✅ ${data.count} productos guardados en ${data.hoja}`);
+    if(!r.ok||data.error)throw new Error(data.error||`HTTP ${r.status}`);
+    setProgress(100,`✅ ${data.count} productos guardados`);
     toastMsg(`✅ ${data.count} productos importados`,'ok');
     setTimeout(()=>{closeImp();reload();},900);
-
   }catch(e){
     toastMsg('❌ '+e.message,'err');
     setProgress(0,'Error: '+e.message);
-    btnImp.disabled=false;
-    btnImp.textContent='⬆ Subir a Sheets';
+    btnImp.disabled=false;btnImp.textContent='⬆ Subir a Sheets';
   }
 }
 </script>
