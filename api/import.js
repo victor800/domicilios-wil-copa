@@ -51,6 +51,9 @@ module.exports = async (req, res) => {
     //   Col G=6  Unidad
     //   Col H=7  Precio
     //   Col I=8  Precio Unitario
+    console.log("fila 0:", JSON.stringify(rows[0]));
+    console.log("fila 1:", JSON.stringify(rows[1]));
+    console.log("fila 2:", JSON.stringify(rows[2]));
     const productos = [];
     for (let i = 1; i < rows.length; i++) {
       const row  = rows[i];
