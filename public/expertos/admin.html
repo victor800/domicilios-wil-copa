@@ -672,30 +672,23 @@ async function doImport() {
   btnImp.textContent = 'Subiendo…';
   document.getElementById('progWrap').style.display = 'block';
   setProgress(30, 'Enviando archivo…');
-
   try {
     const fd = new FormData();
     fd.append('file', selectedFile);
-
     const r = await fetch(`/api/import-stock?tienda=${tienda}`, {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token },
-      // SIN Content-Type — el browser lo pone automático con boundary
       body: fd,
     });
-
     setProgress(80, 'Actualizando Sheets…');
-
     if (!r.ok) {
       const er = await r.json().catch(() => ({}));
       throw new Error(er.error || `HTTP ${r.status}`);
     }
-
     const data = await r.json();
     setProgress(100, `✅ ${data.count} productos guardados`);
     toastMsg(`✅ ${data.count} productos importados`, 'ok');
     setTimeout(() => { closeImp(); reload(); }, 900);
-
   } catch (e) {
     toastMsg('❌ ' + e.message, 'err');
     setProgress(0, 'Error: ' + e.message);
