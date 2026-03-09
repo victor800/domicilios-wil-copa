@@ -8,12 +8,11 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    const tienda    = (req.query.tienda || 'EXPERTOS').toUpperCase();
-    const hoja      = tienda === 'CENTRAL'
+    const tienda = (req.query.tienda || 'EXPERTOS').toUpperCase();
+    const hoja   = tienda === 'CENTRAL'
       ? 'STOCK_DROGUERIA_CENTRAL'
       : 'STOCK_DROGUERIA_EXPERTOS';
-    const q         = (req.query.q || '').toUpperCase().trim();
-    const todosBool = req.query.all === '1';
+    const q      = (req.query.q || '').toUpperCase().trim();
 
     const auth = new google.auth.GoogleAuth({
       credentials: {
@@ -40,14 +39,15 @@ module.exports = async (req, res) => {
         precio:         (row[3] || '').toString().trim(),
         precioUnitario: (row[4] || '').toString().trim(),
       }))
+      .filter(p => p.descripcion.length > 0)
       .filter(p => {
-        if (!q || todosBool) return true;
+        if (!q) return true;
         return (
           p.descripcion.toUpperCase().includes(q) ||
           p.laboratorio.toUpperCase().includes(q)
         );
-      })
-      .slice(0, todosBool ? 5000 : 150);
+      });
+    // Sin .slice() — devuelve TODOS sin límite
 
     res.status(200).json(productos);
   } catch (e) {
