@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Admin · Farma Expertos</title>
+<title>Admin · Red Farma</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <script src="https://accounts.google.com/gsi/client" async></script>
@@ -18,7 +18,7 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;min-height:100vh}
 
-/* LOGIN */
+/* ══ LOGIN ══ */
 #loginWrap{min-height:100vh;display:flex;align-items:center;justify-content:center;
   background:linear-gradient(145deg,#0a1a0e 0%,#0f2d20 40%,#061018 100%);position:relative;overflow:hidden}
 #loginWrap::before{content:'';position:absolute;inset:0;pointer-events:none;
@@ -43,6 +43,55 @@ body{background:var(--bg);color:var(--text);font-family:'Plus Jakarta Sans',sans
 .g-btn img{width:22px}
 .lbox-note{font-size:11px;color:rgba(255,255,255,.3);margin-top:20px;line-height:1.5}
 
+/* ══ SELECTOR DE FARMACIA ══ */
+#pickWrap{min-height:100vh;display:none;align-items:center;justify-content:center;
+  background:linear-gradient(145deg,#0a1a0e 0%,#0f2d20 40%,#061018 100%);
+  position:relative;overflow:hidden;flex-direction:column}
+#pickWrap::before{content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse 600px 500px at 30% 40%,rgba(22,163,74,.15) 0%,transparent 60%),
+             radial-gradient(ellipse 500px 400px at 70% 60%,rgba(13,148,136,.1) 0%,transparent 60%)}
+#pickWrap::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);
+  background-size:48px 48px}
+.pick-inner{position:relative;z-index:1;text-align:center;animation:fadeUp .5s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.pick-hi{font-size:12px;letter-spacing:3px;text-transform:uppercase;color:rgba(134,239,172,.6);margin-bottom:8px;font-weight:600}
+.pick-title{font-family:'Fraunces',serif;font-size:clamp(24px,4vw,36px);font-weight:900;color:#fff;margin-bottom:6px}
+.pick-sub{font-size:14px;color:rgba(255,255,255,.4);margin-bottom:40px}
+.pick-user{display:flex;align-items:center;gap:10px;justify-content:center;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+  border-radius:40px;padding:8px 20px 8px 8px;margin:0 auto 36px;width:fit-content}
+.pick-avatar{width:32px;height:32px;border-radius:50%;border:2px solid rgba(22,163,74,.5)}
+.pick-uname{font-size:13px;font-weight:600;color:rgba(255,255,255,.8)}
+.pick-cards{display:flex;gap:20px;flex-wrap:wrap;justify-content:center;margin-bottom:32px}
+.pick-card{
+  background:rgba(255,255,255,.04);border:2px solid rgba(255,255,255,.1);
+  border-radius:20px;padding:32px 28px;width:200px;cursor:pointer;
+  transition:.2s;text-align:center;position:relative;overflow:hidden;
+}
+.pick-card::before{content:'';position:absolute;inset:0;opacity:0;transition:.2s;
+  background:radial-gradient(ellipse 160px 120px at 50% 50%,rgba(22,163,74,.15) 0%,transparent 70%)}
+.pick-card:hover{border-color:rgba(22,163,74,.6);transform:translateY(-4px);box-shadow:0 16px 40px rgba(0,0,0,.3)}
+.pick-card:hover::before{opacity:1}
+.pick-card.sel{border-color:var(--accent);background:rgba(22,163,74,.08)}
+.pick-card.sel::before{opacity:1}
+.pick-card-ico{font-size:40px;margin-bottom:14px}
+.pick-card-name{font-family:'Fraunces',serif;font-size:17px;font-weight:900;color:#fff;margin-bottom:4px}
+.pick-card-tag{font-size:11px;color:rgba(255,255,255,.4);letter-spacing:.5px}
+.pick-card-badge{position:absolute;top:12px;right:12px;background:var(--accent);color:#fff;
+  font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:.5px;
+  text-transform:uppercase;display:none}
+.pick-card.sel .pick-card-badge{display:block}
+.pick-btn{padding:14px 40px;background:var(--accent);color:#fff;border:none;border-radius:12px;
+  font-size:15px;font-weight:700;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;transition:.2s;
+  opacity:.4;pointer-events:none}
+.pick-btn.active{opacity:1;pointer-events:auto}
+.pick-btn.active:hover{background:#15803d;transform:translateY(-2px);box-shadow:0 8px 24px rgba(22,163,74,.35)}
+.pick-back{margin-top:16px;background:none;border:none;color:rgba(255,255,255,.3);
+  font-size:12px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:.15s}
+.pick-back:hover{color:rgba(255,255,255,.6)}
+
 /* ══ RELOJ EN SIDEBAR ══ */
 .sb-top{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
 .sb-brand{flex:1;min-width:0}
@@ -60,24 +109,29 @@ body{background:var(--bg);color:var(--text);font-family:'Plus Jakarta Sans',sans
 @keyframes dotpulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.85)}}
 .sb-status-lbl{font-size:9px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px}
 
+/* ══ FARMACIA SWITCHER en sidebar ══ */
+.sb-farm{margin:8px 8px 4px;border-radius:10px;background:var(--s2);border:1.5px solid var(--border);
+  padding:10px 12px;cursor:pointer;transition:.15s;display:flex;align-items:center;gap:8px}
+.sb-farm:hover{border-color:var(--accent);background:rgba(22,163,74,.05)}
+.sb-farm-ico{font-size:18px;flex-shrink:0}
+.sb-farm-info{flex:1;min-width:0}
+.sb-farm-name{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-farm-switch{font-size:10px;color:var(--accent);font-weight:600}
+.sb-farm-arr{font-size:14px;color:var(--muted)}
+
 /* ══ LOGOUT CONFIRM ══ */
-#logoutModal{
-  position:fixed;inset:0;z-index:400;
-  background:rgba(0,0,0,.55);backdrop-filter:blur(8px);
-  display:none;align-items:center;justify-content:center;
-}
+#logoutModal{position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.55);
+  backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center}
 #logoutModal.open{display:flex}
-.logout-box{
-  background:var(--s);border-radius:20px;padding:40px 36px;
+.logout-box{background:var(--s);border-radius:20px;padding:40px 36px;
   width:min(360px,88vw);text-align:center;
-  animation:pop .2s ease;box-shadow:0 24px 64px rgba(0,0,0,.22);
-}
+  animation:pop .2s ease;box-shadow:0 24px 64px rgba(0,0,0,.22)}
 .logout-ico{font-size:44px;margin-bottom:14px}
 .logout-box h3{font-family:'Fraunces',serif;font-size:21px;font-weight:900;margin-bottom:8px}
 .logout-box p{font-size:13px;color:var(--muted);margin-bottom:26px;line-height:1.6}
 .logout-acts{display:flex;gap:10px;justify-content:center}
 
-/* APP */
+/* ══ APP ══ */
 #app{display:none}
 .wrap{display:flex;min-height:100vh}
 .sb{width:230px;flex-shrink:0;background:var(--s);border-right:1px solid var(--border);
@@ -190,17 +244,46 @@ td{padding:11px 16px;vertical-align:middle}
 </head>
 <body>
 
-<!-- LOGIN -->
+<!-- ══ PASO 1: LOGIN ══ -->
 <div id="loginWrap">
   <div class="login-box">
     <div class="lbox-cross">💊</div>
     <div class="lbox-title">Panel Admin</div>
-    <div class="lbox-sub">Droguería Farma Expertos · Copacabana</div>
+    <div class="lbox-sub">Red Farma · Copacabana</div>
     <button class="g-btn" onclick="doLogin()">
       <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G"/>
       Continuar con Google
     </button>
     <div class="lbox-note">Solo correos autorizados por el administrador<br>pueden acceder a este panel.</div>
+  </div>
+</div>
+
+<!-- ══ PASO 2: ELEGIR FARMACIA ══ -->
+<div id="pickWrap">
+  <div class="pick-inner">
+    <div class="pick-hi">Bienvenido</div>
+    <div class="pick-title">¿Qué farmacia deseas gestionar?</div>
+    <div class="pick-sub">Selecciona una sede para continuar al panel</div>
+    <div class="pick-user">
+      <img class="pick-avatar" id="pickAvatar" src="" alt=""/>
+      <span class="pick-uname" id="pickName">—</span>
+    </div>
+    <div class="pick-cards">
+      <div class="pick-card" id="card-expertos" onclick="selectFarm('EXPERTOS')">
+        <div class="pick-card-badge">Activa</div>
+        <div class="pick-card-ico">💊</div>
+        <div class="pick-card-name">Farma Expertos</div>
+        <div class="pick-card-tag">Copacabana · Principal</div>
+      </div>
+      <div class="pick-card" id="card-central" onclick="selectFarm('CENTRAL')">
+        <div class="pick-card-badge">Activa</div>
+        <div class="pick-card-ico">🏥</div>
+        <div class="pick-card-name">Farmacia Central</div>
+        <div class="pick-card-tag">Sede Central</div>
+      </div>
+    </div>
+    <button class="pick-btn" id="pickBtn" onclick="enterFarm()">Ingresar al panel →</button>
+    <button class="pick-back" onclick="backToLogin()">← Cambiar cuenta</button>
   </div>
 </div>
 
@@ -217,14 +300,14 @@ td{padding:11px 16px;vertical-align:middle}
   </div>
 </div>
 
-<!-- APP -->
+<!-- ══ PASO 3: APP ══ -->
 <div id="app">
   <div class="wrap">
     <aside class="sb">
       <div class="sb-top">
         <div class="sb-icon">💊</div>
         <div class="sb-brand">
-          <div class="sb-name">Farma Expertos</div>
+          <div class="sb-name" id="sbFarmName">Farma Expertos</div>
           <div class="sb-tag">Admin</div>
         </div>
         <div class="sb-clock-wrap">
@@ -233,6 +316,17 @@ td{padding:11px 16px;vertical-align:middle}
           <div class="sb-status"><div class="sb-dot"></div><span class="sb-status-lbl">Conectado</span></div>
         </div>
       </div>
+
+      <!-- Switcher de farmacia -->
+      <div class="sb-farm" onclick="switchFarm()" title="Cambiar farmacia">
+        <div class="sb-farm-ico" id="sbFarmIco">💊</div>
+        <div class="sb-farm-info">
+          <div class="sb-farm-name" id="sbFarmLabel">Farma Expertos</div>
+          <div class="sb-farm-switch">Cambiar farmacia</div>
+        </div>
+        <div class="sb-farm-arr">⇄</div>
+      </div>
+
       <nav class="sb-nav">
         <button class="nv on" id="nv-inv" onclick="navTo('inv',this)">
           <span class="nv-ico">📦</span> Inventario
@@ -255,7 +349,7 @@ td{padding:11px 16px;vertical-align:middle}
       <!-- INVENTARIO -->
       <div id="pgInv">
         <div class="tbar">
-          <span class="pg-title">📦 Inventario Farma Expertos</span>
+          <span class="pg-title" id="tbarTitle">📦 Inventario</span>
           <div class="tbar-acts">
             <button class="btn btn-b" onclick="openImp()">⬆ Importar Excel</button>
             <button class="btn btn-g" onclick="reload()">↻ Actualizar</button>
@@ -340,7 +434,7 @@ td{padding:11px 16px;vertical-align:middle}
     <p>
       Sube el Excel con el stock actualizado.<br>
       Columnas requeridas: <strong>Descripción · Laboratorio · Unidad · Precio · Precio Unitario</strong><br>
-      <small style="color:var(--muted)">Se sobreescribirá la hoja <strong>STOCK_DROGUERIA_EXPERTOS</strong> columnas A–E. Otras columnas serán ignoradas.</small>
+      <small style="color:var(--muted)">Otras columnas serán ignoradas. Filas sin descripción se omiten.</small>
     </p>
     <div class="drop" id="dropZ"
          onclick="document.getElementById('fIn').click()"
@@ -368,21 +462,36 @@ td{padding:11px 16px;vertical-align:middle}
 
 <script>
 /* ══ CONFIG ══ */
-const SHEET_NAME       = 'STOCK_DROGUERIA_EXPERTOS';
-const PER              = 100;   // productos por página
-const IMPORT_CHUNK     = 500;   // filas por request al importar
+const PER          = 100;
+const IMPORT_CHUNK = 500;
 const GOOGLE_CLIENT_ID = '699856885526-55fqgn6qdr116rige5dcrsg4f3jdu1kp.apps.googleusercontent.com';
-const TIENDA           = 'EXPERTOS';
-const API_CHECK        = '/api/auth-check';
-const API_PEDS         = `/api/pedidos?tienda=${TIENDA}`;
+const API_CHECK    = '/api/auth-check';
 
-let token = '';
-let prods = [], shown = [], impRows = [];
-let curPage = 1;
-let sortK = 'descripcion', sortAsc = true;
-let clockIv = null;
+/* Mapa de farmacias */
+const FARMACIAS = {
+  EXPERTOS: {
+    nombre: 'Farma Expertos',
+    ico:    '💊',
+    hoja:   'STOCK_DROGUERIA_EXPERTOS',
+    tag:    'Copacabana · Principal'
+  },
+  CENTRAL: {
+    nombre: 'Farmacia Central',
+    ico:    '🏥',
+    hoja:   'STOCK_FARMACIA_CENTRAL',
+    tag:    'Sede Central'
+  }
+};
 
-/* ══ RELOJ SIDEBAR — corre siempre mientras el app esté abierto ══ */
+let token     = '';
+let tienda    = '';          // 'EXPERTOS' | 'CENTRAL'
+let prods     = [], shown = [], impRows = [];
+let curPage   = 1;
+let sortK     = 'descripcion', sortAsc = true;
+let clockIv   = null;
+let userInfo  = {};          // {name, email, picture}
+
+/* ══ RELOJ ══ */
 const DIAS  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 
@@ -397,13 +506,6 @@ function tickClock() {
   if (ed) ed.textContent = `${DIAS[n.getDay()]} ${n.getDate()} ${MESES[n.getMonth()]} ${n.getFullYear()}`;
 }
 
-function showWelcome(name, email, picture) {
-  // Solo muestra toast de bienvenida; el reloj ya corre en el sidebar
-  toastMsg(`👋 Bienvenido, ${name.split(' ')[0]}`, 'ok');
-}
-
-function closeBanner() {} // ya no se usa, se deja vacía por compatibilidad
-
 /* ══ GOOGLE AUTH ══ */
 window.onload = () => {
   google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogle });
@@ -417,36 +519,81 @@ async function onGoogle(resp) {
   try {
     const r = await fetch(API_CHECK, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ credential: resp.credential, tienda: TIENDA })
+      body: JSON.stringify({ credential: resp.credential, tienda: 'EXPERTOS' })
     });
     const d = await r.json();
     if (!d.ok) { toastMsg('❌ ' + (d.error || 'Sin acceso'), 'err'); return; }
-    token = resp.credential;
-    const pl = JSON.parse(atob(resp.credential.split('.')[1]));
-    document.getElementById('avNm').textContent = pl.name;
-    document.getElementById('avImg').src        = pl.picture;
-    document.getElementById('loginWrap').style.display = 'none';
-    document.getElementById('app').style.display       = 'block';
-    tickClock();
-    if (!clockIv) clockIv = setInterval(tickClock, 1000);
-    showWelcome(pl.name, pl.email, pl.picture);
-    loadProds();
+    token    = resp.credential;
+    userInfo = JSON.parse(atob(resp.credential.split('.')[1]));
+    // Ir a selector de farmacia
+    showPicker();
   } catch(e) { toastMsg('❌ Error de autenticación', 'err'); }
 }
 
-/* ══ LOGOUT con confirmación ══ */
-function logout() {
-  document.getElementById('logoutModal').classList.add('open');
+/* ══ SELECTOR DE FARMACIA ══ */
+let pickedFarm = '';
+
+function showPicker() {
+  document.getElementById('loginWrap').style.display = 'none';
+  document.getElementById('pickWrap').style.display  = 'flex';
+  document.getElementById('pickAvatar').src          = userInfo.picture || '';
+  document.getElementById('pickName').textContent    = userInfo.name || '';
+  pickedFarm = '';
+  document.querySelectorAll('.pick-card').forEach(c => c.classList.remove('sel'));
+  document.getElementById('pickBtn').classList.remove('active');
 }
-function cancelLogout() {
-  document.getElementById('logoutModal').classList.remove('open');
+
+function selectFarm(id) {
+  pickedFarm = id;
+  document.querySelectorAll('.pick-card').forEach(c => c.classList.remove('sel'));
+  document.getElementById('card-' + id.toLowerCase()).classList.add('sel');
+  document.getElementById('pickBtn').classList.add('active');
 }
+
+function enterFarm() {
+  if (!pickedFarm) return;
+  tienda = pickedFarm;
+  const f = FARMACIAS[tienda];
+  // Actualizar sidebar
+  document.getElementById('sbFarmName').textContent  = f.nombre;
+  document.getElementById('sbFarmLabel').textContent = f.nombre;
+  document.getElementById('sbFarmIco').textContent   = f.ico;
+  document.getElementById('avNm').textContent        = userInfo.name;
+  document.getElementById('avImg').src               = userInfo.picture;
+  document.getElementById('tbarTitle').textContent   = `📦 Inventario · ${f.nombre}`;
+  // Mostrar app
+  document.getElementById('pickWrap').style.display = 'none';
+  document.getElementById('app').style.display      = 'block';
+  tickClock();
+  if (!clockIv) clockIv = setInterval(tickClock, 1000);
+  toastMsg(`✅ ${f.nombre} — cargando inventario…`, 'ok');
+  loadProds();
+}
+
+function backToLogin() {
+  document.getElementById('pickWrap').style.display  = 'none';
+  document.getElementById('loginWrap').style.display = 'flex';
+  token = ''; userInfo = {};
+  google.accounts.id.disableAutoSelect();
+}
+
+/* Cambiar farmacia desde el sidebar (vuelve al picker) */
+function switchFarm() {
+  clearInterval(clockIv); clockIv = null;
+  prods = []; shown = [];
+  document.getElementById('app').style.display = 'none';
+  showPicker();
+}
+
+/* ══ LOGOUT ══ */
+function logout()        { document.getElementById('logoutModal').classList.add('open'); }
+function cancelLogout()  { document.getElementById('logoutModal').classList.remove('open'); }
 function confirmLogout() {
   document.getElementById('logoutModal').classList.remove('open');
-  token = ''; prods = []; shown = [];
+  token = ''; tienda = ''; prods = []; shown = [];
   clearInterval(clockIv); clockIv = null;
+  document.getElementById('app').style.display      = 'none';
   document.getElementById('loginWrap').style.display = 'flex';
-  document.getElementById('app').style.display       = 'none';
   google.accounts.id.disableAutoSelect();
   toastMsg('👋 Sesión cerrada correctamente', 'ok');
 }
@@ -460,11 +607,11 @@ function navTo(page, el) {
   if (page === 'ped') loadPedidos();
 }
 
-/* ══ LEER PRODUCTOS — todos, sin límite, omitir filas/celdas vacías ══ */
+/* ══ LEER PRODUCTOS ══ */
 async function loadProds() {
   showTblMsg('⏳', 'Cargando inventario…');
   try {
-    const r = await fetch(`/api/productos?tienda=${TIENDA}`, {
+    const r = await fetch(`/api/productos?tienda=${tienda}`, {
       headers: { Authorization: 'Bearer ' + token }
     });
     if (!r.ok) {
@@ -472,15 +619,12 @@ async function loadProds() {
       throw new Error(e.error || `HTTP ${r.status}`);
     }
     const data = await r.json();
-
-    /* Formato A: array de objetos {descripcion,...} */
     if (Array.isArray(data) && data.length && typeof data[0] === 'object' && !Array.isArray(data[0])) {
       prods = data.filter(p => p.descripcion?.toString().trim());
     } else {
-      /* Formato B: array de arrays raw de Sheets */
       const rows = (Array.isArray(data) ? data : data.values || []).slice(1);
       prods = rows
-        .filter(row => row[0]?.toString().trim())          // omitir fila vacía
+        .filter(row => row[0]?.toString().trim())
         .map(row => ({
           descripcion:    (row[0] || '').toString().trim(),
           laboratorio:    (row[1] || '').toString().trim(),
@@ -490,12 +634,11 @@ async function loadProds() {
         }))
         .filter(p => p.descripcion.length > 0);
     }
-
     shown = [...prods];
     buildLabSel();
     kpis();
     filt();
-    toastMsg(`✅ ${prods.length} productos cargados`, 'ok');
+    toastMsg(`✅ ${prods.length} productos — ${FARMACIAS[tienda].nombre}`, 'ok');
   } catch(e) {
     showTblMsg('❌', `Error al cargar: ${e.message}`);
     toastMsg('❌ ' + e.message, 'err');
@@ -519,27 +662,17 @@ function buildLabSel() {
 }
 function kpis() {
   document.getElementById('kTotal').textContent = prods.length.toLocaleString('es-CO');
-  document.getElementById('kLabs').textContent  =
-    new Set(prods.map(p => p.laboratorio).filter(Boolean)).size;
-  document.getElementById('kPr').textContent    =
-    prods.filter(p => p.precioUnitario).length.toLocaleString('es-CO');
+  document.getElementById('kLabs').textContent  = new Set(prods.map(p => p.laboratorio).filter(Boolean)).size;
+  document.getElementById('kPr').textContent    = prods.filter(p => p.precioUnitario).length.toLocaleString('es-CO');
 }
-
-/* ══ FORMATO PRECIO COP ══
-   Hoja puede traer: "42.100,00"  "42100,00"  "42100"  "42.100"
-   → mostrar "$42.100" (entero, sin decimales, sin ceros extra)
-*/
 function pn(v) {
   if (!v) return 0;
   let s = v.toString().trim();
-  s = s.replace(/,\d*$/, '');          // quitar parte decimal  ",00" o ",5"
-  s = s.replace(/\./g, '');            // quitar puntos de miles
+  s = s.replace(/,\d*$/, '');
+  s = s.replace(/\./g, '');
   return parseInt(s.replace(/[^0-9]/g, '')) || 0;
 }
-function cop(v) {
-  const n = pn(v);
-  return n ? '$' + n.toLocaleString('es-CO') : '—';
-}
+function cop(v) { const n = pn(v); return n ? '$' + n.toLocaleString('es-CO') : '—'; }
 
 /* ══ FILTRAR Y ORDENAR ══ */
 function filt() {
@@ -594,26 +727,22 @@ function renderTbl() {
           ? `<div class="td-ps">caja ${cop(p.precio)}</div>` : ''}
       </td>
     </tr>`).join('');
-
   const tot   = shown.length;
   const pages = Math.ceil(tot / PER);
   document.getElementById('pagInfo').textContent =
     `${start + 1}–${Math.min(start + PER, tot)} de ${tot.toLocaleString('es-CO')} productos`;
-
   const pgB = document.getElementById('pgBtns');
   pgB.innerHTML = '';
   pgB.appendChild(mk('‹', curPage === 1,     () => { curPage--; renderTbl(); }));
   const from = Math.max(1, curPage - 2), to = Math.min(pages, from + 4);
   for (let i = from; i <= to; i++) {
-    const pg = i;
-    pgB.appendChild(mk(i, false, () => { curPage = pg; renderTbl(); }, i === curPage));
+    const pg = i; pgB.appendChild(mk(i, false, () => { curPage = pg; renderTbl(); }, i === curPage));
   }
   pgB.appendChild(mk('›', curPage === pages, () => { curPage++; renderTbl(); }));
 }
-
 function mk(label, disabled, onclick, active = false) {
   const b = document.createElement('button');
-  b.className   = 'pg-btn' + (active ? ' cur' : '');
+  b.className = 'pg-btn' + (active ? ' cur' : '');
   b.textContent = label; b.disabled = disabled; b.onclick = onclick;
   return b;
 }
@@ -621,7 +750,7 @@ function mk(label, disabled, onclick, active = false) {
 /* ══ PEDIDOS ══ */
 async function loadPedidos() {
   try {
-    const r    = await fetch(API_PEDS, { headers: { Authorization: 'Bearer ' + token } });
+    const r    = await fetch(`/api/pedidos?tienda=${tienda}`, { headers: { Authorization: 'Bearer ' + token } });
     const d    = await r.json();
     const body = document.getElementById('pedTbody');
     if (!d.length) {
@@ -641,19 +770,15 @@ async function loadPedidos() {
   } catch(e) { toastMsg('❌ Error cargando pedidos', 'err'); }
 }
 
-/* ══ IMPORTAR EXCEL ══
-   Solo las 5 columnas exactas: Descripción · Laboratorio · Unidad · Precio · Precio Unitario
-   Cualquier otra columna del Excel se ignora.
-   Filas con Descripción vacía se omiten.
-══ */
+/* ══ IMPORTAR EXCEL ══ */
 function openImp()  { document.getElementById('impModal').classList.add('open'); }
 function closeImp() {
   document.getElementById('impModal').classList.remove('open');
-  document.getElementById('impPrev').style.display   = 'none';
-  document.getElementById('progWrap').style.display  = 'none';
-  document.getElementById('progFill').style.width    = '0%';
-  document.getElementById('btnImp').disabled         = true;
-  document.getElementById('fIn').value               = '';
+  document.getElementById('impPrev').style.display  = 'none';
+  document.getElementById('progWrap').style.display = 'none';
+  document.getElementById('progFill').style.width   = '0%';
+  document.getElementById('btnImp').disabled        = true;
+  document.getElementById('fIn').value              = '';
   impRows = [];
 }
 function onDrop(ev) {
@@ -661,7 +786,6 @@ function onDrop(ev) {
   document.getElementById('dropZ').classList.remove('drag');
   if (ev.dataTransfer.files[0]) onFile(ev.dataTransfer.files[0]);
 }
-
 function onFile(file) {
   if (!file) return;
   const reader = new FileReader();
@@ -669,32 +793,23 @@ function onFile(file) {
     const wb   = XLSX.read(e.target.result, { type: 'binary' });
     const ws   = wb.Sheets[wb.SheetNames[0]];
     const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
-
     const prev = document.getElementById('impPrev');
     prev.style.display = 'block';
-
     if (!data.length) {
       prev.innerHTML = '⚠️ El archivo está vacío o no tiene datos.';
-      document.getElementById('btnImp').disabled = true;
-      return;
+      document.getElementById('btnImp').disabled = true; return;
     }
-
-    /* Mapeo flexible: busca la columna por nombre aproximado (ignora tildes/mayúsculas).
-       Solo se usan las 5 columnas requeridas; el resto del Excel se descarta. */
     const norm = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'');
     const keys = Object.keys(data[0]);
     const col  = (...terms) => keys.find(k => terms.some(t => norm(k).includes(t)));
-
-    const cDesc = col('descrip','nombre','produc');
-    const cLab  = col('laborat','lab','marca','fabrican');
-    const cUnid = col('unidad','unit','present','conten');
+    const cDesc   = col('descrip','nombre','produc');
+    const cLab    = col('laborat','lab','marca','fabrican');
+    const cUnid   = col('unidad','unit','present','conten');
     const cPrecio = col('precio','price','valor','venta');
-    // Precio unitario: debe contener "unitario" o "xunidad" etc, y NO ser igual a cPrecio
-    const cPU = keys.find(k => {
+    const cPU     = keys.find(k => {
       const n = norm(k);
       return (n.includes('unitario') || n.includes('xunidad') || n.includes('porunit')) && k !== cPrecio;
     });
-
     impRows = data
       .map(row => ({
         descripcion:    cDesc   ? (row[cDesc]   || '').toString().trim() : '',
@@ -703,10 +818,9 @@ function onFile(file) {
         precio:         cPrecio ? (row[cPrecio] || '').toString().trim() : '',
         precioUnitario: cPU     ? (row[cPU]     || '').toString().trim() : '',
       }))
-      .filter(r => r.descripcion.length > 0);  // omite filas vacías
-
+      .filter(r => r.descripcion.length > 0);
     if (impRows.length === 0) {
-      prev.innerHTML = '⚠️ No se encontraron productos con descripción. Verifica los encabezados del archivo.';
+      prev.innerHTML = '⚠️ No se encontraron productos. Verifica los encabezados del archivo.';
       document.getElementById('btnImp').disabled = true;
     } else {
       prev.innerHTML = `✅ <strong>${impRows.length}</strong> productos listos de <em>${file.name}</em>`;
@@ -715,7 +829,6 @@ function onFile(file) {
   };
   reader.readAsBinaryString(file);
 }
-
 async function doImport() {
   if (!impRows.length) return;
   const btnImp = document.getElementById('btnImp');
@@ -723,20 +836,15 @@ async function doImport() {
   document.getElementById('progWrap').style.display = 'block';
   setProgress(0, 'Enviando al servidor…');
   try {
-    const total = impRows.length;
-    let sent = 0;
+    const total = impRows.length; let sent = 0;
     for (let start = 0; start < total; start += IMPORT_CHUNK) {
-      const slice   = impRows.slice(start, start + IMPORT_CHUNK);
-      const isFirst = start === 0;
+      const slice = impRows.slice(start, start + IMPORT_CHUNK);
       const r = await fetch('/api/import-stock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-        body: JSON.stringify({ tienda: TIENDA, productos: slice, offset: start, clear: isFirst })
+        body: JSON.stringify({ tienda, productos: slice, offset: start, clear: start === 0 })
       });
-      if (!r.ok) {
-        const er = await r.json().catch(() => ({}));
-        throw new Error(er.error || `HTTP ${r.status}`);
-      }
+      if (!r.ok) { const er = await r.json().catch(() => ({})); throw new Error(er.error || `HTTP ${r.status}`); }
       sent += slice.length;
       setProgress(Math.round((sent / total) * 100), `${sent} / ${total} productos…`);
     }
@@ -746,11 +854,8 @@ async function doImport() {
   } catch(e) {
     toastMsg('❌ ' + e.message, 'err');
     setProgress(0, 'Error: ' + e.message);
-  } finally {
-    btnImp.disabled = false; btnImp.textContent = '⬆ Subir a Sheets';
-  }
+  } finally { btnImp.disabled = false; btnImp.textContent = '⬆ Subir a Sheets'; }
 }
-
 function setProgress(pct, txt) {
   document.getElementById('progFill').style.width = pct + '%';
   document.getElementById('progTxt').textContent  = txt;
