@@ -323,85 +323,53 @@ td{padding:11px 16px;vertical-align:middle}
 
 <script>
 /* ══════════════════════════════════════════════════
-   ▶  PON AQUÍ EL ID DE TU GOOGLE SPREADSHEET
-   URL: https://docs.google.com/spreadsheets/d/ → ESTE_ID ← /edit
+   El SPREADSHEET_ID vive en el backend (.env de Vercel)
+   El frontend solo habla con /api/productos e /api/import-stock
 ══════════════════════════════════════════════════ */
-const SPREADSHEET_ID = 'PON_AQUI_TU_SPREADSHEET_ID';
 
 /* ══ CONFIG (no tocar) ══ */
-const SHEET_NAME     = 'STOCK_DROGUERIA_EXPERTOS';
-const READ_RANGE     = `${SHEET_NAME}!A:E`;   // A=Desc B=Lab C=Unidad D=Precio E=PrecioUnit
-const WRITE_RANGE    = `${SHEET_NAME}!A2`;    // empieza en A2 (A1 = encabezados)
-const SHEETS_API     = 'https://sheets.googleapis.com/v4/spreadsheets';
-const CHUNK          = 100;   // filas por lote al escribir
-const PER            = 100;   // productos por página en tabla
+const SHEET_NAME  = 'STOCK_DROGUERIA_EXPERTOS';
+const CHUNK       = 100;  // productos por página en tabla
+const PER         = 100;
 
 const GOOGLE_CLIENT_ID = '699856885526-55fqgn6qdr116rige5dcrsg4f3jdu1kp.apps.googleusercontent.com';
 const TIENDA   = 'EXPERTOS';
 const API_CHECK = '/api/auth-check';
 const API_PEDS  = `/api/pedidos?tienda=${TIENDA}`;
 
-let token = '';        // JWT de identidad → para /api/auth-check y /api/pedidos
-let sheetsToken = ''; // OAuth2 access token → para Sheets API
+let token = '';
 let prods = [], shown = [], impRows = [];
 let curPage = 1;
 let sortK = 'descripcion', sortAsc = true;
 
-/* ══ GOOGLE AUTH ══
-   Flujo:
-   1. doLogin() → pide Sign-In JWT (identidad)
-   2. onGoogle() → valida en backend → si OK, pide silenciosamente el access token de Sheets
-   3. Con ambos tokens → entra al dashboard y carga productos
-══ */
+/* ══ GOOGLE AUTH — login original, sin tocar ══ */
 window.onload = () => {
   google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogle });
   google.accounts.id.renderButton(document.querySelector('.g-btn'), {});
 };
-
 function doLogin() {
   google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogle });
   google.accounts.id.prompt();
 }
-
 async function onGoogle(resp) {
   try {
-    // 1. Verificar identidad en el backend
     const r = await fetch(API_CHECK, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ credential: resp.credential, tienda: TIENDA })
     });
     const d = await r.json();
     if (!d.ok) { toastMsg('❌ ' + (d.error || 'Sin acceso'), 'err'); return; }
-
     token = resp.credential;
     const pl = JSON.parse(atob(resp.credential.split('.')[1]));
     document.getElementById('avNm').textContent = pl.name;
     document.getElementById('avImg').src = pl.picture;
-
-    // 2. Pedir access token OAuth2 para Sheets (sin popup — usa sesión activa)
-    const tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: GOOGLE_CLIENT_ID,
-      scope: 'https://www.googleapis.com/auth/spreadsheets',
-      prompt: '',   // silencioso si ya hay sesión activa
-      callback: (tokenResp) => {
-        if (tokenResp.error) {
-          toastMsg('⚠️ No se pudo obtener acceso a Sheets: ' + tokenResp.error, 'err');
-          return;
-        }
-        sheetsToken = tokenResp.access_token;
-        // 3. Entrar al dashboard
-        document.getElementById('loginWrap').style.display = 'none';
-        document.getElementById('app').style.display = 'block';
-        loadProds();
-      }
-    });
-    tokenClient.requestAccessToken();
-
+    document.getElementById('loginWrap').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    loadProds();
   } catch(e) { toastMsg('❌ Error de autenticación', 'err'); }
 }
-
 function logout() {
-  token = ''; sheetsToken = '';
+  token = '';
   document.getElementById('loginWrap').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
   google.accounts.id.disableAutoSelect();
@@ -416,32 +384,40 @@ function navTo(page, el) {
   if (page === 'ped') loadPedidos();
 }
 
-/* ══ LEER PRODUCTOS — Sheets API directa (columnas A:E) ══ */
+/* ══ LEER PRODUCTOS — vía backend /api/productos (service account) ══ */
 async function loadProds() {
-  if (SPREADSHEET_ID === 'PON_AQUI_TU_SPREADSHEET_ID') {
-    showTblMsg('⚙️', 'Falta configurar el <code>SPREADSHEET_ID</code> en el código.');
-    return;
-  }
   showTblMsg('⏳', 'Cargando inventario…');
   try {
-    const url = `${SHEETS_API}/${SPREADSHEET_ID}/values/${encodeURIComponent(READ_RANGE)}`;
-    const r = await fetch(url, { headers: { Authorization: 'Bearer ' + sheetsToken } });
+    /* El backend lee STOCK_DROGUERIA_EXPERTOS!A:E con la service account
+       y devuelve array de objetos {descripcion,laboratorio,unidad,precio,precioUnitario} */
+    const r = await fetch(`/api/productos?tienda=${TIENDA}`, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
     if (!r.ok) {
-      const e = await r.json();
-      throw new Error(e.error?.message || `HTTP ${r.status}`);
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.error || `HTTP ${r.status}`);
     }
-    const data  = await r.json();
-    const rows  = (data.values || []).slice(1); // saltar fila de encabezados
+    const data = await r.json();
 
-    prods = rows
-      .filter(row => row[0]?.toString().trim()) // omitir filas con descripción vacía
-      .map(row => ({
-        descripcion:    (row[0] || '').toString().trim(),  // A
-        laboratorio:    (row[1] || '').toString().trim(),  // B
-        unidad:         (row[2] || '').toString().trim(),  // C
-        precio:         (row[3] || '').toString().trim(),  // D
-        precioUnitario: (row[4] || '').toString().trim(),  // E
-      }));
+    /* Soporta dos formatos que puede devolver el backend:
+       A) Array de objetos  [{descripcion,laboratorio,...}, ...]   ← formato nuevo
+       B) {values: [[row],[row],...]}                               ← formato Sheets raw */
+    if (Array.isArray(data) && data.length && typeof data[0] === 'object' && !Array.isArray(data[0])) {
+      // Formato A: array de objetos
+      prods = data.filter(p => p.descripcion?.toString().trim());
+    } else {
+      // Formato B: array de arrays (valores raw de Sheets)
+      const rows = (Array.isArray(data) ? data : data.values || []).slice(1);
+      prods = rows
+        .filter(row => row[0]?.toString().trim())
+        .map(row => ({
+          descripcion:    (row[0] || '').toString().trim(),
+          laboratorio:    (row[1] || '').toString().trim(),
+          unidad:         (row[2] || '').toString().trim(),
+          precio:         (row[3] || '').toString().trim(),
+          precioUnitario: (row[4] || '').toString().trim(),
+        }));
+    }
 
     shown = [...prods];
     buildLabSel();
@@ -644,58 +620,47 @@ function onFile(file) {
 
 async function doImport() {
   if (!impRows.length) return;
-  if (SPREADSHEET_ID === 'PON_AQUI_TU_SPREADSHEET_ID') {
-    toastMsg('⚙️ Configura SPREADSHEET_ID primero', 'err'); return;
-  }
 
   const btnImp = document.getElementById('btnImp');
   btnImp.disabled = true; btnImp.textContent = 'Subiendo…';
   document.getElementById('progWrap').style.display = 'block';
-  setProgress(0, 'Limpiando hoja…');
+  setProgress(0, 'Enviando al servidor…');
 
   try {
-    /* ── Paso 1: limpiar toda la hoja A2:Z (conservar fila 1 de encabezados) ── */
-    await sheetsReq('POST',
-      `/${SPREADSHEET_ID}/values/${encodeURIComponent(SHEET_NAME + '!A2:Z')}:clear`,
-      {}
-    );
+    /* Enviar todos los productos al backend de una sola vez.
+       El backend (/api/import-stock) tiene la service account y
+       escribe en STOCK_DROGUERIA_EXPERTOS columnas A:E */
+    const total = impRows.length;
+    const CHUNK = 500; // chunks solo para la barra de progreso visual
+    let sent = 0;
 
-    /* ── Paso 2: escribir encabezados en A1 ── */
-    await sheetsReq('PUT',
-      `/${SPREADSHEET_ID}/values/${encodeURIComponent(SHEET_NAME + '!A1:E1')}?valueInputOption=RAW`,
-      { values: [['Descripción', 'Laboratorio', 'Unidad', 'Precio', 'Precio Unitario']] }
-    );
-
-    /* ── Paso 3: subir impRows en lotes de CHUNK ── */
-    const total  = impRows.length;
-    let uploaded = 0;
-
+    // Subir en chunks para mostrar progreso real
     for (let start = 0; start < total; start += CHUNK) {
-      const slice  = impRows.slice(start, start + CHUNK);
-      const rowNum = start + 2;   // fila en sheets (1=encabezado, 2=primer dato)
-      const range  = `${SHEET_NAME}!A${rowNum}:E${rowNum + slice.length - 1}`;
-      const values = slice.map(p => [
-        p.descripcion,
-        p.laboratorio,
-        p.unidad,
-        p.precio,
-        p.precioUnitario,
-      ]);
+      const slice = impRows.slice(start, start + CHUNK);
+      const isFirst = start === 0; // primer chunk limpia la hoja
 
-      await sheetsReq('PUT',
-        `/${SPREADSHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW`,
-        { values }
-      );
+      const r = await fetch('/api/import-stock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({
+          tienda: TIENDA,
+          productos: slice,
+          offset: start,       // fila de inicio (0 = desde A2)
+          clear: isFirst,      // solo el primer chunk limpia la hoja
+        })
+      });
 
-      uploaded += slice.length;
-      setProgress(
-        Math.round((uploaded / total) * 100),
-        `${uploaded} / ${total} productos subidos…`
-      );
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        throw new Error(e.error || `HTTP ${r.status}`);
+      }
+
+      sent += slice.length;
+      setProgress(Math.round((sent / total) * 100), `${sent} / ${total} productos…`);
     }
 
     setProgress(100, '¡Listo!');
-    toastMsg(`✅ ${total} productos actualizados en Sheets`, 'ok');
+    toastMsg(`✅ ${total} productos importados`, 'ok');
     setTimeout(() => { closeImp(); reload(); }, 800);
 
   } catch(e) {
@@ -704,23 +669,6 @@ async function doImport() {
   } finally {
     btnImp.disabled = false; btnImp.textContent = '⬆ Subir a Sheets';
   }
-}
-
-/* Helper: llamada a Sheets API usando el JWT como Bearer */
-async function sheetsReq(method, path, body) {
-  const r = await fetch(`${SHEETS_API}${path}`, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: 'Bearer ' + sheetsToken,
-    },
-    body: JSON.stringify(body),
-  });
-  if (!r.ok) {
-    const e = await r.json();
-    throw new Error(e.error?.message || `HTTP ${r.status}`);
-  }
-  return r.json();
 }
 
 function setProgress(pct, txt) {
