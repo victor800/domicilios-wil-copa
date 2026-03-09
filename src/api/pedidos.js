@@ -1,20 +1,5 @@
 // api/pedidos.js
-// Columnas A-R:
-// A=ID_PEDIDO B=NOMBRE_CLI C=TELEFONO D=METODO_PAGO E=ESTADO F=IMAGEN_TRANSFERENCIA
-// G=PRODUCTOS H=MARCA I=CANTIDAD J=V/U K=V/TOTAL L=DIRECCION M=HORA N=FECHA O=TOTAL
-
-const { google }       = require('googleapis');
-const { OAuth2Client } = require('google-auth-library');
-
-async function verificarAdmin(token) {
- const CLIENT_ID = '699856885526-55fqgn6qdr116rige5dcrsg4f3jdu1kp.apps.googleusercontent.com';
-const client  = new OAuth2Client(CLIENT_ID);
-const ticket  = await client.verifyIdToken({ idToken: token, audience: CLIENT_ID });
-  const payload = ticket.getPayload();
-  const admins  = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase());
-  if (!admins.includes(payload.email.toLowerCase())) throw new Error('No autorizado');
-  return payload;
-}
+const { google } = require('googleapis');
 
 function pn(v) { return parseInt((v||'0').toString().replace(/[^0-9]/g,'')) || 0; }
 
@@ -25,9 +10,6 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    const token = (req.headers.authorization || '').replace('Bearer ', '').trim();
-    await verificarAdmin(token);
-
     const tienda = (req.query.tienda || 'EXPERTOS').toUpperCase();
 
     const auth = new google.auth.GoogleAuth({
@@ -72,7 +54,7 @@ module.exports = async (req, res) => {
 
     res.status(200).json(rows);
   } catch (e) {
-    const status = e.message === 'No autorizado' ? 403 : 500;
-    res.status(status).json({ error: e.message });
+    console.error('pedidos API error:', e.message);
+    res.status(500).json({ error: e.message });
   }
 };
