@@ -10,267 +10,163 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
-  --bg:#f0f4f0; --s:#fff; --s2:#f5f8f5; --s3:#e8f0e8;
-  --border:#d4e0d4; --accent:#16a34a; --a2:#0d9488;
-  --danger:#dc2626; --warn:#b45309;
-  --text:#0f1f0f; --muted:#5a7060;
-  --r:12px;
-  --sh:0 1px 4px rgba(0,40,0,.07),0 4px 20px rgba(0,40,0,.05);
+  --bg:#f0f4f0;--s:#fff;--s2:#f5f8f5;--s3:#e8f0e8;
+  --border:#d4e0d4;--accent:#16a34a;--a2:#0d9488;
+  --danger:#dc2626;--warn:#b45309;
+  --text:#0f1f0f;--muted:#5a7060;--r:12px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;min-height:100vh}
 
-/* ═══ LOGIN ═══ */
-#loginWrap {
-  min-height:100vh; display:flex; align-items:center; justify-content:center;
-  background:linear-gradient(145deg,#0a1a0e 0%,#0f2d20 40%,#061018 100%);
-  position:relative; overflow:hidden;
-}
-#loginWrap::before {
-  content:''; position:absolute; inset:0; pointer-events:none;
-  background:
-    radial-gradient(ellipse 600px 500px at 20% 30%, rgba(22,163,74,.18) 0%, transparent 60%),
-    radial-gradient(ellipse 500px 400px at 80% 70%, rgba(13,148,136,.12) 0%, transparent 60%);
-}
-#loginWrap::after {
-  content:''; position:absolute; inset:0; pointer-events:none;
-  background-image:
-    linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
-  background-size:48px 48px;
-}
-.login-box {
-  position:relative; z-index:1;
-  background:rgba(255,255,255,0.04);
-  border:1px solid rgba(255,255,255,0.1);
-  backdrop-filter:blur(28px);
-  border-radius:24px; padding:52px 44px;
-  width:min(420px,92vw); text-align:center;
-}
-.lbox-cross {
-  width:72px; height:72px; margin:0 auto 24px;
-  border-radius:20px; font-size:36px;
-  background:linear-gradient(135deg,#16a34a,#0d9488);
-  display:grid; place-items:center;
-  box-shadow:0 0 40px rgba(22,163,74,.35);
-}
-.lbox-title {
-  font-family:'Fraunces',serif; font-size:28px; font-weight:900;
-  color:#fff; margin-bottom:4px;
-}
-.lbox-sub { font-size:14px; color:rgba(255,255,255,.45); margin-bottom:40px }
-.g-btn {
-  width:100%; padding:15px 20px;
-  display:flex; align-items:center; justify-content:center; gap:12px;
-  background:#fff; border:none; border-radius:12px;
-  font-size:15px; font-weight:700; color:#1a1a1a; cursor:pointer;
-  transition:.2s; font-family:'Plus Jakarta Sans',sans-serif;
-}
-.g-btn:hover { transform:translateY(-2px); box-shadow:0 10px 28px rgba(0,0,0,.3) }
-.g-btn img { width:22px }
-.lbox-note { font-size:11px; color:rgba(255,255,255,.3); margin-top:20px; line-height:1.5 }
+/* LOGIN */
+#loginWrap{min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(145deg,#0a1a0e 0%,#0f2d20 40%,#061018 100%);position:relative;overflow:hidden}
+#loginWrap::before{content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse 600px 500px at 20% 30%,rgba(22,163,74,.18) 0%,transparent 60%),
+             radial-gradient(ellipse 500px 400px at 80% 70%,rgba(13,148,136,.12) 0%,transparent 60%)}
+#loginWrap::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);
+  background-size:48px 48px}
+.login-box{position:relative;z-index:1;background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.1);backdrop-filter:blur(28px);
+  border-radius:24px;padding:52px 44px;width:min(420px,92vw);text-align:center}
+.lbox-cross{width:72px;height:72px;margin:0 auto 24px;border-radius:20px;font-size:36px;
+  background:linear-gradient(135deg,#16a34a,#0d9488);display:grid;place-items:center;
+  box-shadow:0 0 40px rgba(22,163,74,.35)}
+.lbox-title{font-family:'Fraunces',serif;font-size:28px;font-weight:900;color:#fff;margin-bottom:4px}
+.lbox-sub{font-size:14px;color:rgba(255,255,255,.45);margin-bottom:40px}
+.g-btn{width:100%;padding:15px 20px;display:flex;align-items:center;justify-content:center;gap:12px;
+  background:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;color:#1a1a1a;
+  cursor:pointer;transition:.2s;font-family:'Plus Jakarta Sans',sans-serif}
+.g-btn:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(0,0,0,.3)}
+.g-btn img{width:22px}
+.lbox-note{font-size:11px;color:rgba(255,255,255,.3);margin-top:20px;line-height:1.5}
 
-/* ═══ APP ═══ */
-#app { display:none }
-.wrap { display:flex; min-height:100vh }
+/* APP */
+#app{display:none}
+.wrap{display:flex;min-height:100vh}
+.sb{width:230px;flex-shrink:0;background:var(--s);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+.sb-top{padding:18px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.sb-icon{width:38px;height:38px;border-radius:10px;flex-shrink:0;
+  background:linear-gradient(135deg,#16a34a,#0d9488);display:grid;place-items:center;font-size:20px}
+.sb-name{font-family:'Fraunces',serif;font-size:13px;font-weight:700;line-height:1.2}
+.sb-tag{font-size:10px;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase}
+.sb-nav{flex:1;padding:10px 8px}
+.nv{display:flex;align-items:center;gap:9px;padding:10px;border-radius:8px;
+  font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;transition:.15s;
+  margin-bottom:2px;border:none;background:none;width:100%;text-align:left}
+.nv:hover{background:var(--s2);color:var(--text)}
+.nv.on{background:rgba(22,163,74,.1);color:var(--accent)}
+.nv-ico{font-size:17px;width:22px;text-align:center}
+.sb-bot{padding:14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.av{width:36px;height:36px;border-radius:50%;object-fit:cover;background:var(--s3);flex-shrink:0}
+.av-info{flex:1;min-width:0}
+.av-nm{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.av-rl{font-size:10px;color:var(--muted)}
+.sign-out{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:4px;transition:.15s;flex-shrink:0}
+.sign-out:hover{color:var(--danger)}
 
-/* SIDEBAR */
-.sb {
-  width:230px; flex-shrink:0;
-  background:var(--s); border-right:1px solid var(--border);
-  display:flex; flex-direction:column;
-  position:sticky; top:0; height:100vh; overflow-y:auto;
-}
-.sb-top {
-  padding:18px 16px; border-bottom:1px solid var(--border);
-  display:flex; align-items:center; gap:10px;
-}
-.sb-icon {
-  width:38px; height:38px; border-radius:10px; flex-shrink:0;
-  background:linear-gradient(135deg,#16a34a,#0d9488);
-  display:grid; place-items:center; font-size:20px;
-}
-.sb-name { font-family:'Fraunces',serif; font-size:13px; font-weight:700; line-height:1.2 }
-.sb-tag  { font-size:10px; color:var(--accent); letter-spacing:1.5px; text-transform:uppercase }
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.tbar{padding:14px 24px;background:var(--s);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  position:sticky;top:0;z-index:10}
+.pg-title{font-family:'Fraunces',serif;font-size:22px;font-weight:900}
+.tbar-acts{display:flex;gap:8px}
+.content{padding:24px;flex:1}
 
-.sb-nav { flex:1; padding:10px 8px }
-.nv {
-  display:flex; align-items:center; gap:9px;
-  padding:10px 10px; border-radius:8px;
-  font-size:13px; font-weight:600; color:var(--muted); cursor:pointer;
-  transition:.15s; margin-bottom:2px; border:none; background:none; width:100%; text-align:left;
-}
-.nv:hover { background:var(--s2); color:var(--text) }
-.nv.on { background:rgba(22,163,74,.1); color:var(--accent) }
-.nv-ico { font-size:17px; width:22px; text-align:center }
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:24px}
+.kpi{background:var(--s);border:1px solid var(--border);border-radius:var(--r);
+  padding:18px 20px;position:relative;overflow:hidden}
+.kpi::before{content:attr(data-ico);position:absolute;right:14px;bottom:10px;font-size:36px;opacity:.12}
+.kpi-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.kpi-val{font-family:'Fraunces',serif;font-size:30px;font-weight:900;margin-top:4px}
 
-.sb-bot {
-  padding:14px; border-top:1px solid var(--border);
-  display:flex; align-items:center; gap:10px;
-}
-.av { width:36px; height:36px; border-radius:50%; object-fit:cover; background:var(--s3); flex-shrink:0 }
-.av-info { flex:1; min-width:0 }
-.av-nm  { font-size:12px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
-.av-rl  { font-size:10px; color:var(--muted) }
-.sign-out {
-  background:none; border:none; color:var(--muted); cursor:pointer;
-  font-size:18px; padding:4px; transition:.15s; flex-shrink:0;
-}
-.sign-out:hover { color:var(--danger) }
+.toolbar{background:var(--s);border:1px solid var(--border);border-radius:var(--r);
+  padding:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.sf{position:relative;flex:1;min-width:180px}
+.sf input{width:100%;padding:9px 12px 9px 36px;background:var(--s2);border:1.5px solid var(--border);
+  border-radius:8px;font-size:13px;color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;outline:none;transition:.2s}
+.sf input:focus{border-color:var(--accent)}
+.sf::before{content:'🔍';position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none}
+.sel{padding:9px 12px;background:var(--s2);border:1.5px solid var(--border);border-radius:8px;
+  font-size:13px;color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;outline:none;transition:.2s}
+.sel:focus{border-color:var(--accent)}
+.btn{padding:9px 16px;border-radius:8px;border:none;font-size:13px;font-weight:700;
+  font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;transition:.15s;
+  display:flex;align-items:center;gap:6px;white-space:nowrap}
+.btn-g{background:var(--accent);color:#fff}.btn-g:hover{background:#15803d}
+.btn-b{background:#0284c7;color:#fff}.btn-b:hover{background:#0369a1}
+.btn-o{background:var(--s);border:1.5px solid var(--border);color:var(--text)}.btn-o:hover{border-color:var(--accent);color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
 
-/* MAIN */
-.main { flex:1; display:flex; flex-direction:column; min-width:0 }
-.tbar {
-  padding:14px 24px; background:var(--s); border-bottom:1px solid var(--border);
-  display:flex; align-items:center; justify-content:space-between; gap:12px;
-  position:sticky; top:0; z-index:10;
-}
-.pg-title { font-family:'Fraunces',serif; font-size:22px; font-weight:900 }
-.tbar-acts { display:flex; gap:8px }
+.tbl-wrap{background:var(--s);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.tbl-scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{background:var(--s2);padding:11px 16px;text-align:left;font-size:10px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border-bottom:1px solid var(--border);
+  cursor:pointer;user-select:none;white-space:nowrap}
+thead th:hover{color:var(--text)}
+thead th.asc::after{content:' ↑'}
+thead th.desc::after{content:' ↓'}
+tbody tr{border-bottom:1px solid var(--border);transition:.1s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--s2)}
+td{padding:11px 16px;vertical-align:middle}
+.td-nm{font-weight:600;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.td-lab{color:var(--muted);font-size:12px}
+.td-p{font-weight:700;color:var(--accent)}
+.td-ps{font-size:11px;color:var(--muted)}
+.pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;
+  background:rgba(22,163,74,.1);color:var(--accent)}
+.pag{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;
+  border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
+.pg-btns{display:flex;gap:4px}
+.pg-btn{width:30px;height:30px;border-radius:6px;background:var(--s);border:1px solid var(--border);
+  cursor:pointer;font-size:12px;display:grid;place-items:center;transition:.15s;font-family:'Plus Jakarta Sans',sans-serif}
+.pg-btn:hover{border-color:var(--accent);color:var(--accent)}
+.pg-btn.cur{background:var(--accent);color:#fff;border-color:var(--accent)}
 
-.content { padding:24px; flex:1 }
-
-/* STATS ROW */
-.kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:14px; margin-bottom:24px }
-.kpi {
-  background:var(--s); border:1px solid var(--border); border-radius:var(--r);
-  padding:18px 20px; position:relative; overflow:hidden;
-}
-.kpi::before {
-  content:attr(data-ico); position:absolute; right:14px; bottom:10px;
-  font-size:36px; opacity:.12;
-}
-.kpi-lbl { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--muted) }
-.kpi-val { font-family:'Fraunces',serif; font-size:30px; font-weight:900; margin-top:4px }
-.kpi-sub { font-size:11px; color:var(--muted); margin-top:2px }
-
-/* TOOLBAR */
-.toolbar {
-  background:var(--s); border:1px solid var(--border); border-radius:var(--r);
-  padding:14px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;
-  margin-bottom:16px;
-}
-.sf { position:relative; flex:1; min-width:180px }
-.sf input {
-  width:100%; padding:9px 12px 9px 36px;
-  background:var(--s2); border:1.5px solid var(--border);
-  border-radius:8px; font-size:13px; color:var(--text);
-  font-family:'Plus Jakarta Sans',sans-serif; outline:none; transition:.2s;
-}
-.sf input:focus { border-color:var(--accent) }
-.sf::before { content:'🔍'; position:absolute; left:10px; top:50%; transform:translateY(-50%); font-size:13px; pointer-events:none }
-.sel {
-  padding:9px 12px; background:var(--s2); border:1.5px solid var(--border);
-  border-radius:8px; font-size:13px; color:var(--text);
-  font-family:'Plus Jakarta Sans',sans-serif; cursor:pointer; outline:none; transition:.2s;
-}
-.sel:focus { border-color:var(--accent) }
-.btn {
-  padding:9px 16px; border-radius:8px; border:none;
-  font-size:13px; font-weight:700; font-family:'Plus Jakarta Sans',sans-serif;
-  cursor:pointer; transition:.15s; display:flex; align-items:center; gap:6px; white-space:nowrap;
-}
-.btn-g  { background:var(--accent); color:#fff }
-.btn-g:hover { background:#15803d }
-.btn-b  { background:#0284c7; color:#fff }
-.btn-b:hover { background:#0369a1 }
-.btn-o  { background:var(--s); border:1.5px solid var(--border); color:var(--text) }
-.btn-o:hover { border-color:var(--accent); color:var(--accent) }
-
-/* TABLE */
-.tbl-wrap {
-  background:var(--s); border:1px solid var(--border);
-  border-radius:var(--r); overflow:hidden;
-}
-.tbl-scroll { overflow-x:auto }
-table { width:100%; border-collapse:collapse; font-size:13px }
-thead th {
-  background:var(--s2); padding:11px 16px; text-align:left;
-  font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px;
-  color:var(--muted); border-bottom:1px solid var(--border);
-  cursor:pointer; user-select:none; white-space:nowrap;
-}
-thead th:hover { color:var(--text) }
-thead th.asc::after  { content:' ↑' }
-thead th.desc::after { content:' ↓' }
-tbody tr { border-bottom:1px solid var(--border); transition:.1s }
-tbody tr:last-child  { border-bottom:none }
-tbody tr:hover { background:var(--s2) }
-td { padding:11px 16px; vertical-align:middle }
-.td-nm { font-weight:600; max-width:280px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
-.td-lab { color:var(--muted); font-size:12px }
-.td-p { font-weight:700; color:var(--accent) }
-.td-ps { font-size:11px; color:var(--muted) }
-.pill {
-  display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600;
-  background:rgba(22,163,74,.1); color:var(--accent);
-}
-
-.pag {
-  display:flex; align-items:center; justify-content:space-between;
-  padding:12px 16px; border-top:1px solid var(--border);
-  font-size:12px; color:var(--muted);
-}
-.pg-btns { display:flex; gap:4px }
-.pg-btn {
-  width:30px; height:30px; border-radius:6px;
-  background:var(--s); border:1px solid var(--border);
-  cursor:pointer; font-size:12px; display:grid; place-items:center; transition:.15s;
-}
-.pg-btn:hover { border-color:var(--accent); color:var(--accent) }
-.pg-btn.cur { background:var(--accent); color:#fff; border-color:var(--accent) }
-
-/* IMPORT MODAL */
-.modal-bg {
-  position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:300;
-  display:none; align-items:center; justify-content:center; backdrop-filter:blur(4px);
-}
-.modal-bg.open { display:flex }
-.modal {
-  background:var(--s); border-radius:20px; padding:36px;
-  width:min(520px,92vw); box-shadow:0 24px 64px rgba(0,0,0,.18);
-  animation:pop .2s ease;
-}
-@keyframes pop { from{transform:scale(.95);opacity:0} to{transform:scale(1);opacity:1} }
-.modal-h { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:6px }
-.modal-h h3 { font-family:'Fraunces',serif; font-size:22px; font-weight:900 }
-.modal-close { background:none; border:none; font-size:22px; color:var(--muted); cursor:pointer }
-.modal p { font-size:13px; color:var(--muted); margin-bottom:24px; line-height:1.5 }
-.drop {
-  border:2px dashed var(--border); border-radius:12px; padding:44px 20px;
-  text-align:center; cursor:pointer; transition:.2s;
-}
-.drop:hover,.drop.drag { border-color:var(--accent); background:rgba(22,163,74,.04) }
-.drop-ico { font-size:44px; margin-bottom:10px }
-.drop p { font-size:14px; color:var(--muted) }
-.drop strong { color:var(--accent); cursor:pointer }
-#fIn { display:none }
-.imp-prev {
-  margin-top:14px; background:var(--s2); border:1px solid var(--border);
-  border-radius:8px; padding:12px 16px; font-size:13px; display:none; color:var(--text);
-}
-.modal-acts { display:flex; gap:10px; margin-top:20px; justify-content:flex-end }
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;
+  display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal-bg.open{display:flex}
+.modal{background:var(--s);border-radius:20px;padding:36px;width:min(540px,92vw);
+  box-shadow:0 24px 64px rgba(0,0,0,.18);animation:pop .2s ease}
+@keyframes pop{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
+.modal-h{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px}
+.modal-h h3{font-family:'Fraunces',serif;font-size:22px;font-weight:900}
+.modal-close{background:none;border:none;font-size:22px;color:var(--muted);cursor:pointer}
+.modal p{font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.5}
+.drop{border:2px dashed var(--border);border-radius:12px;padding:36px 20px;
+  text-align:center;cursor:pointer;transition:.2s}
+.drop:hover,.drop.drag{border-color:var(--accent);background:rgba(22,163,74,.04)}
+.drop-ico{font-size:40px;margin-bottom:8px}
+.drop p{font-size:14px;color:var(--muted)}
+.drop strong{color:var(--accent)}
+#fIn{display:none}
+.imp-prev{margin-top:14px;background:var(--s2);border:1px solid var(--border);
+  border-radius:8px;padding:12px 16px;font-size:13px;display:none}
+.prog-wrap{margin-top:14px;display:none}
+.prog-bar{height:8px;background:var(--s3);border-radius:4px;overflow:hidden;margin-top:6px}
+.prog-fill{height:100%;background:var(--accent);border-radius:4px;transition:width .3s;width:0%}
+.prog-txt{font-size:12px;color:var(--muted);margin-top:4px}
+.modal-acts{display:flex;gap:10px;margin-top:20px;justify-content:flex-end}
 
 /* TOAST */
-.toast {
-  position:fixed; bottom:20px; right:20px; z-index:500;
-  padding:12px 20px; border-radius:10px; font-size:13px; font-weight:600;
-  transform:translateY(60px); opacity:0; transition:.3s; pointer-events:none;
-  max-width:300px; box-shadow:0 8px 24px rgba(0,0,0,.15);
-}
-.toast.ok  { background:#052e16; color:#86efac; border:1px solid #166534 }
-.toast.err { background:#450a0a; color:#fca5a5; border:1px solid #7f1d1d }
-.toast.show { transform:translateY(0); opacity:1 }
-
-@media(max-width:700px){
-  .sb { display:none }
-  .kpis { grid-template-columns:repeat(2,1fr) }
-}
+.toast{position:fixed;bottom:20px;right:20px;z-index:500;padding:12px 20px;border-radius:10px;
+  font-size:13px;font-weight:600;transform:translateY(60px);opacity:0;transition:.3s;pointer-events:none;
+  max-width:320px;box-shadow:0 8px 24px rgba(0,0,0,.15)}
+.toast.ok{background:#052e16;color:#86efac;border:1px solid #166534}
+.toast.err{background:#450a0a;color:#fca5a5;border:1px solid #7f1d1d}
+.toast.show{transform:translateY(0);opacity:1}
+@media(max-width:700px){.sb{display:none}.kpis{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
 
-<!-- ═══ LOGIN ═══ -->
+<!-- LOGIN -->
 <div id="loginWrap">
   <div class="login-box">
     <div class="lbox-cross">💊</div>
@@ -284,16 +180,13 @@ td { padding:11px 16px; vertical-align:middle }
   </div>
 </div>
 
-<!-- ═══ APP ═══ -->
+<!-- APP -->
 <div id="app">
   <div class="wrap">
     <aside class="sb">
       <div class="sb-top">
         <div class="sb-icon">💊</div>
-        <div>
-          <div class="sb-name">Farma Expertos</div>
-          <div class="sb-tag">Admin</div>
-        </div>
+        <div><div class="sb-name">Farma Expertos</div><div class="sb-tag">Admin</div></div>
       </div>
       <nav class="sb-nav">
         <button class="nv on" id="nv-inv" onclick="navTo('inv',this)">
@@ -325,20 +218,10 @@ td { padding:11px 16px; vertical-align:middle }
         </div>
         <div class="content">
           <div class="kpis">
-            <div class="kpi" data-ico="📦">
-              <div class="kpi-lbl">Total productos</div>
-              <div class="kpi-val" id="kTotal">—</div>
-            </div>
-            <div class="kpi" data-ico="🏭">
-              <div class="kpi-lbl">Laboratorios</div>
-              <div class="kpi-val" id="kLabs">—</div>
-            </div>
-            <div class="kpi" data-ico="💰">
-              <div class="kpi-lbl">Con precio unid.</div>
-              <div class="kpi-val" id="kPr">—</div>
-            </div>
+            <div class="kpi" data-ico="📦"><div class="kpi-lbl">Total productos</div><div class="kpi-val" id="kTotal">—</div></div>
+            <div class="kpi" data-ico="🏭"><div class="kpi-lbl">Laboratorios</div><div class="kpi-val" id="kLabs">—</div></div>
+            <div class="kpi" data-ico="💰"><div class="kpi-lbl">Con precio unid.</div><div class="kpi-val" id="kPr">—</div></div>
           </div>
-
           <div class="toolbar">
             <div class="sf">
               <input type="text" id="srch" placeholder="Buscar producto o laboratorio…" oninput="filt()"/>
@@ -353,19 +236,16 @@ td { padding:11px 16px; vertical-align:middle }
               <option value="pd">Precio unitario ↓</option>
             </select>
           </div>
-
           <div class="tbl-wrap">
             <div class="tbl-scroll">
               <table>
-                <thead>
-                  <tr>
-                    <th onclick="thSort('descripcion',this)">Descripción</th>
-                    <th onclick="thSort('laboratorio',this)">Laboratorio</th>
-                    <th>Unidad</th>
-                    <th onclick="thSort('_p',this)">Precio Caja</th>
-                    <th onclick="thSort('_pu',this)">Precio Unitario</th>
-                  </tr>
-                </thead>
+                <thead><tr>
+                  <th onclick="thSort('descripcion',this)">Descripción</th>
+                  <th onclick="thSort('laboratorio',this)">Laboratorio</th>
+                  <th>Unidad</th>
+                  <th onclick="thSort('_p',this)">Precio Caja</th>
+                  <th onclick="thSort('_pu',this)">Precio Unitario</th>
+                </tr></thead>
                 <tbody id="tbody">
                   <tr><td colspan="5" style="text-align:center;padding:48px;color:var(--muted)">
                     <div style="font-size:36px;margin-bottom:10px">⏳</div>Cargando inventario…
@@ -379,43 +259,44 @@ td { padding:11px 16px; vertical-align:middle }
             </div>
           </div>
         </div>
-      </div><!-- /pgInv -->
+      </div>
 
-      <!-- PEDIDOS WEB -->
+      <!-- PEDIDOS -->
       <div id="pgPed" style="display:none">
         <div class="tbar">
           <span class="pg-title">🛒 Pedidos web</span>
           <button class="btn btn-g" onclick="loadPedidos()">↻ Actualizar</button>
         </div>
         <div class="content">
-          <div class="tbl-wrap">
-            <div class="tbl-scroll">
-              <table>
-                <thead><tr>
-                  <th>ID</th><th>Cliente</th><th>Teléfono</th>
-                  <th>Productos</th><th>Total</th><th>Estado</th><th>Hora</th>
-                </tr></thead>
-                <tbody id="pedTbody">
-                  <tr><td colspan="7" style="text-align:center;padding:48px;color:var(--muted)">Cargando pedidos…</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <div class="tbl-wrap"><div class="tbl-scroll">
+            <table>
+              <thead><tr>
+                <th>ID</th><th>Cliente</th><th>Teléfono</th>
+                <th>Productos</th><th>Total</th><th>Estado</th><th>Hora</th>
+              </tr></thead>
+              <tbody id="pedTbody">
+                <tr><td colspan="7" style="text-align:center;padding:48px;color:var(--muted)">Cargando pedidos…</td></tr>
+              </tbody>
+            </table>
+          </div></div>
         </div>
       </div>
     </main>
   </div>
 </div>
 
-<!-- IMPORT MODAL -->
+<!-- MODAL IMPORTAR -->
 <div class="modal-bg" id="impModal">
   <div class="modal">
     <div class="modal-h">
-      <h3>⬆ Importar stock</h3>
+      <h3>⬆ Importar / Actualizar Stock</h3>
       <button class="modal-close" onclick="closeImp()">✕</button>
     </div>
-    <p>Sube el archivo Excel descargado de tu sistema.<br>
-       Columnas requeridas: <strong>Descripción · Laboratorio · Unidad · Precio · Precio Unitario</strong></p>
+    <p>
+      Sube el Excel con el stock actualizado.<br>
+      Columnas requeridas: <strong>Descripción · Laboratorio · Unidad · Precio · Precio Unitario</strong><br>
+      <small style="color:var(--muted)">Se sobreescribirá la hoja <strong>STOCK_DROGUERIA_EXPERTOS</strong> columnas A–E. Celdas vacías serán omitidas.</small>
+    </p>
     <div class="drop" id="dropZ"
          onclick="document.getElementById('fIn').click()"
          ondragover="event.preventDefault();this.classList.add('drag')"
@@ -427,9 +308,13 @@ td { padding:11px 16px; vertical-align:middle }
     </div>
     <input type="file" id="fIn" accept=".xlsx,.xls" onchange="onFile(this.files[0])"/>
     <div class="imp-prev" id="impPrev"></div>
+    <div class="prog-wrap" id="progWrap">
+      <div class="prog-bar"><div class="prog-fill" id="progFill"></div></div>
+      <div class="prog-txt" id="progTxt">Preparando…</div>
+    </div>
     <div class="modal-acts">
       <button class="btn btn-o" onclick="closeImp()">Cancelar</button>
-      <button class="btn btn-b" id="btnImp" onclick="doImport()" disabled>Subir a Sheets</button>
+      <button class="btn btn-b" id="btnImp" onclick="doImport()" disabled>⬆ Subir a Sheets</button>
     </div>
   </div>
 </div>
@@ -437,39 +322,31 @@ td { padding:11px 16px; vertical-align:middle }
 <div class="toast" id="toast"></div>
 
 <script>
-/* ═══════════════════════════════════════════════════════
-   CONFIG  — pon el ID de tu Google Spreadsheet aquí
-   Lo encuentras en la URL:
-   https://docs.google.com/spreadsheets/d/  →  ESTE_ID  ←  /edit
-═══════════════════════════════════════════════════════ */
-const SPREADSHEET_ID = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU'
+/* ══════════════════════════════════════════════════
+   ▶  PON AQUÍ EL ID DE TU GOOGLE SPREADSHEET
+   URL: https://docs.google.com/spreadsheets/d/ → ESTE_ID ← /edit
+══════════════════════════════════════════════════ */
+const SPREADSHEET_ID = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
 
-/* Nombre exacto de la hoja */
-const SHEET_NAME = 'STOCK_DROGUERIA_EXPERTOS';
+/* ══ CONFIG (no tocar) ══ */
+const SHEET_NAME     = 'STOCK_DROGUERIA_EXPERTOS';
+const READ_RANGE     = `${SHEET_NAME}!A:E`;   // A=Desc B=Lab C=Unidad D=Precio E=PrecioUnit
+const WRITE_RANGE    = `${SHEET_NAME}!A2`;    // empieza en A2 (A1 = encabezados)
+const SHEETS_API     = 'https://sheets.googleapis.com/v4/spreadsheets';
+const CHUNK          = 100;   // filas por lote al escribir
+const PER            = 100;   // productos por página en tabla
 
-/* Columnas H,I,K,L,M  (J vacía se omite en el mapeo)
-   H = Descripción   → índice 0
-   I = Laboratorio   → índice 1
-   J = (vacía)       → índice 2  ← ignorada
-   K = Unidad        → índice 3
-   L = Precio caja   → índice 4
-   M = Precio unit.  → índice 5
-   El rango H:M trae 6 columnas; la fila 1 es el encabezado */
-const RANGE = `${SHEET_NAME}!H:M`;
-
-/* ═══════════════════════════════════════════════════════ */
 const GOOGLE_CLIENT_ID = '699856885526-55fqgn6qdr116rige5dcrsg4f3jdu1kp.apps.googleusercontent.com';
 const TIENDA   = 'EXPERTOS';
-const API_CHECK = `/api/auth-check`;
-const API_IMP   = `/api/import-stock`;
+const API_CHECK = '/api/auth-check';
 const API_PEDS  = `/api/pedidos?tienda=${TIENDA}`;
 
 let token = '';
 let prods = [], shown = [], impRows = [];
-let curPage = 1; const PER = 50;
+let curPage = 1;
 let sortK = 'descripcion', sortAsc = true;
 
-/* ── GOOGLE AUTH — original exacto ──────────────────── */
+/* ══ GOOGLE AUTH — original exacto ══ */
 window.onload = () => {
   if (!GOOGLE_CLIENT_ID.includes('TU_CLIENT')) {
     google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogle });
@@ -504,7 +381,7 @@ function logout() {
   google.accounts.id.disableAutoSelect();
 }
 
-/* ── NAV ─────────────────────────────────────────────── */
+/* ══ NAV ══ */
 function navTo(page, el) {
   document.querySelectorAll('.nv').forEach(n => n.classList.remove('on'));
   el.classList.add('on');
@@ -513,86 +390,59 @@ function navTo(page, el) {
   if (page === 'ped') loadPedidos();
 }
 
-/* ── CARGAR PRODUCTOS DESDE GOOGLE SHEETS ────────────── */
+/* ══ LEER PRODUCTOS — Sheets API directa (columnas A:E) ══ */
 async function loadProds() {
-  // Verificar que tenemos el spreadsheet ID configurado
-GOOGLE_SHEETS_ID='1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU'
-
   if (SPREADSHEET_ID === '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU') {
-    toastMsg('⚠️ Configura SPREADSHEET_ID en el código', 'err');
-    document.getElementById('tbody').innerHTML = `
-      <tr><td colspan="5" style="text-align:center;padding:48px;color:var(--muted)">
-        <div style="font-size:36px;margin-bottom:10px">⚙️</div>
-        Falta configurar el ID del spreadsheet.<br>
-        <small>Busca la línea <code>SPREADSHEET_ID</code> en el código y ponlo.</small>
-      </td></tr>`;
+    showTblMsg('⚙️', 'Falta configurar el <code>SPREADSHEET_ID</code> en el código.');
     return;
   }
-
+  showTblMsg('⏳', 'Cargando inventario…');
   try {
-    document.getElementById('tbody').innerHTML = `
-      <tr><td colspan="5" style="text-align:center;padding:48px;color:var(--muted)">
-        <div style="font-size:36px;margin-bottom:10px">⏳</div>Cargando inventario…
-      </td></tr>`;
-
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(RANGE)}`;
-    const r = await fetch(url, {
-      headers: { Authorization: 'Bearer ' + token }
-    });
-
+    const url = `${SHEETS_API}/${SPREADSHEET_ID}/values/${encodeURIComponent(READ_RANGE)}`;
+    const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
     if (!r.ok) {
-      const err = await r.json();
-      throw new Error(err.error?.message || 'Error Sheets API');
+      const e = await r.json();
+      throw new Error(e.error?.message || `HTTP ${r.status}`);
     }
+    const data  = await r.json();
+    const rows  = (data.values || []).slice(1); // saltar fila de encabezados
 
-    const data = await r.json();
-    const rows = data.values || [];
-
-    if (rows.length < 2) {
-      toastMsg('⚠️ La hoja está vacía o sin datos', 'err');
-      prods = [];
-    } else {
-      /* Fila 0 = encabezados, ignorar
-         H[0]=Descripción  I[1]=Laboratorio  J[2]=vacía(omitir)
-         K[3]=Unidad       L[4]=Precio caja  M[5]=Precio unit. */
-      prods = rows.slice(1)                        // saltar encabezados
-        .filter(row => row[0]?.toString().trim())   // descartar filas vacías
-        .map(row => ({
-          descripcion:    (row[0] || '').toString().trim(),
-          laboratorio:    (row[1] || '').toString().trim(),
-          // row[2] = J vacía — omitida
-          unidad:         (row[3] || '').toString().trim(),
-          precio:         (row[4] || '').toString().trim(),
-          precioUnitario: (row[5] || '').toString().trim(),
-        }));
-    }
+    prods = rows
+      .filter(row => row[0]?.toString().trim()) // omitir filas con descripción vacía
+      .map(row => ({
+        descripcion:    (row[0] || '').toString().trim(),  // A
+        laboratorio:    (row[1] || '').toString().trim(),  // B
+        unidad:         (row[2] || '').toString().trim(),  // C
+        precio:         (row[3] || '').toString().trim(),  // D
+        precioUnitario: (row[4] || '').toString().trim(),  // E
+      }));
 
     shown = [...prods];
     buildLabSel();
     kpis();
     filt();
     toastMsg(`✅ ${prods.length} productos cargados`, 'ok');
-
   } catch(e) {
+    showTblMsg('❌', `Error al cargar: ${e.message}`);
     toastMsg('❌ ' + e.message, 'err');
-    document.getElementById('tbody').innerHTML = `
-      <tr><td colspan="5" style="text-align:center;padding:48px;color:var(--muted)">
-        <div style="font-size:36px;margin-bottom:10px">❌</div>
-        Error al cargar: ${e.message}
-      </td></tr>`;
   }
 }
-
 function reload() { loadProds(); }
 
-/* ── HELPERS ─────────────────────────────────────────── */
-function buildLabSel() {
-  const labs = [...new Set(prods.map(p => p.laboratorio).filter(Boolean))].sort();
-  const sel  = document.getElementById('selLab');
-  sel.innerHTML = '<option value="">Todos los laboratorios</option>' +
-    labs.map(l => `<option>${l}</option>`).join('');
+function showTblMsg(ico, msg) {
+  document.getElementById('tbody').innerHTML =
+    `<tr><td colspan="5" style="text-align:center;padding:48px;color:var(--muted)">
+       <div style="font-size:36px;margin-bottom:10px">${ico}</div>${msg}
+     </td></tr>`;
 }
 
+/* ══ HELPERS ══ */
+function buildLabSel() {
+  const labs = [...new Set(prods.map(p => p.laboratorio).filter(Boolean))].sort();
+  document.getElementById('selLab').innerHTML =
+    '<option value="">Todos los laboratorios</option>' +
+    labs.map(l => `<option>${l}</option>`).join('');
+}
 function kpis() {
   document.getElementById('kTotal').textContent = prods.length.toLocaleString('es-CO');
   document.getElementById('kLabs').textContent  =
@@ -600,10 +450,10 @@ function kpis() {
   document.getElementById('kPr').textContent    =
     prods.filter(p => p.precioUnitario).length.toLocaleString('es-CO');
 }
-
-function pn(v) { return parseInt((v || '0').toString().replace(/[^0-9]/g, '')) || 0; }
+function pn(v)  { return parseInt((v || '0').toString().replace(/[^0-9]/g, '')) || 0; }
 function cop(v) { const n = pn(v); return n ? '$' + n.toLocaleString('es-CO') : '—'; }
 
+/* ══ FILTRAR Y ORDENAR ══ */
 function filt() {
   const q   = document.getElementById('srch').value.toLowerCase().trim();
   const lab = document.getElementById('selLab').value;
@@ -619,8 +469,7 @@ function filt() {
     if (s === 'pd')  return b._pu - a._pu;
     return a.descripcion.localeCompare(b.descripcion);
   });
-  curPage = 1;
-  renderTbl();
+  curPage = 1; renderTbl();
 }
 
 function thSort(col, th) {
@@ -632,23 +481,19 @@ function thSort(col, th) {
     const r  = typeof va === 'number' ? va - vb : va.toString().localeCompare(vb.toString());
     return sortAsc ? r : -r;
   });
-  curPage = 1;
-  renderTbl();
+  curPage = 1; renderTbl();
 }
 
 function renderTbl() {
   const start = (curPage - 1) * PER;
   const page  = shown.slice(start, start + PER);
   const body  = document.getElementById('tbody');
-
   if (!shown.length) {
-    body.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:48px;color:var(--muted)">
-      <div style="font-size:36px;margin-bottom:10px">🔍</div>Sin resultados</td></tr>`;
+    showTblMsg('🔍', 'Sin resultados');
     document.getElementById('pagInfo').textContent = '0 productos';
     document.getElementById('pgBtns').innerHTML = '';
     return;
   }
-
   body.innerHTML = page.map(p => `
     <tr>
       <td class="td-nm" title="${p.descripcion}">${p.descripcion}</td>
@@ -669,18 +514,27 @@ function renderTbl() {
 
   const pgB = document.getElementById('pgBtns');
   pgB.innerHTML = '';
+  // ← prev
+  const prev = mk('‹', curPage === 1, () => { curPage--; renderTbl(); });
+  pgB.appendChild(prev);
+  // páginas numéricas
   const from = Math.max(1, curPage - 2), to = Math.min(pages, from + 4);
   for (let i = from; i <= to; i++) {
-    const b = document.createElement('button');
-    b.className = 'pg-btn' + (i === curPage ? ' cur' : '');
-    b.textContent = i;
     const pg = i;
-    b.onclick = () => { curPage = pg; renderTbl(); };
-    pgB.appendChild(b);
+    pgB.appendChild(mk(i, false, () => { curPage = pg; renderTbl(); }, i === curPage));
   }
+  // next →
+  pgB.appendChild(mk('›', curPage === pages, () => { curPage++; renderTbl(); }));
 }
 
-/* ── PEDIDOS ─────────────────────────────────────────── */
+function mk(label, disabled, onclick, active = false) {
+  const b = document.createElement('button');
+  b.className = 'pg-btn' + (active ? ' cur' : '');
+  b.textContent = label; b.disabled = disabled; b.onclick = onclick;
+  return b;
+}
+
+/* ══ PEDIDOS ══ */
 async function loadPedidos() {
   try {
     const r = await fetch(API_PEDS, { headers: { Authorization: 'Bearer ' + token } });
@@ -703,11 +557,20 @@ async function loadPedidos() {
   } catch(e) { toastMsg('❌ Error cargando pedidos', 'err'); }
 }
 
-/* ── IMPORT EXCEL ────────────────────────────────────── */
+/* ══════════════════════════════════════════════════
+   IMPORTAR EXCEL → GOOGLE SHEETS  (chunks de 100)
+   Flujo:
+   1. Parsear Excel con XLSX.js → impRows[]
+   2. Limpiar la hoja entera (clearValues)
+   3. Escribir encabezados en A1
+   4. Subir impRows en lotes de CHUNK filas via batchUpdate
+══════════════════════════════════════════════════ */
 function openImp()  { document.getElementById('impModal').classList.add('open'); }
 function closeImp() {
   document.getElementById('impModal').classList.remove('open');
   document.getElementById('impPrev').style.display = 'none';
+  document.getElementById('progWrap').style.display = 'none';
+  document.getElementById('progFill').style.width = '0%';
   document.getElementById('btnImp').disabled = true;
   impRows = [];
 }
@@ -716,6 +579,7 @@ function onDrop(ev) {
   document.getElementById('dropZ').classList.remove('drag');
   if (ev.dataTransfer.files[0]) onFile(ev.dataTransfer.files[0]);
 }
+
 function onFile(file) {
   if (!file) return;
   const reader = new FileReader();
@@ -723,23 +587,27 @@ function onFile(file) {
     const wb   = XLSX.read(e.target.result, { type: 'binary' });
     const ws   = wb.Sheets[wb.SheetNames[0]];
     const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
-    const get  = (row, keys, ...names) => {
+
+    // Mapeo flexible de columnas por nombre aproximado
+    const get = (row, keys, ...names) => {
       for (const n of names) {
-        const k = keys.find(k => k.toLowerCase().replace(/[^a-z]/g, '').includes(n));
+        const k = keys.find(k => k.toLowerCase().replace(/[^a-záéíóúñ]/gi, '').includes(n));
         if (k) return (row[k] || '').toString().trim();
       }
       return '';
     };
+
     impRows = data.map(row => {
       const keys = Object.keys(row);
       return {
-        descripcion:    get(row, keys, 'descripci', 'descrip', 'nombre', 'produc'),
-        laboratorio:    get(row, keys, 'laborator', 'lab', 'marca', 'fabrican'),
-        unidad:         get(row, keys, 'unidad', 'unit', 'presentac', 'conten'),
-        precio:         get(row, keys, 'precio', 'price', 'valor', 'vta', 'venta'),
-        precioUnitario: get(row, keys, 'unitario', 'unitprice', 'xunidad', 'porunit'),
+        descripcion:    get(row, keys, 'descrip', 'nombre', 'produc'),
+        laboratorio:    get(row, keys, 'laborat', 'lab', 'marca', 'fabrican'),
+        unidad:         get(row, keys, 'unidad', 'unit', 'present', 'conten'),
+        precio:         get(row, keys, 'precio', 'price', 'valor', 'venta'),
+        precioUnitario: get(row, keys, 'unitario', 'xunidad', 'porunit', 'unitprice'),
       };
-    }).filter(r => r.descripcion);
+    }).filter(r => r.descripcion.length > 0);  // omitir filas sin descripción
+
     const prev = document.getElementById('impPrev');
     prev.style.display = 'block';
     prev.innerHTML = `✅ <strong>${impRows.length}</strong> productos listos de <em>${file.name}</em>`;
@@ -747,33 +615,99 @@ function onFile(file) {
   };
   reader.readAsBinaryString(file);
 }
+
 async function doImport() {
   if (!impRows.length) return;
-  const btn = document.getElementById('btnImp');
-  btn.disabled = true; btn.textContent = 'Importando…';
+  if (SPREADSHEET_ID === '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU') {
+    toastMsg('⚙️ Configura SPREADSHEET_ID primero', 'err'); return;
+  }
+
+  const btnImp = document.getElementById('btnImp');
+  btnImp.disabled = true; btnImp.textContent = 'Subiendo…';
+  document.getElementById('progWrap').style.display = 'block';
+  setProgress(0, 'Limpiando hoja…');
+
   try {
-    const r = await fetch(API_IMP, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-      body: JSON.stringify({ tienda: TIENDA, productos: impRows })
-    });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error);
-    toastMsg('✅ ' + d.count + ' productos importados', 'ok');
-    closeImp();
-    reload();
-  } catch(e) { toastMsg('❌ ' + e.message, 'err'); }
-  finally { btn.disabled = false; btn.textContent = 'Subir a Sheets'; }
+    /* ── Paso 1: limpiar toda la hoja A2:Z (conservar fila 1 de encabezados) ── */
+    await sheetsReq('POST',
+      `/${SPREADSHEET_ID}/values/${encodeURIComponent(SHEET_NAME + '!A2:Z')}:clear`,
+      {}
+    );
+
+    /* ── Paso 2: escribir encabezados en A1 ── */
+    await sheetsReq('PUT',
+      `/${SPREADSHEET_ID}/values/${encodeURIComponent(SHEET_NAME + '!A1:E1')}?valueInputOption=RAW`,
+      { values: [['Descripción', 'Laboratorio', 'Unidad', 'Precio', 'Precio Unitario']] }
+    );
+
+    /* ── Paso 3: subir impRows en lotes de CHUNK ── */
+    const total  = impRows.length;
+    let uploaded = 0;
+
+    for (let start = 0; start < total; start += CHUNK) {
+      const slice  = impRows.slice(start, start + CHUNK);
+      const rowNum = start + 2;   // fila en sheets (1=encabezado, 2=primer dato)
+      const range  = `${SHEET_NAME}!A${rowNum}:E${rowNum + slice.length - 1}`;
+      const values = slice.map(p => [
+        p.descripcion,
+        p.laboratorio,
+        p.unidad,
+        p.precio,
+        p.precioUnitario,
+      ]);
+
+      await sheetsReq('PUT',
+        `/${SPREADSHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW`,
+        { values }
+      );
+
+      uploaded += slice.length;
+      setProgress(
+        Math.round((uploaded / total) * 100),
+        `${uploaded} / ${total} productos subidos…`
+      );
+    }
+
+    setProgress(100, '¡Listo!');
+    toastMsg(`✅ ${total} productos actualizados en Sheets`, 'ok');
+    setTimeout(() => { closeImp(); reload(); }, 800);
+
+  } catch(e) {
+    toastMsg('❌ ' + e.message, 'err');
+    setProgress(0, 'Error: ' + e.message);
+  } finally {
+    btnImp.disabled = false; btnImp.textContent = '⬆ Subir a Sheets';
+  }
 }
 
-/* ── TOAST ───────────────────────────────────────────── */
+/* Helper: llamada a Sheets API usando el JWT como Bearer */
+async function sheetsReq(method, path, body) {
+  const r = await fetch(`${SHEETS_API}${path}`, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + token,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const e = await r.json();
+    throw new Error(e.error?.message || `HTTP ${r.status}`);
+  }
+  return r.json();
+}
+
+function setProgress(pct, txt) {
+  document.getElementById('progFill').style.width = pct + '%';
+  document.getElementById('progTxt').textContent  = txt;
+}
+
+/* ══ TOAST ══ */
 let tt;
 function toastMsg(msg, type = 'ok') {
   const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.className = 'toast ' + type + ' show';
-  clearTimeout(tt);
-  tt = setTimeout(() => el.className = 'toast ' + type, 3200);
+  el.textContent = msg; el.className = 'toast ' + type + ' show';
+  clearTimeout(tt); tt = setTimeout(() => el.className = 'toast ' + type, 3200);
 }
 </script>
 </body>
