@@ -1,13 +1,10 @@
 // api/productos.js
-// GET /api/productos?tienda=EXPERTOS&q=ibuprofeno
-// Columnas A–E de STOCK_DROGUERIA_*:
-//   A=Descripción  B=Laboratorio  C=Unidad  D=Precio  E=Precio Unitario
-
 const { google } = require('googleapis');
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
@@ -18,29 +15,30 @@ module.exports = async (req, res) => {
     const q         = (req.query.q || '').toUpperCase().trim();
     const todosBool = req.query.all === '1';
 
-    const creds = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
-    const auth  = new google.auth.GoogleAuth({
-      credentials: creds,
+    const auth = new google.auth.GoogleAuth({
+      credentials: {
+        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        private_key:  (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+      },
       scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
     });
     const sheets = google.sheets({ version: 'v4', auth: await auth.getClient() });
 
-    // ← CAMBIO: ahora lee A:E en vez de H:M
     const r = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEETS_ID,
       range: `${hoja}!A:E`
     });
 
-    const rows = (r.data.values || []).slice(1); // saltar fila de encabezados
+    const rows = (r.data.values || []).slice(1);
 
     const productos = rows
-      .filter(row => row[0]?.toString().trim())  // descripción no vacía
+      .filter(row => row[0]?.toString().trim())
       .map(row => ({
-        descripcion:    (row[0] || '').toString().trim(),  // A
-        laboratorio:    (row[1] || '').toString().trim(),  // B
-        unidad:         (row[2] || '').toString().trim(),  // C
-        precio:         (row[3] || '').toString().trim(),  // D
-        precioUnitario: (row[4] || '').toString().trim(),  // E
+        descripcion:    (row[0] || '').toString().trim(),
+        laboratorio:    (row[1] || '').toString().trim(),
+        unidad:         (row[2] || '').toString().trim(),
+        precio:         (row[3] || '').toString().trim(),
+        precioUnitario: (row[4] || '').toString().trim(),
       }))
       .filter(p => {
         if (!q || todosBool) return true;
