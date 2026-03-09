@@ -44,9 +44,10 @@ body{background:var(--bg);color:var(--text);font-family:'Plus Jakarta Sans',sans
 .lbox-note{font-size:11px;color:rgba(255,255,255,.3);margin-top:20px;line-height:1.5}
 
 /* ══ SELECTOR DE FARMACIA ══ */
-#pickWrap{min-height:100vh;display:none;align-items:center;justify-content:center;
+#pickWrap{min-height:100vh;display:none;flex-direction:column;align-items:center;justify-content:center;
   background:linear-gradient(145deg,#0a1a0e 0%,#0f2d20 40%,#061018 100%);
-  position:relative;overflow:hidden;flex-direction:column}
+  position:relative;overflow:hidden}
+#pickWrap.show{display:flex}
 #pickWrap::before{content:'';position:absolute;inset:0;pointer-events:none;
   background:radial-gradient(ellipse 600px 500px at 30% 40%,rgba(22,163,74,.15) 0%,transparent 60%),
              radial-gradient(ellipse 500px 400px at 70% 60%,rgba(13,148,136,.1) 0%,transparent 60%)}
@@ -535,7 +536,8 @@ let pickedFarm = '';
 
 function showPicker() {
   document.getElementById('loginWrap').style.display = 'none';
-  document.getElementById('pickWrap').style.display  = 'flex';
+  document.getElementById('app').style.display       = 'none';
+  document.getElementById('pickWrap').classList.add('show');
   document.getElementById('pickAvatar').src          = userInfo.picture || '';
   document.getElementById('pickName').textContent    = userInfo.name || '';
   pickedFarm = '';
@@ -562,7 +564,7 @@ function enterFarm() {
   document.getElementById('avImg').src               = userInfo.picture;
   document.getElementById('tbarTitle').textContent   = `📦 Inventario · ${f.nombre}`;
   // Mostrar app
-  document.getElementById('pickWrap').style.display = 'none';
+  document.getElementById('pickWrap').classList.remove('show');
   document.getElementById('app').style.display      = 'block';
   tickClock();
   if (!clockIv) clockIv = setInterval(tickClock, 1000);
@@ -571,7 +573,7 @@ function enterFarm() {
 }
 
 function backToLogin() {
-  document.getElementById('pickWrap').style.display  = 'none';
+  document.getElementById('pickWrap').classList.remove('show');
   document.getElementById('loginWrap').style.display = 'flex';
   token = ''; userInfo = {};
   google.accounts.id.disableAutoSelect();
