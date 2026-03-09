@@ -371,7 +371,7 @@ const FARMACIAS = {
   CENTRAL:  { nombre:'Farmacia Central', ico:'🏥', tag:'Sede Central' }
 };
 
-let token='', tienda='', parsedProducts=[], prods=[], shown=[], selectedFile=null;
+let token='', tienda='', parsedProducts=[],  parsedProducts=[], prods=[], shown=[], selectedFile=null;
 let curPage=1, sortK='descripcion', sortAsc=true, clockIv=null, userInfo={};
 
 const DIAS  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
@@ -623,38 +623,28 @@ function onDrop(ev){
 function onFile(file){
   if(!file) return;
   selectedFile=file;
+  parsedProducts=[];
   const kb=(file.size/1024).toFixed(0);
   const prev=document.getElementById('impPrev');
   prev.style.display='block';
   prev.innerHTML=`📄 <strong>${file.name}</strong> · ${kb} KB<br><span style="font-size:11px;color:var(--muted)">Procesando…</span>`;
   document.getElementById('btnImp').disabled=true;
-
   const reader=new FileReader();
   reader.onload=function(e){
     try{
-      const data=new Uint8Array(e.target.result);
-      const wb=XLSX.read(data,{type:'array'});
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
       const ws=wb.Sheets[wb.SheetNames[0]];
       const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-      // Columnas: A=Código B=Desc C=Código D=Lab E=IVA F=Venta G=Unidad H=Precio I=PrecioUnit
       parsedProducts=[];
       for(let i=1;i<rows.length;i++){
         const row=rows[i];
         const desc=(row[1]||'').toString().trim();
         if(!desc)continue;
-        parsedProducts.push([
-          desc,
-          (row[3]||'').toString().trim(),
-          (row[6]||'').toString().trim(),
-          (row[7]||'').toString().trim(),
-          (row[8]||'').toString().trim(),
-        ]);
+        parsedProducts.push([desc,(row[3]||'').toString().trim(),(row[6]||'').toString().trim(),(row[7]||'').toString().trim(),(row[8]||'').toString().trim()]);
       }
       prev.innerHTML=`✅ <strong>${parsedProducts.length} productos listos</strong> de <em>${file.name}</em>`;
       document.getElementById('btnImp').disabled=parsedProducts.length===0;
-    }catch(err){
-      prev.innerHTML=`❌ Error leyendo Excel: ${err.message}`;
-    }
+    }catch(err){prev.innerHTML=`❌ Error: ${err.message}`;}
   };
   reader.readAsArrayBuffer(file);
 }
