@@ -652,20 +652,26 @@ function onFile(file){
 async function doImport(){
   if(!parsedProducts||!parsedProducts.length)return;
   const btnImp=document.getElementById('btnImp');
-  btnImp.disabled=true;btnImp.textContent='Subiendo…';
+  btnImp.disabled=true;
   document.getElementById('progWrap').style.display='block';
-  setProgress(30,'Enviando a servidor…');
+  const LOTE=500;
+  const total=parsedProducts.length;
+  let enviados=0;
   try{
-    const r=await fetch(`/api/import?tienda=${tienda}`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-      body:JSON.stringify({productos:parsedProducts}),
-    });
-    setProgress(85,'Procesando en Sheets…');
-    const data=await r.json();
-    if(!r.ok||data.error)throw new Error(data.error||`HTTP ${r.status}`);
-    setProgress(100,`✅ ${data.count} productos guardados`);
-    toastMsg(`✅ ${data.count} productos importados`,'ok');
+    for(let i=0;i*LOTE<total;i++){
+      const chunk=parsedProducts.slice(i*LOTE,(i+1)*LOTE);
+      setProgress(Math.round((enviados/total)*90)+5,`Enviando ${enviados+chunk.length} de ${total}…`);
+      const r=await fetch(`/api/import?tienda=${tienda}`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+        body:JSON.stringify({productos:chunk,lote:i,total,tienda}),
+      });
+      const data=await r.json();
+      if(!r.ok||data.error)throw new Error(data.error||`HTTP ${r.status}`);
+      enviados+=chunk.length;
+    }
+    setProgress(100,`✅ ${total} productos guardados`);
+    toastMsg(`✅ ${total} productos importados`,'ok');
     setTimeout(()=>{closeImp();reload();},900);
   }catch(e){
     toastMsg('❌ '+e.message,'err');
