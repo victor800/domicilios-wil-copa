@@ -30,7 +30,7 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 // ESTADO EN MEMORIA
 // ══════════════════════════════════════════════════════════════════════════════
 const S = {};   // Sesiones clientes
-const drivers = {};   // { telegramId: { nombre, pedidoActual, loginTs } }
+const drivers = {};   // { telegramId: { nombre, telefono, pedidoActual, loginTs } }
 const pool = {};   // Pedidos en memoria
 const espClave = {};
 const espClaveAdmin = {};
@@ -55,11 +55,17 @@ const COP = n => {
   return (n < 0 ? '-$' : '$') + f;
 };
 
+// ── PARCHE 3: Link de Google Maps con la dirección cruda del cliente ──────────
+function gmapsLinkDir(direccionCliente) {
+  const q = encodeURIComponent((direccionCliente || '') + ', Antioquia, Colombia');
+  return `https://maps.google.com/?q=${q}`;
+}
+
 function tipoBadge(p) {
   if (!p) return '';
   if (p.tipo === 'paqueteria') return '📦 Paquetería';
-  if (p.tienda === 'EXPERTOS') return '💊 Farmacia Expertos';
-  if (p.tienda === 'CENTRAL') return '🏥 Farmacia La Central';
+  if (p.tienda === 'EXPERTOS') return '💊 FarmaExpertos Copacabana';
+  if (p.tienda === 'CENTRAL') return '🏥  Farmacia Central Copacabana';
   return '🏪 WIL';
 }
 
@@ -82,6 +88,7 @@ async function getContadores() {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // RECARGOS INTERNOS (ocultos al cliente)
+// PARCHE 8: Pocos = 1-5 productos (+$1.000), Muchos = 6+ (+$2.000)
 // ══════════════════════════════════════════════════════════════════════════════
 function calcularRecargos(horaRegistro, cantidadItems, esCopacabana) {
   if (!esCopacabana) return 0;
@@ -92,7 +99,9 @@ function calcularRecargos(horaRegistro, cantidadItems, esCopacabana) {
     const mins = moment().tz('America/Bogota').diff(t, 'minutes');
     if (mins >= 15) recargo += 1000;
   }
-  if ((cantidadItems || 0) > 5) recargo += 2000;
+  const items = cantidadItems || 0;
+  if (items >= 1 && items <= 5) recargo += 1000;   // pocos productos +$1.000
+  if (items > 5) recargo += 2000;                   // muchos productos +$2.000
   return recargo;
 }
 
@@ -171,6 +180,7 @@ function menuPublico() {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // CARDS PEDIDO
+// PARCHE 5: cardPedidoDriver agrega link Maps con dirección real del cliente
 // ══════════════════════════════════════════════════════════════════════════════
 function cardPedidoDriver(p, estado) {
   const ico = estado === 'PENDIENTE' ? '🟡' : estado === 'EN_PROCESO' ? '🔵' : '🟢';
@@ -186,7 +196,7 @@ function cardPedidoDriver(p, estado) {
     ).join('\n');
   }
 
-  return (
+  const card =
     `<code>┌─────────────────────────┐\n` +
     `│ ${ico} ${p.id.padEnd(22)} │\n` +
     `│ ${tipoBadge(p).padEnd(23)} │\n` +
@@ -202,8 +212,15 @@ function cardPedidoDriver(p, estado) {
     (p.presupuesto ? `│ 💰 ${('Ppto: ' + p.presupuesto).substring(0, 21).padEnd(21)} │\n` : '') +
     (dom ? `│ 🛵 ${'Dom: ' + dom}${' '.repeat(Math.max(0, 21 - ('Dom: ' + dom).length))} │\n` : '') +
     `│ 💵 ${'Total: ' + totalStr}${' '.repeat(Math.max(0, 21 - ('Total: ' + totalStr).length))} │\n` +
-    `└─────────────────────────┘</code>`
-  );
+    `└─────────────────────────┘</code>`;
+
+  // PARCHE 5: Línea clickeable con la dirección original del cliente
+  const dirCliente = p.direccionCliente || p.direccion || '';
+  const linkMaps = dirCliente
+    ? `\n📍 <a href="${gmapsLinkDir(dirCliente)}">${dirCliente}</a>`
+    : '';
+
+  return card + linkMaps;
 }
 
 function cardPedidoCliente(s) {
@@ -332,7 +349,6 @@ async function obtenerTarifaRapida(texto, dirRefSheet) {
       let tarifaFinal = r.tarifa;
 
       if (lat && lng) {
-        
         const calc = await calcularTarifaKm(lat, lng);
         tarifaFinal = calc.precio;
         if (!coordsAncla) {
@@ -472,13 +488,13 @@ async function obtenerTarifaRapida(texto, dirRefSheet) {
 
 function buildGmapsUrl(lugar, pedido, driverLat, driverLng) {
   let destino = null;
-  // Prioridad: GPS en tiempo real del cliente > coords cacheadas > dirección texto
   if (pedido?.latCliente && pedido?.lngCliente) {
     destino = `${pedido.latCliente},${pedido.lngCliente}`;
   } else if (pedido?.lat && pedido?.lng) {
     destino = `${pedido.lat},${pedido.lng}`;
   } else {
-    const dir = pedido?.direccion || lugar || '';
+    // PARCHE: usar direccionCliente (la que ingresó el cliente) si existe
+    const dir = pedido?.direccionCliente || pedido?.direccion || lugar || '';
     destino = encodeURIComponent(dir + ', Antioquia, Colombia');
   }
 
@@ -568,7 +584,6 @@ bot.on('location', async ctx => {
   const lng = loc.longitude;
   const esEnVivo = !!(loc.live_period || loc.heading !== undefined);
 
-  // ── Cliente en flujo de pedido esperando GPS ─────────────────────────────
   const sCliente = S[uid];
   if (sCliente?.tipo === 'pedido' && sCliente?.paso === 'esperando_ubi_cliente') {
     sCliente.latCliente = lat;
@@ -598,7 +613,6 @@ bot.on('location', async ctx => {
   drivers[uid].latTs = Date.now();
   drivers[uid].lastActivity = Date.now();
 
-  // Guardar siempre la última ubicación conocida (visible en card offline)
   if (!driversLastSeen[uid]) driversLastSeen[uid] = {};
   driversLastSeen[uid].nombre = drivers[uid].nombre;
   driversLastSeen[uid].lat = lat;
@@ -608,10 +622,8 @@ bot.on('location', async ctx => {
 
   const pedidoId = drivers[uid].pedidoActual;
 
-  // Actualizaciones en vivo → silencio total, solo guardar
   if (esEnVivo) return;
 
-  // Ubicación manual con pedido activo → mostrar ruta
   if (pedidoId) {
     const p = pool[pedidoId];
     if (p) {
@@ -643,7 +655,6 @@ bot.on('location', async ctx => {
 // ══════════════════════════════════════════════════════════════════════════════
 // HANDLER TEXTO PRINCIPAL
 // ══════════════════════════════════════════════════════════════════════════════
-// ── Confirmación de ubicación compartida (domi) ───────────────────────────────
 bot.action('loc_confirmado', async ctx => {
   try { await ctx.answerCbQuery('✅ ¡Perfecto!'); } catch (_) { }
   try {
@@ -656,13 +667,11 @@ bot.action('loc_confirmado', async ctx => {
   } catch (_) { }
 });
 
-// Omitir GPS del cliente → avanzar al paso referencia
 bot.action(/^cli_skip_ubi_(.+)$/, async ctx => {
   try { await ctx.answerCbQuery(); } catch (_) { }
   const uid = ctx.match[1];
   const s = S[uid];
   if (!s || s.tipo !== 'pedido') return;
-  // Limpiar estado de espera ubicación
   delete clienteUbicacion[uid];
   s.paso = 'referencia';
   try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch (_) { }
@@ -674,10 +683,8 @@ bot.action(/^cli_skip_ubi_(.+)$/, async ctx => {
   );
 });
 
-// clienteUbicacion: { [uid]: { pedidoId, barrio } } — ubicación en vivo del cliente
 const clienteUbicacion = {};
 
-// ── Actualizaciones de ubicación en vivo (Telegram edited_message) ────────────
 bot.on('edited_message', async ctx => {
   const msg = ctx.editedMessage;
   if (!msg?.location) return;
@@ -686,7 +693,6 @@ bot.on('edited_message', async ctx => {
   const lat = msg.location.latitude;
   const lng = msg.location.longitude;
 
-  // Driver online → actualizar silenciosamente
   if (drivers[uid]) {
     drivers[uid].lat = lat;
     drivers[uid].lng = lng;
@@ -700,7 +706,6 @@ bot.on('edited_message', async ctx => {
     return;
   }
 
-  // Cliente con pedido ya confirmado → actualizar coords en pool y sheets
   const cu = clienteUbicacion[uid];
   if (cu?.pedidoId && pool[cu.pedidoId]) {
     const p = pool[cu.pedidoId];
@@ -875,6 +880,7 @@ async function manejarAutenticacionAdmin(ctx, uid, clave, msgId) {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // AUTENTICACIÓN DOMICILIARIO
+// PARCHE 1+2: Lee columna E (teléfono) y lo guarda en drivers[uid]
 // ══════════════════════════════════════════════════════════════════════════════
 async function manejarAutenticacion(ctx, uid, clave, msgId) {
   delete espClave[uid];
@@ -882,10 +888,18 @@ async function manejarAutenticacion(ctx, uid, clave, msgId) {
   const r = await verificarClave(clave);
   if (!r.valida) return ctx.reply(`❌ <b>Clave incorrecta.</b>\nPide una nueva al administrador.`, { parse_mode: 'HTML' });
   drivers[uid] = { nombre: r.nombre, pedidoActual: null, loginTs: Date.now() };
+
+  // PARCHE 2: Buscar teléfono del domiciliario en el cache del sheet (columna E)
+  await getSheetDrivers(); // asegurar que el cache esté fresco
+  const sheetEntry = _sheetCache.find(x => x.nombre === r.nombre);
+  if (sheetEntry?.telefono) {
+    drivers[uid].telefono = sheetEntry.telefono;
+    console.log(`📱 Teléfono domiciliario ${r.nombre}: ${sheetEntry.telefono}`);
+  }
+
   await guardarTelegramDriver(r.fila, uid);
   const kb = await menuDriver(uid);
   await ctx.reply(`🎉 <b>¡Acceso concedido!</b>\nHola <b>${r.nombre}</b> 👋`, { parse_mode: 'HTML', ...kb });
-  // Pedir ubicación en tiempo real al iniciar sesión
   await ctx.reply(
     `📍 <b>Comparte tu ubicación en tiempo real</b>\n\n` +
     `Esto nos permite ver dónde estás y calcular rutas precisas.\n\n` +
@@ -914,10 +928,9 @@ async function cmdResumen(ctx) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// DOMICILIARIOS — cache, lista, card detalle  ✨ MEJORADO
+// DOMICILIARIOS — cache, lista, card detalle
+// PARCHE 1: getSheetDrivers lee columna E (teléfono)
 // ══════════════════════════════════════════════════════════════════════════════
-
-// Cache del sheet en memoria
 let _sheetCache = [];
 let _sheetCacheTs = 0;
 
@@ -930,18 +943,19 @@ async function getSheetDrivers() {
     const sheets = google.sheets({ version: 'v4', auth: client });
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEETS_ID,
-      range: 'Domiciliarios!A:D'
+      range: 'Domiciliarios!A:E'   // PARCHE 1: ampliar rango hasta columna E
     });
+    // PARCHE 1: leer índice 4 = columna E (teléfono)
     _sheetCache = (res.data.values || []).slice(1).filter(r => r[1]).map(r => ({
       telegramId: (r[0] || '').toString().trim(),
-      nombre: (r[1] || '').toString().trim(),
+      nombre:     (r[1] || '').toString().trim(),
+      telefono:   (r[4] || '').toString().trim(),  // columna E
     }));
     _sheetCacheTs = Date.now();
   } catch (e) { console.error('getSheetDrivers:', e.message); }
   return _sheetCache;
 }
 
-// Stats del día desde pool únicamente (instantáneo, sin sheet)
 function statsDriverPool(nombre) {
   const ps = Object.values(pool).filter(p => p.estado === 'FINALIZADO' && p.domiciliario === nombre);
   return {
@@ -959,21 +973,18 @@ function tFmt(ms) {
   return mm > 0 ? `${h}h ${String(mm).padStart(2, '0')}min` : `${h}h`;
 }
 
-// ── Card detallada — HTML limpio sin tablas, legible en móvil ─────────────────
 function buildCard(nombre, telegramId) {
   const d = drivers[telegramId];
   const ahora = Date.now();
   const online = !!d;
   const { entregas, ganancia } = statsDriverPool(nombre);
 
-  // ── OFFLINE ────────────────────────────────────────────────────────────────
   if (!online) {
     const seen = driversLastSeen[telegramId];
     const desdeTs = seen?.ts || null;
     const fechaStr = desdeTs ? moment(desdeTs).tz('America/Bogota').format('DD/MM/YYYY') : null;
     const horaStr = desdeTs ? moment(desdeTs).tz('America/Bogota').format('hh:mm A') : null;
     const haceStr = desdeTs ? tFmt(ahora - desdeTs) : null;
-
     const seen_loc = seen?.lat && seen?.lng;
     const gmOffline = seen_loc ? `https://www.google.com/maps?q=${seen.lat},${seen.lng}` : null;
 
@@ -995,7 +1006,6 @@ function buildCard(nombre, telegramId) {
     return { text: cardText, gmapsLink: gmOffline };
   }
 
-  // ── ONLINE ─────────────────────────────────────────────────────────────────
   const enRuta = !!d.pedidoActual;
   const sesionMs = d.loginTs ? (ahora - d.loginTs) : 0;
   const actMs = d.lastActivity ? (ahora - d.lastActivity) : sesionMs;
@@ -1010,7 +1020,6 @@ function buildCard(nombre, telegramId) {
   const valDom = pedido?.precioDomicilio ? COP(pedido.precioDomicilio) : '—';
   const negocio = pedido?.negocioNombre || '—';
 
-  // Link Google Maps — con GPS real del driver si lo compartió
   let gmapsLink = null;
   if (hasLoc && enRuta && pedido) {
     gmapsLink = buildGmapsUrl(pedido.barrio || pedido.direccion || '', pedido, d.lat, d.lng);
@@ -1026,7 +1035,6 @@ function buildCard(nombre, telegramId) {
     ? `⚠️ Sin actividad hace <b>${tFmt(actMs)}</b>`
     : `✅ Activo en este momento`;
 
-  // Barra de sesión visual (8 bloques = 8 horas)
   const pct = Math.min(1, sesionMs / (8 * 3600000));
   const filled = Math.round(pct * 8);
   const bar = '▓'.repeat(filled) + '░'.repeat(8 - filled) + `  ${Math.round(pct * 100)}%`;
@@ -1034,27 +1042,18 @@ function buildCard(nombre, telegramId) {
   let cardText =
     `${badge} <b>${nombre}</b>  ·  <i>${estadoTx}</i>\n` +
     `―――――――――――――――――――――\n\n` +
-
     `🔗 <b>Sesión activa</b>\n` +
     `    ⏰ Ingresó a las  <b>${horaLogin}</b>\n` +
     `    ⏱ Tiempo activo  <b>${tFmt(sesionMs)}</b>\n` +
     `    ${bar}\n` +
-    `    ${actTxt}\n` +
-
-    `
-
-` +
-
+    `    ${actTxt}\n\n` +
     `📍 <b>Ubicación GPS</b>\n` +
     (hasLoc
       ? `    ✅ Activa  ·  hace <b>${locHace}</b>\n` +
       `    ${d.lat.toFixed(6)}, ${d.lng.toFixed(6)}\n`
       : `    ❌ No compartida\n` +
       `    <i>La ruta parte desde la sede</i>\n`) +
-
-    `
-
-`;
+    `\n`;
 
   if (enRuta && pedido) {
     cardText +=
@@ -1065,10 +1064,7 @@ function buildCard(nombre, telegramId) {
       `    📱 Teléfono:   <b>${telCliente}</b>\n` +
       `    📍 Destino:    <b>${destino}</b>\n` +
       `    💵 Domicilio:  <b>${valDom}</b>\n` +
-      `    ⏰ Tomado a las <b>${horaTomo}</b>\n` +
-      `
-
-`;
+      `    ⏰ Tomado a las <b>${horaTomo}</b>\n\n`;
   } else {
     const pendCount = Object.values(pool).filter(p => p.estado === 'PENDIENTE').length;
     cardText +=
@@ -1076,9 +1072,7 @@ function buildCard(nombre, telegramId) {
       (pendCount > 0
         ? `    ⚡ Hay <b>${pendCount}</b> pedido${pendCount !== 1 ? 's' : ''} esperando\n`
         : `    ✅ Sin pedidos pendientes\n`) +
-      `
-
-`;
+      `\n`;
   }
 
   cardText +=
@@ -1089,7 +1083,6 @@ function buildCard(nombre, telegramId) {
   return { text: cardText, gmapsLink };
 }
 
-// ── Lista principal — un botón por fila, nombre completo ─────────────────────
 async function buildLista() {
   const todosSheet = await getSheetDrivers();
   const idsOnline = new Set(Object.keys(drivers).map(String));
@@ -1104,13 +1097,9 @@ async function buildLista() {
   const nOffline = todosSheet.filter(d => !idsOnline.has(d.telegramId)).length;
 
   const header =
-    `👷 <b>Domiciliarios</b>  ·  ${fecha}  ⏰ ${ahora}\n` +
-    `
-` +
+    `👷 <b>Domiciliarios</b>  ·  ${fecha}  ⏰ ${ahora}\n\n` +
     `🟢 <b>${nOnline}</b> en línea   🔴 <b>${nOffline}</b> offline\n` +
-    `📦 Entregas hoy: <b>${totalEntregas}</b>   💵 <b>${COP(totalGanancia)}</b>\n` +
-    `
-` +
+    `📦 Entregas hoy: <b>${totalEntregas}</b>   💵 <b>${COP(totalGanancia)}</b>\n\n` +
     `<i>Toca un nombre para ver el detalle</i>`;
 
   const online = Object.entries(drivers).map(([id, d]) => {
@@ -1122,7 +1111,6 @@ async function buildLista() {
     .filter(d => !idsOnline.has(d.telegramId))
     .map(d => ({ telegramId: d.telegramId, nombre: d.nombre, badge: '🔴' }));
 
-  // Dos botones por fila: nombre (decorativo) + Ver detalles (acción)
   const filas = [...online, ...offline].map(d => ([
     Markup.button.callback(`${d.badge} ${d.nombre}`, `drv_nop`),
     Markup.button.callback(`📋 Ver detalles`, `drv_det_${d.telegramId}`)
@@ -1131,7 +1119,6 @@ async function buildLista() {
   return { header, filas };
 }
 
-// ── cmdDomiciliarios ──────────────────────────────────────────────────────────
 async function cmdDomiciliarios(ctx) {
   if (!esAdmin(ctx.from.id)) return ctx.reply('🚫 Sin acceso.');
   const { header, filas } = await buildLista();
@@ -1140,7 +1127,6 @@ async function cmdDomiciliarios(ctx) {
 
 bot.action('drv_nop', async ctx => { try { await ctx.answerCbQuery(); } catch (_) { } });
 
-// ── Tap en driver → card detallada ───────────────────────────────────────────
 bot.action(/^drv_det_(.+)$/, async ctx => {
   try { await ctx.answerCbQuery(); } catch (_) { }
   if (!esAdmin(ctx.from.id)) return;
@@ -1154,48 +1140,37 @@ bot.action(/^drv_det_(.+)$/, async ctx => {
 
   const { text: cardText, gmapsLink } = buildCard(nombre, telegramId);
 
-  // ── Botones en orden visual lógico ────────────────────────────────────────
   const btns = [];
 
   if (d) {
-    // ONLINE con pedido en ruta
     if (d.pedidoActual) {
       const p = pool[d.pedidoActual];
       const dLat = d.lat || null;
       const dLng = d.lng || null;
-      // Ruta real: origen = GPS del driver si lo compartió, si no desde sede
       const gmRuta = p ? buildGmapsUrl(p.barrio || p.direccion || '', p, dLat, dLng) : null;
 
-      // 1. Maps SIEMPRE arriba — con GPS real si lo compartió
       if (gmRuta) {
         const labelMaps = dLat ? '🗺️ Ver ruta en tiempo real' : '🗺️ Ver ruta al destino';
         btns.push([Markup.button.url(labelMaps, gmRuta)]);
       }
-      // 2. Acciones del pedido
       btns.push([Markup.button.callback(`✅ Marcar entregado · ${d.pedidoActual}`, `entregar_${d.pedidoActual}`)]);
       btns.push([Markup.button.callback(`❌ Cancelar pedido · ${d.pedidoActual}`, `cancelar_order_${d.pedidoActual}`)]);
-
     } else {
-      // ONLINE libre — mostrar ubicación actual si la compartió
       if (gmapsLink) {
         btns.push([Markup.button.url('📍 Ver ubicación actual en Maps', gmapsLink)]);
       }
-      // Asignarle un pedido pendiente
       const pendientes = Object.values(pool).filter(p => p.estado === 'PENDIENTE');
       pendientes.slice(0, 2).forEach(p => {
         btns.push([Markup.button.callback(`📋 Asignar pedido ${p.id}`, `asignar_${p.id}_${telegramId}`)]);
       });
     }
-
   } else {
-    // OFFLINE — última ubicación si quedó guardada
     const seen = driversLastSeen[telegramId];
     if (seen?.lat && seen?.lng) {
       btns.push([Markup.button.url('📍 Última ubicación conocida', `https://www.google.com/maps?q=${seen.lat},${seen.lng}`)]);
     }
   }
 
-  // Volver siempre al final
   btns.push([Markup.button.callback('🔙 Volver al panel', 'drv_back')]);
 
   try {
@@ -1205,7 +1180,6 @@ bot.action(/^drv_det_(.+)$/, async ctx => {
   } catch (e) { console.error('drv_det:', e.message); }
 });
 
-// ── Volver → lista ───────────────────────────────────────────────────────────
 bot.action('drv_back', async ctx => {
   try { await ctx.answerCbQuery(); } catch (_) { }
   if (!esAdmin(ctx.from.id)) return;
@@ -1334,19 +1308,30 @@ bot.action('cancelar_postulacion', async ctx => {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // CARDS DRIVER + BOTONES
+// PARCHE 8: botonesCard agrega botón 📍 Ver en Maps con dirección del cliente
 // ══════════════════════════════════════════════════════════════════════════════
 function botonesCard(p, gmaps) {
   const id = p.id;
+  // PARCHE 8: usar direccionCliente (lo que ingresó el cliente) para el link Maps
+  const dirCliente = p.direccionCliente || p.direccion || '';
+  const mapsDirBtn = dirCliente
+    ? [Markup.button.url('📍 Ver en Maps', gmapsLinkDir(dirCliente))]
+    : null;
+
   if (p.estado === 'EN_PROCESO') {
-    return Markup.inlineKeyboard([
+    const filas = [
       [Markup.button.callback('✅ Entregar', `entregar_${id}`), Markup.button.url('🗺️ Ver Ruta', gmaps)],
-      [Markup.button.callback('❌ Cancelar pedido', `cancelar_order_${id}`)]
-    ]);
+    ];
+    if (mapsDirBtn) filas.push(mapsDirBtn);
+    filas.push([Markup.button.callback('❌ Cancelar pedido', `cancelar_order_${id}`)]);
+    return Markup.inlineKeyboard(filas);
   }
-  return Markup.inlineKeyboard([
+  const filas = [
     [Markup.button.callback('🎯 Tomar', `tomar_${id}`), Markup.button.callback('📸 Subir Factura', `factura_${id}`)],
-    [Markup.button.url('🗺️ Ver Ruta', gmaps), Markup.button.callback('❌ Cancelar', `cancelar_order_${id}`)]
-  ]);
+    [Markup.button.url('🗺️ Ver Ruta', gmaps), Markup.button.callback('❌ Cancelar', `cancelar_order_${id}`)],
+  ];
+  if (mapsDirBtn) filas.splice(1, 0, mapsDirBtn);
+  return Markup.inlineKeyboard(filas);
 }
 
 async function mostrarPendientes(ctx) {
@@ -1360,6 +1345,8 @@ async function mostrarPendientes(ctx) {
       ...enSheets.filter(p => !ids.has(p.id)).map(p => ({
         id: p.id, negocioNombre: p.negocio || p.negocioNombre || '—', tienda: p.tienda || null,
         tipo: p.tipo || null, cliente: p.cliente || '—', telefono: p.telefono || '—',
+        // PARCHE: preservar direccionCliente si viene del sheet, si no usar direccion
+        direccionCliente: p.direccionCliente || p.direccion || '—',
         direccion: p.direccion || '—', barrio: p.barrio || p.direccion || '—',
         origen: p.origen || null, productos: p.productos || '—',
         total: p.total ? (Number(String(p.total).replace(/[^0-9.]/g, '')) || null) : null,
@@ -1373,7 +1360,7 @@ async function mostrarPendientes(ctx) {
         const dLat1 = drivers[uid]?.lat || null;
         const dLng1 = drivers[uid]?.lng || null;
         const gmaps = buildGmapsUrl(p.barrio || p.direccion || '', p, dLat1, dLng1);
-        await ctx.reply(cardPedidoDriver(p, 'PENDIENTE'), { parse_mode: 'HTML', ...botonesCard(p, gmaps) });
+        await ctx.reply(cardPedidoDriver(p, 'PENDIENTE'), { parse_mode: 'HTML', disable_web_page_preview: true, ...botonesCard(p, gmaps) });
       } catch (err) { console.error(`Error pedido ${p.id}:`, err.message); }
     }
   } catch (error) {
@@ -1391,7 +1378,9 @@ async function mostrarEnProceso(ctx) {
     ...enMem,
     ...enSheets.filter(p => !ids.has(p.id)).map(p => ({
       id: p.id, negocioNombre: p.negocio, tienda: p.tienda || null, tipo: p.tipo || null,
-      cliente: p.cliente, telefono: p.telefono, direccion: p.direccion,
+      cliente: p.cliente, telefono: p.telefono,
+      direccionCliente: p.direccionCliente || p.direccion || '—',
+      direccion: p.direccion,
       barrio: p.barrio || p.direccion, origen: p.origen || null, productos: p.productos,
       total: p.total ? (Number(String(p.total).replace(/[^0-9.]/g, '')) || null) : null,
       precioDomicilio: Number(p.precioDomicilio) || 0, domiciliario: p.domiciliario,
@@ -1406,7 +1395,7 @@ async function mostrarEnProceso(ctx) {
     const gmaps = buildGmapsUrl(p.barrio || p.direccion || '', p, dLat, dLng);
     await ctx.reply(
       cardPedidoDriver(p, 'EN_PROCESO') + `\n🛵 <b>${p.domiciliario || '?'}</b> — ⏰ ${p.horaTomo || '?'}`,
-      { parse_mode: 'HTML', ...botonesCard(p, gmaps) }
+      { parse_mode: 'HTML', disable_web_page_preview: true, ...botonesCard(p, gmaps) }
     );
   }
 }
@@ -1429,6 +1418,7 @@ async function mostrarFinalizados(ctx) {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TOMAR PEDIDO
+// PARCHE 6+9: notifica cliente con nombre+teléfono del domi, 40 min estimado
 // ══════════════════════════════════════════════════════════════════════════════
 bot.action(/^tomar_(.+)$/, async ctx => {
   const id = ctx.match[1];
@@ -1447,6 +1437,7 @@ bot.action(/^tomar_(.+)$/, async ctx => {
       id: found.id, negocioNombre: found.negocio || found.negocioNombre || '—',
       tienda: found.tienda || null, tipo: found.tipo || null, cliente: found.cliente || '—',
       telefono: found.telefono || '—', clienteId: found.clienteId || null,
+      direccionCliente: found.direccionCliente || found.direccion || '—',
       direccion: found.direccion || '—', barrio: found.barrio || found.direccion || '—',
       origen: found.origen || null, productos: found.productos || '—', total: found.total || null,
       precioDomicilio: found.precioDomicilio || 0, presupuesto: found.presupuesto || null,
@@ -1462,31 +1453,54 @@ bot.action(/^tomar_(.+)$/, async ctx => {
   const dLat3 = drivers[uid]?.lat || null;
   const dLng3 = drivers[uid]?.lng || null;
   const gmaps = buildGmapsUrl(p.barrio || p.direccion || '', p, dLat3, dLng3);
+
+  // PARCHE 9: Notificar cliente con nombre + teléfono del domiciliario + 40 min
   if (p.clienteId) {
-    const horaEst = calcularHoraEstimada(p.distRutaKm || null);
-    const trackerMsg = trackerCliente('EN_PROCESO', domiciliario.nombre, horaEst) +
-      `\n\n🆔 <b>${id}</b>\n📍 ${p.barrio || p.direccion}\n` +
-      `🛵 Domicilio: <b>${COP(p.precioDomicilio || 0)}</b>`;
+    const telDomi = drivers[uid]?.telefono || '';
+    const dirDisplay = p.direccionCliente || p.direccion || p.barrio || '—';
+    let productosDetalle = p.productos || '—';
+    if (p.carrito?.length > 0) productosDetalle = p.carrito.map(i => `• ${i.cantidad}× ${i.descripcion}`).join('\n');
+
+    const trackerMsg =
+      `🛵 <b>¡Tu pedido está en camino!</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `✅ <b>Domiciliario asignado</b>\n\n` +
+      `👤 <b>${domiciliario.nombre}</b>\n` +
+      (telDomi ? `📱 <b>${telDomi}</b>\n` : '') +
+      `\n🏪 ${p.negocioNombre || '—'}\n` +
+      `📍 ${dirDisplay}\n\n` +
+      `📦 <b>Productos:</b>\n${productosDetalle}\n\n` +
+      `🛵 Domicilio: <b>${COP(p.precioDomicilio || 0)}</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🔴 <b>Tiempo estimado: 40 minutos</b>\n` +
+      `🏍️🏍️🏍️🏍️🏍️............\n` +
+      `<i>¡Tu pedido viene en camino! 🛵❤️</i>`;
     bot.telegram.sendMessage(p.clienteId, trackerMsg, { parse_mode: 'HTML' }).catch(() => { });
   }
-  try {
-    await ctx.editMessageText(
-      cardPedidoDriver({ ...p, domiciliario: domiciliario.nombre }, 'EN_PROCESO') +
-      `\n🛵 <b>${domiciliario.nombre}</b> — ⏰ ${pool[id].horaTomo}`,
-      { parse_mode: 'HTML', ...botonesCard({ ...p, estado: 'EN_PROCESO' }, gmaps) }
-    );
-  } catch (e) { console.error('edit tomar:', e.message); }
+
+  // PARCHE 4a: Canal de pedidos con dirección clickeable
   if (process.env.CANAL_PEDIDOS_ID) {
+    const dirCliente = p.direccionCliente || p.direccion || p.barrio || '—';
+    const dirLink = gmapsLinkDir(dirCliente);
     const cardTomar =
       `🔵 <b>TOMADO — ${id}</b>\n━━━━━━━━━━━━━━━━━━\n` +
       `🛵 Domiciliario: <b>${domiciliario.nombre}</b>\n` +
       `👤 Cliente: ${p.cliente || '—'}  📱 ${p.telefono || '—'}\n` +
-      `📍 ${p.barrio || p.direccion}\n` +
+      `📍 <a href="${dirLink}">${dirCliente}</a>\n` +
       `🏪 ${p.negocioNombre || '—'}\n` +
       `💵 Domicilio: <b>${COP(p.precioDomicilio || 0)}</b>\n` +
       `⏰ ${pool[id].horaTomo}\n━━━━━━━━━━━━━━━━━━`;
-    bot.telegram.sendMessage(process.env.CANAL_PEDIDOS_ID, cardTomar, { parse_mode: 'HTML' }).catch(() => { });
+    bot.telegram.sendMessage(process.env.CANAL_PEDIDOS_ID, cardTomar, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(() => { });
   }
+
+  try {
+    await ctx.editMessageText(
+      cardPedidoDriver({ ...p, domiciliario: domiciliario.nombre }, 'EN_PROCESO') +
+      `\n🛵 <b>${domiciliario.nombre}</b> — ⏰ ${pool[id].horaTomo}`,
+      { parse_mode: 'HTML', disable_web_page_preview: true, ...botonesCard({ ...p, estado: 'EN_PROCESO' }, gmaps) }
+    );
+  } catch (e) { console.error('edit tomar:', e.message); }
+
   const kb = await menuDriver(uid);
   return ctx.reply(`🔵 <b>Pedido #${id}</b>\n✅ Tomado\n⏰ ${pool[id].horaTomo}`, { parse_mode: 'HTML', ...kb });
 });
@@ -1518,7 +1532,7 @@ bot.action(/^factura_(.+)$/, async ctx => {
   try {
     await ctx.editMessageText(
       cardPedidoDriver(p || { id }, 'EN_PROCESO') + `\n\n📸 <b>Envía la foto de la factura...</b>`,
-      { parse_mode: 'HTML', ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver', `verpedido_wil_${id}`)]]) }
+      { parse_mode: 'HTML', disable_web_page_preview: true, ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver', `verpedido_wil_${id}`)]]) }
     );
   } catch (e) { console.error('edit factura prompt:', e.message); }
 });
@@ -1539,6 +1553,10 @@ bot.on('photo', async ctx => {
   }
 });
 
+// ══════════════════════════════════════════════════════════════════════════════
+// PROCESAR FACTURA DOMICILIARIO
+// PARCHE 4b: NO enviar "en camino" al canal al subir factura
+// ══════════════════════════════════════════════════════════════════════════════
 async function procesarFacturaDomiciliario(ctx, uid) {
   const { pedidoId, chatId, msgId, precioDomicilio, clienteId, nombre, pedido } = espFacturaDrv[uid];
   delete espFacturaDrv[uid];
@@ -1552,7 +1570,7 @@ async function procesarFacturaDomiciliario(ctx, uid) {
         cardPedidoDriver(pedido || { id: pedidoId }, 'EN_PROCESO') +
         `\n\n❌ <b>No pude leer el total.</b>\n${resultado.error || 'Intenta con una foto más nítida.'}\n\n📸 Envía la foto de nuevo:`,
         {
-          parse_mode: 'HTML', ...Markup.inlineKeyboard([
+          parse_mode: 'HTML', disable_web_page_preview: true, ...Markup.inlineKeyboard([
             [Markup.button.callback('✏️ Ingresar total manual', `corregir_total_${pedidoId}`)],
             [Markup.button.callback('🔙 Volver', `verpedido_wil_${pedidoId}`)]
           ])
@@ -1579,12 +1597,14 @@ async function procesarFacturaDomiciliario(ctx, uid) {
   let productosDetalle = pedido?.productos || '—';
   if (pedido?.carrito?.length > 0) productosDetalle = pedido.carrito.map(i => `• ${i.cantidad}× ${i.descripcion}`).join('\n');
 
+  // Notificar al cliente con la factura (incluye desglose)
   if (clienteId) {
+    const dirCliente = pedido?.direccionCliente || pedido?.direccion || '—';
     try {
       await bot.telegram.sendPhoto(clienteId, fileId, {
         caption:
           `🧾 <b>FACTURA DE TU PEDIDO</b>\n━━━━━━━━━━━━━━━━━━\n🆔 <b>${pedidoId}</b>\n` +
-          `👤 ${pedido?.cliente || '—'}\n📍 <b>${pedido?.barrio || pedido?.direccion || '—'}</b>\n` +
+          `👤 ${pedido?.cliente || '—'}\n📍 <b>${dirCliente}</b>\n` +
           `━━━━━━━━━━━━━━━━━━\n📦 <b>PRODUCTOS:</b>\n${productosDetalle}\n━━━━━━━━━━━━━━━━━━\n` +
           `🧾 Productos: <b>${COP(totalProductos)}</b>\n🛵 Domicilio: <b>${COP(domFinal)}</b>\n` +
           `━━━━━━━━━━━━━━━━━━\n💵 <b>TOTAL: ${COP(totalFinal)}</b>\n🛵 ${nombre}`,
@@ -1592,14 +1612,8 @@ async function procesarFacturaDomiciliario(ctx, uid) {
       });
     } catch (e) { console.error('Factura al cliente:', e.message); }
   }
-  if (process.env.CANAL_PEDIDOS_ID) {
-    bot.telegram.sendMessage(process.env.CANAL_PEDIDOS_ID,
-      `📦 <b>EN CAMINO — ${pedidoId}</b>\n${tipoBadge(pedido)}\n` +
-      `👤 ${pedido?.cliente || '—'}  📱 ${pedido?.telefono || '—'}\n📍 <b>${pedido?.barrio || pedido?.direccion || '—'}</b>\n` +
-      `🧾 ${COP(totalProductos)} + 🛵 ${COP(domFinal)} = 💵 <b>${COP(totalFinal)}</b>\n🛵 ${nombre}`,
-      { parse_mode: 'HTML' }
-    ).catch(() => { });
-  }
+
+  // PARCHE 4b: NO enviar "en camino" al canal al subir factura — solo actualizar card del driver
   const driverId = uid;
   const dLat4 = drivers[driverId]?.lat || null;
   const dLng4 = drivers[driverId]?.lng || null;
@@ -1610,7 +1624,7 @@ async function procesarFacturaDomiciliario(ctx, uid) {
       cardPedidoDriver({ ...pActual, total: totalFinal }, 'EN_PROCESO') +
       `\n🛵 <b>${nombre}</b>\n🧾 ${COP(totalProductos)} + 🛵 ${COP(domFinal)} = 💵 <b>${COP(totalFinal)}</b>\n📲 <i>Cliente notificado ✅</i>`,
       {
-        parse_mode: 'HTML', ...Markup.inlineKeyboard([
+        parse_mode: 'HTML', disable_web_page_preview: true, ...Markup.inlineKeyboard([
           [Markup.button.callback('✅ Entregar', `entregar_${pedidoId}`), Markup.button.url('🗺️ Ver Ruta', gmaps)],
           [Markup.button.callback('❌ Cancelar pedido', `cancelar_order_${pedidoId}`)]
         ])
@@ -1631,13 +1645,13 @@ bot.action(/^verpedido_wil_(.+)$/, async ctx => {
   if (!p) {
     const lista = await getPedidos('ALL').catch(() => []);
     const f = lista.find(x => x.id === id);
-    if (f) p = { ...f, barrio: f.barrio || f.direccion };
+    if (f) p = { ...f, barrio: f.barrio || f.direccion, direccionCliente: f.direccionCliente || f.direccion };
   }
   if (!p) return;
   const dLat5 = drivers[uid]?.lat || null;
   const dLng5 = drivers[uid]?.lng || null;
   const gmaps = buildGmapsUrl(p.barrio || p.direccion || '', p, dLat5, dLng5);
-  try { await ctx.editMessageText(cardPedidoDriver(p, p.estado || 'EN_PROCESO'), { parse_mode: 'HTML', ...botonesCard(p, gmaps) }); } catch (_) { }
+  try { await ctx.editMessageText(cardPedidoDriver(p, p.estado || 'EN_PROCESO'), { parse_mode: 'HTML', disable_web_page_preview: true, ...botonesCard(p, gmaps) }); } catch (_) { }
 });
 
 bot.action('volver_pendientes', async ctx => { await ctx.answerCbQuery(); await mostrarPendientes(ctx); });
@@ -1730,7 +1744,7 @@ bot.action(/^entregar_(.+)$/, async ctx => {
     try { await bot.telegram.sendPhoto(ctx.chat.id, p.facturaFileId, { caption: resumenDriver, parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } }); } catch (_) { }
     try { await ctx.editMessageText(`🟢 Pedido <b>${id}</b> finalizado · ⏰ ${hora || '—'}`, { parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } }); } catch (_) { }
   } else {
-    try { await ctx.editMessageText(resumenDriver, { parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } }); } catch (_) { }
+    try { await ctx.editMessageText(resumenDriver, { parse_mode: 'HTML', disable_web_page_preview: true, reply_markup: { inline_keyboard: [] } }); } catch (_) { }
   }
 
   if (p?.clienteId) {
@@ -1743,18 +1757,20 @@ bot.action(/^entregar_(.+)$/, async ctx => {
   }
 
   if (process.env.CANAL_PEDIDOS_ID) {
+    const dirCliente = p?.direccionCliente || p?.direccion || p?.barrio || '—';
+    const dirLink = gmapsLinkDir(dirCliente);
     const cardCanal =
       `🟢 <b>ENTREGADO — ${id}</b>\n━━━━━━━━━━━━━━━━━━\n` +
       `🛵 Domiciliario: <b>${nomDomi}</b>\n` +
       `👤 ${p?.cliente || '—'}  📱 ${p?.telefono || '—'}\n` +
-      `📍 ${p?.barrio || p?.direccion || '—'}\n` +
+      `📍 <a href="${dirLink}">${dirCliente}</a>\n` +
       `🏪 ${p?.negocioNombre || '—'}\n` +
       `📦 ${productosDetalle}\n━━━━━━━━━━━━━━━━━━\n` +
       (p?.totalProductos ? `🧾 Productos: <b>${COP(p.totalProductos)}</b>\n` : '') +
       (p?.precioDomicilio ? `🛵 Domicilio: <b>${COP(p.precioDomicilio)}</b>\n` : '') +
       (p?.total ? `💵 <b>TOTAL: ${COP(p.total)}</b>\n` : '') +
       `⏰ Entregado: ${hora || '—'}`;
-    bot.telegram.sendMessage(process.env.CANAL_PEDIDOS_ID, cardCanal, { parse_mode: 'HTML' }).catch(() => { });
+    bot.telegram.sendMessage(process.env.CANAL_PEDIDOS_ID, cardCanal, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(() => { });
   }
 
   const kb = await menuDriver(uid);
@@ -1804,8 +1820,8 @@ async function mostrarOpcionesPedido(ctx) {
   delete S[ctx.from.id];
   return ctx.reply('¿De dónde quieres pedir?', Markup.inlineKeyboard([
     [Markup.button.callback('🏪 Domicilios WIL (general)', 'neg_wil')],
-    [Markup.button.callback('💊 Farmacia Expertos', 'neg_expertos')],
-    [Markup.button.callback('🏥 Farmacia La Central', 'neg_central')],
+    [Markup.button.callback('💊 FarmaExpertos Copacabana', 'neg_expertos')],
+    [Markup.button.callback('🏥 Farmacia Central Copacabana', 'neg_central')],
     [Markup.button.callback('📦 Paquetería', 'paqueteria')]
   ]));
 }
@@ -1897,6 +1913,7 @@ async function procesarPaquete(ctx, uid) {
   pool[id] = {
     id, negocioNombre: '📦 Paquetería WIL — Recogida', tienda: null, tipo: 'paqueteria',
     cliente: s.nombre, telefono: s.telefono, clienteId: uid,
+    direccionCliente: s.barrioDestino || s.direccionDestino,
     direccion: s.barrioDestino || s.direccionDestino, barrio: s.barrioDestino || s.direccionDestino,
     origen: s.origenBarrio || null, productos: productosStr, total: null,
     precioDomicilio: dom, estado: 'PENDIENTE',
@@ -2130,9 +2147,8 @@ async function manejarSesionCliente(ctx, uid, txt) {
       );
 
     case 'direccion': {
-      s.direccion = txt;
+      s.direccion = txt;  // guardamos la dirección RAW del cliente
       s.paso = 'esperando_ubi_cliente';
-      // Guardar barrio temporal para vincularlo cuando llegue el GPS
       clienteUbicacion[uid] = { pedidoId: null, barrio: txt };
       return ctx.reply(
         cardPedidoCliente(s) +
@@ -2150,7 +2166,6 @@ async function manejarSesionCliente(ctx, uid, txt) {
     }
 
     case 'esperando_ubi_cliente': {
-      // El usuario escribió texto en lugar de compartir ubicación → ignorar, repetir pedido
       return ctx.reply(
         `📍 Por favor comparte tu <b>ubicación en tiempo real</b>,\n` +
         `o toca <b>Continuar sin GPS</b> para avanzar.`,
@@ -2257,7 +2272,7 @@ async function buscarYMostrar(ctx, s, termino) {
     const precioDisplay = p.tienePrecioVarios
       ? `1 und: <b>${COP(p.precioUnidad)}</b>  |  Varios: <b>${COP(p.precioUnitario)}</b>`
       : `<b>${COP(p.precioUnitario)}</b> c/u`;
-    msg += `${i + 1}. <b>${p.descripcion}</b>\n   🏭 ${p.laboratorio || '—'}  📦 ${p.unidad || 'Unidad'}\n   💰 ${precioDisplay}\n\n`;
+    msg += `${i + 1}. <b>${p.descripcionCompleta || p.descripcion}</b>\n   🏭 ${p.laboratorio || '—'}  📦 ${p.unidad || 'Unidad'}\n   💰 ${precioDisplay}\n\n`;
   });
   const botones = res.map((p, i) => [Markup.button.callback(`${i + 1}. ${p.descripcion.substring(0, 28)} ${COP(p.precioUnitario)}`, `prod_${i}`)]);
   botones.push([Markup.button.callback('🔍 Buscar otro', 'buscar_otro')]);
@@ -2268,7 +2283,7 @@ async function buscarYMostrar(ctx, s, termino) {
 async function agregarAlCarrito(ctx, s, cantidad) {
   const p = s.prodSel;
   const pu = cantidad === 1 ? (p.precioUnidad || p.precioUnitario || 0) : (p.precioUnitario || p.precioUnidad || 0);
-  s.carrito.push({ descripcion: p.descripcion, laboratorio: p.laboratorio, unidad: p.unidad, cantidad, precioUnitario: pu, subtotal: pu * cantidad });
+  s.carrito.push({ descripcion: p.descripcionCompleta || p.descripcion, laboratorio: p.laboratorio, unidad: p.unidad, cantidad, precioUnitario: pu, subtotal: pu * cantidad });
   s.paso = 'buscar'; delete s._cantPendiente;
   return ctx.reply(
     cardPedidoCliente(s) + `\n\n✅ <b>Agregado al carrito</b>\n\n🔍 ¿Qué más necesitas?`,
@@ -2291,7 +2306,7 @@ bot.action(/^prod_(\d+)$/, async ctx => {
   s.paso = 'cantidad';
   const p = s.prodSel;
   return ctx.reply(
-    `💊 <b>${p.descripcion}</b>\n🏭 ${p.laboratorio || '—'}\n📦 ${p.unidad || 'Unidad'}\n` +
+    `💊 <b>${p.descripcionCompleta || p.descripcion}</b>\n🏭 ${p.laboratorio || '—'}\n📦 ${p.unidad || 'Unidad'}\n` +
     (p.tienePrecioVarios
       ? `💰 1 und: <b>${COP(p.precioUnidad)}</b>  |  Varios: <b>${COP(p.precioUnitario)}</b>\n\n`
       : `💰 <b>${COP(p.precioUnitario)}</b> c/u\n\n`) +
@@ -2346,6 +2361,10 @@ bot.action(/^pago_(.+)$/, async ctx => {
   await procesarPedido(ctx, ctx.from.id);
 });
 
+// ══════════════════════════════════════════════════════════════════════════════
+// PROCESAR PEDIDO
+// PARCHE 4a: Canal con dirección clickeable + PARCHE guarda direccionCliente
+// ══════════════════════════════════════════════════════════════════════════════
 async function procesarPedido(ctx, uid) {
   const s = S[uid];
   const sub = s.carrito.reduce((a, i) => a + (i.subtotal || 0), 0);
@@ -2358,44 +2377,50 @@ async function procesarPedido(ctx, uid) {
     precioDomicilio: dom, totalFinal: tot, presupuesto: s.presupuesto
   });
   await ctx.reply(facturaHTML(s, id) + `\n\n🆔 <b>${id}</b>\n<i>Guarda este ID para consultar tu pedido.</i>`, { parse_mode: 'HTML' });
+
+  // PARCHE: guardar direccionCliente (la que ingresó el cliente literalmente)
   pool[id] = {
     id, negocioNombre: s.negocioNombre, tienda: s.tienda || null, tipo: 'pedido',
     cliente: s.nombre, telefono: s.telefono, clienteId: uid,
-    direccion: s.barrioDetectado || s.direccion, barrio: s.barrioDetectado || s.direccion,
+    direccionCliente: s.direccion,                     // ← RAW del cliente
+    direccion: s.barrioDetectado || s.direccion,       // ← normalizada para lógica interna
+    barrio: s.barrioDetectado || s.direccion,
     presupuesto: s.presupuesto || null, zona: s.zona || '', municipio: s.municipio || '',
     productos: s.carrito.map(i => `${i.cantidad}× ${i.descripcion}`).join(', '),
     carrito: s.carrito, total: tot > 0 ? tot : null, precioDomicilio: dom,
     estado: 'PENDIENTE', hora: moment().tz('America/Bogota').format('hh:mm A'),
     createdAt: Date.now(),
-    // GPS en tiempo real del cliente (si lo compartió en el flujo)
     latCliente: s.latCliente || null,
     lngCliente: s.lngCliente || null,
   };
-  // Vincular clienteUbicacion al pedido ya confirmado (para actualizaciones en vivo)
+
   if (s.latCliente && s.lngCliente) {
     clienteUbicacion[uid] = { pedidoId: id, barrio: s.barrioDetectado || s.direccion || '' };
-    // Guardar en sheets
     actualizarUbicacionPedido(id, s.latCliente, s.lngCliente).catch(() => { });
   }
+
   const { pend } = await getContadores();
   for (const [did, d] of Object.entries(drivers)) {
     if (!d.pedidoActual) {
       bot.telegram.sendMessage(did,
         `🔴 <b>Nuevo pedido</b>\n🆕 <b>${id}</b>\n🏪 ${s.negocioNombre}\n` +
-        `📍 ${s.barrioDetectado || s.direccion}\n🛵 Domicilio: <b>${COP(dom)}</b>\n\nPresiona 📋 Pendientes (${pend})`,
+        `📍 ${s.direccion}\n🛵 Domicilio: <b>${COP(dom)}</b>\n\nPresiona 📋 Pendientes (${pend})`,
         { parse_mode: 'HTML' }
       ).catch(() => { });
     }
   }
+
+  // PARCHE 4a: Canal con dirección clickeable
   if (process.env.CANAL_PEDIDOS_ID) {
+    const dirLink = gmapsLinkDir(s.direccion);
     const cardCanal =
       `🔴 <b>NUEVO PEDIDO — ${id}</b>\n━━━━━━━━━━━━━━━━━━\n` +
       `🏪 ${s.negocioNombre}\n` +
       `👤 ${s.nombre}  📱 ${s.telefono}\n` +
-      `📍 ${s.barrioDetectado || s.direccion}\n` +
+      `📍 <a href="${dirLink}">${s.direccion}</a>\n` +
       `🛵 Domicilio: <b>${COP(dom)}</b>\n` +
       `⏰ ${moment().tz('America/Bogota').format('hh:mm A')}\n━━━━━━━━━━━━━━━━━━`;
-    bot.telegram.sendMessage(process.env.CANAL_PEDIDOS_ID, cardCanal, { parse_mode: 'HTML' }).catch(() => { });
+    bot.telegram.sendMessage(process.env.CANAL_PEDIDOS_ID, cardCanal, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(() => { });
   }
   delete S[uid];
 }
@@ -2471,7 +2496,7 @@ async function enviarRecordatorio() {
     msg +=
       `🔴 <b>${p.id}</b>\n` +
       `👤 ${p.cliente || '—'}  📱 ${p.telefono || '—'}\n` +
-      `📍 ${p.direccion || p.barrio || '—'}\n` +
+      `📍 ${p.direccionCliente || p.direccion || p.barrio || '—'}\n` +
       `⏰ Hace <b>${mins} min</b>\n\n`;
   });
 
@@ -2574,7 +2599,9 @@ bot.action(/^asignar_(.+)_(.+)$/, async ctx => {
       id: found.id, negocioNombre: found.negocio || found.negocioNombre || '—',
       tienda: found.tienda || null, tipo: found.tipo || null,
       cliente: found.cliente || '—', telefono: found.telefono || '—',
-      clienteId: found.clienteId || null, direccion: found.direccion || '—',
+      clienteId: found.clienteId || null,
+      direccionCliente: found.direccionCliente || found.direccion || '—',
+      direccion: found.direccion || '—',
       barrio: found.barrio || found.direccion || '—', productos: found.productos || '—',
       total: found.total || null, precioDomicilio: found.precioDomicilio || 0,
       estado: 'PENDIENTE', carrito: found.carrito || [], hora: found.hora || null
@@ -2605,6 +2632,7 @@ bot.action(/^asignar_(.+)_(.+)$/, async ctx => {
   const dLat6 = drivers[driverId]?.lat || null;
   const dLng6 = drivers[driverId]?.lng || null;
   const gmaps = buildGmapsUrl(p.barrio || p.direccion || '', p, dLat6, dLng6);
+  const telDomi = d.telefono || '';
 
   bot.telegram.sendMessage(driverId,
     `👋 <b>Hola ${d.nombre},</b>\n\n` +
@@ -2613,7 +2641,7 @@ bot.action(/^asignar_(.+)_(.+)$/, async ctx => {
     `🆔  <b>${pedidoId}</b>\n` +
     `🏪  ${p.negocioNombre || '—'}\n` +
     `👤  ${p.cliente || '—'}  📱 ${p.telefono || '—'}\n` +
-    `📍  <b>${p.barrio || p.direccion}</b>\n` +
+    `📍  <b>${p.direccionCliente || p.direccion || p.barrio}</b>\n` +
     `💵  Domicilio: <b>${COP(p.precioDomicilio || 0)}</b>\n` +
     `━━━━━━━━━━━━━━━━━━━━━━\n` +
     `<i>Recuerda ser puntual y amable con el cliente 😊</i>`,
@@ -2626,21 +2654,38 @@ bot.action(/^asignar_(.+)_(.+)$/, async ctx => {
     }
   ).catch(() => { });
 
+  // PARCHE 9: Notificar cliente con nombre + teléfono del domiciliario al asignar
   if (p.clienteId) {
-    const horaEst = calcularHoraEstimada(null);
-    const trackerMsg = trackerCliente('EN_PROCESO', d.nombre, horaEst) +
-      `\n\n🆔 <b>${pedidoId}</b>\n📍 ${p.barrio || p.direccion}\n` +
-      `💵 Domicilio: <b>${COP(p.precioDomicilio || 0)}</b>`;
+    const dirDisplay = p.direccionCliente || p.direccion || p.barrio || '—';
+    let productosDetalle = p.productos || '—';
+    if (p.carrito?.length > 0) productosDetalle = p.carrito.map(i => `• ${i.cantidad}× ${i.descripcion}`).join('\n');
+
+    const trackerMsg =
+      `🛵 <b>¡Tu pedido está en camino!</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `✅ <b>Domiciliario asignado</b>\n\n` +
+      `👤 <b>${d.nombre}</b>\n` +
+      (telDomi ? `📱 <b>${telDomi}</b>\n` : '') +
+      `\n🏪 ${p.negocioNombre || '—'}\n` +
+      `📍 ${dirDisplay}\n\n` +
+      `📦 <b>Productos:</b>\n${productosDetalle}\n\n` +
+      `🛵 Domicilio: <b>${COP(p.precioDomicilio || 0)}</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🔴 <b>Tiempo estimado: 40 minutos</b>\n` +
+      `🏍️🏍️🏍️🏍️🏍️............\n` +
+      `<i>¡Tu pedido viene en camino! 🛵❤️</i>`;
     bot.telegram.sendMessage(p.clienteId, trackerMsg, { parse_mode: 'HTML' }).catch(() => { });
   }
 
   if (process.env.CANAL_PEDIDOS_ID) {
+    const dirCliente = p.direccionCliente || p.direccion || p.barrio || '—';
+    const dirLink = gmapsLinkDir(dirCliente);
     bot.telegram.sendMessage(process.env.CANAL_PEDIDOS_ID,
       `🔵 <b>ASIGNADO POR ADMIN — ${pedidoId}</b>\n` +
       `🛵 Domiciliario: <b>${d.nombre}</b>\n` +
       `👤 ${p.cliente || '—'}  📱 ${p.telefono || '—'}\n` +
-      `📍 ${p.barrio || p.direccion}\n⏰ ${p.horaTomo}`,
-      { parse_mode: 'HTML' }
+      `📍 <a href="${dirLink}">${dirCliente}</a>\n⏰ ${p.horaTomo}`,
+      { parse_mode: 'HTML', disable_web_page_preview: true }
     ).catch(() => { });
   }
 });

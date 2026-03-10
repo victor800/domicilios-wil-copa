@@ -1,10 +1,13 @@
 // ══════════════════════════════════════════════════════════════════════════════
 // sheets.js — Google Sheets backend para Domicilios WIL
 //
+// Hojas stock: STOCK_DROGUERIA_EXPERTOS / STOCK_DROGUERIA_CENTRAL
+//   A=Descripción  B=Laboratorio  C=Unidad  D=Precio  E=Precio Unitario
+//   r[0]           r[1]           r[2]      r[3]      r[4]
+//
 // Hoja coordenadas: A=BARRIO B=TARIFA C=PAQ_PEQUEÑO D=PAQ_MEDIANO
 //                   E=PAQ_GRANDE F=DIRECCION G=ZONA H=LAT I=LNG
-//
-// Hoja Pedidos: A–S igual que antes + T=LAT_CLIENTE  U=LNG_CLIENTE
+// Hoja Pedidos: A–S + T=LAT_CLIENTE U=LNG_CLIENTE
 // ══════════════════════════════════════════════════════════════════════════════
 const { google } = require('googleapis');
 const moment     = require('moment-timezone');
@@ -40,7 +43,7 @@ const HEADERS_PEDIDOS = [
   'IMAGEN_TRANSFERENCIA','PRODUCTOS','MARCA','CANTIDAD','V/U','V/TOTAL',
   'DIRECCION','HORA','FECHA','TOTAL','NOMBRE_DOMICILIARIO',
   'HORA_TOMO_PEDIDO','HORA_ENTREGO','CALIFICACION',
-  'LAT_CLIENTE','LNG_CLIENTE'   // T, U — ubicación GPS en tiempo real del cliente
+  'LAT_CLIENTE','LNG_CLIENTE'
 ];
 
 const HEADERS_COORDENADAS    = ['BARRIO','TARIFA','PAQ_PEQUEÑO','PAQ_MEDIANO','PAQ_GRANDE','DIRECCION','ZONA','LAT','LNG'];
@@ -113,34 +116,197 @@ async function getProductosPorCategoria(categoria) {
              .map(r => ({ categoria: r[0], producto: r[1], precio: pn(r[2]) }));
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// BÚSQUEDA FUZZY DE MEDICAMENTOS
+//
+// Columnas A:E de ambas hojas de stock:
+//   r[0] = A = Descripción      ← nombre del medicamento (se busca aquí)
+//   r[1] = B = Laboratorio
+//   r[2] = C = Unidad
+//   r[3] = D = Precio           ← precio por 1 unidad sola
+//   r[4] = E = Precio Unitario  ← precio comprando varios (caja/blíster)
+//
+// LÓGICA DE PRECIOS:
+//   Solo D   → se muestra ese precio para cualquier cantidad
+//   D y E    → se muestran ambos: "1 und: $X | Varios: $Y"
+//   Solo E   → se usa E como precio base
+//
+// BÚSQUEDA TOLERANTE — 8 niveles:
+//   Permite encontrar "Pedialyte" escribiendo "Pedialite", "Pedialy", etc.
+// ══════════════════════════════════════════════════════════════════════════════
+
+/** Normaliza: minúsculas + sin tildes + sin símbolos */
+function _norm(txt) {
+  return (txt || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Clave fonética para español farmacéutico.
+ * Maneja confusiones comunes: y/i, b/v, ll/y, c/k/qu, z/s, ph/f, h muda, letras dobles.
+ * Permite: "Pedialite" → "pedialite" → encuentra "PEDIALYTE"
+ *          "Amoxicilina" → encuentra "AMOXICILLINA"
+ *          "Ibuprofeno" → encuentra "IBUPROFEN"
+ */
+function _fonetica(txt) {
+  return _norm(txt)
+    .replace(/ph/g, 'f')
+    .replace(/qu/g, 'k')
+    .replace(/ck/g, 'k')
+    .replace(/ll/g, 'l')
+    .replace(/[yx]/g, 'i')
+    .replace(/[bv]/g, 'b')
+    .replace(/[zs]/g, 's')
+    .replace(/h/g, '')
+    .replace(/([a-z])\1+/g, '$1');
+}
+
+/**
+ * Calcula relevancia entre lo que escribió el cliente y el nombre del producto.
+ * Retorna 0–100. Solo se incluyen en resultados los que tengan score > 0.
+ */
+function _puntaje(query, descripcion) {
+  if (!query || !descripcion) return 0;
+
+  const qN = _norm(query);
+  const dN = _norm(descripcion);
+  const qF = _fonetica(query);
+  const dF = _fonetica(descripcion);
+
+  // Nivel 1: descripción empieza exactamente con la query
+  // "pedialyte" → "PEDIALYTE SUERO ORAL 1L" = 100
+  if (dN.startsWith(qN)) return 100;
+
+  // Nivel 2: query es substring exacto de la descripción
+  // "lyte" dentro de "PEDIALYTE" = 90
+  if (qN.length >= 4 && dN.includes(qN)) return 90;
+
+  // Nivel 3: descripción fonética empieza con la query fonética
+  // "pedialite" → "pedialite" ≈ "pedialite" (fonética) = 85
+  if (qF.length >= 4 && dF.startsWith(qF)) return 85;
+
+  // Nivel 4: query fonética es substring de descripción fonética
+  if (qF.length >= 4 && dF.includes(qF)) return 75;
+
+  // Nivel 5: todas las palabras del query aparecen en la descripción
+  const pQ = qN.split(' ').filter(p => p.length >= 3);
+  const pD = dN.split(' ');
+  if (pQ.length > 0) {
+    const hits = pQ.filter(w => pD.some(d => d.startsWith(w) || w.startsWith(d)));
+    if (hits.length === pQ.length) return 65;
+
+    // Nivel 6: mayoría de palabras coinciden (≥60%)
+    const ratio = hits.length / pQ.length;
+    if (ratio >= 0.6 && hits.length >= 1) return Math.round(25 + ratio * 25);
+  }
+
+  // Nivel 7: primera palabra de la query coincide con inicio de descripción
+  const w0Q = qN.split(' ')[0];
+  const w0D = dN.split(' ')[0];
+  if (w0Q.length >= 4 && w0D.startsWith(w0Q)) return 50;
+
+  // Nivel 8: primera palabra fonética coincide
+  const f0Q = _fonetica(w0Q);
+  const f0D = _fonetica(w0D);
+  if (f0Q.length >= 4 && (f0D.startsWith(f0Q) || f0Q.startsWith(f0D))) return 40;
+
+  return 0;
+}
+
+/**
+ * Trunca nombres muy largos para el botón de Telegram (máx 38 chars).
+ * Corta en el último espacio para no partir palabras.
+ * Ej: "ACETAMINOFEN GENFAR 500MG TABLETA X10 UND" → "ACETAMINOFEN GENFAR 500MG…"
+ */
+function _truncar(nombre, max = 38) {
+  if (!nombre || nombre.length <= max) return nombre;
+  const corte = nombre.substring(0, max);
+  const ultimoEsp = corte.lastIndexOf(' ');
+  return (ultimoEsp > max * 0.55 ? corte.substring(0, ultimoEsp) : corte) + '…';
+}
+
 async function buscarProductos(termino, tienda) {
   await inicializar();
   const sheets = await getSheets();
-  const hoja   = tienda === 'CENTRAL' ? 'STOCK_DROGUERIA_CENTRAL' : 'STOCK_DROGUERIA_EXPERTOS';
+
+  // Seleccionar hoja según farmacia
+  const hoja = tienda === 'CENTRAL'
+    ? 'STOCK_DROGUERIA_CENTRAL'
+    : 'STOCK_DROGUERIA_EXPERTOS';
+
+  console.log(`\n🔍 buscarProductos("${termino}") → ${hoja}`);
+
   try {
-    const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: `${hoja}!H:M` });
+    // Leer columnas A a E — Descripción, Laboratorio, Unidad, Precio, PrecioUnitario
+    const res  = await sheets.spreadsheets.values.get({
+      spreadsheetId: SID(),
+      range: `${hoja}!A:E`
+    });
     const rows = res.data.values || [];
-    const q    = termino.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-    const out  = [];
+
+    const candidatos = [];
+
+    // Fila 0 = encabezados → empezar desde índice 1
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
-      if (!r?.[0]) continue;
-      const desc = r[0].toString().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-      if (!desc.includes(q)) continue;
-      const precioUnidad   = pn(r[4]);
-      const precioUnitario = pn(r[5]);
-      const precioMostrar  = precioUnitario > 0 ? precioUnitario : (precioUnidad > 0 ? precioUnidad : 0);
-      if (precioMostrar === 0) continue;
-      out.push({
-        descripcion: r[0]||'', laboratorio: r[1]||'', unidad: r[3]||'',
-        precioUnidad, precioUnitario: precioMostrar,
-        tienePrecioVarios: precioUnitario > 0 && precioUnidad > 0 && precioUnitario !== precioUnidad
-      });
-      if (out.length >= 6) break;
+
+      // r[0] = A = Descripción (nombre del medicamento)
+      if (!r || !r[0] || !r[0].toString().trim()) continue;
+
+      const nombreRaw = r[0].toString().trim();
+
+      // r[3] = D = Precio (1 unidad)
+      // r[4] = E = Precio Unitario (varios/caja)
+      const precioD = pn(r[3]);
+      const precioE = pn(r[4]);
+
+      // Sin precio → omitir
+      if (precioD === 0 && precioE === 0) continue;
+
+      const score = _puntaje(termino, nombreRaw);
+      if (score === 0) continue;
+
+      candidatos.push({ score, nombreRaw, r });
     }
-    return out;
+
+    // Ordenar de mayor a menor relevancia
+    candidatos.sort((a, b) => b.score - a.score);
+
+    // Retornar los 6 mejores
+    const resultado = candidatos.slice(0, 6).map(({ score, nombreRaw, r }) => {
+      const precioD = pn(r[3]); // D: precio 1 unidad sola
+      const precioE = pn(r[4]); // E: precio por varios / caja
+
+      // precioUnidad   = lo que paga comprando 1 (col D)
+      // precioUnitario = precio por varios (col E), si no existe usa D
+      const precioUnidad   = precioD;
+      const precioUnitario = precioE > 0 ? precioE : precioD;
+
+      // Hay dos precios diferentes → mostrar ambos al cliente
+      const tienePrecioVarios = precioD > 0 && precioE > 0 && precioD !== precioE;
+
+      console.log(`  [${score}] "${nombreRaw}" D=$${precioD} E=$${precioE}`);
+
+      return {
+        descripcion:         _truncar(nombreRaw),  // nombre corto para botón
+        descripcionCompleta: nombreRaw,             // nombre completo para factura
+        laboratorio:         (r[1] || '').toString().trim(), // col B
+        unidad:              (r[2] || '').toString().trim(), // col C
+        precioUnidad,        // precio 1 sola unidad
+        precioUnitario,      // precio varios (o igual a precioUnidad si no hay)
+        tienePrecioVarios,   // true → mostrar "1 und: $X | Varios: $Y"
+      };
+    });
+
+    console.log(`✅ ${resultado.length} resultado(s)\n`);
+    return resultado;
+
   } catch(e) {
-    console.error('buscarProductos:', e.message);
+    console.error('buscarProductos ERROR:', e.message);
     return [];
   }
 }
@@ -207,13 +373,10 @@ async function buscarBarrioEnSheet(texto) {
       const bn = norm(barrio);
       let score = 0;
 
-      if (bn === query) {
-        score = 100;
-      } else if (query.includes(bn) && bn.length >= 4) {
-        score = 90;
-      } else if (bn.includes(query) && query.length >= 4) {
-        score = 75;
-      } else {
+      if (bn === query)                                  { score = 100; }
+      else if (query.includes(bn) && bn.length >= 4)    { score = 90;  }
+      else if (bn.includes(query) && query.length >= 4) { score = 75;  }
+      else {
         const palabrasBarrio = bn.split(' ').filter(p => p.length >= 4);
         const palabrasQuery  = query.split(' ').filter(p => p.length >= 4);
         const coinciden = palabrasBarrio.filter(pb =>
@@ -303,8 +466,7 @@ async function getTodosBarriosSheet() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// NUEVA — guardar lat/lng del cliente en el pedido (cols T y U)
-// Se llama cuando el cliente comparte ubicación en tiempo real
+// UBICACIÓN GPS DEL CLIENTE (cols T y U de Pedidos)
 // ══════════════════════════════════════════════════════════════════════════════
 async function actualizarUbicacionPedido(pedidoId, lat, lng) {
   try {
@@ -379,12 +541,12 @@ async function registrarPedido(p) {
     item.precioUnitario,
     item.subtotal,
     i===0 ? p.direccion                : '',
-    i===0 ? ahora.format('hh:mm A')    : '',
-    i===0 ? ahora.format('DD/MM/YYYY') : '',
+    i===0 ? ahora.format('hh:mm A')   : '',
+    i===0 ? ahora.format('DD/MM/YYYY'): '',
     i===0 ? p.totalFinal               : '',
     '', '', '',
     '',   // S — Calificación
-    '',   // T — LAT_CLIENTE (se llena después con actualizarUbicacionPedido)
+    '',   // T — LAT_CLIENTE
     '',   // U — LNG_CLIENTE
   ]);
   await sheets.spreadsheets.values.append({
@@ -581,7 +743,7 @@ module.exports = {
   getCategorias, getProductosPorCategoria, buscarProductos,
   registrarPedido, getPedidos, contarPedidosPorEstado, pendientesSinAtender,
   asignarDomiciliario, marcarEntregado, actualizarTotalPedido, cancelarPedido,
-  actualizarUbicacionPedido,   // ← NUEVA
+  actualizarUbicacionPedido,
   verificarClave, guardarTelegramDriver, resumenDia,
   buscarBarrioEnSheet, buscarBarrioCopacabana, guardarBarrioEnSheet, getTodosBarriosSheet,
   registrarPostulante, guardarCalificacion,
