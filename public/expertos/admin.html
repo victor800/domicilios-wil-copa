@@ -627,40 +627,46 @@ function onFile(file){
   const kb=(file.size/1024).toFixed(0);
   const prev=document.getElementById('impPrev');
   prev.style.display='block';
-  prev.innerHTML=`📄 <strong>${file.name}</strong> · ${kb} KB<br><span style="font-size:11px;color:var(--muted)">Procesando…</span>`;
-  document.getElementById('btnImp').disabled=true;
-  const reader=new FileReader();
-  reader.onload=function(e){
-    try{
-      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
-      const ws=wb.Sheets[wb.SheetNames[0]];
-      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-      parsedProducts=[];
-      for(let i=1;i<rows.length;i++){
-        const row=rows[i];
-        const desc=(row[1]||'').toString().trim();
-        if(!desc)continue;
-        parsedProducts.push([desc,(row[3]||'').toString().trim(),(row[6]||'').toString().trim(),(row[7]||'').toString().trim(),(row[8]||'').toString().trim()]);
-      }
-      prev.innerHTML=`✅ <strong>${parsedProducts.length} productos listos</strong> de <em>${file.name}</em>`;
-      document.getElementById('btnImp').disabled=parsedProducts.length===0;
-    }catch(err){prev.innerHTML=`❌ Error: ${err.message}`;}
-  };
-  reader.readAsArrayBuffer(file);
+  prev.innerHTML=`📄 <strong>${file.name}</strong> · ${kb} KB<br><span style="font-size:11px;color:var(--muted)">Listo para subir</span>`;
+  document.getElementById('btnImp').disabled=false;
 }
 
 async function doImport(){
-  if(!parsedProducts||!parsedProducts.length)return;
+  if(!selectedFile) return;
   const btnImp=document.getElementById('btnImp');
   btnImp.disabled=true;
   document.getElementById('progWrap').style.display='block';
-  const LOTE=500;
+  setProgress(10,'Leyendo archivo…');
+
+  const ab = await selectedFile.arrayBuffer();
+  const wb = XLSX.read(new Uint8Array(ab),{type:'array'});
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const allRows = XLSX.utils.sheet_to_json(ws,{header:1,defval:'',blankrows:false});
+
+  const hIdx = allRows.findIndex(r=>r.some(c=>c.toString().toLowerCase().includes('descripci')));
+  const headers = allRows[hIdx]||[];
+  const dI=headers.findIndex(h=>h.toString().toLowerCase().includes('descripci'));
+  const lI=headers.findIndex(h=>h.toString().toLowerCase().includes('laborator'));
+  const uI=headers.findIndex(h=>h.toString().toLowerCase().includes('unidad'));
+  const pI=headers.findIndex(h=>h.toString().toLowerCase().includes('precio')&&!h.toString().toLowerCase().includes('unitario'));
+  const puI=headers.findIndex(h=>h.toString().toLowerCase().includes('unitario'));
+
+  parsedProducts=[];
+  for(let i=hIdx+1;i<allRows.length;i++){
+    const row=allRows[i];
+    const desc=(row[dI]||'').toString().trim();
+    if(!desc)continue;
+    parsedProducts.push([desc,(row[lI]||'').toString().trim(),(row[uI]||'').toString().trim(),(row[pI]||'').toString().trim(),(row[puI]||'').toString().trim()]);
+  }
+
+  setProgress(40,`${parsedProducts.length} productos leídos, enviando…`);
+
+  const LOTE=300;
   const total=parsedProducts.length;
   let enviados=0;
   try{
     for(let i=0;i*LOTE<total;i++){
       const chunk=parsedProducts.slice(i*LOTE,(i+1)*LOTE);
-      setProgress(Math.round((enviados/total)*90)+5,`Enviando ${enviados+chunk.length} de ${total}…`);
       const r=await fetch(`/api/import?tienda=${tienda}`,{
         method:'POST',
         headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
@@ -669,6 +675,7 @@ async function doImport(){
       const data=await r.json();
       if(!r.ok||data.error)throw new Error(data.error||`HTTP ${r.status}`);
       enviados+=chunk.length;
+      setProgress(40+Math.round((enviados/total)*55),`Subiendo ${enviados} de ${total}…`);
     }
     setProgress(100,`✅ ${total} productos guardados`);
     toastMsg(`✅ ${total} productos importados`,'ok');
