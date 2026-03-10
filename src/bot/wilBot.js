@@ -332,7 +332,8 @@ async function obtenerTarifaRapida(texto, dirRefSheet) {
       let tarifaFinal = r.tarifa;
 
       if (lat && lng) {
-        const calc = calcularTarifaKm(lat, lng);
+        
+        const calc = await calcularTarifaKm(lat, lng);
         tarifaFinal = calc.precio;
         if (!coordsAncla) {
           guardarBarrioEnSheet({
