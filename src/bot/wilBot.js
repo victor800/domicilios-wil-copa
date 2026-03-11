@@ -2267,13 +2267,7 @@ async function buscarYMostrar(ctx, s, termino) {
     );
   }
   s.busqueda = res;
-  let msg = `💊 <b>${res.length}</b> resultado(s) para <b>"${termino}"</b>:\n\n`;
-  res.forEach((p, i) => {
-    const precioDisplay = p.tienePrecioVarios
-      ? `1 und: <b>${COP(p.precioUnidad)}</b>  |  Varios: <b>${COP(p.precioUnitario)}</b>`
-      : `<b>${COP(p.precioUnitario)}</b> c/u`;
-    msg += `${i + 1}. <b>${p.descripcionCompleta || p.descripcion}</b>\n   🏭 ${p.laboratorio || '—'}  📦 ${p.unidad || 'Unidad'}\n   💰 ${precioDisplay}\n\n`;
-  });
+  const msg = `💊 Resultados para <b>"${termino}"</b> — elige uno:`;
   const botones = res.map((p, i) => [Markup.button.callback(`${i + 1}. ${p.descripcion.substring(0, 28)} ${COP(p.precioUnitario)}`, `prod_${i}`)]);
   botones.push([Markup.button.callback('🔍 Buscar otro', 'buscar_otro')]);
   if (s.carrito.length) botones.push([Markup.button.callback('✅ Finalizar pedido', 'finalizar')]);

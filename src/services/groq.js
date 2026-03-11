@@ -7,21 +7,28 @@
 //     → Tarifa fija del SHEET por barrio
 //
 //   TODO LO DEMÁS (Medellín, Bello, Envigado, Oriente, etc.):
-//     → $1.800 × km recorrido (haversine × 1.35) desde la sede
+//     → $1.800 × km recorrido desde la sede (ruta real via ORS/OSRM o haversine×1.35)
 //     → Aplica tanto para DOMICILIOS como para PAQUETES
 //     → El tamaño/peso del paquete NO cambia el precio
 //
-//   La dirección completa + barrio son OBLIGATORIOS fuera de Copacabana.
+// FLUJO interpretarDireccion (MEJORADO):
+//   1. calcularDistancia() → coords reales (Nominatim + Photon + fallbacks)
+//   2. Groq llama-3.3-70b  → valida municipio, extrae barrio limpio, punto de referencia
+//   3. Si Groq discrepa del municipio geocodificado → se usa el geocodificado (más confiable)
+//   4. Si geocodificación falló → Groq intenta inferir coords por conocimiento propio
 // ─────────────────────────────────────────────────────────────────────────────
 
 const Groq = require('groq-sdk');
-const { calcularDistancia, calcularPrecioPorKm, zonaLegible, esZonaCopacabana } = require('./distancia');
+const {
+  calcularDistancia, calcularPrecioPorKm, calcularTarifaKm,
+  zonaLegible, esZonaCopacabana, detectarMunicipioEnTexto
+} = require('./distancia');
 const { buscarBarrioCopacabana } = require('./sheets');
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-const SEDE_LAT = parseFloat(process.env.SEDE_LAT || '6.3538');
-const SEDE_LNG = parseFloat(process.env.SEDE_LNG || '-75.4932');
+const SEDE_LAT = parseFloat(process.env.SEDE_LAT || '6.35112');
+const SEDE_LNG = parseFloat(process.env.SEDE_LNG || '-75.49190');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // extraerProductosIA
@@ -80,88 +87,142 @@ async function detectarIntencion(texto) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// interpretarDireccion — para DOMICILIOS NORMALES y consulta de tarifa
+// interpretarDireccion — FLUJO MEJORADO
 //
-// IMPORTANTE: NO asume que todo es Copacabana.
-// Copacabana/Niquía → tarifa del sheet
-// Todo lo demás     → $1.800 × km desde la sede
+// ANTES: Groq inventaba coords → poco confiable
+// AHORA:
+//   Paso 1 → calcularDistancia() obtiene coords REALES (Nominatim + Photon + fallbacks)
+//   Paso 2 → Groq enriquece: limpia nombre barrio, extrae punto de referencia,
+//             valida municipio, detecta si es Copacabana
+//   Paso 3 → Se usa el municipio geocodificado (más confiable que la inferencia de Groq)
+//             y solo se usa lat/lng de Groq si la geocodificación no encontró nada
 // ─────────────────────────────────────────────────────────────────────────────
 async function interpretarDireccion(texto, todosBarrios, dirRefSheet) {
+  console.log(`\n🤖 interpretarDireccion: "${texto}"`);
+
+  // ── PASO 1: Geocodificación real (Nominatim → Photon → fallbacks) ─────────
+  let geo = null;
   try {
-    // Solo barrios reales de Copacabana para el prompt
-    const barriosCopa = (todosBarrios || [])
-      .filter(b => {
-        const z = (b.zona || '').toLowerCase();
-        const n = (b.barrio || '').toLowerCase();
-        return z.includes('copacabana') || z.includes('local') ||
-               (!z && !n.includes('bello') && !n.includes('medellín'));
-      })
-      .slice(0, 30)
-      .map(b => `${b.barrio}`)
-      .join(', ');
+    geo = await calcularDistancia(texto, dirRefSheet, null);
+    if (geo?.lat && geo?.lng) {
+      console.log(`📍 Geo real: ${geo.fuenteGeo} → ${geo.lat.toFixed(5)}, ${geo.lng.toFixed(5)} (${geo.municipio})`);
+    }
+  } catch(e) {
+    console.error('interpretarDireccion - calcularDistancia:', e.message);
+  }
 
-    // Contexto de zona extraído de la col F del sheet
-    // Ejemplo: "Cra 68 #97-95, Castilla, Medellín" → zona = Castilla, Medellín
-    const contextoZona = dirRefSheet
-      ? `\nCONTEXTO DE ZONA (punto de referencia del barrio en el sheet): "${dirRefSheet}"
-→ Úsalo para confirmar/determinar el municipio y zona correctos.`
-      : '';
+  // ── PASO 2: Groq enriquece y valida ───────────────────────────────────────
+  // Solo barrios de Copacabana para el prompt (para no confundir el modelo)
+  const barriosCopa = (todosBarrios || [])
+    .filter(b => {
+      const z = (b.zona || '').toLowerCase();
+      const n = (b.barrio || '').toLowerCase();
+      return z.includes('copacabana') || z.includes('local') ||
+             (!z && !n.includes('bello') && !n.includes('medellín'));
+    })
+    .slice(0, 30)
+    .map(b => b.barrio)
+    .join(', ');
 
-    const prompt = `Eres un asistente de domicilios en Copacabana y Área Metropolitana de Medellín, Colombia.
-La sede está en Cra. 50 #50-15, Copacabana, Antioquia (lat: ${SEDE_LAT}, lng: ${SEDE_LNG}).
+  // Contexto de zona del sheet (columna F) — ancla geográfica confiable
+  const contextoZona = dirRefSheet
+    ? `\nCONTEXTO GEOGRÁFICO DEL SHEET: "${dirRefSheet}" — usa esto para confirmar el municipio.`
+    : '';
 
-Dirección del cliente: "${texto}"${contextoZona}
+  // Resultado de geocodificación para que Groq lo use como contexto
+  const contextoGeo = geo?.lat
+    ? `\nGEOCODIFICACIÓN (${geo.fuenteGeo}): lat=${geo.lat.toFixed(5)}, lng=${geo.lng.toFixed(5)}, municipio="${geo.municipio}", barrio="${geo.barrio}" — ESTO ES CONFIABLE, valídalo.`
+    : `\nGEOCODIFICACIÓN: No se encontraron coordenadas — infiere lo mejor posible.`;
 
-REGLAS:
-- Determina el municipio REAL (Medellín, Bello, Envigado, Copacabana, etc.)
-- El contexto de zona del sheet es una guía confiable del área — úsalo
-- "Castilla", "Laureles", "El Poblado", "Aranjuez", "Robledo" → MEDELLÍN
-- "Bello" sin mencionar Niquía → BELLO, no Copacabana
-- Solo es Copacabana si lo dice explícitamente o son estos barrios: ${barriosCopa}
-- Si el cliente puso solo el barrio sin número, lat/lng serán aproximados
+  const prompt = `Eres un experto en direcciones de Antioquia, Colombia.
+Sede WIL: Cra. 50 #50-15, Copacabana (lat: ${SEDE_LAT}, lng: ${SEDE_LNG}).
 
-Responde SOLO en JSON sin texto adicional:
+Dirección del cliente: "${texto}"${contextoZona}${contextoGeo}
+
+REGLAS ESTRICTAS:
+1. Municipio: usa el de la geocodificación si está disponible — es más confiable que tu inferencia
+2. "Castilla", "Laureles", "Poblado", "Robledo", "Aranjuez" → MEDELLÍN (no Copacabana)
+3. "Bello" sin mencionar Niquía → BELLO, NO Copacabana
+4. Solo es Copacabana si dice explícitamente o el barrio está en: ${barriosCopa}
+5. Si no hay coordenadas de geocodificación, infiere lat/lng con tu conocimiento (aproximado)
+6. punto_referencia: cualquier detalle extra que mencione el cliente (edificio, local, color, "frente a", "cerca de", etc.)
+
+Responde SOLO en JSON, sin texto adicional, sin markdown:
 {
-  "barrio": "nombre del barrio",
+  "barrio": "nombre limpio del barrio/sector",
   "municipio": "municipio exacto",
-  "zona": "descripción de zona",
-  "esCopacabana": true|false,
-  "tarifa": 0,
+  "zona": "descripción corta de la zona",
+  "esCopacabana": true/false,
   "confianza": "alta|media|baja",
+  "punto_referencia": "detalle adicional si lo hay, o vacío",
   "lat": número o null,
   "lng": número o null
 }`;
 
-    const res   = await groq.chat.completions.create({
+  let groqData = null;
+  try {
+    const res = await groq.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 300, temperature: 0.1
     });
-
-    const txt   = res.choices[0]?.message?.content || '';
-    const clean = txt.replace(/```json|```/g, '').trim();
-    const data  = JSON.parse(clean);
-
-    // Si Groq dice que NO es Copacabana y tenemos coords, calculamos por km
-    if (!data.esCopacabana && data.lat && data.lng) {
-      const { calcularPrecioPorKm } = require('./distancia');
-      const dist  = calcularPrecioPorKm(SEDE_LAT, SEDE_LNG, data.lat, data.lng);
-      data.tarifa = dist.precioCOP;
-      data.distKm = dist.distanciaRutaKm;
-    }
-
-    return data;
+    const raw = (res.choices[0]?.message?.content || '').replace(/```json|```/g, '').trim();
+    groqData  = JSON.parse(raw);
+    console.log(`🤖 Groq: municipio="${groqData.municipio}" esCopa=${groqData.esCopacabana} barrio="${groqData.barrio}"`);
   } catch(e) {
-    console.error('interpretarDireccion error:', e.message);
-    return null;
+    console.error('interpretarDireccion - Groq:', e.message);
   }
+
+  // ── PASO 3: Fusionar geocodificación real + enriquecimiento Groq ──────────
+  //
+  // Prioridad de coords: geo real > Groq (solo si geo falló)
+  // Prioridad de municipio: geo real > Groq (geo es más confiable)
+  // Prioridad de barrio: Groq (nombre más limpio) > geo
+  // punto_referencia: solo viene de Groq
+
+  const lat        = geo?.lat       || groqData?.lat       || null;
+  const lng        = geo?.lng       || groqData?.lng       || null;
+  const municipio  = geo?.municipio || groqData?.municipio || null;
+  const barrio     = groqData?.barrio     || geo?.barrio     || texto;
+  const zona       = groqData?.zona       || geo?.zona       || zonaLegible(municipio, barrio);
+  const esCopa     = esZonaCopacabana(municipio || '', barrio);
+  const confianza  = geo?.confianzaGeo || groqData?.confianza || 'baja';
+  const ptRef      = groqData?.punto_referencia || '';
+  const nota       = dirRefSheet || geo?.direccionFormateada || '';
+
+  // Calcular tarifa con coords reales
+  let tarifa = null;
+  if (lat && lng) {
+    try {
+      const calc = await calcularTarifaKm(lat, lng);
+      tarifa = calc.precio;
+      console.log(`💰 Tarifa final: ${calc.formula}`);
+    } catch(e) {
+      // Si las coords vienen de Groq, usar calcularPrecioPorKm (síncrono)
+      const dist = calcularPrecioPorKm(SEDE_LAT, SEDE_LNG, lat, lng);
+      tarifa = dist.precioCOP;
+    }
+  }
+
+  return {
+    barrio,
+    municipio,
+    zona,
+    esCopacabana: esCopa,
+    tarifa:       esCopa ? null : tarifa,
+    confianza,
+    lat,
+    lng,
+    nota,
+    puntoReferencia: ptRef,
+    fuenteGeo: geo?.fuenteGeo || (groqData?.lat ? 'groq_inferido' : 'sin_coords'),
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // interpretarDireccionPaquete — PAQUETERÍA
 //
-// El precio de paquete es SIEMPRE por km recorrido, independiente del tamaño.
-// El tamaño/peso se registra como información para el domiciliario.
+// También mejorado: geocodificación real primero, Groq solo estructura.
 // ─────────────────────────────────────────────────────────────────────────────
 async function interpretarDireccionPaquete(textoDir, latOrigen, lngOrigen, dirRefSheet) {
   try {
@@ -170,8 +231,8 @@ async function interpretarDireccionPaquete(textoDir, latOrigen, lngOrigen, dirRe
     const orLat = latOrigen || SEDE_LAT;
     const orLng = lngOrigen || SEDE_LNG;
 
-    // PASO 1: Geocodificar destino
-    const geo = await calcularDistancia(textoDir, dirRefSheet);
+    // PASO 1: Geocodificar destino con el stack completo (Nominatim + Photon + fallbacks)
+    const geo = await calcularDistancia(textoDir, dirRefSheet, null);
 
     const lat         = geo.lat;
     const lng         = geo.lng;
@@ -181,10 +242,9 @@ async function interpretarDireccionPaquete(textoDir, latOrigen, lngOrigen, dirRe
     const obs         = geo.observaciones || '';
     const tieneCoords = geo.esCoherente && lat && lng;
 
-    console.log(`📍 Destino: "${barrio}", ${municipio} [${lat?.toFixed(6)}, ${lng?.toFixed(6)}] conf=${confianza}`);
-    if (lat && lng) console.log(`   🗺️  https://www.google.com/maps?q=${lat},${lng}`);
+    console.log(`📍 Destino: "${barrio}", ${municipio} [${lat?.toFixed(6)}, ${lng?.toFixed(6)}] conf=${confianza} fuente=${geo.fuenteGeo}`);
 
-    // PASO 2: Calcular precio por km (SIEMPRE por km para paquetes)
+    // PASO 2: Calcular precio (siempre por km para paquetes)
     let precioPaquete = null;
     let distanciaInfo = null;
 
@@ -193,20 +253,19 @@ async function interpretarDireccionPaquete(textoDir, latOrigen, lngOrigen, dirRe
       precioPaquete = distanciaInfo.precioCOP;
       console.log(`🧮 Paquete: ${distanciaInfo.formula}`);
     } else if (geo.tarifa) {
-      // Fallback: usar tarifa ya calculada (puede venir del sheet si es local)
       precioPaquete = geo.tarifa;
     }
 
-    // PASO 3: Groq estructura dirección + extrae punto de referencia
+    // PASO 3: Groq estructura la dirección y extrae punto de referencia
     const promptPaquete =
-`Analiza esta dirección para paquetería en Antioquia, Colombia:
-Texto usuario: "${textoDir}"
-Google Maps / geocodificación devolvió: barrio="${barrio}", municipio="${municipio}", dirección="${geo.direccionFormateada || textoDir}"
+`Analiza esta dirección de paquetería en Antioquia, Colombia:
+Texto del cliente: "${textoDir}"
+Geocodificación obtuvo: barrio="${barrio}", municipio="${municipio}", dirección="${geo.direccionFormateada || textoDir}"
 
-Extrae y estructura. Deja vacío si no está en el texto.
-IMPORTANTE: punto_referencia es cualquier referencia que mencione el usuario (ej: "frente al Éxito", "junto al parque", "cerca de la iglesia").
+Extrae. Deja vacío si no está en el texto original.
+punto_referencia: indicación extra que dé el cliente ("frente al Éxito", "edificio azul", "apto 302", etc.)
 
-FORMATO JSON sin markdown:
+JSON sin markdown:
 {"direccion_completa":"","barrio":"","municipio":"","punto_referencia":"","observaciones":""}`;
 
     let direccionCompleta = geo.direccionFormateada || textoDir;
@@ -226,11 +285,12 @@ FORMATO JSON sin markdown:
       const raw = rGroq.choices[0]?.message?.content?.trim() || '{}';
       const pg  = JSON.parse(raw.replace(/```json|```/g,'').trim());
       if (pg.direccion_completa) direccionCompleta = pg.direccion_completa;
-      if (pg.barrio)             barrioFinal       = pg.barrio;
-      if (pg.municipio)          municipioFinal    = pg.municipio;
-      if (pg.punto_referencia)   puntoReferencia   = pg.punto_referencia;
-      if (pg.observaciones)      obsGroq           = pg.observaciones;
-      console.log(`🗺️  Groq: dir="${direccionCompleta}" barrio="${barrioFinal}" ref="${puntoReferencia}"`);
+      // Barrio y municipio de Groq solo si la geocodificación no los encontró
+      if (pg.barrio    && !barrio)    barrioFinal    = pg.barrio;
+      if (pg.municipio && !municipio) municipioFinal = pg.municipio;
+      if (pg.punto_referencia)        puntoReferencia = pg.punto_referencia;
+      if (pg.observaciones)           obsGroq         = pg.observaciones;
+      console.log(`🤖 Groq paquete: dir="${direccionCompleta}" ref="${puntoReferencia}"`);
     } catch(e) {
       console.warn('Groq paquete falló:', e.message);
     }
@@ -240,6 +300,7 @@ FORMATO JSON sin markdown:
     return {
       lat, lng, tieneCoords,
       confianzaGeo:      confianza,
+      fuenteGeo:         geo.fuenteGeo,
       direccionCompleta,
       barrio:            barrioFinal,
       municipio:         municipioFinal,
@@ -253,7 +314,7 @@ FORMATO JSON sin markdown:
       esZonaSheets:      zonaSheets,
       nota: `${municipioFinal}${barrioFinal ? ' — ' + barrioFinal : ''}`,
       razon: tieneCoords
-        ? `Verificado: ${(geo.direccionFormateada||'').substring(0, 60)}`
+        ? `Verificado (${geo.fuenteGeo}): ${(geo.direccionFormateada||'').substring(0, 60)}`
         : 'Sin geocodificación exacta — verificar con el cliente'
     };
 
