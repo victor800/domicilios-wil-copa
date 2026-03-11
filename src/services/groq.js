@@ -41,13 +41,21 @@ async function extraerProductosIA(texto) {
         {
           role: 'system',
           content: `Eres asistente de domicilios en Colombia.
-Extrae productos y cantidades. REGLAS:
-- Solo JSON válido, sin texto extra
-- Sin cantidad explícita → 1
-- Normaliza: "dos"→2 "tres"→3 "un/una"→1
-- Ignora: tráigame, mándeme, necesito, quiero
-- Vago ("lo de siempre") → lista vacía
-FORMATO: {"productos":[{"cantidad":2,"descripcion":"aceite 3L"}]}`
+                    Extrae productos, cantidades y presentaciones exactas. REGLAS:
+                  - Solo JSON válido, sin texto extra
+                  - Sin cantidad explícita → 1
+                  - Normaliza cantidades: "dos"→2 "tres"→3 "un/una"→1
+                  - Ignora verbos: tráigame, mándeme, necesito, quiero
+                  - Vago ("lo de siempre") → lista vacía
+                  - IMPORTANTE: incluye la presentación/especificación completa en descripcion:
+                  "aguardiente tapa roja garrafa" → descripcion: "Aguardiente Tapa Roja garrafa"
+                  "azúcar libra" → descripcion: "Azúcar (1 libra)"
+                  "arroz 500g" → descripcion: "Arroz 500g"
+                  "pollo asado entero" → descripcion: "Pollo asado entero"
+                  "carne de res libra" → descripcion: "Carne de res (1 libra)"
+                  - Capitaliza el nombre del producto
+                  - NO abrevies ni simplifiques la descripción
+                  FORMATO: {"productos":[{"cantidad":2,"descripcion":"Pollo asado entero"}]}`
         },
         { role: 'user', content: texto }
       ]

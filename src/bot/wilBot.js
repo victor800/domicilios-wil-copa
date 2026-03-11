@@ -18,6 +18,7 @@ const {
   registrarPostulante, guardarCalificacion
 } = require('../services/sheets');
 const { tarifasTexto } = require('../data/tarifas');
+const { guardarImagenTransferencia } = require('../services/sheets');
 const {
   calcularDistancia, calcularPreciosPaquete,
   zonaLegible, detectarMunicipioEnTexto, detectarZonaFija,
@@ -25,6 +26,8 @@ const {
 } = require('../services/distancia');
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
+let LOGO_FILE_ID = process.env.LOGO_FILE_ID || null;
+const espComprobanteCliente = {};
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ESTADO EN MEMORIA
@@ -48,17 +51,46 @@ const esDriver = id => !!drivers[id];
 // ══════════════════════════════════════════════════════════════════════════════
 // UTILS
 // ══════════════════════════════════════════════════════════════════════════════
-const COP = n => {
-  if (!n && n !== 0) return '$0';
-  const abs = Math.abs(Math.round(n));
-  const f = abs.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  return (n < 0 ? '-$' : '$') + f;
+
+// ── PARCHE 1: COP con parseo seguro de strings con formato colombiano ──────
+const COP = (n) => {
+  // Si es null o undefined, retornar $0
+  if (n === null || n === undefined) return '$0';
+
+  let numero;
+
+  // Si es un string, limpiarlo y convertirlo a número
+  if (typeof n === 'string') {
+    // Eliminar el símbolo de moneda, puntos de miles y cualquier otro caracter no numérico (excepto el signo menos)
+    const limpio = n.replace(/[^\d\-]/g, '');
+    numero = parseInt(limpio, 10);
+  } else {
+    // Si ya es un número, usarlo directamente
+    numero = n;
+  }
+
+  // Verificar que sea un número válido
+  if (isNaN(numero) || typeof numero !== 'number') {
+    return '$0';
+  }
+
+  // Formatear el número con separadores de miles (puntos)
+  const formateado = numero.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+  return `$${formateado}`;
 };
 
-// ── PARCHE 3: Link de Google Maps con la dirección cruda del cliente ──────────
+// ── PARCHE helpers: sanitizar total que viene del sheet con puntos de miles ─
+const parsearTotal = val => {
+  if (!val) return null;
+  const s = String(val).replace(/\./g, '').replace(/[^0-9\-]/g, '');
+  return Number(s) || null;
+};
+
+// ── Link de Google Maps con la dirección cruda del cliente ──────────
 function gmapsLinkDir(direccionCliente) {
-  const q = encodeURIComponent((direccionCliente || '') + ', Antioquia, Colombia');
-  return `https://maps.google.com/?q=${q}`;
+  const q = encodeURIComponent((direccionCliente || '').trim() + ', Antioquia, Colombia');
+  return `https://www.google.com/maps/search/?api=1&query=${q}`;
 }
 
 function tipoBadge(p) {
@@ -88,7 +120,7 @@ async function getContadores() {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // RECARGOS INTERNOS (ocultos al cliente)
-// PARCHE 8: Pocos = 1-5 productos (+$1.000), Muchos = 6+ (+$2.000)
+// Pocos = 1-5 productos (+$1.000), Muchos = 6+ (+$2.000)
 // ══════════════════════════════════════════════════════════════════════════════
 function calcularRecargos(horaRegistro, cantidadItems, esCopacabana) {
   if (!esCopacabana) return 0;
@@ -179,81 +211,139 @@ function menuPublico() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// CARDS PEDIDO
-// PARCHE 5: cardPedidoDriver agrega link Maps con dirección real del cliente
+// CARDS PEDIDO  —  formato tabla monoespacio alineado
 // ══════════════════════════════════════════════════════════════════════════════
-function cardPedidoDriver(p, estado) {
-  const ico = estado === 'PENDIENTE' ? '🟡' : estado === 'EN_PROCESO' ? '🔵' : '🟢';
 
-  const totalNum = p.total ? Number(p.total) : 0;
-  const totalStr = totalNum > 0 ? COP(totalNum) : (p.tienda ? 'Por confirmar' : 'Al facturar');
-  const dom = (p.precioDomicilio && Number(p.precioDomicilio) > 0) ? COP(Number(p.precioDomicilio)) : null;
-
-  let productosLista = p.productos || '—';
-  if (p.carrito && p.carrito.length > 0) {
-    productosLista = p.carrito.map(item =>
-      `  · ${item.cantidad}× ${item.descripcion}${item.precioUnitario ? ` ${COP(item.precioUnitario)}` : ''}`
-    ).join('\n');
-  }
-
-  const card =
-    `<code>┌─────────────────────────┐\n` +
-    `│ ${ico} ${p.id.padEnd(22)} │\n` +
-    `│ ${tipoBadge(p).padEnd(23)} │\n` +
-    `├─────────────────────────┤\n` +
-    `│ 👤 ${(p.cliente || '?').substring(0, 21).padEnd(21)} │\n` +
-    `│ 📱 ${(p.telefono || '?').substring(0, 21).padEnd(21)} │\n` +
-    `│ 📍 ${(p.barrio || p.direccion || '?').substring(0, 21).padEnd(21)} │\n` +
-    (p.origen ? `│ 🔄 ${p.origen.substring(0, 21).padEnd(21)} │\n` : '') +
-    `├─────────────────────────┤\n` +
-    `│ 📦 PRODUCTOS            │\n` +
-    `${productosLista.split('\n').map(l => `│ ${l.substring(0, 25).padEnd(25)}│`).join('\n')}\n` +
-    `├─────────────────────────┤\n` +
-    (p.presupuesto ? `│ 💰 ${('Ppto: ' + p.presupuesto).substring(0, 21).padEnd(21)} │\n` : '') +
-    (dom ? `│ 🛵 ${'Dom: ' + dom}${' '.repeat(Math.max(0, 21 - ('Dom: ' + dom).length))} │\n` : '') +
-    `│ 💵 ${'Total: ' + totalStr}${' '.repeat(Math.max(0, 21 - ('Total: ' + totalStr).length))} │\n` +
-    `└─────────────────────────┘</code>`;
-
-  // PARCHE 5: Línea clickeable con la dirección original del cliente
-  const dirCliente = p.direccionCliente || p.direccion || '';
-  const linkMaps = dirCliente
-    ? `\n📍 <a href="${gmapsLinkDir(dirCliente)}">${dirCliente}</a>`
-    : '';
-
-  return card + linkMaps;
+const TW = 32;
+// longitud visual: emojis y chars multi-byte cuentan 2 en fuente monoespacio
+function _vlen(s) { return String(s).replace(/[^\x00-\xff]/g, '  ').length; }
+function _vpad(s, n) { const d = n - _vlen(s); return s + (d > 0 ? ' '.repeat(d) : ''); }
+function _sep() { return '├' + '─'.repeat(TW) + '┤'; }
+function _top() { return '┌' + '─'.repeat(TW) + '┐'; }
+function _bot() { return '└' + '─'.repeat(TW) + '┘'; }
+function _fila(txt) {
+  const t = String(txt == null ? '' : txt) || ' ';
+  const out = [];
+  for (let i = 0; i < t.length; i += TW)
+    out.push('│' + _vpad(t.slice(i, i + TW), TW) + '│');
+  return out.join('\n');
+}
+function _fila2(izq, der) {
+  const d = String(der == null ? '' : der);
+  const espacio = TW - _vlen(d);
+  const maxIzq = Math.max(espacio - 1, 1);
+  const izqStr = String(izq == null ? '' : izq).slice(0, maxIzq);
+  return '│' + _vpad(izqStr, maxIzq) + ' ' + d + '│';
+}
+function _centro(txt) {
+  const t = String(txt == null ? '' : txt).slice(0, TW);
+  const tv = _vlen(t);
+  const pad = Math.floor((TW - tv) / 2);
+  return '│' + ' '.repeat(pad) + t + ' '.repeat(Math.max(TW - pad - tv, 0)) + '│';
 }
 
+
+function cardPedidoDriver(p, estado) {
+  const ico = estado === 'PENDIENTE' ? '🟡' : estado === 'EN_PROCESO' ? '🔵' : '🟢';
+  const totalNum = p.total ? parsearTotal(p.total) : 0;
+  const totalStr = totalNum > 0 ? COP(totalNum) : (p.tienda ? 'Por confirmar' : 'Al facturar');
+  const domNum = (p.precioDomicilio && Number(p.precioDomicilio) > 0) ? Number(p.precioDomicilio) : 0;
+  const dirCliente = p.direccionCliente || p.direccion || '—';
+
+  let filasProds = '';
+  if (p.carrito && p.carrito.length > 0) {
+    const items = p.carrito.map(function(item) {
+      let lineas = _fila(item.descripcion);
+      if (item.precioUnitario > 0) {
+        lineas += '\n' + _fila2('  ' + item.cantidad + 'x ' + COP(item.precioUnitario), COP(item.subtotal));
+      } else {
+        lineas += '\n' + _fila('  Cant: ' + item.cantidad);
+      }
+      return lineas;
+    });
+    filasProds = items.join('\n' + _sep() + '\n');
+  } else {
+    const raw = (p.productos || '—').split(',').map(function(x) { return x.trim(); }).filter(Boolean);
+    filasProds = raw.map(_fila).join('\n');
+  }
+
+  const lines = [
+    _top(),
+    _centro(ico + ' DOMICILIOS WIL'),
+    _centro(tipoBadge(p).replace(/<[^>]+>/g, '')),
+    _sep(),
+    _fila('ID: ' + (p.id || '—')),
+    _fila(p.hora || ''),
+    _sep(),
+    _fila('👤 ' + (p.cliente || '?')),
+    _fila('📱 ' + (p.telefono || '?')),
+    _fila('📍 ' + dirCliente)
+  ];
+  if (p.origen) lines.push(_fila('🔄 Origen: ' + p.origen));
+  lines.push(_sep(), _fila2('DESCRIPCION', 'TOTAL'), _sep(), filasProds, _sep());
+  if (p.presupuesto) lines.push(_fila2('Presupuesto', p.presupuesto));
+  if (domNum > 0)    lines.push(_fila2('Domicilio',   COP(domNum)));
+  lines.push(_fila2('TOTAL', totalStr), _bot());
+
+  const linkMaps = dirCliente !== '—'
+    ? '\n<a href="' + gmapsLinkDir(dirCliente) + '">📍 Ver en Maps</a>'
+    : '';
+
+  return '<code>' + lines.join('\n') + '</code>' + linkMaps;
+}
+
+
 function cardPedidoCliente(s) {
-  const sub = (s.carrito || []).reduce((a, i) => a + (i.subtotal || 0), 0);
+  const sub = (s.carrito || []).reduce(function(a, i) { return a + (i.subtotal || 0); }, 0);
   const dom = s.precioDomicilio || 0;
   const tot = sub + dom;
   const esWIL = !s.tienda;
-  let prods = '';
-  if (s.carrito?.length) {
-    prods = `\n<b>📦 Productos:</b>\n`;
-    s.carrito.forEach((item, i) => {
+
+  let filasProds = '';
+  if (s.carrito && s.carrito.length > 0) {
+    const items = s.carrito.map(function(item, i) {
+      const num = (i + 1) + '.';
       if (!esWIL && item.precioUnitario > 0) {
-        prods += `  ${i + 1}. ${item.descripcion}\n      ${item.cantidad} × ${COP(item.precioUnitario)} = <b>${COP(item.subtotal)}</b>\n`;
+        return _fila(num + ' ' + item.descripcion) + '\n' +
+               _fila2('   ' + item.cantidad + 'x ' + COP(item.precioUnitario), COP(item.subtotal));
       } else {
-        prods += `  ${i + 1}. ${item.descripcion} × ${item.cantidad}\n`;
+        return _fila(num + ' ' + item.descripcion + ' x' + item.cantidad);
       }
     });
+    filasProds = items.join('\n' + _sep() + '\n');
   }
-  return (
-    `🛵 <b>PEDIDO WIL</b>\n━━━━━━━━━━━━━━━━━━━━━━\n` +
-    `🏪 ${s.negocioNombre || '—'}\n` +
-    `👤 ${s.nombre || '—'}   📱 ${s.telefono || '—'}\n` +
-    `📍 ${s.direccion || '—'}\n` + prods +
-    `━━━━━━━━━━━━━━━━━━━━━━\n` +
-    (esWIL
-      ? `🧾 Productos:  <b>Por confirmar</b>\n🛵 Domicilio:  <b>${dom ? COP(dom) : 'Por confirmar'}</b>\n💵 <b>TOTAL: Por confirmar</b>\n`
-      : `${sub > 0 ? `🧾 Subtotal:   <b>${COP(sub)}</b>\n` : ''}` +
-      `🛵 Domicilio:  <b>${dom ? COP(dom) : 'Por confirmar'}</b>\n` +
-      `${tot > 0 ? `💵 <b>TOTAL: ${COP(tot)}</b>\n` : ''}`
-    ) +
-    `━━━━━━━━━━━━━━━━━━━━━━`
-  );
+
+  const lines = [
+    _top(),
+    _centro('🛵 DOMICILIOS WIL'),
+    _centro('Copacabana, Ant.'),
+    _sep(),
+    _fila('👤 ' + (s.nombre || '—')),
+    _fila('📱 ' + (s.telefono || '—')),
+    _fila('📍 ' + (s.direccion || '—')),
+    _sep(),
+    _centro(s.negocioNombre || '—')
+  ];
+  if (filasProds) {
+    lines.push(_sep(), filasProds);
+  }
+  lines.push(_sep());
+  if (esWIL) {
+    lines.push(
+      _fila2('Productos', 'Por confirmar'),
+      _fila2('Domicilio', dom ? COP(dom) : 'Por confirmar'),
+      _fila2('TOTAL', 'Por confirmar')
+    );
+  } else {
+    if (sub > 0) lines.push(_fila2('Subtotal', COP(sub)));
+    lines.push(_fila2('Domicilio', dom ? COP(dom) : 'Por confirmar'));
+    if (tot > 0) lines.push(_fila2('TOTAL', COP(tot)));
+  }
+  lines.push(_bot());
+
+  return '<code>' + lines.join('\n') + '</code>';
 }
+
 
 // ══════════════════════════════════════════════════════════════════════════════
 // GEOCODIFICACIÓN Y TARIFAS
@@ -322,9 +412,13 @@ async function obtenerTarifaRapida(texto, dirRefSheet) {
       const { detectarMunicipioEnTexto, calcularTarifaKm } = require('../services/distancia');
       const municipioDirF = detectarMunicipioEnTexto(dirF);
       const municipioZona = zona.toLowerCase().includes('copacabana') ? 'Copacabana' : detectarMunicipioEnTexto(zona);
-      const municipio = municipioDirF || municipioZona || null;
+      // PARCHE: detectar municipio también desde el texto original del cliente
+      const municipioTexto = detectarMunicipioEnTexto(texto);
+      const municipio = municipioDirF || municipioZona || municipioTexto || null;
       const esCopa = esZonaCopacabana(municipio || 'Copacabana', barrio);
 
+      // PARCHE TARIFA: si el match del sheet tiene municipio NO Copacabana,
+      // ignorar la tarifa guardada y siempre recalcular por km
       if (esCopa && r.tarifa !== null) {
         const msg = _mensajeUbicacion(barrio, zona, 'Copacabana', '✅', '');
         return {
@@ -486,26 +580,23 @@ async function obtenerTarifaRapida(texto, dirRefSheet) {
   };
 }
 
+const PARQUE_COPA_LAT = 6.35112;
+const PARQUE_COPA_LNG = -75.49190;
+
 function buildGmapsUrl(lugar, pedido, driverLat, driverLng) {
-  let destino = null;
+  // Destino: coords GPS del cliente > dirección ingresada por el cliente (RAW)
+  let destino;
   if (pedido?.latCliente && pedido?.lngCliente) {
     destino = `${pedido.latCliente},${pedido.lngCliente}`;
-  } else if (pedido?.lat && pedido?.lng) {
-    destino = `${pedido.lat},${pedido.lng}`;
   } else {
-    // PARCHE: usar direccionCliente (la que ingresó el cliente) si existe
-    const dir = pedido?.direccionCliente || pedido?.direccion || lugar || '';
-    destino = encodeURIComponent(dir + ', Antioquia, Colombia');
+    const dirRaw = pedido?.direccionCliente || pedido?.direccion || lugar || '';
+    destino = encodeURIComponent(dirRaw.trim() + ', Antioquia, Colombia');
   }
 
-  let origen;
-  if (driverLat && driverLng) {
-    origen = `${driverLat},${driverLng}`;
-  } else if (pedido?.tipo === 'paqueteria' && pedido?.origenLat && pedido?.origenLng) {
-    origen = `${pedido.origenLat},${pedido.origenLng}`;
-  } else {
-    origen = `${SEDE_LAT},${SEDE_LNG}`;
-  }
+  // Origen: GPS real del domi compartido en tiempo real > Parque de Copacabana (ancla fija)
+  const origenLat = driverLat || PARQUE_COPA_LAT;
+  const origenLng = driverLng || PARQUE_COPA_LNG;
+  const origen = `${origenLat},${origenLng}`;
 
   return `https://www.google.com/maps/dir/${origen}/${destino}`;
 }
@@ -560,10 +651,31 @@ bot.start(async ctx => {
   const uid = ctx.from.id;
   delete S[uid]; delete drivers[uid];
   delete espClave[uid]; delete espClaveAdmin[uid]; delete espPostulante[uid];
-  return ctx.reply(
-    `🛵 <b>¡Bienvenido a Domicilios WIL!</b>\n📍 Copacabana, Antioquia 🇨🇴\n\n¿Qué deseas hacer?`,
-    { parse_mode: 'HTML', ...menuPublico() }
-  );
+
+  const caption =
+    `🛵 <b>¡Bienvenido a Domicilios WIL!</b>\n` +
+    `📍 Copacabana, Antioquia 🇨🇴\n\n` +
+    `¿Qué deseas hacer?`;
+
+  try {
+    if (LOGO_FILE_ID) {
+      await ctx.replyWithPhoto(LOGO_FILE_ID, {
+        caption,
+        parse_mode: 'HTML',
+        ...menuPublico()
+      });
+    } else {
+      const msg = await ctx.replyWithPhoto(
+        { source: require('path').join(__dirname, '../assets/logo.jpeg') },
+        { caption, parse_mode: 'HTML', ...menuPublico() }
+      );
+      LOGO_FILE_ID = msg.photo[msg.photo.length - 1].file_id;
+      console.log(`✅ LOGO_FILE_ID cacheado: ${LOGO_FILE_ID}`);
+    }
+  } catch (e) {
+    console.error('Logo /start error:', e.message);
+    await ctx.reply(caption, { parse_mode: 'HTML', ...menuPublico() });
+  }
 });
 
 bot.command('cancelar', ctx => {
@@ -827,6 +939,123 @@ bot.on('text', async ctx => {
   return ctx.reply('❓ No entendí. Usa /start para comenzar.');
 });
 
+// Botón "Subir comprobante" que le llega al cliente
+bot.action(/^subir_comp_(.+)$/, async ctx => {
+  const pedidoId = ctx.match[1];
+  const uid = ctx.from.id;
+  await ctx.answerCbQuery();
+  espComprobanteCliente[uid] = {
+    pedidoId,
+    metodoPago: pool[pedidoId]?.metodoPago || 'TRANSFERENCIA'
+  };
+  try {
+    await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+  } catch (_) { }
+  return ctx.reply(
+    `📲 <b>Envía la foto de tu comprobante</b>\n` +
+    `<i>Nequi, Daviplata o transferencia bancaria</i>`,
+    { parse_mode: 'HTML' }
+  );
+});
+
+// Recibir la foto del comprobante del cliente
+async function procesarComprobanteCliente(ctx, uid) {
+  const { pedidoId, metodoPago } = espComprobanteCliente[uid];
+  delete espComprobanteCliente[uid];
+
+  const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+
+  await ctx.reply(`🔍 <b>Verificando comprobante...</b>`, { parse_mode: 'HTML' });
+
+  const resultado = await leerTotalFactura(fileId, process.env.BOT_TOKEN);
+  const totalComprobante = resultado?.total || null;
+  const totalEsperado = pool[pedidoId]?.total ? parsearTotal(pool[pedidoId].total) : null;
+
+  const TOLERANCIA = 500;
+  const coincide = totalComprobante && totalEsperado
+    ? Math.abs(totalComprobante - totalEsperado) <= TOLERANCIA
+    : null;
+
+  if (coincide === true) {
+    try {
+      await guardarImagenTransferencia(pedidoId, fileId, process.env.BOT_TOKEN);
+    } catch (e) { console.error('guardarImagenTransferencia:', e.message); }
+  }
+
+  if (coincide === true) {
+    await ctx.reply(
+      `✅ <b>¡Comprobante verificado!</b>\n` +
+      `━━━━━━━━━━━━━━━━━━\n` +
+      `🆔 Pedido: <b>${pedidoId}</b>\n` +
+      `💵 Total comprobante: <b>${COP(totalComprobante)}</b>\n` +
+      `💵 Total pedido:      <b>${COP(totalEsperado)}</b>\n` +
+      `━━━━━━━━━━━━━━━━━━\n` +
+      `✅ <b>Los valores coinciden</b>\n` +
+      `<i>Tu pago fue verificado correctamente. ¡Gracias! 🛵❤️</i>`,
+      { parse_mode: 'HTML' }
+    );
+  } else if (coincide === false) {
+    await ctx.reply(
+      `⚠️ <b>Los valores no coinciden</b>\n` +
+      `━━━━━━━━━━━━━━━━━━\n` +
+      `🆔 Pedido: <b>${pedidoId}</b>\n` +
+      `💵 Total comprobante: <b>${COP(totalComprobante)}</b>\n` +
+      `💵 Total pedido:      <b>${COP(totalEsperado)}</b>\n` +
+      `━━━━━━━━━━━━━━━━━━\n` +
+      `❌ <b>Diferencia: ${COP(Math.abs(totalComprobante - totalEsperado))}</b>\n\n` +
+      `<i>Por favor verifica el monto y vuelve a enviar el comprobante,\n` +
+      `o contacta al domiciliario.</i>`,
+      {
+        parse_mode: 'HTML',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('🔄 Enviar otro comprobante', `subir_comp_${pedidoId}`)],
+        ])
+      }
+    );
+  } else {
+    await ctx.reply(
+      `📲 <b>Comprobante recibido</b>\n` +
+      `🆔 ${pedidoId}\n\n` +
+      `<i>No pudimos leer el monto automáticamente.\n` +
+      `Un administrador lo revisará manualmente. ¡Gracias! 🛵</i>`,
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  if (process.env.CANAL_PEDIDOS_ID) {
+    const estadoValidacion = coincide === true
+      ? `✅ <b>COMPROBANTE VÁLIDO</b>`
+      : coincide === false
+        ? `❌ <b>COMPROBANTE NO COINCIDE</b> — Diferencia: ${COP(Math.abs(totalComprobante - totalEsperado))}`
+        : `⚠️ <b>NO SE PUDO LEER — REVISAR MANUAL</b>`;
+
+    await bot.telegram.sendPhoto(process.env.CANAL_PEDIDOS_ID, fileId, {
+      caption:
+        `${estadoValidacion}\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
+        `🆔 <b>${pedidoId}</b>\n` +
+        `💳 Método: <b>${metodoPago}</b>\n` +
+        `👤 ${pool[pedidoId]?.cliente || '—'}  📱 ${pool[pedidoId]?.telefono || '—'}\n` +
+        (totalComprobante ? `💵 Comprobante: <b>${COP(totalComprobante)}</b>\n` : '') +
+        (totalEsperado    ? `💵 Pedido:      <b>${COP(totalEsperado)}</b>\n`    : ''),
+      parse_mode: 'HTML'
+    }).catch(() => { });
+  }
+
+  for (const adminId of ADMIN_IDS) {
+    bot.telegram.sendPhoto(adminId, fileId, {
+      caption:
+        `${coincide === true ? '✅' : coincide === false ? '❌' : '⚠️'} Comprobante — <b>${pedidoId}</b>\n` +
+        `💳 ${metodoPago}\n` +
+        `👤 ${pool[pedidoId]?.cliente || '—'}\n` +
+        (totalComprobante ? `💵 Comp: ${COP(totalComprobante)}\n` : '') +
+        (totalEsperado    ? `💵 Pedido: ${COP(totalEsperado)}\n`  : '') +
+        (coincide === false ? `⚠️ Diferencia: ${COP(Math.abs(totalComprobante - totalEsperado))}` : ''),
+      parse_mode: 'HTML'
+    }).catch(() => { });
+  }
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // AUTENTICACIÓN ADMIN
 // ══════════════════════════════════════════════════════════════════════════════
@@ -880,7 +1109,6 @@ async function manejarAutenticacionAdmin(ctx, uid, clave, msgId) {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // AUTENTICACIÓN DOMICILIARIO
-// PARCHE 1+2: Lee columna E (teléfono) y lo guarda en drivers[uid]
 // ══════════════════════════════════════════════════════════════════════════════
 async function manejarAutenticacion(ctx, uid, clave, msgId) {
   delete espClave[uid];
@@ -889,8 +1117,7 @@ async function manejarAutenticacion(ctx, uid, clave, msgId) {
   if (!r.valida) return ctx.reply(`❌ <b>Clave incorrecta.</b>\nPide una nueva al administrador.`, { parse_mode: 'HTML' });
   drivers[uid] = { nombre: r.nombre, pedidoActual: null, loginTs: Date.now() };
 
-  // PARCHE 2: Buscar teléfono del domiciliario en el cache del sheet (columna E)
-  await getSheetDrivers(); // asegurar que el cache esté fresco
+  await getSheetDrivers();
   const sheetEntry = _sheetCache.find(x => x.nombre === r.nombre);
   if (sheetEntry?.telefono) {
     drivers[uid].telefono = sheetEntry.telefono;
@@ -929,7 +1156,6 @@ async function cmdResumen(ctx) {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // DOMICILIARIOS — cache, lista, card detalle
-// PARCHE 1: getSheetDrivers lee columna E (teléfono)
 // ══════════════════════════════════════════════════════════════════════════════
 let _sheetCache = [];
 let _sheetCacheTs = 0;
@@ -943,13 +1169,12 @@ async function getSheetDrivers() {
     const sheets = google.sheets({ version: 'v4', auth: client });
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEETS_ID,
-      range: 'Domiciliarios!A:E'   // PARCHE 1: ampliar rango hasta columna E
+      range: 'Domiciliarios!A:E'
     });
-    // PARCHE 1: leer índice 4 = columna E (teléfono)
     _sheetCache = (res.data.values || []).slice(1).filter(r => r[1]).map(r => ({
       telegramId: (r[0] || '').toString().trim(),
       nombre:     (r[1] || '').toString().trim(),
-      telefono:   (r[4] || '').toString().trim(),  // columna E
+      telefono:   (r[4] || '').toString().trim(),
     }));
     _sheetCacheTs = Date.now();
   } catch (e) { console.error('getSheetDrivers:', e.message); }
@@ -960,7 +1185,7 @@ function statsDriverPool(nombre) {
   const ps = Object.values(pool).filter(p => p.estado === 'FINALIZADO' && p.domiciliario === nombre);
   return {
     entregas: ps.length,
-    ganancia: ps.reduce((a, p) => a + (p.precioDomicilio || 0), 0)
+    ganancia: ps.reduce((a, p) => a + (parsearTotal(p.precioDomicilio) || 0), 0)
   };
 }
 
@@ -995,7 +1220,7 @@ function buildCard(nombre, telegramId) {
         ? `  📅 <b>${fechaStr}</b>  a las  <b>${horaStr}</b>\n` +
         `  ⏱ Hace  <b>${haceStr}</b>\n`
         : `  <i>Sin registro todavía</i>\n`) +
-      `\n📍 <b>Última ubicación GPS</b>\n` +
+      `\n📍 <b>Ubicación GPS</b>\n` +
       (seen_loc
         ? `  ✅ ${seen.lat.toFixed(6)}, ${seen.lng.toFixed(6)}\n`
         : `  ❌ <i>Nunca compartió ubicación</i>\n`) +
@@ -1014,10 +1239,11 @@ function buildCard(nombre, telegramId) {
   const locHace = hasLoc ? tFmt(ahora - d.latTs) : null;
   const pedido = enRuta ? (pool[d.pedidoActual] || null) : null;
   const horaTomo = pedido?.horaTomo || '—';
-  const destino = pedido?.barrio || pedido?.direccion || '—';
+  // Siempre dirección original del cliente
+  const destino = pedido?.direccionCliente || pedido?.direccion || '—';
   const cliente = pedido?.cliente || '—';
   const telCliente = pedido?.telefono || '—';
-  const valDom = pedido?.precioDomicilio ? COP(pedido.precioDomicilio) : '—';
+  const valDom = pedido?.precioDomicilio ? COP(parsearTotal(pedido.precioDomicilio) || pedido.precioDomicilio) : '—';
   const negocio = pedido?.negocioNombre || '—';
 
   let gmapsLink = null;
@@ -1091,7 +1317,7 @@ async function buildLista() {
   const totalEntregas = Object.values(pool).filter(p => p.estado === 'FINALIZADO').length;
   const totalGanancia = Object.values(pool)
     .filter(p => p.estado === 'FINALIZADO')
-    .reduce((a, p) => a + (p.precioDomicilio || 0), 0);
+    .reduce((a, p) => a + (parsearTotal(p.precioDomicilio) || 0), 0);
 
   const nOnline = idsOnline.size;
   const nOffline = todosSheet.filter(d => !idsOnline.has(d.telegramId)).length;
@@ -1141,24 +1367,21 @@ bot.action(/^drv_det_(.+)$/, async ctx => {
   const { text: cardText, gmapsLink } = buildCard(nombre, telegramId);
 
   const btns = [];
-
   if (d) {
     if (d.pedidoActual) {
       const p = pool[d.pedidoActual];
       const dLat = d.lat || null;
       const dLng = d.lng || null;
       const gmRuta = p ? buildGmapsUrl(p.barrio || p.direccion || '', p, dLat, dLng) : null;
-
-      if (gmRuta) {
-        const labelMaps = dLat ? '🗺️ Ver ruta en tiempo real' : '🗺️ Ver ruta al destino';
-        btns.push([Markup.button.url(labelMaps, gmRuta)]);
-      }
+      if (gmRuta) btns.push([Markup.button.url('📍 Ver en Maps (ruta activa)', gmRuta)]);
       btns.push([Markup.button.callback(`✅ Marcar entregado · ${d.pedidoActual}`, `entregar_${d.pedidoActual}`)]);
       btns.push([Markup.button.callback(`❌ Cancelar pedido · ${d.pedidoActual}`, `cancelar_order_${d.pedidoActual}`)]);
     } else {
-      if (gmapsLink) {
-        btns.push([Markup.button.url('📍 Ver ubicación actual en Maps', gmapsLink)]);
-      }
+      const locUrl = (d.lat && d.lng)
+        ? `https://www.google.com/maps?q=${d.lat},${d.lng}`
+        : null;
+      if (locUrl) btns.push([Markup.button.url('📍 Ver ubicación actual', locUrl)]);
+
       const pendientes = Object.values(pool).filter(p => p.estado === 'PENDIENTE');
       pendientes.slice(0, 2).forEach(p => {
         btns.push([Markup.button.callback(`📋 Asignar pedido ${p.id}`, `asignar_${p.id}_${telegramId}`)]);
@@ -1265,10 +1488,17 @@ async function manejarFotoPostulante(ctx, uid) {
 }
 
 bot.action('enviar_postulacion', async ctx => {
-  const uid = ctx.from.id; const s = espPostulante[uid];
+  const uid = ctx.from.id;
+  const s   = espPostulante[uid];
   await ctx.answerCbQuery();
   if (!s || s.paso !== 'confirmando') return ctx.reply('❌ Algo salió mal. Inicia de nuevo con /start');
-  try { await ctx.editMessageText(`⏳ <b>Enviando tu postulación...</b>`, { parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } }); } catch (_) { }
+
+  try {
+    await ctx.editMessageText(`⏳ <b>Enviando tu postulación...</b>`, {
+      parse_mode: 'HTML', reply_markup: { inline_keyboard: [] }
+    });
+  } catch (_) { }
+
   try {
     await registrarPostulante({
       nombre: s.nombre, cedula: s.cedula, telefono: s.telefono,
@@ -1277,20 +1507,82 @@ bot.action('enviar_postulacion', async ctx => {
     });
   } catch (e) {
     console.error('registrarPostulante error:', e.message);
-    return ctx.reply(`❌ <b>Error al guardar.</b>\nContáctanos: 📱 <b>${process.env.WHATSAPP_NUMERO || '3XXXXXXXXX'}</b>`, { parse_mode: 'HTML', ...menuPublico() });
+    return ctx.reply(
+      `❌ <b>Error al guardar.</b>\nContáctanos: 📱 <b>${process.env.WHATSAPP_NUMERO || '3XXXXXXXXX'}</b>`,
+      { parse_mode: 'HTML', ...menuPublico() }
+    );
   }
+
   delete espPostulante[uid];
-  const adminMsg = `🆕 <b>NUEVA POSTULACIÓN</b>\n━━━━━━━━━━━━━━━━━━━━━━\n` +
-    `👤 <b>${s.nombre}</b>\n🪪 ${s.cedula}\n📱 ${s.telefono}\n🆔 Telegram: <code>${uid}</code>\n` +
-    `📅 ${moment().tz('America/Bogota').format('DD/MM/YYYY hh:mm A')}\n━━━━━━━━━━━━━━━━━━━━━━`;
-  for (const adminId of ADMIN_IDS) {
+
+  const fecha = moment().tz('America/Bogota').format('DD/MM/YYYY hh:mm A');
+
+  async function urlFoto(fileId) {
     try {
-      await bot.telegram.sendMessage(adminId, adminMsg, { parse_mode: 'HTML' });
-      await bot.telegram.sendPhoto(adminId, s.fotoLicencia, { caption: '📷 Licencia' });
-      await bot.telegram.sendPhoto(adminId, s.fotoTecnomecanica, { caption: '📷 Tecnomecánica' });
-      await bot.telegram.sendPhoto(adminId, s.fotoSeguro, { caption: '📷 SOAT' });
-    } catch (e) { console.error('Notif admin postulacion:', e.message); }
+      const f = await bot.telegram.getFile(fileId);
+      return `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${f.file_path}`;
+    } catch (e) { console.error('urlFoto:', e.message); return null; }
   }
+
+  const [urlLic, urlTec, urlSoat] = await Promise.all([
+    urlFoto(s.fotoLicencia),
+    urlFoto(s.fotoTecnomecanica),
+    urlFoto(s.fotoSeguro),
+  ]);
+
+  const CANAL_DOM = process.env.CANAL_DOMICILIARIOS_ID;
+  if (CANAL_DOM) {
+    // 1. Mensaje principal con datos del postulante
+    const msgCanal =
+      `🆕 <b>NUEVA POSTULACIÓN</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `👤 <b>${s.nombre}</b>\n` +
+      `🪪 Cédula:    <code>${s.cedula}</code>\n` +
+      `📱 Teléfono:  <code>${s.telefono}</code>\n` +
+      `🆔 Telegram:  <code>${uid}</code>\n` +
+      `📅 ${fecha}\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `<i>📊 Datos completos en Google Sheets → hoja domiciliarios_nuevos</i>`;
+
+    try {
+      await bot.telegram.sendMessage(CANAL_DOM, msgCanal, { parse_mode: 'HTML' });
+    } catch (e) { console.error('Canal DOM mensaje:', e.message); }
+
+    // 2. Enviar las 3 fotos como álbum real con fileId (no URLs que expiran)
+    const mediaGroup = [
+      { type: 'photo', media: s.fotoLicencia,      caption: `🪪 Licencia — ${s.nombre}` },
+      { type: 'photo', media: s.fotoTecnomecanica, caption: `🔧 Tecnomecánica — ${s.nombre}` },
+      { type: 'photo', media: s.fotoSeguro,         caption: `🛡️ SOAT — ${s.nombre}` }
+    ];
+
+    try {
+      await bot.telegram.sendMediaGroup(CANAL_DOM, mediaGroup);
+    } catch (e) {
+      console.error('Canal DOM álbum fotos:', e.message);
+      // Fallback: enviar una por una si el álbum falla
+      for (const [label, fileId] of [
+        ['🪪 Licencia', s.fotoLicencia],
+        ['🔧 Tecnomecánica', s.fotoTecnomecanica],
+        ['🛡️ SOAT', s.fotoSeguro]
+      ]) {
+        await bot.telegram.sendPhoto(CANAL_DOM, fileId, {
+          caption: `${label} — ${s.nombre}`
+        }).catch(() => {});
+      }
+    }
+  }
+
+  const adminMsg =
+    `🆕 <b>NUEVA POSTULACIÓN</b>\n━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `👤 <b>${s.nombre}</b>\n🪪 ${s.cedula}\n📱 ${s.telefono}\n` +
+    `🆔 Telegram: <code>${uid}</code>\n📅 ${fecha}\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `📋 Ver detalles en el canal de domiciliarios`;
+
+  for (const adminId of ADMIN_IDS) {
+    bot.telegram.sendMessage(adminId, adminMsg, { parse_mode: 'HTML' }).catch(() => { });
+  }
+
   return ctx.reply(
     `🎉 <b>¡Postulación enviada con éxito!</b>\n\n` +
     `Uno de nuestros asesores se <b>contactará pronto</b> al <b>${s.telefono}</b>. 🛵\n\n` +
@@ -1308,32 +1600,28 @@ bot.action('cancelar_postulacion', async ctx => {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // CARDS DRIVER + BOTONES
-// PARCHE 8: botonesCard agrega botón 📍 Ver en Maps con dirección del cliente
 // ══════════════════════════════════════════════════════════════════════════════
 function botonesCard(p, gmaps) {
   const id = p.id;
-  // PARCHE 8: usar direccionCliente (lo que ingresó el cliente) para el link Maps
-  const dirCliente = p.direccionCliente || p.direccion || '';
-  const mapsDirBtn = dirCliente
-    ? [Markup.button.url('📍 Ver en Maps', gmapsLinkDir(dirCliente))]
-    : null;
+  const verMapsBtn = Markup.button.url('📍 Ver en Maps', gmaps);
 
   if (p.estado === 'EN_PROCESO') {
-    const filas = [
-      [Markup.button.callback('✅ Entregar', `entregar_${id}`), Markup.button.url('🗺️ Ver Ruta', gmaps)],
-    ];
-    if (mapsDirBtn) filas.push(mapsDirBtn);
-    filas.push([Markup.button.callback('❌ Cancelar pedido', `cancelar_order_${id}`)]);
-    return Markup.inlineKeyboard(filas);
+    return Markup.inlineKeyboard([
+      [Markup.button.callback('✅ Entregar', `entregar_${id}`), verMapsBtn],
+      [Markup.button.callback('❌ Cancelar pedido', `cancelar_order_${id}`)],
+    ]);
   }
-  const filas = [
+  return Markup.inlineKeyboard([
     [Markup.button.callback('🎯 Tomar', `tomar_${id}`), Markup.button.callback('📸 Subir Factura', `factura_${id}`)],
-    [Markup.button.url('🗺️ Ver Ruta', gmaps), Markup.button.callback('❌ Cancelar', `cancelar_order_${id}`)],
-  ];
-  if (mapsDirBtn) filas.splice(1, 0, mapsDirBtn);
-  return Markup.inlineKeyboard(filas);
+    [verMapsBtn, Markup.button.callback('❌ Cancelar', `cancelar_order_${id}`)],
+  ]);
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// MOSTRAR PEDIDOS
+// PARCHE 2: parsearTotal() en vez de Number(String().replace(/[^0-9.]/g,''))
+// PARCHE 3: direccionCliente siempre se preserva de la original del cliente
+// ══════════════════════════════════════════════════════════════════════════════
 async function mostrarPendientes(ctx) {
   const uid = ctx.from.id;
   try {
@@ -1343,15 +1631,25 @@ async function mostrarPendientes(ctx) {
     const merged = [
       ...enMem,
       ...enSheets.filter(p => !ids.has(p.id)).map(p => ({
-        id: p.id, negocioNombre: p.negocio || p.negocioNombre || '—', tienda: p.tienda || null,
-        tipo: p.tipo || null, cliente: p.cliente || '—', telefono: p.telefono || '—',
-        // PARCHE: preservar direccionCliente si viene del sheet, si no usar direccion
+        id: p.id,
+        negocioNombre: p.negocio || p.negocioNombre || '—',
+        tienda: p.tienda || null,
+        tipo: p.tipo || null,
+        cliente: p.cliente || '—',
+        telefono: p.telefono || '—',
+        // PARCHE 3: siempre la dirección original — nunca el match del sheet
         direccionCliente: p.direccionCliente || p.direccion || '—',
-        direccion: p.direccion || '—', barrio: p.barrio || p.direccion || '—',
-        origen: p.origen || null, productos: p.productos || '—',
-        total: p.total ? (Number(String(p.total).replace(/[^0-9.]/g, '')) || null) : null,
-        precioDomicilio: Number(p.precioDomicilio) || 0, estado: 'PENDIENTE',
-        clienteId: p.clienteId || null, presupuesto: p.presupuesto || null, carrito: p.carrito || []
+        direccion: p.direccionCliente || p.direccion || '—',
+        barrio: p.direccionCliente || p.direccion || '—',
+        origen: p.origen || null,
+        productos: p.productos || '—',
+        // PARCHE 2: parsearTotal elimina puntos de miles antes de convertir
+        total: parsearTotal(p.total),
+        precioDomicilio: parsearTotal(p.precioDomicilio) || 0,
+        estado: 'PENDIENTE',
+        clienteId: p.clienteId || null,
+        presupuesto: p.presupuesto || null,
+        carrito: p.carrito || []
       }))
     ];
     if (!merged.length) return ctx.reply('😴 No hay pedidos pendientes ahora.');
@@ -1377,14 +1675,26 @@ async function mostrarEnProceso(ctx) {
   const merged = [
     ...enMem,
     ...enSheets.filter(p => !ids.has(p.id)).map(p => ({
-      id: p.id, negocioNombre: p.negocio, tienda: p.tienda || null, tipo: p.tipo || null,
-      cliente: p.cliente, telefono: p.telefono,
+      id: p.id,
+      negocioNombre: p.negocio || p.negocioNombre || '—',
+      tienda: p.tienda || null,
+      tipo: p.tipo || null,
+      cliente: p.cliente || '—',
+      telefono: p.telefono || '—',
+      // PARCHE 3: siempre la dirección original — nunca el match del sheet
       direccionCliente: p.direccionCliente || p.direccion || '—',
-      direccion: p.direccion,
-      barrio: p.barrio || p.direccion, origen: p.origen || null, productos: p.productos,
-      total: p.total ? (Number(String(p.total).replace(/[^0-9.]/g, '')) || null) : null,
-      precioDomicilio: Number(p.precioDomicilio) || 0, domiciliario: p.domiciliario,
-      horaTomo: p.horaTomo, estado: 'EN_PROCESO', clienteId: p.clienteId || null, carrito: p.carrito || []
+      direccion: p.direccionCliente || p.direccion || '—',
+      barrio: p.direccionCliente || p.direccion || '—',
+      origen: p.origen || null,
+      productos: p.productos || '—',
+      // PARCHE 2: parsearTotal
+      total: parsearTotal(p.total),
+      precioDomicilio: parsearTotal(p.precioDomicilio) || 0,
+      domiciliario: p.domiciliario,
+      horaTomo: p.horaTomo,
+      estado: 'EN_PROCESO',
+      clienteId: p.clienteId || null,
+      carrito: p.carrito || []
     }))
   ];
   if (!merged.length) return ctx.reply('📭 Ningún pedido en proceso.');
@@ -1406,10 +1716,20 @@ async function mostrarFinalizados(ctx) {
   if (!ps.length) return ctx.reply(`📭 Sin entregas finalizadas hoy (${hoy})`);
   let msg = `✅ <b>${ps.length}</b> entrega(s) hoy ${hoy}:\n\n`;
   ps.forEach((p, i) => {
+    const pPool = pool[p.id] || {};
+    // PARCHE 2: parsearTotal para todos los valores monetarios
+    const totalMostrar = parsearTotal(pPool.total) || parsearTotal(p.total) || 0;
+    const domMostrar   = parsearTotal(pPool.precioDomicilio) || parsearTotal(p.precioDomicilio) || 0;
+    const prodMostrar  = parsearTotal(pPool.totalProductos) || (totalMostrar - domMostrar) || 0;
+    // PARCHE 3: siempre dirección original
+    const direccionMostrar = p.direccionCliente || p.direccion || p.barrio || '—';
+
     msg += `${i + 1}. 🆔 <b>${p.id}</b>  <i>${tipoBadge(p)}</i>\n`;
-    msg += `   📍 ${p.barrio || p.direccion}\n`;
+    msg += `   📍 ${direccionMostrar}\n`;
     msg += `   🛵 ${p.domiciliario || '?'} ⏰ ${p.horaEntrego || '?'}\n`;
-    msg += `   💵 ${COP(p.total)}\n`;
+    if (prodMostrar > 0) msg += `   🧾 Productos: ${COP(prodMostrar)}\n`;
+    if (domMostrar > 0)  msg += `   🛵 Domicilio: ${COP(domMostrar)}\n`;
+    msg += `   💵 <b>Total: ${COP(totalMostrar)}</b>\n`;
     if (p.calificacion) msg += `   ⭐ ${p.calificacion}\n`;
     msg += '\n';
   });
@@ -1418,7 +1738,6 @@ async function mostrarFinalizados(ctx) {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TOMAR PEDIDO
-// PARCHE 6+9: notifica cliente con nombre+teléfono del domi, 40 min estimado
 // ══════════════════════════════════════════════════════════════════════════════
 bot.action(/^tomar_(.+)$/, async ctx => {
   const id = ctx.match[1];
@@ -1434,14 +1753,25 @@ bot.action(/^tomar_(.+)$/, async ctx => {
     const found = lista.find(x => x.id === id);
     if (!found) return ctx.answerCbQuery('⚠️ No encontré ese pedido.', true);
     pool[id] = {
-      id: found.id, negocioNombre: found.negocio || found.negocioNombre || '—',
-      tienda: found.tienda || null, tipo: found.tipo || null, cliente: found.cliente || '—',
-      telefono: found.telefono || '—', clienteId: found.clienteId || null,
+      id: found.id,
+      negocioNombre: found.negocio || found.negocioNombre || '—',
+      tienda: found.tienda || null,
+      tipo: found.tipo || null,
+      cliente: found.cliente || '—',
+      telefono: found.telefono || '—',
+      clienteId: found.clienteId || null,
+      // PARCHE 3: siempre dirección original
       direccionCliente: found.direccionCliente || found.direccion || '—',
-      direccion: found.direccion || '—', barrio: found.barrio || found.direccion || '—',
-      origen: found.origen || null, productos: found.productos || '—', total: found.total || null,
-      precioDomicilio: found.precioDomicilio || 0, presupuesto: found.presupuesto || null,
-      estado: 'PENDIENTE', carrito: found.carrito || [], hora: found.hora || null
+      direccion: found.direccionCliente || found.direccion || '—',
+      barrio: found.direccionCliente || found.direccion || '—',
+      origen: found.origen || null,
+      productos: found.productos || '—',
+      total: parsearTotal(found.total),
+      precioDomicilio: parsearTotal(found.precioDomicilio) || 0,
+      presupuesto: found.presupuesto || null,
+      estado: 'PENDIENTE',
+      carrito: found.carrito || [],
+      hora: found.hora || null
     };
   }
   pool[id].estado = 'EN_PROCESO';
@@ -1454,10 +1784,9 @@ bot.action(/^tomar_(.+)$/, async ctx => {
   const dLng3 = drivers[uid]?.lng || null;
   const gmaps = buildGmapsUrl(p.barrio || p.direccion || '', p, dLat3, dLng3);
 
-  // PARCHE 9: Notificar cliente con nombre + teléfono del domiciliario + 40 min
   if (p.clienteId) {
     const telDomi = drivers[uid]?.telefono || '';
-    const dirDisplay = p.direccionCliente || p.direccion || p.barrio || '—';
+    const dirDisplay = p.direccionCliente || p.direccion || '—';
     let productosDetalle = p.productos || '—';
     if (p.carrito?.length > 0) productosDetalle = p.carrito.map(i => `• ${i.cantidad}× ${i.descripcion}`).join('\n');
 
@@ -1478,9 +1807,8 @@ bot.action(/^tomar_(.+)$/, async ctx => {
     bot.telegram.sendMessage(p.clienteId, trackerMsg, { parse_mode: 'HTML' }).catch(() => { });
   }
 
-  // PARCHE 4a: Canal de pedidos con dirección clickeable
   if (process.env.CANAL_PEDIDOS_ID) {
-    const dirCliente = p.direccionCliente || p.direccion || p.barrio || '—';
+    const dirCliente = p.direccionCliente || p.direccion || '—';
     const dirLink = gmapsLinkDir(dirCliente);
     const cardTomar =
       `🔵 <b>TOMADO — ${id}</b>\n━━━━━━━━━━━━━━━━━━\n` +
@@ -1514,27 +1842,118 @@ bot.action(/^factura_(.+)$/, async ctx => {
   const chatId = ctx.callbackQuery.message.chat.id;
   const msgId = ctx.callbackQuery.message.message_id;
   await ctx.answerCbQuery();
+
   if (!drivers[uid] && !esAdmin(uid)) return ctx.reply('❌ Autentícate primero.');
+
   let p = pool[id];
-  if (p && p.estado === 'PENDIENTE') {
+
+  if (!p || p.estado === 'PENDIENTE') {
     const domiciliario = drivers[uid] || { nombre: 'Admin', pedidoActual: null };
-    if (!domiciliario.pedidoActual) {
-      p.estado = 'EN_PROCESO'; p.domiciliario = domiciliario.nombre;
-      p.horaTomo = moment().tz('America/Bogota').format('hh:mm A');
-      if (drivers[uid]) drivers[uid].pedidoActual = id;
-      await asignarDomiciliario(id, domiciliario.nombre);
+
+    if (drivers[uid]?.pedidoActual && drivers[uid].pedidoActual !== id) {
+      return ctx.answerCbQuery('⚠️ Ya tienes un pedido activo.', true);
+    }
+
+    if (!p) {
+      const lista = await getPedidos('PENDIENTE').catch(() => []);
+      const found = lista.find(x => x.id === id);
+      if (!found) return ctx.answerCbQuery('⚠️ Pedido no encontrado.', true);
+      pool[id] = {
+        id: found.id,
+        negocioNombre: found.negocio || found.negocioNombre || '—',
+        tienda: found.tienda || null,
+        tipo: found.tipo || null,
+        cliente: found.cliente || '—',
+        telefono: found.telefono || '—',
+        clienteId: found.clienteId || null,
+        // PARCHE 3: siempre dirección original
+        direccionCliente: found.direccionCliente || found.direccion || '—',
+        direccion: found.direccionCliente || found.direccion || '—',
+        barrio: found.direccionCliente || found.direccion || '—',
+        productos: found.productos || '—',
+        total: parsearTotal(found.total),
+        precioDomicilio: parsearTotal(found.precioDomicilio) || 0,
+        estado: 'PENDIENTE',
+        carrito: found.carrito || [],
+        hora: found.hora || null
+      };
+      p = pool[id];
+    }
+
+    p.estado = 'EN_PROCESO';
+    p.domiciliario = domiciliario.nombre;
+    p.horaTomo = moment().tz('America/Bogota').format('hh:mm A');
+    if (drivers[uid]) {
+      drivers[uid].pedidoActual = id;
+      drivers[uid].lastActivity = Date.now();
+    }
+    await asignarDomiciliario(id, domiciliario.nombre);
+
+    if (p.clienteId) {
+      const telDomi = drivers[uid]?.telefono || '';
+      const dirDisplay = p.direccionCliente || p.direccion || '—';
+      let productosDetalle = p.productos || '—';
+      if (p.carrito?.length > 0) productosDetalle = p.carrito.map(i => `• ${i.cantidad}× ${i.descripcion}`).join('\n');
+
+      const trackerMsg =
+        `🛵 <b>¡Tu pedido está en camino!</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━\n✅ <b>Domiciliario asignado</b>\n\n` +
+        `👤 <b>${domiciliario.nombre}</b>\n` +
+        (telDomi ? `📱 <b>${telDomi}</b>\n` : '') +
+        `\n🏪 ${p.negocioNombre || '—'}\n📍 ${dirDisplay}\n\n` +
+        `📦 <b>Productos:</b>\n${productosDetalle}\n\n` +
+        `🛵 Domicilio: <b>${COP(p.precioDomicilio || 0)}</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━\n🔴 <b>Tiempo estimado: 40 minutos</b>\n` +
+        `🏍️🏍️🏍️🏍️🏍️............\n<i>¡Tu pedido viene en camino! 🛵❤️</i>`;
+      bot.telegram.sendMessage(p.clienteId, trackerMsg, { parse_mode: 'HTML' }).catch(() => {});
+    }
+
+    if (process.env.CANAL_PEDIDOS_ID) {
+      const dirCliente = p.direccionCliente || p.direccion || '—';
+      bot.telegram.sendMessage(process.env.CANAL_PEDIDOS_ID,
+        `🔵 <b>TOMADO — ${id}</b>\n━━━━━━━━━━━━━━━━━━\n` +
+        `🛵 Domiciliario: <b>${domiciliario.nombre}</b>\n` +
+        `👤 ${p.cliente || '—'}  📱 ${p.telefono || '—'}\n` +
+        `📍 <a href="${gmapsLinkDir(dirCliente)}">${dirCliente}</a>\n` +
+        `🏪 ${p.negocioNombre || '—'}\n💵 Domicilio: <b>${COP(p.precioDomicilio || 0)}</b>\n` +
+        `⏰ ${p.horaTomo}\n━━━━━━━━━━━━━━━━━━`,
+        { parse_mode: 'HTML', disable_web_page_preview: true }
+      ).catch(() => {});
     }
   }
+
   espFacturaDrv[uid] = {
-    pedidoId: id, chatId, msgId, precioDomicilio: p?.precioDomicilio || 0,
-    clienteId: p?.clienteId || null, nombre: drivers[uid]?.nombre || 'Admin', pedido: p
+    pedidoId: id,
+    chatId,
+    msgId,
+    precioDomicilio: p?.precioDomicilio || 0,
+    clienteId: p?.clienteId || null,
+    nombre: drivers[uid]?.nombre || 'Admin',
+    pedido: p
   };
+
+  const dLat = drivers[uid]?.lat || null;
+  const dLng = drivers[uid]?.lng || null;
+  const gmaps = buildGmapsUrl(p?.barrio || p?.direccion || '', p, dLat, dLng);
+  const dirCliente = p?.direccionCliente || p?.direccion || '';
+
   try {
-    await ctx.editMessageText(
-      cardPedidoDriver(p || { id }, 'EN_PROCESO') + `\n\n📸 <b>Envía la foto de la factura...</b>`,
-      { parse_mode: 'HTML', disable_web_page_preview: true, ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver', `verpedido_wil_${id}`)]]) }
+    await ctx.telegram.editMessageText(chatId, msgId, null,
+      cardPedidoDriver(p, 'EN_PROCESO') +
+      `\n🛵 <b>${p.domiciliario}</b> — ⏰ ${p.horaTomo}\n\n` +
+      `📸 <b>Ahora envía la foto de la factura...</b>`,
+      {
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+        ...Markup.inlineKeyboard([
+          ...(dirCliente ? [[Markup.button.url('📍 Ver en Maps', gmaps)]] : []),
+          [Markup.button.callback('🔙 Cancelar', `verpedido_wil_${id}`)]
+        ])
+      }
     );
-  } catch (e) { console.error('edit factura prompt:', e.message); }
+  } catch(e) {
+    console.error('edit factura prompt:', e.message);
+  }
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1546,6 +1965,7 @@ bot.on('photo', async ctx => {
     await manejarFotoPostulante(ctx, uid); return;
   }
   if (espFacturaDrv[uid]) { await procesarFacturaDomiciliario(ctx, uid); return; }
+  if (espComprobanteCliente[uid]) { await procesarComprobanteCliente(ctx, uid); return; }
   const s = S[uid];
   if (s && s.paso === 'comprobante') {
     s.imagenFileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
@@ -1555,7 +1975,6 @@ bot.on('photo', async ctx => {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PROCESAR FACTURA DOMICILIARIO
-// PARCHE 4b: NO enviar "en camino" al canal al subir factura
 // ══════════════════════════════════════════════════════════════════════════════
 async function procesarFacturaDomiciliario(ctx, uid) {
   const { pedidoId, chatId, msgId, precioDomicilio, clienteId, nombre, pedido } = espFacturaDrv[uid];
@@ -1584,7 +2003,9 @@ async function procesarFacturaDomiciliario(ctx, uid) {
   const esCopa = esZonaCopacabana(pedido?.zona || pedido?.municipio || '', pedido?.barrio || '');
   const items = pedido?.carrito?.length || 1;
   const recargo = calcularRecargos(pedido?.hora || pool[pedidoId]?.hora, items, esCopa);
-  const domFinal = (precioDomicilio || 0) + recargo;
+  // PARCHE 2: parsearTotal para el precioDomicilio que viene del pedido
+  const domBase = parsearTotal(precioDomicilio) || Number(precioDomicilio) || 0;
+  const domFinal = domBase + recargo;
   const totalFinal = totalProductos + domFinal;
 
   await actualizarTotalPedido(pedidoId, totalFinal);
@@ -1594,26 +2015,61 @@ async function procesarFacturaDomiciliario(ctx, uid) {
     pool[pedidoId].facturaFileId = fileId;
   }
 
-  let productosDetalle = pedido?.productos || '—';
-  if (pedido?.carrito?.length > 0) productosDetalle = pedido.carrito.map(i => `• ${i.cantidad}× ${i.descripcion}`).join('\n');
+  if (pool[pedidoId]?.carrito?.length > 0) {
+    const carrito = pool[pedidoId].carrito;
+    const totalSinPrecio = carrito.reduce((sum, item) => sum + (item.precioUnitario || 0), 0);
+    if (totalSinPrecio === 0) {
+      carrito[0].subtotal = totalProductos;
+      carrito[0].precioUnitario = Math.round(totalProductos / carrito[0].cantidad);
+    } else {
+      const factor = totalProductos / totalSinPrecio;
+      carrito.forEach(item => {
+        if (item.precioUnitario) {
+          item.subtotal = Math.round(item.precioUnitario * item.cantidad * factor);
+        }
+      });
+    }
+  }
 
-  // Notificar al cliente con la factura (incluye desglose)
+  let productosDetalle = '';
+  if (pedido?.carrito?.length > 0) {
+    productosDetalle = pedido.carrito.map(i => {
+      const precioUnit = i.precioUnitario ? COP(i.precioUnitario) : '';
+      const subtotal = i.subtotal ? COP(i.subtotal) : '';
+      return `• ${i.cantidad}× ${i.descripcion} ${precioUnit ? `@ ${precioUnit}` : ''} ${subtotal ? `= ${subtotal}` : ''}`;
+    }).join('\n');
+  } else {
+    productosDetalle = pedido?.productos || '—';
+  }
+
   if (clienteId) {
     const dirCliente = pedido?.direccionCliente || pedido?.direccion || '—';
+    const metodoPago = pedido?.metodoPago || pool[pedidoId]?.metodoPago || 'EFECTIVO';
+    const esPagoElectronico = ['NEQUI', 'TRANSFERENCIA'].includes(metodoPago);
+
     try {
-      await bot.telegram.sendPhoto(clienteId, fileId, {
-        caption:
-          `🧾 <b>FACTURA DE TU PEDIDO</b>\n━━━━━━━━━━━━━━━━━━\n🆔 <b>${pedidoId}</b>\n` +
-          `👤 ${pedido?.cliente || '—'}\n📍 <b>${dirCliente}</b>\n` +
-          `━━━━━━━━━━━━━━━━━━\n📦 <b>PRODUCTOS:</b>\n${productosDetalle}\n━━━━━━━━━━━━━━━━━━\n` +
-          `🧾 Productos: <b>${COP(totalProductos)}</b>\n🛵 Domicilio: <b>${COP(domFinal)}</b>\n` +
-          `━━━━━━━━━━━━━━━━━━\n💵 <b>TOTAL: ${COP(totalFinal)}</b>\n🛵 ${nombre}`,
-        parse_mode: 'HTML'
-      });
+      const captionFactura =
+        `🧾 <b>FACTURA DE TU PEDIDO</b>\n━━━━━━━━━━━━━━━━━━\n🆔 <b>${pedidoId}</b>\n` +
+        `👤 ${pedido?.cliente || '—'}\n📍 <b>${dirCliente}</b>\n` +
+        `━━━━━━━━━━━━━━━━━━\n📦 <b>PRODUCTOS:</b>\n${productosDetalle}\n━━━━━━━━━━━━━━━━━━\n` +
+        `🧾 Productos: <b>${COP(totalProductos)}</b>\n🛵 Domicilio: <b>${COP(domFinal)}</b>\n` +
+        `━━━━━━━━━━━━━━━━━━\n💵 <b>TOTAL: ${COP(totalFinal)}</b>\n` +
+        `💳 Pago: <b>${metodoPago}</b>\n🛵 ${nombre}` +
+        (esPagoElectronico ? `\n\n📲 <b>Por favor sube tu comprobante de pago:</b>` : '');
+
+      const opcionesMsg = esPagoElectronico
+        ? { parse_mode: 'HTML', ...Markup.inlineKeyboard([[Markup.button.callback('📲 Subir comprobante', `subir_comp_${pedidoId}`)]]) }
+        : { parse_mode: 'HTML' };
+
+      await bot.telegram.sendPhoto(clienteId, fileId, { caption: captionFactura, ...opcionesMsg });
+
+      if (esPagoElectronico) {
+        espComprobanteCliente[clienteId] = { pedidoId, metodoPago };
+      }
+
     } catch (e) { console.error('Factura al cliente:', e.message); }
   }
 
-  // PARCHE 4b: NO enviar "en camino" al canal al subir factura — solo actualizar card del driver
   const driverId = uid;
   const dLat4 = drivers[driverId]?.lat || null;
   const dLng4 = drivers[driverId]?.lng || null;
@@ -1625,7 +2081,10 @@ async function procesarFacturaDomiciliario(ctx, uid) {
       `\n🛵 <b>${nombre}</b>\n🧾 ${COP(totalProductos)} + 🛵 ${COP(domFinal)} = 💵 <b>${COP(totalFinal)}</b>\n📲 <i>Cliente notificado ✅</i>`,
       {
         parse_mode: 'HTML', disable_web_page_preview: true, ...Markup.inlineKeyboard([
-          [Markup.button.callback('✅ Entregar', `entregar_${pedidoId}`), Markup.button.url('🗺️ Ver Ruta', gmaps)],
+          ...(pActual.estado === 'PENDIENTE'
+            ? [[Markup.button.callback('🎯 Tomar pedido', `tomar_${pedidoId}`)]]
+            : [[Markup.button.callback('✅ Entregar', `entregar_${pedidoId}`)]]),
+          [Markup.button.url('📍 Ver en Maps', gmaps)],
           [Markup.button.callback('❌ Cancelar pedido', `cancelar_order_${pedidoId}`)]
         ])
       }
@@ -1645,7 +2104,15 @@ bot.action(/^verpedido_wil_(.+)$/, async ctx => {
   if (!p) {
     const lista = await getPedidos('ALL').catch(() => []);
     const f = lista.find(x => x.id === id);
-    if (f) p = { ...f, barrio: f.barrio || f.direccion, direccionCliente: f.direccionCliente || f.direccion };
+    if (f) p = {
+      ...f,
+      // PARCHE 3: siempre dirección original
+      direccionCliente: f.direccionCliente || f.direccion || '—',
+      direccion: f.direccionCliente || f.direccion || '—',
+      barrio: f.direccionCliente || f.direccion || '—',
+      total: parsearTotal(f.total),
+      precioDomicilio: parsearTotal(f.precioDomicilio) || 0
+    };
   }
   if (!p) return;
   const dLat5 = drivers[uid]?.lat || null;
@@ -1667,13 +2134,13 @@ bot.action(/^corregir_total_(.+)$/, async ctx => {
   if (datos) delete espConfirmar[uid];
   espTotalManual[uid] = {
     pedidoId: id,
-    precioDomicilio: pool[id]?.precioDomicilio || 0,
+    precioDomicilio: parsearTotal(pool[id]?.precioDomicilio) || 0,
     clienteId: pool[id]?.clienteId || null,
     fileId: datos?.fileId || null,
     pedido: datos?.pedido || pool[id] || null
   };
   return ctx.reply(
-    `✏️ <b>Ingresa el total correcto de la factura</b>\n\n🛵 Domicilio: <b>${COP(pool[id]?.precioDomicilio || 0)}</b>\n\nEscribe solo el <b>valor de los productos</b>:\n<i>Ej: 87500</i>`,
+    `✏️ <b>Ingresa el total correcto de la factura</b>\n\n🛵 Domicilio: <b>${COP(parsearTotal(pool[id]?.precioDomicilio) || 0)}</b>\n\nEscribe solo el <b>valor de los productos</b>:\n<i>Ej: 87500</i>`,
     { parse_mode: 'HTML' }
   );
 });
@@ -1688,20 +2155,39 @@ async function manejarTotalManual(ctx, uid, txt) {
   const esCopa = esZonaCopacabana(pedido?.zona || pedido?.municipio || '', pedido?.barrio || '');
   const items = pedido?.carrito?.length || 1;
   const recargo = calcularRecargos(pedido?.hora || pool[pedidoId]?.hora, items, esCopa);
-  const domFinal = (precioDomicilio || 0) + recargo;
+  // PARCHE 2: parsearTotal
+  const domBase = parsearTotal(precioDomicilio) || Number(precioDomicilio) || 0;
+  const domFinal = domBase + recargo;
   const totalFinal = valor + domFinal;
 
   await actualizarTotalPedido(pedidoId, totalFinal);
-  if (pool[pedidoId]) { pool[pedidoId].total = totalFinal; pool[pedidoId].totalProductos = valor; }
+  if (pool[pedidoId]) {
+    pool[pedidoId].total = totalFinal;
+    pool[pedidoId].totalProductos = valor;
+    if (pool[pedidoId].carrito?.length > 0) {
+      pool[pedidoId].carrito[0].subtotal = valor;
+      pool[pedidoId].carrito[0].precioUnitario = Math.round(valor / pool[pedidoId].carrito[0].cantidad);
+    }
+  }
 
-  let productosDetalle = pedido?.productos || '—';
-  if (pedido?.carrito?.length > 0) productosDetalle = pedido.carrito.map(i => `• ${i.cantidad}× ${i.descripcion}`).join('\n');
+  let productosDetalle = '';
+  if (pedido?.carrito?.length > 0) {
+    productosDetalle = pedido.carrito.map(i => {
+      const precioUnit = i.precioUnitario ? COP(i.precioUnitario) : '';
+      const subtotal = i.subtotal ? COP(i.subtotal) : '';
+      return `• ${i.cantidad}× ${i.descripcion} ${precioUnit ? `@ ${precioUnit}` : ''} ${subtotal ? `= ${subtotal}` : ''}`;
+    }).join('\n');
+  } else {
+    productosDetalle = pedido?.productos || '—';
+  }
 
   if (clienteId) {
     try {
+      const dirCliente = pedido?.direccionCliente || pedido?.direccion || '—';
       const clienteMsg =
         `🧾 <b>FACTURA DE TU PEDIDO</b>\n━━━━━━━━━━━━━━━━━━\n🆔 <b>${pedidoId}</b>\n` +
-        `📦 <b>PRODUCTOS:</b>\n${productosDetalle}\n━━━━━━━━━━━━━━━━━━\n` +
+        `👤 ${pedido?.cliente || '—'}\n📍 <b>${dirCliente}</b>\n` +
+        `━━━━━━━━━━━━━━━━━━\n📦 <b>PRODUCTOS:</b>\n${productosDetalle}\n━━━━━━━━━━━━━━━━━━\n` +
         `🧾 Productos: <b>${COP(valor)}</b>\n🛵 Domicilio: <b>${COP(domFinal)}</b>\n` +
         `━━━━━━━━━━━━━━━━━━\n💵 <b>TOTAL: ${COP(totalFinal)}</b>`;
       if (fileId) await bot.telegram.sendPhoto(clienteId, fileId, { caption: clienteMsg, parse_mode: 'HTML' });
@@ -1726,18 +2212,37 @@ bot.action(/^entregar_(.+)$/, async ctx => {
   if (drivers[uid]) drivers[uid].pedidoActual = null;
   const p = pool[id];
 
-  let productosDetalle = p?.productos || '—';
-  if (p?.carrito?.length > 0) productosDetalle = p.carrito.map(i => `• ${i.cantidad}× ${i.descripcion}`).join('\n');
+  if (pool[id] && !pool[id].total) {
+    try {
+      const fromSheet = await getPedidos('ALL').then(ps => ps.find(x => x.id === id));
+      if (fromSheet?.total) pool[id].total = parsearTotal(fromSheet.total);
+    } catch(_) {}
+  }
+
+  let productosDetalle = '';
+  if (p?.carrito?.length > 0) {
+    productosDetalle = p.carrito.map(i => {
+      const precioUnit = i.precioUnitario ? COP(i.precioUnitario) : '';
+      const subtotal = i.subtotal ? COP(i.subtotal) : '';
+      return `• ${i.cantidad}× ${i.descripcion} ${precioUnit ? `@ ${precioUnit}` : ''} ${subtotal ? `= ${subtotal}` : ''}`;
+    }).join('\n');
+  } else {
+    productosDetalle = p?.productos || '—';
+  }
 
   const nomDomi = drivers[uid]?.nombre || p?.domiciliario || 'Admin';
+  // PARCHE 2: parsearTotal en resumen final
+  const totalFinal = parsearTotal(p?.total) || 0;
+  const totalProd  = parsearTotal(p?.totalProductos) || 0;
+  const totalDom   = parsearTotal(p?.precioDomicilio) || 0;
 
   const resumenDriver =
     `🟢 <b>ENTREGADO · ${hora || '—'}</b>\n━━━━━━━━━━━━━━━━━━\n` +
     (p ? cardPedidoDriver({ ...p, estado: 'FINALIZADO' }, 'FINALIZADO') + '\n' : `🆔 ${id}\n`) +
     `📦 <b>PRODUCTOS:</b>\n${productosDetalle}\n━━━━━━━━━━━━━━━━━━\n` +
-    (p?.totalProductos ? `🧾 Productos: <b>${COP(p.totalProductos)}</b>\n` : '') +
-    (p?.precioDomicilio ? `🛵 Domicilio: <b>${COP(p.precioDomicilio)}</b>\n` : '') +
-    (p?.total ? `💵 <b>TOTAL COBRADO: ${COP(p.total)}</b>\n` : '') +
+    (totalProd > 0 ? `🧾 Productos: <b>${COP(totalProd)}</b>\n` : '') +
+    (totalDom  > 0 ? `🛵 Domicilio: <b>${COP(totalDom)}</b>\n`  : '') +
+    (totalFinal > 0 ? `💵 <b>TOTAL COBRADO: ${COP(totalFinal)}</b>\n` : '') +
     `🛵 ${nomDomi} ⏰ ${hora || '—'}`;
 
   if (p?.facturaFileId) {
@@ -1750,27 +2255,26 @@ bot.action(/^entregar_(.+)$/, async ctx => {
   if (p?.clienteId) {
     const trackerMsg = trackerCliente('ENTREGADO', nomDomi, null) +
       `\n\n🆔 <b>${id}</b>\n📦 ${productosDetalle}\n` +
-      (p?.total ? `💵 <b>Total: ${COP(p.total)}</b>\n` : '') +
+      (totalFinal > 0 ? `💵 <b>Total: ${COP(totalFinal)}</b>\n` : '') +
       `\n<i>¡Gracias por pedir con Domicilios WIL! 🛵❤️</i>`;
     try { await bot.telegram.sendMessage(p.clienteId, trackerMsg, { parse_mode: 'HTML' }); } catch (_) { }
     await enviarMensajeCalificacion(p.clienteId, id);
   }
 
-  if (process.env.CANAL_PEDIDOS_ID) {
-    const dirCliente = p?.direccionCliente || p?.direccion || p?.barrio || '—';
-    const dirLink = gmapsLinkDir(dirCliente);
-    const cardCanal =
+  if (process.env.CANAL_PEDIDOS_ID && p) {
+    const dirCliente = p.direccionCliente || p.direccion || '—';
+    bot.telegram.sendMessage(process.env.CANAL_PEDIDOS_ID,
       `🟢 <b>ENTREGADO — ${id}</b>\n━━━━━━━━━━━━━━━━━━\n` +
-      `🛵 Domiciliario: <b>${nomDomi}</b>\n` +
-      `👤 ${p?.cliente || '—'}  📱 ${p?.telefono || '—'}\n` +
-      `📍 <a href="${dirLink}">${dirCliente}</a>\n` +
-      `🏪 ${p?.negocioNombre || '—'}\n` +
-      `📦 ${productosDetalle}\n━━━━━━━━━━━━━━━━━━\n` +
-      (p?.totalProductos ? `🧾 Productos: <b>${COP(p.totalProductos)}</b>\n` : '') +
-      (p?.precioDomicilio ? `🛵 Domicilio: <b>${COP(p.precioDomicilio)}</b>\n` : '') +
-      (p?.total ? `💵 <b>TOTAL: ${COP(p.total)}</b>\n` : '') +
-      `⏰ Entregado: ${hora || '—'}`;
-    bot.telegram.sendMessage(process.env.CANAL_PEDIDOS_ID, cardCanal, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(() => { });
+      `🛵 Domiciliario: <b>${p.domiciliario || nomDomi}</b>\n` +
+      `👤 ${p.cliente || '—'}  📱 ${p.telefono || '—'}\n` +
+      `📍 <a href="${gmapsLinkDir(dirCliente)}">${dirCliente}</a>\n` +
+      `🏪 ${p.negocioNombre || '—'}\n━━━━━━━━━━━━━━━━━━\n` +
+      (totalProd  > 0 ? `🧾 Productos: <b>${COP(totalProd)}</b>\n`  : '') +
+      (totalDom   > 0 ? `🛵 Domicilio: <b>${COP(totalDom)}</b>\n`   : '') +
+      (totalFinal > 0 ? `💵 <b>TOTAL: ${COP(totalFinal)}</b>\n`     : '') +
+      `⏰ ${p.horaEntrego || hora || '—'}`,
+      { parse_mode: 'HTML', disable_web_page_preview: true }
+    ).catch(() => { });
   }
 
   const kb = await menuDriver(uid);
@@ -1896,7 +2400,8 @@ async function procesarPaquete(ctx, uid) {
     nombre: s.nombre, telefono: s.telefono, metodoPago: 'EFECTIVO',
     imagenFileId: '', carrito: [{ descripcion: productosStr, cantidad: 1, precioUnitario: 0, subtotal: 0 }],
     negocioNombre: '📦 Paquetería WIL — Recogida', tienda: null, tipo: 'paqueteria',
-    direccion: s.barrioDestino || s.direccionDestino, precioDomicilio: dom, totalFinal: dom
+    direccion: s.barrioDestino || s.direccionDestino,
+    precioDomicilio: dom, totalFinal: dom
   });
 
   await ctx.reply(
@@ -1911,12 +2416,22 @@ async function procesarPaquete(ctx, uid) {
   );
 
   pool[id] = {
-    id, negocioNombre: '📦 Paquetería WIL — Recogida', tienda: null, tipo: 'paqueteria',
-    cliente: s.nombre, telefono: s.telefono, clienteId: uid,
+    id,
+    negocioNombre: '📦 Paquetería WIL — Recogida',
+    tienda: null,
+    tipo: 'paqueteria',
+    cliente: s.nombre,
+    telefono: s.telefono,
+    clienteId: uid,
+    // Dirección de entrega como dirección original
     direccionCliente: s.barrioDestino || s.direccionDestino,
-    direccion: s.barrioDestino || s.direccionDestino, barrio: s.barrioDestino || s.direccionDestino,
-    origen: s.origenBarrio || null, productos: productosStr, total: null,
-    precioDomicilio: dom, estado: 'PENDIENTE',
+    direccion: s.barrioDestino || s.direccionDestino,
+    barrio: s.barrioDestino || s.direccionDestino,
+    origen: s.origenBarrio || null,
+    productos: productosStr,
+    total: null,
+    precioDomicilio: dom,
+    estado: 'PENDIENTE',
     hora: moment().tz('America/Bogota').format('hh:mm A'),
     createdAt: Date.now()
   };
@@ -2147,7 +2662,7 @@ async function manejarSesionCliente(ctx, uid, txt) {
       );
 
     case 'direccion': {
-      s.direccion = txt;  // guardamos la dirección RAW del cliente
+      s.direccion = txt;  // guardamos la dirección RAW original del cliente — nunca se pisa
       s.paso = 'esperando_ubi_cliente';
       clienteUbicacion[uid] = { pedidoId: null, barrio: txt };
       return ctx.reply(
@@ -2187,22 +2702,24 @@ async function manejarSesionCliente(ctx, uid, txt) {
         dirRefSheet = matchSheet?.direccion || matchSheet?.nota || null;
       } catch (_) { }
       const r = await obtenerTarifaRapida(s.direccion, dirRefSheet);
-      s.barrioDetectado = r.barrio || s.direccion;
+      // PARCHE 3: guardar solo para tarifas, NUNCA pisar s.direccion
+      s.barrioDetectado = r.barrio || s.direccion;  // solo uso interno para geo
       s.precioDomicilio = r.tarifa || 0;
       s.zona = r.zona || '';
       s.municipio = r.municipio || '';
       s.paqPeq = r.paqPeq || 0;
       s.paqMed = r.paqMed || 0;
       s.paqGran = r.paqGran || 0;
+      // s.direccion se mantiene intacta (la original del cliente)
       if (s.negocio === 'wil') {
         s.paso = 'presupuesto';
         return ctx.reply(
-          cardPedidoCliente(s) + `\n\n${r.mensaje}\n\n💰 ¿Cuánto tienes de <b>presupuesto</b>?\n<i>(Ej: 30000 o escribe "no sé")</i>`,
+          `💰 ¿Cuánto tienes de <b>presupuesto</b> para esta compra?\n<i>(Ej: 30000 o escribe "no sé")</i>`,
           { parse_mode: 'HTML' }
         );
       }
       s.paso = 'buscar';
-      return ctx.reply(cardPedidoCliente(s) + `\n\n${r.mensaje}\n\n🔍 Escribe el nombre del medicamento:`, { parse_mode: 'HTML' });
+      return ctx.reply(cardPedidoCliente(s) + `\n\n🔍 Escribe el nombre del medicamento:`, { parse_mode: 'HTML' });
     }
 
     case 'presupuesto': {
@@ -2210,7 +2727,7 @@ async function manejarSesionCliente(ctx, uid, txt) {
       s.presupuesto = isNaN(n) ? 'Sin límite' : COP(n);
       s.paso = 'pedido_libre';
       return ctx.reply(
-        cardPedidoCliente(s) + `\n\n💰 Presupuesto: <b>${s.presupuesto}</b>\n\n📦 ¿Qué necesitas?\n<i>Ej: "2 aceites, 1 arroz, 3 cervezas"</i>`,
+        `✅ Presupuesto: <b>${s.presupuesto}</b>\n\n📦 ¿Qué necesitas?\n<i>Ej: "2 pollos asados, 1 garrafa aguardiente Tapa Roja, 2 libras azúcar"</i>`,
         { parse_mode: 'HTML' }
       );
     }
@@ -2348,74 +2865,118 @@ bot.action('confirmar_pedido_libre', async ctx => {
 });
 
 bot.action(/^pago_(.+)$/, async ctx => {
-  const s = S[ctx.from.id]; await ctx.answerCbQuery();
-  if (!s) return;
+  await ctx.answerCbQuery();
+  const s = S[ctx.from.id];
+  // PARCHE: sesión perdida o interrumpida antes de llegar al paso de pago
+  if (!s || s.paso !== 'pago') {
+    return ctx.reply('❌ Sesión expirada. Usa /start para comenzar de nuevo.');
+  }
   s.metodoPago = ctx.match[1];
-  if (s.metodoPago !== 'EFECTIVO') { s.paso = 'comprobante'; return ctx.reply('📸 Envía la <b>foto del comprobante</b>:', { parse_mode: 'HTML' }); }
   await procesarPedido(ctx, ctx.from.id);
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PROCESAR PEDIDO
-// PARCHE 4a: Canal con dirección clickeable + PARCHE guarda direccionCliente
 // ══════════════════════════════════════════════════════════════════════════════
 async function procesarPedido(ctx, uid) {
   const s = S[uid];
+  // PARCHE: validar sesión completa antes de intentar registrar
+  if (!s) return ctx.reply('❌ Sesión expirada. Usa /start para comenzar de nuevo.');
+  if (!s.nombre || !s.telefono || !s.direccion) {
+    delete S[uid];
+    return ctx.reply('❌ Faltan datos del pedido. Usa /start para comenzar de nuevo.');
+  }
+  if (!s.carrito || !s.carrito.length) {
+    delete S[uid];
+    return ctx.reply('❌ El carrito está vacío. Usa /start para comenzar de nuevo.');
+  }
   const sub = s.carrito.reduce((a, i) => a + (i.subtotal || 0), 0);
   const dom = s.precioDomicilio || 0;
   const tot = !s.tienda ? 0 : sub + dom;
+
   const id = await registrarPedido({
-    nombre: s.nombre, telefono: s.telefono, metodoPago: s.metodoPago,
-    imagenFileId: s.imagenFileId || '', carrito: s.carrito, negocioNombre: s.negocioNombre,
-    tienda: s.tienda, direccion: s.barrioDetectado || s.direccion,
-    precioDomicilio: dom, totalFinal: tot, presupuesto: s.presupuesto
+    nombre: s.nombre,
+    telefono: s.telefono,
+    metodoPago: s.metodoPago,
+    imagenFileId: '',
+    carrito: s.carrito,
+    negocioNombre: s.negocioNombre,
+    tienda: s.tienda,
+    direccion: s.direccion,             // SIEMPRE la original ingresada por el cliente
+    direccionDetectada: s.barrioDetectado || '', // solo para referencia interna
+    precioDomicilio: dom,
+    totalFinal: tot,
+    presupuesto: s.presupuesto
   });
+
   await ctx.reply(facturaHTML(s, id) + `\n\n🆔 <b>${id}</b>\n<i>Guarda este ID para consultar tu pedido.</i>`, { parse_mode: 'HTML' });
 
-  // PARCHE: guardar direccionCliente (la que ingresó el cliente literalmente)
   pool[id] = {
-    id, negocioNombre: s.negocioNombre, tienda: s.tienda || null, tipo: 'pedido',
-    cliente: s.nombre, telefono: s.telefono, clienteId: uid,
-    direccionCliente: s.direccion,                     // ← RAW del cliente
-    direccion: s.barrioDetectado || s.direccion,       // ← normalizada para lógica interna
-    barrio: s.barrioDetectado || s.direccion,
-    presupuesto: s.presupuesto || null, zona: s.zona || '', municipio: s.municipio || '',
+    id,
+    negocioNombre: s.negocioNombre,
+    tienda: s.tienda || null,
+    tipo: 'pedido',
+    cliente: s.nombre,
+    telefono: s.telefono,
+    clienteId: uid,
+    // PARCHE 3: todos los campos de dirección apuntan a la original del cliente
+    direccionCliente: s.direccion,
+    direccionDetectada: s.barrioDetectado || '',
+    direccion: s.direccion,
+    barrio: s.direccion,
+    presupuesto: s.presupuesto || null,
+    zona: s.zona || '',
+    municipio: s.municipio || '',
     productos: s.carrito.map(i => `${i.cantidad}× ${i.descripcion}`).join(', '),
-    carrito: s.carrito, total: tot > 0 ? tot : null, precioDomicilio: dom,
-    estado: 'PENDIENTE', hora: moment().tz('America/Bogota').format('hh:mm A'),
+    carrito: s.carrito,
+    total: tot > 0 ? tot : null,
+    precioDomicilio: dom,
+    metodoPago: s.metodoPago,
+    estado: 'PENDIENTE',
+    hora: moment().tz('America/Bogota').format('hh:mm A'),
     createdAt: Date.now(),
     latCliente: s.latCliente || null,
     lngCliente: s.lngCliente || null,
   };
 
   if (s.latCliente && s.lngCliente) {
-    clienteUbicacion[uid] = { pedidoId: id, barrio: s.barrioDetectado || s.direccion || '' };
+    clienteUbicacion[uid] = { pedidoId: id, barrio: s.direccion };
     actualizarUbicacionPedido(id, s.latCliente, s.lngCliente).catch(() => { });
   }
+
+  const esPagoElectronico = ['NEQUI', 'TRANSFERENCIA'].includes(s.metodoPago);
 
   const { pend } = await getContadores();
   for (const [did, d] of Object.entries(drivers)) {
     if (!d.pedidoActual) {
       bot.telegram.sendMessage(did,
         `🔴 <b>Nuevo pedido</b>\n🆕 <b>${id}</b>\n🏪 ${s.negocioNombre}\n` +
-        `📍 ${s.direccion}\n🛵 Domicilio: <b>${COP(dom)}</b>\n\nPresiona 📋 Pendientes (${pend})`,
+        `📍 ${s.direccion}\n💳 Pago: <b>${s.metodoPago}</b>\n🛵 Domicilio: <b>${COP(dom)}</b>\n\nPresiona 📋 Pendientes (${pend})`,
         { parse_mode: 'HTML' }
       ).catch(() => { });
     }
   }
 
-  // PARCHE 4a: Canal con dirección clickeable
   if (process.env.CANAL_PEDIDOS_ID) {
     const dirLink = gmapsLinkDir(s.direccion);
-    const cardCanal =
+    let cardCanal =
       `🔴 <b>NUEVO PEDIDO — ${id}</b>\n━━━━━━━━━━━━━━━━━━\n` +
       `🏪 ${s.negocioNombre}\n` +
       `👤 ${s.nombre}  📱 ${s.telefono}\n` +
       `📍 <a href="${dirLink}">${s.direccion}</a>\n` +
+      `💳 Pago: <b>${s.metodoPago}</b>\n` +
       `🛵 Domicilio: <b>${COP(dom)}</b>\n` +
       `⏰ ${moment().tz('America/Bogota').format('hh:mm A')}\n━━━━━━━━━━━━━━━━━━`;
-    bot.telegram.sendMessage(process.env.CANAL_PEDIDOS_ID, cardCanal, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(() => { });
+
+    if (esPagoElectronico) {
+      cardCanal += `\n\n⚠️ <b>PAGO POR ${s.metodoPago} — PENDIENTE DE COMPROBANTE</b>\n<i>El cliente subirá el comprobante cuando el domi le envíe la factura.</i>`;
+    }
+
+    bot.telegram.sendMessage(process.env.CANAL_PEDIDOS_ID, cardCanal,
+      { parse_mode: 'HTML', disable_web_page_preview: true }
+    ).catch(() => { });
   }
+
   delete S[uid];
 }
 
@@ -2423,33 +2984,63 @@ function facturaHTML(s, id) {
   const esWIL = !s.tienda;
   const dom = s.precioDomicilio || 0;
   const ahora = moment().tz('America/Bogota').format('DD/MM/YYYY hh:mm A');
-  const sub = s.carrito.reduce((a, i) => a + (i.subtotal || 0), 0);
+  const sub = s.carrito.reduce(function(a, i) { return a + (i.subtotal || 0); }, 0);
   const tot = sub + dom;
-  let filas = '';
-  s.carrito.forEach(item => {
-    filas += `╠══════════════════════════╣\n`;
-    filas += `║ ${item.descripcion.substring(0, 26).padEnd(26)} ║\n`;
+
+  let filasProds = '';
+  s.carrito.forEach(function(item) {
+    filasProds += _sep() + '\n';
+    filasProds += _fila(item.descripcion) + '\n';
     if (!esWIL && item.precioUnitario > 0) {
-      const precStr = COP(item.precioUnitario).padEnd(10);
-      const subStr = COP(item.subtotal).padStart(8);
-      filas += `║ ${item.cantidad}x ${precStr} ${subStr} ║\n`;
+      filasProds += _fila2('  ' + item.cantidad + 'x ' + COP(item.precioUnitario), COP(item.subtotal)) + '\n';
     } else {
-      filas += `║ Cant: ${String(item.cantidad).padEnd(21)} ║\n`;
+      filasProds += _fila('  Cant: ' + item.cantidad) + '\n';
     }
   });
-  const bloqueTotal = esWIL
-    ? `║ Productos  PENDIENTE      ║\n║ Domicilio  ${COP(dom).padStart(14)} ║\n╠══════════════════════════╣\n║ TOTAL      POR CONFIRMAR ║\n║ Pago: ${(s.metodoPago || '').padEnd(20)} ║\n╚══════════════════════════╝</code>\n\n<i>🛵 El domiciliario comprará y te enviará la factura con el total.</i>`
-    : (sub > 0 ? `║ Subtotal   ${COP(sub).padStart(14)} ║\n` : '') +
-    `║ Domicilio  ${COP(dom).padStart(14)} ║\n╠══════════════════════════╣\n║ TOTAL      ${COP(tot).padStart(14)} ║\n║ Pago: ${(s.metodoPago || '').padEnd(20)} ║\n╚══════════════════════════╝</code>\n\n<i>🛵 En breve un domiciliario tomará tu pedido.</i>`;
-  return (
-    `✅ <b>¡PEDIDO CONFIRMADO!</b>\n\n<code>` +
-    `╔══════════════════════════╗\n║    🛵 DOMICILIOS WIL    ║\n║   Copacabana, Ant.      ║\n` +
-    `╠══════════════════════════╣\n║ ID: ${id.substring(0, 21).padEnd(21)} ║\n║ ${ahora.padEnd(26)} ║\n` +
-    `╠══════════════════════════╣\n║ 👤 ${(s.nombre || '').substring(0, 22).padEnd(22)} ║\n║ 📍 ${(s.barrioDetectado || s.direccion || '').substring(0, 22).padEnd(22)} ║\n` +
-    `╠══════════════════════════╣\n║ 🏪 ${(s.negocioNombre || '').substring(0, 22).padEnd(22)} ║\n` +
-    filas + `╠══════════════════════════╣\n` + bloqueTotal
-  );
+
+  const lines = [
+    _top(),
+    _centro('🛵 DOMICILIOS WIL'),
+    _centro('Copacabana, Ant.'),
+    _sep(),
+    _fila('ID: ' + id),
+    _fila(ahora),
+    _sep(),
+    _fila('👤 ' + (s.nombre || '—')),
+    _fila('📍 ' + (s.direccion || '—')),
+    _sep(),
+    _fila('🏪 ' + (s.negocioNombre || '—')),
+    filasProds.trimEnd(),
+    _sep()
+  ];
+
+  if (esWIL) {
+    lines.push(
+      _fila2('Productos', 'PENDIENTE'),
+      _fila2('Domicilio', COP(dom)),
+      _sep(),
+      _fila2('TOTAL', 'POR CONFIRMAR'),
+      _fila2('Pago', s.metodoPago || '—'),
+      _bot()
+    );
+  } else {
+    if (sub > 0) lines.push(_fila2('Subtotal', COP(sub)));
+    lines.push(
+      _fila2('Domicilio', COP(dom)),
+      _sep(),
+      _fila2('TOTAL', COP(tot)),
+      _fila2('Pago', s.metodoPago || '—'),
+      _bot()
+    );
+  }
+
+  const nota = esWIL
+    ? '\n\n<i>🛵 El domiciliario comprará y te enviará la factura con el total.</i>'
+    : '\n\n<i>🛵 En breve un domiciliario tomará tu pedido.</i>';
+
+  return '✅ <b>¡PEDIDO CONFIRMADO!</b>\n\n<code>' + lines.join('\n') + '</code>' + nota;
 }
+
 
 // ══════════════════════════════════════════════════════════════════════════════
 // RECORDATORIO AUTOMÁTICO
@@ -2487,10 +3078,12 @@ async function enviarRecordatorio() {
   nuevos.forEach(p => {
     const t = moment.tz(`${hoy} ${p.hora}`, 'DD/MM/YYYY hh:mm A', 'America/Bogota');
     const mins = ahora.diff(t, 'minutes');
+    // PARCHE 3: siempre dirección original
+    const dirMostrar = p.direccionCliente || p.direccion || p.barrio || '—';
     msg +=
       `🔴 <b>${p.id}</b>\n` +
       `👤 ${p.cliente || '—'}  📱 ${p.telefono || '—'}\n` +
-      `📍 ${p.direccionCliente || p.direccion || p.barrio || '—'}\n` +
+      `📍 ${dirMostrar}\n` +
       `⏰ Hace <b>${mins} min</b>\n\n`;
   });
 
@@ -2590,15 +3183,23 @@ bot.action(/^asignar_(.+)_(.+)$/, async ctx => {
       return ctx.editMessageText(`❌ Pedido <b>${pedidoId}</b> ya no está disponible.`, { parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } }).catch(() => { });
     }
     pool[pedidoId] = {
-      id: found.id, negocioNombre: found.negocio || found.negocioNombre || '—',
-      tienda: found.tienda || null, tipo: found.tipo || null,
-      cliente: found.cliente || '—', telefono: found.telefono || '—',
+      id: found.id,
+      negocioNombre: found.negocio || found.negocioNombre || '—',
+      tienda: found.tienda || null,
+      tipo: found.tipo || null,
+      cliente: found.cliente || '—',
+      telefono: found.telefono || '—',
       clienteId: found.clienteId || null,
+      // PARCHE 3: siempre dirección original
       direccionCliente: found.direccionCliente || found.direccion || '—',
-      direccion: found.direccion || '—',
-      barrio: found.barrio || found.direccion || '—', productos: found.productos || '—',
-      total: found.total || null, precioDomicilio: found.precioDomicilio || 0,
-      estado: 'PENDIENTE', carrito: found.carrito || [], hora: found.hora || null
+      direccion: found.direccionCliente || found.direccion || '—',
+      barrio: found.direccionCliente || found.direccion || '—',
+      productos: found.productos || '—',
+      total: parsearTotal(found.total),
+      precioDomicilio: parsearTotal(found.precioDomicilio) || 0,
+      estado: 'PENDIENTE',
+      carrito: found.carrito || [],
+      hora: found.hora || null
     };
   }
 
@@ -2635,22 +3236,21 @@ bot.action(/^asignar_(.+)_(.+)$/, async ctx => {
     `🆔  <b>${pedidoId}</b>\n` +
     `🏪  ${p.negocioNombre || '—'}\n` +
     `👤  ${p.cliente || '—'}  📱 ${p.telefono || '—'}\n` +
-    `📍  <b>${p.direccionCliente || p.direccion || p.barrio}</b>\n` +
+    `📍  <b>${p.direccionCliente || p.direccion || '—'}</b>\n` +
     `💵  Domicilio: <b>${COP(p.precioDomicilio || 0)}</b>\n` +
     `━━━━━━━━━━━━━━━━━━━━━━\n` +
     `<i>Recuerda ser puntual y amable con el cliente 😊</i>`,
     {
       parse_mode: 'HTML',
       ...Markup.inlineKeyboard([
-        [Markup.button.callback('✅ Entregar', `entregar_${pedidoId}`), Markup.button.url('🗺️ Ver Ruta', gmaps)],
+        [Markup.button.callback('✅ Entregar', `entregar_${pedidoId}`), Markup.button.url('📍 Ver en Maps', gmaps)],
         [Markup.button.callback('📸 Subir Factura', `factura_${pedidoId}`)]
       ])
     }
   ).catch(() => { });
 
-  // PARCHE 9: Notificar cliente con nombre + teléfono del domiciliario al asignar
   if (p.clienteId) {
-    const dirDisplay = p.direccionCliente || p.direccion || p.barrio || '—';
+    const dirDisplay = p.direccionCliente || p.direccion || '—';
     let productosDetalle = p.productos || '—';
     if (p.carrito?.length > 0) productosDetalle = p.carrito.map(i => `• ${i.cantidad}× ${i.descripcion}`).join('\n');
 
@@ -2672,7 +3272,7 @@ bot.action(/^asignar_(.+)_(.+)$/, async ctx => {
   }
 
   if (process.env.CANAL_PEDIDOS_ID) {
-    const dirCliente = p.direccionCliente || p.direccion || p.barrio || '—';
+    const dirCliente = p.direccionCliente || p.direccion || '—';
     const dirLink = gmapsLinkDir(dirCliente);
     bot.telegram.sendMessage(process.env.CANAL_PEDIDOS_ID,
       `🔵 <b>ASIGNADO POR ADMIN — ${pedidoId}</b>\n` +
@@ -2707,20 +3307,14 @@ function iniciarCron() {
   console.log('⏰ Crons activos: pedidos (10 min) | inactividad drivers (10 min)');
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// EXPORTAR
+// ══════════════════════════════════════════════════════════════════════════════
 module.exports = {
-  bot, wilBot: bot,
-  iniciarCron, saludarAlArrancar,
+  bot,
+  wilBot: bot,
+  iniciarCron,
+  saludarAlArrancar,
   getPool: () => pool,
   getDrivers: () => drivers
 };
-
-/*
-── USO EN index.js ──────────────────────────────────────────────
-const { wilBot, iniciarCron, saludarAlArrancar } = require('./bots/wilBot');
-wilBot.launch().then(async () => {
-  console.log('🤖 WilBot corriendo');
-  iniciarCron();
-  await saludarAlArrancar();
-});
-────────────────────────────────────────────────────────────────
-*/

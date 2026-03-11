@@ -53,7 +53,7 @@ const HEADERS_ADMINS         = ['ID_TELEGRAM','NOMBRE','CLAVE','ACTIVO'];
 const ESTRUCTURA = {
   Pedidos:              HEADERS_PEDIDOS,
   Domiciliarios:        ['ID_TELEGRAM','NOMBRE','CLAVE','ACTIVO'],
-  CATALOGO_WIL:         ['CATEGORIA','PRODUCTO','PRECIO','DISPONIBLE'],
+  CATALOGO_WIL:         ['CATEGORIA','PRODUCTO','PRECIO','DISPONIBLE','PRECIO_DOMICILIO'],
   coordenadas:          HEADERS_COORDENADAS,
   domiciliarios_nuevos: HEADERS_POSTULACIONES,
   Admins:               HEADERS_ADMINS,
@@ -592,7 +592,7 @@ async function getPedidos(estado = 'ALL') {
     estado:          (r[4] ||'').toString().trim().toUpperCase(),
     productos:       (r[6] ||'').toString().trim(),
     negocio:         (r[7] ||'').toString().trim(),
-    direccion:       (r[11]||'').toString().trim(),
+    direccionCliente:(r[11]||'').toString().trim(),
     barrio:          (r[11]||'').toString().trim(),
     hora:            (r[12]||'').toString().trim(),
     fecha:           (r[13]||'').toString().trim(),
@@ -738,6 +738,38 @@ async function resumenDia() {
   };
 }
 
+// Guarda el file_id del comprobante en col F (imagen transferencia) de la hoja Pedidos
+async function guardarImagenTransferencia(pedidoId, fileId, botToken) {
+  // 1. Obtener URL real de la imagen desde Telegram
+  let urlImagen = fileId; // fallback: guardar el fileId si falla
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`);
+    const data = await res.json();
+    if (data.ok && data.result?.file_path) {
+      urlImagen = `https://api.telegram.org/file/bot${botToken}/${data.result.file_path}`;
+    }
+  } catch (e) { console.error('getFile Telegram:', e.message); }
+
+  // 2. Guardar en col F
+  const sheets = await getSheets();
+  const res2 = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.GOOGLE_SHEETS_ID,
+    range: 'Pedidos!A:A'
+  });
+  const rows = res2.data.values || [];
+  const fila = rows.findIndex(r => r[0] === pedidoId);
+  if (fila < 0) throw new Error(`Pedido ${pedidoId} no encontrado`);
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: process.env.GOOGLE_SHEETS_ID,
+    range: `Pedidos!F${fila + 1}`,
+    valueInputOption: 'USER_ENTERED',
+    resource: { values: [[urlImagen]] }
+  });
+  console.log(`✅ Comprobante guardado en F${fila + 1}: ${urlImagen}`);
+}
+
+
+
 module.exports = {
   inicializar, fmt, pn,
   getCategorias, getProductosPorCategoria, buscarProductos,
@@ -747,4 +779,5 @@ module.exports = {
   verificarClave, guardarTelegramDriver, resumenDia,
   buscarBarrioEnSheet, buscarBarrioCopacabana, guardarBarrioEnSheet, getTodosBarriosSheet,
   registrarPostulante, guardarCalificacion,
+  guardarImagenTransferencia
 };
