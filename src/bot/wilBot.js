@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// wilBot.js  — Domicilios WIL  (flujo corregido v2)
+// wilBot.js  — Domicilios WIL  (flujo corregido v2 + features v2)
 // ══════════════════════════════════════════════════════════════════════════════
 const { Telegraf, Markup } = require('telegraf');
 const moment = require('moment-timezone');
@@ -24,6 +24,9 @@ const {
   zonaLegible, detectarMunicipioEnTexto, detectarZonaFija,
   esZonaCopacabana, calcularPrecioPorKm, SEDE_LAT, SEDE_LNG
 } = require('../services/distancia');
+
+// ── Integración features ──────────────────────────────────────────────────────
+const features = require('./features');
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 let LOGO_FILE_ID = process.env.LOGO_FILE_ID || null;
@@ -67,28 +70,20 @@ const COP = n => {
 
 const parsearTotal = val => {
   if (val === null || val === undefined || val === '') return null;
-  // Si ya es número, devolverlo directo
   if (typeof val === 'number') return isNaN(val) ? null : Math.round(val);
   const s = String(val).trim();
-  // Formato colombiano: 107.000 o 107.000,50  → quitar puntos de miles, quitar decimales
-  // Formato internacional: 107,000 → quitar comas de miles
-  // Detectar si el punto es separador de miles (ej: "107.000") o decimal (ej: "107.5")
-  const tieneComaDecimal = /,\d{1,2}$/.test(s);           // termina en ,XX
-  const tienePuntoDos = /\.\d{1,2}$/.test(s);              // termina en .XX (posible decimal)
-  const tienePuntoMiles = /\.\d{3}/.test(s);               // tiene .XXX (miles)
+  const tieneComaDecimal = /,\d{1,2}$/.test(s);
+  const tienePuntoDos = /\.\d{1,2}$/.test(s);
+  const tienePuntoMiles = /\.\d{3}/.test(s);
 
   let limpio;
   if (tieneComaDecimal) {
-    // "107.000,50" → quitar puntos de miles, quitar decimales con coma
     limpio = s.replace(/\./g, '').replace(/,\d+$/, '');
   } else if (tienePuntoMiles) {
-    // "107.000" → quitar punto de miles
     limpio = s.replace(/\./g, '');
   } else if (tienePuntoDos && !tienePuntoMiles) {
-    // "107.5" → truncar decimal
     limpio = s.replace(/\.\d+$/, '');
   } else {
-    // limpiar todo lo que no sea número
     limpio = s.replace(/[^0-9]/g, '');
   }
   const n = Number(limpio.replace(/[^0-9]/g, ''));
@@ -104,7 +99,7 @@ function tipoBadge(p) {
   if (!p) return '';
   if (p.tipo === 'paqueteria') return '📦 Paquetería';
   if (p.tienda === 'EXPERTOS') return '💊 FarmaExpertos Copacabana';
-  if (p.tienda === 'CENTRAL') return '🏥  Farmacia Central Copacabana';
+  if (p.tienda === 'CENTRAL') return '🏥  Drogueria Central Copacabana';
   return '🏪 WIL';
 }
 
@@ -192,7 +187,7 @@ async function menuDriver(uid) {
   return Markup.keyboard([
     [`📋 Pendientes (${pend})`, `🚚 En Proceso (${proc})`],
     [`✅ Finalizados (${fin})`, locBtn],
-    [`🚪 Cerrar Sesión`]
+    [`👤 Mi Perfil`, `🚪 Cerrar Sesión`]
   ]).resize();
 }
 
@@ -551,20 +546,15 @@ const PARQUE_COPA_LAT = 6.35112;
 const PARQUE_COPA_LNG = -75.49190;
 
 function buildGmapsUrl(lugar, pedido, driverLat, driverLng) {
-  // Origen del domi: GPS real > Parque Copacabana como ancla fija
   const origenLat = driverLat || PARQUE_COPA_LAT;
   const origenLng = driverLng || PARQUE_COPA_LNG;
   const origen = `${origenLat},${origenLng}`;
 
-  // Destino: GPS exacto del cliente > dirección completa con contexto
   if (pedido?.latCliente && pedido?.lngCliente) {
-    // GPS exacto — el más preciso, maps lo resuelve perfecto
     return `https://www.google.com/maps/dir/${origen}/${pedido.latCliente},${pedido.lngCliente}`;
   }
 
-  // Sin GPS: construir dirección COMPLETA con contexto para que Maps la resuelva bien
   const dirRaw = (pedido?.direccionCliente || pedido?.direccion || lugar || '').trim();
-  // Agregar contexto geográfico si no lo tiene
   const dirCompleta = /antioquia|colombia|copacabana|medell/i.test(dirRaw)
     ? dirRaw
     : `${dirRaw}, Antioquia, Colombia`;
@@ -572,10 +562,7 @@ function buildGmapsUrl(lugar, pedido, driverLat, driverLng) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// BOTONES CARD — FLUJO CORRECTO
-// PENDIENTE:   [🎯 Tomar] [📍 Ver Ruta] [❌ Cancelar]
-// EN_PROCESO:  [📸 Subir Factura] [📍 Ver Ruta]
-//              [✅ Entregado] [❌ Cancelar]
+// BOTONES CARD
 // ══════════════════════════════════════════════════════════════════════════════
 function botonesCard(p, gmaps) {
   const id = p.id;
@@ -588,14 +575,12 @@ function botonesCard(p, gmaps) {
       [Markup.button.callback('❌ Cancelar pedido', `cancelar_order_${id}`)],
     ]);
   }
-  // PENDIENTE
   return Markup.inlineKeyboard([
     [Markup.button.callback('🎯 Tomar', `tomar_${id}`), verRutaBtn],
     [Markup.button.callback('❌ Cancelar', `cancelar_order_${id}`)],
   ]);
 }
 
-// Botones post-factura: ya no se puede tomar, solo entregar o cancelar
 function botonesPostFactura(pedidoId, gmaps) {
   return Markup.inlineKeyboard([
     [Markup.button.callback('✅ Entregado', `entregar_${pedidoId}`), Markup.button.url('📍 Ver Ruta', gmaps)],
@@ -604,29 +589,36 @@ function botonesPostFactura(pedidoId, gmaps) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// CALIFICACIÓN
+// CALIFICACIÓN (original — mantenida para compatibilidad)
 // ══════════════════════════════════════════════════════════════════════════════
 async function enviarMensajeCalificacion(clienteId, pedidoId) {
+  // Usamos la encuesta mejorada de features si está disponible
   try {
-    await bot.telegram.sendMessage(clienteId,
-      `🛵 <b>¡Tu pedido fue entregado!</b>\n` +
-      `━━━━━━━━━━━━━━━━━━\n` +
-      `<i>Gracias por confiar en Domicilios WIL ❤️</i>\n\n` +
-      `¿Deseas calificar nuestro servicio?`,
-      {
-        parse_mode: 'HTML',
-        ...Markup.inlineKeyboard([[
-          Markup.button.callback('⭐', `cal_${pedidoId}_1`),
-          Markup.button.callback('⭐⭐', `cal_${pedidoId}_2`),
-          Markup.button.callback('⭐⭐⭐', `cal_${pedidoId}_3`),
-          Markup.button.callback('⭐⭐⭐⭐', `cal_${pedidoId}_4`),
-          Markup.button.callback('⭐⭐⭐⭐⭐', `cal_${pedidoId}_5`),
-        ]])
-      }
-    );
-  } catch (e) { console.error('enviarMensajeCalificacion:', e.message); }
+    await features.enviarEncuestaPostEntrega(bot, clienteId, pedidoId);
+  } catch (e) {
+    // Fallback al sistema original
+    try {
+      await bot.telegram.sendMessage(clienteId,
+        `🛵 <b>¡Tu pedido fue entregado!</b>\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
+        `<i>Gracias por confiar en Domicilios WIL ❤️</i>\n\n` +
+        `¿Deseas calificar nuestro servicio?`,
+        {
+          parse_mode: 'HTML',
+          ...Markup.inlineKeyboard([[
+            Markup.button.callback('⭐', `cal_${pedidoId}_1`),
+            Markup.button.callback('⭐⭐', `cal_${pedidoId}_2`),
+            Markup.button.callback('⭐⭐⭐', `cal_${pedidoId}_3`),
+            Markup.button.callback('⭐⭐⭐⭐', `cal_${pedidoId}_4`),
+            Markup.button.callback('⭐⭐⭐⭐⭐', `cal_${pedidoId}_5`),
+          ]])
+        }
+      );
+    } catch (e2) { console.error('enviarMensajeCalificacion fallback:', e2.message); }
+  }
 }
 
+// Calificación original (fallback)
 bot.action(/^cal_(.+)_(\d)$/, async ctx => {
   const pedidoId = ctx.match[1];
   const estrellas = parseInt(ctx.match[2]);
@@ -659,7 +651,6 @@ bot.action(/^cal_(.+)_(\d)$/, async ctx => {
 // ══════════════════════════════════════════════════════════════════════════════
 bot.start(async ctx => {
   const uid = ctx.from.id;
-  // Siempre limpiar TODO — /start es siempre el menú público sin importar rol
   if (drivers[uid]) {
     driversLastSeen[uid] = { nombre: drivers[uid].nombre, ts: Date.now(), lat: drivers[uid].lat || null, lng: drivers[uid].lng || null };
   }
@@ -743,11 +734,16 @@ bot.on('location', async ctx => {
 
   console.log(`📍 ${esEnVivo ? '🔴 VIVO' : 'Manual'} — ${drivers[uid].nombre}: ${lat}, ${lng}`);
 
-  const pedidoId = drivers[uid].pedidoActual;
+  // Actualizar ETA si el domi tiene un pedido activo
+  const pedidoActualId = drivers[uid].pedidoActual;
+  if (pedidoActualId) {
+    features.actualizarETA(bot, pedidoActualId, lat, lng).catch(() => {});
+  }
+
   if (esEnVivo) return;
 
-  if (pedidoId) {
-    const p = pool[pedidoId];
+  if (pedidoActualId) {
+    const p = pool[pedidoActualId];
     if (p) {
       const gmaps = buildGmapsUrl(p.barrio || p.direccion || '', p, lat, lng);
       await ctx.reply(
@@ -758,7 +754,7 @@ bot.on('location', async ctx => {
           parse_mode: 'HTML',
           ...Markup.inlineKeyboard([
             [Markup.button.url('📍 Ver Ruta Actualizada', gmaps)],
-            [Markup.button.callback('✅ Entregado', `entregar_${pedidoId}`)]
+            [Markup.button.callback('✅ Entregado', `entregar_${pedidoActualId}`)]
           ])
         }
       );
@@ -825,6 +821,12 @@ bot.on('edited_message', async ctx => {
     driversLastSeen[uid].lat = lat;
     driversLastSeen[uid].lng = lng;
     console.log(`🔴 VIVO driver ${drivers[uid].nombre}: ${lat}, ${lng}`);
+
+    // Actualizar ETA en tiempo real
+    const pedidoActualId = drivers[uid].pedidoActual;
+    if (pedidoActualId) {
+      features.actualizarETA(bot, pedidoActualId, lat, lng).catch(() => {});
+    }
     return;
   }
 
@@ -854,6 +856,15 @@ bot.on('text', async ctx => {
     if (txt.includes('📋 Pendientes')) return await mostrarPendientes(ctx);
     if (txt.includes('🚚 En Proceso')) return await mostrarEnProceso(ctx);
     if (txt.includes('✅ Finalizados')) return await mostrarFinalizados(ctx);
+    if (txt === '👤 Mi Perfil' && drivers[uid]) {
+      const nombre = drivers[uid].nombre;
+      const tel    = drivers[uid].telefono || '';
+      await cargarEntregasDesdeSheet().catch(() => {});
+      const { entregas } = statsDriverPool(nombre);
+      const caption = captionPerfilDomi(nombre, tel, entregas);
+      const kb      = keyboardPerfilInicio();
+      return features.enviarTarjetaPerfil(ctx, nombre, tel, entregas, caption, kb);
+    }
     if (txt.includes('📍 Compartir Ubicación') || txt.includes('📍 Ubicación activa')) {
       const d = drivers[uid];
       const hasLoc = d?.lat && d?.latTs && (Date.now() - d.latTs < 3600000);
@@ -881,6 +892,7 @@ bot.on('text', async ctx => {
           ts: Date.now(),
           lat: drivers[uid].lat || null,
           lng: drivers[uid].lng || null,
+          turnoGuardado: features.turnos[uid] || driversLastSeen[uid]?.turnoGuardado || null,
         };
       }
       delete drivers[uid]; delete espClave[uid];
@@ -904,9 +916,7 @@ bot.on('text', async ctx => {
     espClave[uid] = true;
     return ctx.reply(
       `🔐 Escribe tu <b>clave de acceso</b>:\n<i>(El mensaje se borrará automáticamente)</i>`,
-      `🕐 <b>¿Cuál es tu turno hoy?</b>\n<i>Solo recibirás alertas en ese horario</i>`,
-      { parse_mode: 'HTML', ...Markup.removeKeyboard() },
-      { parse_mode: 'HTML', ...features.keyboardTurno() }
+      { parse_mode: 'HTML', ...Markup.removeKeyboard() }
     );
   }
 
@@ -955,7 +965,7 @@ bot.on('text', async ctx => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// BOTÓN "Subir comprobante" — llega al cliente tras recibir la factura
+// BOTÓN "Subir comprobante"
 // ══════════════════════════════════════════════════════════════════════════════
 bot.action(/^subir_comp_(.+)$/, async ctx => {
   const pedidoId = ctx.match[1];
@@ -1045,7 +1055,6 @@ async function procesarComprobanteCliente(ctx, uid) {
     );
   }
 
-  // ── Notificar al canal WIL con la foto del comprobante ────────────────────
   if (process.env.CANAL_PEDIDOS_ID) {
     const estadoValidacion = coincide === true
       ? `✅ <b>COMPROBANTE VÁLIDO</b>`
@@ -1066,7 +1075,6 @@ async function procesarComprobanteCliente(ctx, uid) {
     }).catch(() => { });
   }
 
-  // ── Alerta especial a admins para transferencia bancaria ──────────────────
   const captionAdmin =
     `${coincide === true ? '✅' : coincide === false ? '❌' : '⚠️'} Comprobante Transferencia — <b>${pedidoId}</b>\n` +
     `💳 ${metodoPago}\n` +
@@ -1151,21 +1159,44 @@ async function manejarAutenticacion(ctx, uid, clave, msgId) {
     console.log(`📱 Teléfono domiciliario ${r.nombre}: ${sheetEntry.telefono}`);
   }
 
+  // Cargar foto del domi: columna F del sheet (si existe) o auto-detectar en assets/
+  if (sheetEntry?.fotoUrl) {
+    features.guardarFotoDomiUrl(r.nombre, sheetEntry.fotoUrl);
+  } else {
+    // Busca assets/victor.jpeg, assets/juan.jpg, etc. por el nombre del domi
+    features.autoDetectarFotoAssets(r.nombre);
+  }
+
   await guardarTelegramDriver(r.fila, uid);
   const kb = await menuDriver(uid);
+
+  const esPrimerLogin = !driversLastSeen[uid]?.turnoGuardado;
+
   await ctx.reply(`🎉 <b>¡Acceso concedido!</b>\nHola <b>${r.nombre}</b> 👋`, { parse_mode: 'HTML', ...kb });
-  await ctx.reply(
-    `📍 <b>Comparte tu ubicación en tiempo real</b>\n\n` +
-    `Esto nos permite ver dónde estás y calcular rutas precisas.\n\n` +
-    `👇 Toca el clip 📎 → <b>Ubicación</b> → <b>Compartir ubicación en tiempo real</b>\n` +
-    `Elige <b>8 horas</b> para cubrir tu turno completo.`,
-    {
-      parse_mode: 'HTML',
-      ...Markup.inlineKeyboard([[
-        Markup.button.callback('📍 Ya la compartí ✅', 'loc_confirmado')
-      ]])
-    }
-  );
+
+  if (esPrimerLogin) {
+    // Primera vez — pedir GPS y turno
+    await ctx.reply(
+      `📍 <b>Comparte tu ubicación en tiempo real</b>\n\n` +
+      `Esto nos permite ver dónde estás y calcular rutas precisas.\n\n` +
+      `👇 Toca el clip 📎 → <b>Ubicación</b> → <b>Compartir ubicación en tiempo real</b>\n` +
+      `Elige <b>8 horas</b> para cubrir tu turno completo.`,
+      {
+        parse_mode: 'HTML',
+        ...Markup.inlineKeyboard([[
+          Markup.button.callback('📍 Ya la compartí ✅', 'loc_confirmado')
+        ]])
+      }
+    );
+    await ctx.reply(
+      `🕐 <b>¿Cuál es tu turno?</b>\n<i>Lo recordaremos para los próximos ingresos.</i>`,
+      { parse_mode: 'HTML', ...features.keyboardTurno() }
+    );
+  } else {
+    // Reingreso — restaurar turno guardado silenciosamente
+    const turnoGuardado = driversLastSeen[uid].turnoGuardado;
+    features.setTurno(uid, turnoGuardado);
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1196,22 +1227,69 @@ async function getSheetDrivers() {
     const sheets = google.sheets({ version: 'v4', auth: client });
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEETS_ID,
-      range: 'Domiciliarios!A:E'
+      range: 'Domiciliarios!A:F'   // ← ampliado a F para incluir fotoUrl
     });
     _sheetCache = (res.data.values || []).slice(1).filter(r => r[1]).map(r => ({
       telegramId: (r[0] || '').toString().trim(),
       nombre:     (r[1] || '').toString().trim(),
       telefono:   (r[4] || '').toString().trim(),
+      fotoUrl:    (r[5] || '').toString().trim(),   // ← columna F: ruta o URL de la foto
     }));
     _sheetCacheTs = Date.now();
+
+    // Registrar fotos en features para todos los domis del sheet
+    _sheetCache.forEach(d => {
+      if (d.fotoUrl) features.guardarFotoDomiUrl(d.nombre, d.fotoUrl);
+    });
   } catch (e) { console.error('getSheetDrivers:', e.message); }
   return _sheetCache;
 }
 
+// Cache de entregas por domi leído de Pedidos!F  { nombreLower: count }
+let _entregasCache   = {};
+let _entregasCacheTs = 0;
+const ENTREGAS_TTL   = 60 * 1000; // refresca cada 60 seg
+
+/**
+ * Lee Pedidos!F (NOMBRE_DOMI) y cuenta filas por nombre exacto.
+ * Resultado cacheado 60 segundos para no saturar la API.
+ */
+async function cargarEntregasDesdeSheet() {
+  if (Date.now() - _entregasCacheTs < ENTREGAS_TTL) return;
+  try {
+    const { google } = require('googleapis');
+    const authG  = new google.auth.GoogleAuth({ keyFile: './credentials.json', scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
+    const client = await authG.getClient();
+    const sheets = google.sheets({ version: 'v4', auth: client });
+    const res    = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.GOOGLE_SHEETS_ID,
+      range: 'Pedidos!P2:P',   // columna P = NOMBRE_DOMI, desde fila 2 (sin header)
+    });
+    const rows = res.data.values || [];
+    const conteo = {};
+    for (const r of rows) {
+      const nombre = (r[0] || '').toString().trim();
+      if (!nombre) continue;
+      const key = nombre.toLowerCase();
+      conteo[key] = (conteo[key] || 0) + 1;
+    }
+    _entregasCache   = conteo;
+    _entregasCacheTs = Date.now();
+    console.log(`📊 Entregas desde Pedidos!P cargadas: ${rows.length} filas`);
+  } catch (e) {
+    console.warn('cargarEntregasDesdeSheet:', e.message);
+  }
+}
+
 function statsDriverPool(nombre) {
   const ps = Object.values(pool).filter(p => p.estado === 'FINALIZADO' && p.domiciliario === nombre);
+  // Entregas históricas desde Pedidos!F (más confiable que pool en memoria)
+  const key            = nombre.toLowerCase().trim();
+  const entregasSheet  = _entregasCache[key] || 0;
+  // Evitar doble conteo: usar el mayor entre sheet y pool
+  const entregas       = Math.max(entregasSheet, ps.length);
   return {
-    entregas: ps.length,
+    entregas,
     ganancia: ps.reduce((a, p) => a + (parsearTotal(p.precioDomicilio) || 0), 0)
   };
 }
@@ -1226,6 +1304,7 @@ function tFmt(ms) {
 }
 
 function buildCard(nombre, telegramId) {
+  cargarEntregasDesdeSheet().catch(() => {}); // refresh silencioso
   const d = drivers[telegramId];
   const ahora = Date.now();
   const online = !!d;
@@ -1336,6 +1415,7 @@ function buildCard(nombre, telegramId) {
 }
 
 async function buildLista() {
+  await cargarEntregasDesdeSheet(); // refresca conteo desde Pedidos!F
   const todosSheet = await getSheetDrivers();
   const idsOnline = new Set(Object.keys(drivers).map(String));
   const ahora = moment().tz('America/Bogota').format('hh:mm A');
@@ -1540,7 +1620,6 @@ bot.action('enviar_postulacion', async ctx => {
 
   const CANAL_DOM = process.env.CANAL_DOMICILIARIOS_ID;
   if (CANAL_DOM) {
-    // Validar que sea un ID numérico — los links t.me/+xxx NO funcionan como chat_id
     const esIdValido = /^-?\d+$/.test(CANAL_DOM.trim());
     if (!esIdValido) {
       console.error(`❌ CANAL_DOMICILIARIOS_ID="${CANAL_DOM}" no es un ID numérico válido.`);
@@ -1582,7 +1661,7 @@ bot.action('enviar_postulacion', async ctx => {
         await bot.telegram.sendPhoto(CANAL_DOM, fileId, { caption: `${label} — ${s.nombre}` }).catch(() => {});
       }
     }
-    } // fin else esIdValido
+    }
   }
 
   const adminMsg =
@@ -1692,9 +1771,17 @@ async function mostrarEnProceso(ctx) {
 }
 
 async function mostrarFinalizados(ctx) {
+  const uid = ctx.from.id;
   const hoy = moment().tz('America/Bogota').format('DD/MM/YYYY');
-  const ps = (await getPedidos('FINALIZADO').catch(() => [])).filter(p => p.fecha === hoy);
+  const todos = (await getPedidos('FINALIZADO').catch(() => [])).filter(p => p.fecha === hoy);
+
+  // Domi solo ve los suyos — admin ve todo
+  const ps = esAdmin(uid)
+    ? todos
+    : todos.filter(p => (p.domiciliario || '').toLowerCase().trim() === (drivers[uid]?.nombre || '').toLowerCase().trim());
+
   if (!ps.length) return ctx.reply(`📭 Sin entregas finalizadas hoy (${hoy})`);
+
   let msg = `✅ <b>${ps.length}</b> entrega(s) hoy ${hoy}:\n\n`;
   ps.forEach((p, i) => {
     const pPool = pool[p.id] || {};
@@ -1717,8 +1804,6 @@ async function mostrarFinalizados(ctx) {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TOMAR PEDIDO
-// Flujo: edita la card a EN_PROCESO + notifica cliente y canal WIL
-// NO crea mensaje nuevo al domi (solo actualiza el menú teclado con un reply breve)
 // ══════════════════════════════════════════════════════════════════════════════
 bot.action(/^tomar_(.+)$/, async ctx => {
   const id = ctx.match[1];
@@ -1732,7 +1817,6 @@ bot.action(/^tomar_(.+)$/, async ctx => {
   if (domiciliario.pedidoActual) return ctx.answerCbQuery('⚠️ Ya tienes un pedido activo. Entrégalo primero.', true);
   if (pool[id] && pool[id].estado !== 'PENDIENTE') return ctx.answerCbQuery('⚠️ Ese pedido ya fue tomado.', true);
 
-  // Cargar desde sheet si no está en pool
   if (!pool[id]) {
     const lista = await getPedidos('PENDIENTE').catch(() => []);
     const found = lista.find(x => x.id === id);
@@ -1740,7 +1824,6 @@ bot.action(/^tomar_(.+)$/, async ctx => {
     pool[id] = _normalizarPedido({ ...found, estado: 'PENDIENTE' });
   }
 
-  // Marcar EN_PROCESO
   pool[id].estado = 'EN_PROCESO';
   pool[id].domiciliario = domiciliario.nombre;
   pool[id].horaTomo = moment().tz('America/Bogota').format('hh:mm A');
@@ -1753,7 +1836,6 @@ bot.action(/^tomar_(.+)$/, async ctx => {
   const dLng = drivers[uid]?.lng || null;
   const gmaps = buildGmapsUrl(p.barrio || p.direccion || '', p, dLat, dLng);
 
-  // ── Editar card a EN_PROCESO ───────────────────────────────────────────────
   try {
     await ctx.editMessageText(
       cardPedidoDriver({ ...p }, 'EN_PROCESO') +
@@ -1762,26 +1844,18 @@ bot.action(/^tomar_(.+)$/, async ctx => {
     );
   } catch (e) { console.error('edit tomar:', e.message); }
 
-  // ── Notificar al cliente: domi asignado ───────────────────────────────────
+  // Notificar al cliente con foto del domi (features)
   if (p.clienteId) {
     const telDomi = drivers[uid]?.telefono || '';
-    let productosDetalle = p.productos || '—';
-    if (p.carrito?.length > 0) productosDetalle = p.carrito.map(i => `• ${i.cantidad}× ${i.descripcion}`).join('\n');
-    const msgTomado =
-      `🛵 <b>¡Tu pedido fue tomado!</b>\n` +
-      `━━━━━━━━━━━━━━━━━━\n` +
-      `✅ <b>Domiciliario asignado</b>\n\n` +
-      `👤 <b>${domiciliario.nombre}</b>\n` +
-      (telDomi ? `📱 <b>${telDomi}</b>\n` : '') +
-      `⏰ ${p.horaTomo}\n\n` +
-      `🏪 ${p.negocioNombre || '—'}\n` +
-      `📍 ${p.direccionCliente || p.direccion || '—'}\n\n` +
-      `📦 <b>Productos:</b>\n${productosDetalle}\n\n` +
-      `<i>En breve recibirás la factura con el total a pagar.</i>`;
-    bot.telegram.sendMessage(p.clienteId, msgTomado, { parse_mode: 'HTML' }).catch(() => {});
+    await features.notificarClientePedidoTomado(bot, p.clienteId, p, domiciliario.nombre, telDomi, p.horaTomo);
+
+    // Activar ETA si el cliente compartió ubicación
+    if (p.latCliente && p.lngCliente && dLat && dLng) {
+      features.activarETA(bot, p.clienteId, id, dLat, dLng, p.latCliente, p.lngCliente).catch(() => {});
+    }
   }
 
-  // ── Notificar canal WIL ───────────────────────────────────────────────────
+  // Notificar canal WIL
   if (process.env.CANAL_PEDIDOS_ID) {
     const dirCanal = p.direccionCliente || p.direccion || '—';
     bot.telegram.sendMessage(process.env.CANAL_PEDIDOS_ID,
@@ -1796,7 +1870,6 @@ bot.action(/^tomar_(.+)$/, async ctx => {
     ).catch(() => {});
   }
 
-  // ── Actualizar menú teclado del domi (breve, sin duplicar la card) ────────
   const kb = await menuDriver(uid);
   return ctx.reply(
     `🔵 Pedido <b>${id}</b> tomado ✅  ⏰ ${p.horaTomo}`,
@@ -1806,24 +1879,19 @@ bot.action(/^tomar_(.+)$/, async ctx => {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // SUBIR FACTURA
-// Flujo:
-//  - Si pedido PENDIENTE → marca EN_PROCESO en silencio (sin notificar "tomado" al cliente)
-//  - Edita card solicitando la foto
-//  - Tras recibir foto: edita card con resultado, notifica cliente y canal WIL
-//  - NO marca como entregado
 // ══════════════════════════════════════════════════════════════════════════════
 bot.action(/^factura_(.+)$/, async ctx => {
   const id = ctx.match[1];
   const uid = ctx.from.id;
   const chatId = ctx.callbackQuery.message.chat.id;
   const msgId = ctx.callbackQuery.message.message_id;
-  await ctx.answerCbQuery();
+  // Mostrar spinner inmediato al cliente mientras procesa
+  await ctx.answerCbQuery('⏳ Cargando factura...', false);
 
   if (!drivers[uid] && !esAdmin(uid)) return ctx.reply('❌ Autentícate primero.');
 
   let p = pool[id];
 
-  // ── Si viene de PENDIENTE: marcar EN_PROCESO silenciosamente ──────────────
   if (!p || p.estado === 'PENDIENTE') {
     const domiciliario = drivers[uid] || { nombre: 'Admin', pedidoActual: null };
 
@@ -1845,7 +1913,6 @@ bot.action(/^factura_(.+)$/, async ctx => {
     if (drivers[uid]) { drivers[uid].pedidoActual = id; drivers[uid].lastActivity = Date.now(); }
     await asignarDomiciliario(id, domiciliario.nombre).catch(e => console.error('asignarDomiciliario factura:', e.message));
 
-    // Notificar canal WIL que fue tomado (sin notificar al cliente — llegará la factura en breve)
     if (process.env.CANAL_PEDIDOS_ID) {
       const dirCanal = p.direccionCliente || p.direccion || '—';
       bot.telegram.sendMessage(process.env.CANAL_PEDIDOS_ID,
@@ -1859,7 +1926,6 @@ bot.action(/^factura_(.+)$/, async ctx => {
     }
   }
 
-  // ── Guardar contexto para cuando llegue la foto ───────────────────────────
   espFacturaDrv[uid] = {
     pedidoId: id,
     chatId,
@@ -1874,7 +1940,6 @@ bot.action(/^factura_(.+)$/, async ctx => {
   const dLng = drivers[uid]?.lng || null;
   const gmaps = buildGmapsUrl(p?.barrio || p?.direccion || '', p, dLat, dLng);
 
-  // ── Editar card para pedir la foto ────────────────────────────────────────
   try {
     await ctx.telegram.editMessageText(chatId, msgId, null,
       cardPedidoDriver(p, 'EN_PROCESO') +
@@ -1898,10 +1963,27 @@ bot.action(/^factura_(.+)$/, async ctx => {
 // ══════════════════════════════════════════════════════════════════════════════
 bot.on('photo', async ctx => {
   const uid = ctx.from.id;
+
+  // Foto de perfil del domi (caption "mi foto")
+  const caption = (ctx.message.caption || '').toLowerCase().trim();
+  if (drivers[uid] && (caption === 'mi foto' || caption === 'foto perfil')) {
+    const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+    features.guardarFotoDomi(drivers[uid].nombre, fileId);
+    return ctx.reply(
+      `✅ <b>¡Foto guardada!</b>\nLos clientes verán tu foto al asignarte un pedido. 📷`,
+      { parse_mode: 'HTML' }
+    );
+  }
+
   if (espPostulante[uid] && ['licencia', 'tecnomecanica', 'seguro'].includes(espPostulante[uid].paso)) {
     await manejarFotoPostulante(ctx, uid); return;
   }
-  if (espFacturaDrv[uid]) { await procesarFacturaDomiciliario(ctx, uid); return; }
+  if (espFacturaDrv[uid]) {
+    console.log(`📸 Foto recibida de domi ${uid} — procesando factura pedido ${espFacturaDrv[uid].pedidoId}`);
+    await procesarFacturaDomiciliario(ctx, uid);
+    return;
+  }
+  console.log(`📸 Foto recibida de uid=${uid} — espFacturaDrv: ${JSON.stringify(espFacturaDrv[uid])} | drivers: ${!!drivers[uid]} | espPostulante: ${!!espPostulante[uid]}`);
   if (espComprobanteCliente[uid]) { await procesarComprobanteCliente(ctx, uid); return; }
   const s = S[uid];
   if (s && s.paso === 'comprobante') {
@@ -1912,11 +1994,6 @@ bot.on('photo', async ctx => {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PROCESAR FACTURA DOMICILIARIO
-// - Lee OCR → calcula total + domicilio + recargos
-// - Edita card domi con resultado y botones post-factura
-// - Notifica cliente con factura (foto + desglose)
-// - Notifica canal WIL con foto de factura
-// - NO marca como entregado
 // ══════════════════════════════════════════════════════════════════════════════
 async function procesarFacturaDomiciliario(ctx, uid) {
   const { pedidoId, chatId, msgId, precioDomicilio, nombre, pedido } = espFacturaDrv[uid];
@@ -1924,7 +2001,6 @@ async function procesarFacturaDomiciliario(ctx, uid) {
   try { await ctx.deleteMessage(); } catch (_) { }
   const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
 
-  // Mostrar "Leyendo..." en la card
   try {
     await bot.telegram.editMessageText(chatId, msgId, null,
       `🔄 <b>Leyendo factura...</b>`,
@@ -1935,12 +2011,9 @@ async function procesarFacturaDomiciliario(ctx, uid) {
   const resultado = await leerTotalFactura(fileId, process.env.BOT_TOKEN);
   const p = pool[pedidoId] || pedido || { id: pedidoId };
 
-  // ── Resolver clienteId: pool > espFacturaDrv.pedido > intentar por Telegram uid si mismo cliente
   const clienteId = pool[pedidoId]?.clienteId || pedido?.clienteId || null;
   console.log(`📦 procesarFactura — pedidoId=${pedidoId} clienteId=${clienteId} pool.clienteId=${pool[pedidoId]?.clienteId}`);
 
-
-  // ── Si no se pudo leer: pedir de nuevo con opción manual ──────────────────
   if (!resultado.ok || !resultado.total) {
     const dLat = drivers[uid]?.lat || null;
     const dLng = drivers[uid]?.lng || null;
@@ -1964,7 +2037,6 @@ async function procesarFacturaDomiciliario(ctx, uid) {
 
   const totalProductos = resultado.total;
 
-  // ── Calcular recargos y total final ───────────────────────────────────────
   const esCopa = esZonaCopacabana(p?.zona || p?.municipio || '', p?.barrio || '');
   const items = p?.carrito?.length || 1;
   const recargo = calcularRecargos(p?.hora || pool[pedidoId]?.hora, items, esCopa);
@@ -1972,7 +2044,6 @@ async function procesarFacturaDomiciliario(ctx, uid) {
   const domFinal = domBase + recargo;
   const totalFinal = totalProductos + domFinal;
 
-  // Actualizar pool y sheet
   await actualizarTotalPedido(pedidoId, totalFinal).catch(e => console.error('actualizarTotalPedido:', e.message));
   if (pool[pedidoId]) {
     pool[pedidoId].total = totalFinal;
@@ -1980,7 +2051,6 @@ async function procesarFacturaDomiciliario(ctx, uid) {
     pool[pedidoId].facturaFileId = fileId;
   }
 
-  // Actualizar precios del carrito
   if (pool[pedidoId]?.carrito?.length > 0) {
     const carrito = pool[pedidoId].carrito;
     const totalSinPrecio = carrito.reduce((sum, item) => sum + (item.precioUnitario || 0), 0);
@@ -1998,10 +2068,7 @@ async function procesarFacturaDomiciliario(ctx, uid) {
   let productosDetalle = '';
   if (p?.carrito?.length > 0) {
     productosDetalle = p.carrito.map(i => {
-      const precioUnit = i.precioUnitario ? COP(i.precioUnitario) : '';
-      const subtotal = i.subtotal ? COP(i.subtotal) : '';
-      // Mostrar precio solo si hay más de 1 unidad (si no, es redundante)
-      const precioStr = (i.precioUnitario && i.cantidad > 1) ? ` @ ${precioUnit} = ${subtotal}` : '';
+      const precioStr = (i.precioUnitario && i.cantidad > 1) ? ` @ ${COP(i.precioUnitario)} = ${COP(i.subtotal)}` : '';
       return `• ${i.cantidad}× ${i.descripcion}${precioStr}`;
     }).join('\n');
   } else {
@@ -2011,7 +2078,6 @@ async function procesarFacturaDomiciliario(ctx, uid) {
   const metodoPago = p?.metodoPago || pool[pedidoId]?.metodoPago || 'EFECTIVO';
   const esTransferencia = metodoPago === 'TRANSFERENCIA';
 
-  // ── Notificar al cliente con la factura (foto + desglose) ─────────────────
   let clienteNotificado = false;
   if (clienteId) {
     const dirCliente = p?.direccionCliente || p?.direccion || '—';
@@ -2051,7 +2117,6 @@ async function procesarFacturaDomiciliario(ctx, uid) {
     console.warn(`⚠️ clienteId null para pedido ${pedidoId} — no se pudo notificar al cliente automáticamente`);
   }
 
-  // ── Notificar canal WIL con la foto de la factura ─────────────────────────
   if (process.env.CANAL_PEDIDOS_ID) {
     const dirCanal = p?.direccionCliente || p?.direccion || '—';
     bot.telegram.sendPhoto(process.env.CANAL_PEDIDOS_ID, fileId, {
@@ -2069,7 +2134,6 @@ async function procesarFacturaDomiciliario(ctx, uid) {
     }).catch(() => {});
   }
 
-  // ── Alerta especial al admin si es transferencia ──────────────────────────
   if (esTransferencia) {
     for (const adminId of ADMIN_IDS) {
       bot.telegram.sendMessage(adminId,
@@ -2084,7 +2148,6 @@ async function procesarFacturaDomiciliario(ctx, uid) {
     }
   }
 
-  // ── Editar card domi con resultado y botones post-factura ─────────────────
   const dLat = drivers[uid]?.lat || null;
   const dLng = drivers[uid]?.lng || null;
   const gmaps = buildGmapsUrl(p?.barrio || p?.direccion || '', p, dLat, dLng);
@@ -2190,8 +2253,6 @@ async function manejarTotalManual(ctx, uid, txt) {
   let productosDetalle = '';
   if (pedido?.carrito?.length > 0) {
     productosDetalle = pedido.carrito.map(i => {
-      const precioUnit = i.precioUnitario ? COP(i.precioUnitario) : '';
-      const subtotal = i.subtotal ? COP(i.subtotal) : '';
       const precioStr2 = (i.precioUnitario && i.cantidad > 1) ? ` @ ${COP(i.precioUnitario)} = ${COP(i.subtotal)}` : '';
       return `• ${i.cantidad}× ${i.descripcion}${precioStr2}`;
     }).join('\n');
@@ -2233,7 +2294,6 @@ async function manejarTotalManual(ctx, uid, txt) {
     } catch (e) { console.error('factura manual al cliente:', e.message); }
   }
 
-  // Notificar canal WIL
   if (process.env.CANAL_PEDIDOS_ID) {
     const dirCanal = pedido?.direccionCliente || pedido?.direccion || '—';
     const captionCanal =
@@ -2252,7 +2312,6 @@ async function manejarTotalManual(ctx, uid, txt) {
     }
   }
 
-  // Alerta especial al admin si es transferencia
   if (esTransferencia) {
     for (const adminId of ADMIN_IDS) {
       bot.telegram.sendMessage(adminId,
@@ -2293,6 +2352,9 @@ bot.action(/^entregar_(.+)$/, async ctx => {
   if (pool[id]) pool[id].estado = 'FINALIZADO';
   if (drivers[uid]) drivers[uid].pedidoActual = null;
 
+  // Desactivar ETA
+  features.desactivarETA(bot, id).catch(() => {});
+
   let p = pool[id];
   if (!p) {
     try {
@@ -2311,8 +2373,6 @@ bot.action(/^entregar_(.+)$/, async ctx => {
   let productosDetalle = '';
   if (p?.carrito?.length > 0) {
     productosDetalle = p.carrito.map(i => {
-      const precioUnit = i.precioUnitario ? COP(i.precioUnitario) : '';
-      const subtotal = i.subtotal ? COP(i.subtotal) : '';
       const precioStr3 = (i.precioUnitario && i.cantidad > 1) ? ` @ ${COP(i.precioUnitario)} = ${COP(i.subtotal)}` : '';
       return `• ${i.cantidad}× ${i.descripcion}${precioStr3}`;
     }).join('\n');
@@ -2325,7 +2385,6 @@ bot.action(/^entregar_(.+)$/, async ctx => {
   const totalProd  = parsearTotal(p?.totalProductos) || 0;
   const totalDom   = parsearTotal(p?.precioDomicilio) || 0;
 
-  // ── Editar card a FINALIZADO ───────────────────────────────────────────────
   const resumenDriver =
     cardPedidoDriver({ ...p, estado: 'FINALIZADO' }, 'FINALIZADO') +
     `\n━━━━━━━━━━━━━━━━━━\n` +
@@ -2344,7 +2403,7 @@ bot.action(/^entregar_(.+)$/, async ctx => {
     try { await ctx.editMessageText(resumenDriver, { parse_mode: 'HTML', disable_web_page_preview: true, reply_markup: { inline_keyboard: [] } }); } catch (_) { }
   }
 
-  // ── Notificar al cliente: entregado + calificación ────────────────────────
+  // Notificar al cliente + encuesta mejorada
   if (p?.clienteId) {
     const dirCliente = p.direccionCliente || p.direccion || '—';
     const msgEntregado =
@@ -2366,7 +2425,6 @@ bot.action(/^entregar_(.+)$/, async ctx => {
     await enviarMensajeCalificacion(p.clienteId, id);
   }
 
-  // ── Notificar canal WIL ───────────────────────────────────────────────────
   if (process.env.CANAL_PEDIDOS_ID && p) {
     bot.telegram.sendMessage(process.env.CANAL_PEDIDOS_ID,
       `🟢 <b>ENTREGADO — ${id}</b>\n━━━━━━━━━━━━━━━━━━\n` +
@@ -2383,7 +2441,6 @@ bot.action(/^entregar_(.+)$/, async ctx => {
     ).catch(() => { });
   }
 
-  // ── Notificar admins ──────────────────────────────────────────────────────
   for (const adminId of ADMIN_IDS) {
     if (adminId === uid.toString()) continue;
     bot.telegram.sendMessage(adminId,
@@ -2444,7 +2501,7 @@ async function mostrarOpcionesPedido(ctx) {
   return ctx.reply('¿De dónde quieres pedir?', Markup.inlineKeyboard([
     [Markup.button.callback('🏪 Domicilios WIL (general)', 'neg_wil')],
     [Markup.button.callback('💊 FarmaExpertos Copacabana', 'neg_expertos')],
-    [Markup.button.callback('🏥 Farmacia Central Copacabana', 'neg_central')],
+    [Markup.button.callback('🏥 Drogueria Central Copacabana', 'neg_central')],
     [Markup.button.callback('📦 Paquetería', 'paqueteria')]
   ]));
 }
@@ -2545,7 +2602,7 @@ async function procesarPaquete(ctx, uid) {
 
   const { pend } = await getContadores();
   for (const [did, d] of Object.entries(drivers)) {
-    if (!d.pedidoActual) {
+    if (!d.pedidoActual && features.estaEnTurno(did)) {
       bot.telegram.sendMessage(did,
         `📦 <b>Nuevo paquete</b>\n🆕 <b>${id}</b>\n👤 ${s.nombre}  📱 ${s.telefono}\n` +
         `🔄 Recoge en: ${s.origenBarrio}\n📍 Entrega en: ${s.barrioDestino || s.direccionDestino}\n` +
@@ -2563,8 +2620,8 @@ async function procesarPaquete(ctx, uid) {
 // ══════════════════════════════════════════════════════════════════════════════
 const NEGOCIOS = {
   wil: { nombre: '🏪 Domicilios WIL', tienda: null },
-  expertos: { nombre: '💊 Farmacia Expertos', tienda: 'EXPERTOS' },
-  central: { nombre: '🏥 Farmacia La Central', tienda: 'CENTRAL' }
+  expertos: { nombre: '💊 Drogueria Farma Expertos', tienda: 'EXPERTOS' },
+  central: { nombre: '🏥 Drogueria Central', tienda: 'CENTRAL' }
 };
 
 bot.action(/^neg_(.+)$/, async ctx => {
@@ -3038,10 +3095,10 @@ async function procesarPedido(ctx, uid) {
 
   const esTransferencia = s.metodoPago === 'TRANSFERENCIA';
 
-  // ── Notificar domiciliarios disponibles ───────────────────────────────────
+  // Notificar domiciliarios disponibles — solo los que están en turno
   const { pend } = await getContadores();
   for (const [did, d] of Object.entries(drivers)) {
-    if (!d.pedidoActual) {
+    if (!d.pedidoActual && features.estaEnTurno(did)) {
       bot.telegram.sendMessage(did,
         `🔴 <b>Nuevo pedido</b>\n🆕 <b>${id}</b>\n🏪 ${s.negocioNombre}\n` +
         `📍 ${s.direccion}\n💳 Pago: <b>${esTransferencia ? 'Transferencia Bancolombia' : 'Efectivo'}</b>\n` +
@@ -3051,7 +3108,6 @@ async function procesarPedido(ctx, uid) {
     }
   }
 
-  // ── Notificar canal WIL ───────────────────────────────────────────────────
   if (process.env.CANAL_PEDIDOS_ID) {
     const dirLink = gmapsLinkDir(s.direccion);
     let cardCanal =
@@ -3187,7 +3243,7 @@ async function enviarRecordatorio() {
     bot.telegram.sendMessage(id, msg, { parse_mode: 'HTML' }).catch(() => { });
   }
   for (const [did, d] of Object.entries(drivers)) {
-    if (!d.pedidoActual) {
+    if (!d.pedidoActual && features.estaEnTurno(did)) {
       bot.telegram.sendMessage(did,
         `🔴 <b>${nuevos.length}</b> pedido(s) sin atender más de 10 min\nRevisa 📋 <b>Pendientes</b>`,
         { parse_mode: 'HTML' }
@@ -3316,23 +3372,15 @@ bot.action(/^asignar_(.+)_(.+)$/, async ctx => {
     }
   ).catch(() => { });
 
-  // Notificar al cliente
+  // Notificar al cliente con foto del domi (features)
   if (p.clienteId) {
     const telDomi = d.telefono || '';
-    let productosDetalle = p.productos || '—';
-    if (p.carrito?.length > 0) productosDetalle = p.carrito.map(i => `• ${i.cantidad}× ${i.descripcion}`).join('\n');
-    bot.telegram.sendMessage(p.clienteId,
-      `🛵 <b>¡Tu pedido fue tomado!</b>\n` +
-      `━━━━━━━━━━━━━━━━━━\n` +
-      `👤 <b>${d.nombre}</b>\n` +
-      (telDomi ? `📱 <b>${telDomi}</b>\n` : '') +
-      `⏰ ${p.horaTomo}\n\n` +
-      `🏪 ${p.negocioNombre || '—'}\n` +
-      `📍 ${p.direccionCliente || p.direccion || '—'}\n\n` +
-      `📦 <b>Productos:</b>\n${productosDetalle}\n\n` +
-      `<i>En breve recibirás la factura con el total a pagar.</i>`,
-      { parse_mode: 'HTML' }
-    ).catch(() => {});
+    await features.notificarClientePedidoTomado(bot, p.clienteId, p, d.nombre, telDomi, p.horaTomo);
+
+    // Activar ETA si el cliente tiene GPS
+    if (p.latCliente && p.lngCliente && dLat && dLng) {
+      features.activarETA(bot, p.clienteId, pedidoId, dLat, dLng, p.latCliente, p.lngCliente).catch(() => {});
+    }
   }
 
   // Notificar canal
@@ -3346,6 +3394,249 @@ bot.action(/^asignar_(.+)_(.+)$/, async ctx => {
       { parse_mode: 'HTML', disable_web_page_preview: true }
     ).catch(() => { });
   }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// INTEGRACIÓN FEATURES — registra encuesta mejorada, ETA, turnos, historial
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MI PERFIL  —  tarjeta foto + historial con calendario de fechas
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function getPedidosDomiTodos(nombreDomi) {
+  const key = nombreDomi.toLowerCase().trim();
+  const enPool = Object.values(pool).filter(p =>
+    p.estado === 'FINALIZADO' &&
+    (p.domiciliario || '').toLowerCase().trim() === key
+  );
+  let enSheet = [];
+  try {
+    const todos = await getPedidos('FINALIZADO');
+    enSheet = todos.filter(p => (p.domiciliario || '').toLowerCase().trim() === key);
+  } catch (_) {}
+  const ids = new Set(enPool.map(p => p.id));
+  return [...enPool, ...enSheet.filter(p => !ids.has(p.id))].sort((a, b) => {
+    const ta = a.createdAt || moment(a.fecha, 'DD/MM/YYYY').valueOf() || 0;
+    const tb = b.createdAt || moment(b.fecha, 'DD/MM/YYYY').valueOf() || 0;
+    return tb - ta;
+  });
+}
+
+function fechasUnicasDomi(pedidos) {
+  const set = new Set();
+  for (const p of pedidos) {
+    let f = p.fecha;
+    if (!f && p.createdAt) f = moment(p.createdAt).tz('America/Bogota').format('DD/MM/YYYY');
+    if (f) set.add(f);
+  }
+  return [...set].sort((a, b) => moment(b, 'DD/MM/YYYY').valueOf() - moment(a, 'DD/MM/YYYY').valueOf());
+}
+
+function keyboardCalendarioDomi(pedidos) {
+  const fechas = fechasUnicasDomi(pedidos);
+  const rows = [];
+  for (let i = 0; i < Math.min(fechas.length, 10); i += 2) {
+    const row = [];
+    const f1 = fechas[i];
+    const n1 = pedidos.filter(p => {
+      const f = p.fecha || (p.createdAt ? moment(p.createdAt).tz('America/Bogota').format('DD/MM/YYYY') : '');
+      return f === f1;
+    }).length;
+    row.push(Markup.button.callback(`📅 ${f1} (${n1})`, `dperfil_fecha_${f1}`));
+    if (fechas[i + 1]) {
+      const f2 = fechas[i + 1];
+      const n2 = pedidos.filter(p => {
+        const f = p.fecha || (p.createdAt ? moment(p.createdAt).tz('America/Bogota').format('DD/MM/YYYY') : '');
+        return f === f2;
+      }).length;
+      row.push(Markup.button.callback(`📅 ${f2} (${n2})`, `dperfil_fecha_${f2}`));
+    }
+    rows.push(row);
+  }
+  rows.push([Markup.button.callback('🔙 Volver a mi perfil', 'dperfil_inicio')]);
+  return Markup.inlineKeyboard(rows);
+}
+
+function captionPerfilDomi(nombre, tel, totalEntregas) {
+  const ahora = moment().tz('America/Bogota').format('DD/MM/YYYY hh:mm A');
+  return (
+    `🛵 <b>${nombre}</b>\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `📞 ${tel || '—'}\n` +
+    `✅ Estado: <b>Activo</b>\n` +
+    `📦 Total entregas: <b>${totalEntregas}</b>\n` +
+    `🕐 <i>${ahora}</i>\n\n` +
+    `Elige una opción:`
+  );
+}
+
+function captionDiaDomi(nombre, fecha, pedidosDia) {
+  let cap =
+    `🛵 <b>${nombre}</b>  —  📅 ${fecha}\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `📦 Entregas: <b>${pedidosDia.length}</b>\n` +
+    `━━━━━━━━━━━━━━━━━━\n`;
+  pedidosDia.slice(0, 10).forEach((p, i) => {
+    const hora = p.hora || (p.createdAt ? moment(p.createdAt).tz('America/Bogota').format('hh:mm A') : '—');
+    cap += `${i + 1}. <b>${p.id}</b>  ${hora}\n`;
+  });
+  if (pedidosDia.length > 10) cap += `<i>...y ${pedidosDia.length - 10} más</i>\n`;
+  cap += `\n<i>👇 Toca un pedido para ver el detalle</i>`;
+  return cap;
+}
+
+function keyboardDiaDomi(pedidosDia) {
+  const rows = [];
+  for (let i = 0; i < Math.min(pedidosDia.length, 10); i += 2) {
+    const row = [];
+    const p1 = pedidosDia[i];
+    row.push(Markup.button.callback(`📦 ${p1.id.slice(-6)}`, `dperfil_pid_${p1.id}`));
+    if (pedidosDia[i + 1]) {
+      const p2 = pedidosDia[i + 1];
+      row.push(Markup.button.callback(`📦 ${p2.id.slice(-6)}`, `dperfil_pid_${p2.id}`));
+    }
+    rows.push(row);
+  }
+  rows.push([
+    Markup.button.callback('🔙 Ver fechas', 'dperfil_historial'),
+    Markup.button.callback('🏠 Perfil',     'dperfil_inicio'),
+  ]);
+  return Markup.inlineKeyboard(rows);
+}
+
+function keyboardPerfilInicio() {
+  return Markup.inlineKeyboard([
+    [Markup.button.callback('📊 Ver Historial por fecha', 'dperfil_historial')],
+    [Markup.button.callback('🔙 Volver al panel',         'dperfil_volver')],
+  ]);
+}
+
+// ── "📊 Ver Historial" → calendario de fechas (edita caption) ────────────────
+bot.action('dperfil_historial', async ctx => {
+  const uid = ctx.from.id;
+  await ctx.answerCbQuery('📅 Cargando...');
+  if (!drivers[uid]) return;
+  const nombre  = drivers[uid].nombre;
+  const pedidos = await getPedidosDomiTodos(nombre);
+  if (!pedidos.length) {
+    const noKb = Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver', 'dperfil_inicio')]]);
+    return ctx.editMessageCaption(
+      `📊 <b>Historial de ${nombre}</b>\n━━━━━━━━━━━━━━━━━━\n<i>No hay entregas registradas aún.</i>`,
+      { parse_mode: 'HTML', ...noKb }
+    ).catch(() => ctx.editMessageText(
+      `📊 <b>Historial de ${nombre}</b>\n━━━━━━━━━━━━━━━━━━\n<i>No hay entregas registradas aún.</i>`,
+      { parse_mode: 'HTML', ...noKb }
+    ));
+  }
+  const capHist =
+    `📊 <b>Historial — ${nombre}</b>\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `📦 Total: <b>${pedidos.length}</b> entregas\n\n` +
+    `📅 Elige una fecha para ver el detalle:`;
+  const kb = keyboardCalendarioDomi(pedidos);
+  await ctx.editMessageCaption(capHist, { parse_mode: 'HTML', ...kb })
+    .catch(() => ctx.editMessageText(capHist, { parse_mode: 'HTML', ...kb }));
+});
+
+// ── Fecha específica → detalle de entregas (edita caption) ───────────────────
+bot.action(/^dperfil_fecha_(\d{2}\/\d{2}\/\d{4})$/, async ctx => {
+  const uid   = ctx.from.id;
+  const fecha = ctx.match[1];
+  await ctx.answerCbQuery(`📅 ${fecha}`);
+  if (!drivers[uid]) return;
+  const nombre = drivers[uid].nombre;
+  const todos  = await getPedidosDomiTodos(nombre);
+  const diaPs  = todos.filter(p => {
+    const f = p.fecha || (p.createdAt ? moment(p.createdAt).tz('America/Bogota').format('DD/MM/YYYY') : '');
+    return f === fecha;
+  });
+  const cap = captionDiaDomi(nombre, fecha, diaPs);
+  const kb  = keyboardDiaDomi(diaPs);
+  await ctx.editMessageCaption(cap, { parse_mode: 'HTML', ...kb })
+    .catch(() => ctx.editMessageText(cap, { parse_mode: 'HTML', ...kb }));
+});
+
+// ── Popup detalle de un pedido individual ────────────────────────────────────
+bot.action(/^dperfil_pid_(.+)$/, async ctx => {
+  const id = ctx.match[1];
+  await ctx.answerCbQuery();
+
+  // Buscar primero en pool (tiene precioDomicilio correcto), luego en sheet
+  let p = pool[id];
+  if (!p) {
+    const fromSheet = await getPedidos('ALL').then(ps => ps.find(x => x.id === id)).catch(() => null);
+    if (fromSheet) p = fromSheet;
+  }
+  if (!p) return ctx.answerCbQuery('⚠️ Pedido no encontrado', true);
+
+  const dom     = parsearTotal(p.precioDomicilio) || 0;
+  const total   = parsearTotal(p.total) || 0;
+  const prod    = parsearTotal(p.totalProductos) || (total - dom) || 0;
+  const hora    = p.hora || p.horaTomo || (p.createdAt ? moment(p.createdAt).tz('America/Bogota').format('hh:mm A') : '—');
+  const dir     = p.direccionCliente || p.direccion || p.barrio || '—';
+  const neg     = p.negocioNombre || p.negocio || '—';
+  const metodo  = p.metodoPago || '—';
+  const fecha   = p.fecha || '—';
+
+  let msg =
+    `📦 <b>Pedido ${id}</b>\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `📅 ${fecha}   ⏰ ${hora}\n` +
+    `🏪 <b>${neg}</b>\n` +
+    `📍 ${dir}\n` +
+    `━━━━━━━━━━━━━━━━━━\n`;
+  if (prod > 0)  msg += `🧾 Productos:  <b>${COP(prod)}</b>\n`;
+  if (dom > 0)   msg += `🛵 Domicilio:  <b>${COP(dom)}</b>\n`;
+  if (total > 0) msg += `💵 Total:      <b>${COP(total)}</b>\n`;
+  msg += `💳 Pago: ${metodo}\n`;
+  if (p.calificacion) msg += `⭐ Calificación: ${p.calificacion}\n`;
+
+  await ctx.answerCbQuery();
+  await ctx.reply(msg, {
+    parse_mode: 'HTML',
+    ...Markup.inlineKeyboard([[Markup.button.callback('✖️ Cerrar', `dperfil_cerrar_msg`)]])
+  });
+});
+
+bot.action('dperfil_cerrar_msg', async ctx => {
+  await ctx.answerCbQuery();
+  try { await ctx.deleteMessage(); } catch (_) {}
+});
+
+// ── Volver al caption de perfil original ─────────────────────────────────────
+bot.action('dperfil_inicio', async ctx => {
+  const uid = ctx.from.id;
+  await ctx.answerCbQuery();
+  if (!drivers[uid]) return;
+  const nombre = drivers[uid].nombre;
+  const tel    = drivers[uid].telefono || '';
+  await cargarEntregasDesdeSheet().catch(() => {});
+  const { entregas } = statsDriverPool(nombre);
+  const caption = captionPerfilDomi(nombre, tel, entregas);
+  const kb      = keyboardPerfilInicio();
+  await ctx.editMessageCaption(caption, { parse_mode: 'HTML', ...kb })
+    .catch(() => ctx.editMessageText(caption, { parse_mode: 'HTML', ...kb }));
+});
+
+// ── Volver al panel principal ─────────────────────────────────────────────────
+bot.action('dperfil_volver', async ctx => {
+  await ctx.answerCbQuery();
+  try { await ctx.deleteMessage(); } catch (_) {}
+  const uid = ctx.from.id;
+  if (drivers[uid]) {
+    const kb = await menuDriver(uid);
+    await ctx.reply('Panel principal 👇', { ...kb });
+  }
+});
+
+features.integrar(bot, {
+  pool,
+  drivers,
+  ADMIN_IDS,
+  getPedidos,
+  guardarCalificacion,
+  registrarPedido,
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
