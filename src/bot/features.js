@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// features.js — Domicilios WIL  (v2 — integración completa sin tocar wilBot.js)
+// features.js — Domicilios WIL
 // Módulo de funcionalidades avanzadas:
 //   1. Pedidos programados (agendar para fecha/hora futura)
 //   2. Historial del cliente

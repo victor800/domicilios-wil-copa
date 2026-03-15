@@ -4,6 +4,7 @@
 const { Telegraf, Markup } = require('telegraf');
 const moment = require('moment-timezone');
 const cron = require('node-cron');
+const path = require('path');
 
 const { extraerProductosIA, detectarIntencion, interpretarDireccion } = require('../services/groq');
 const { leerTotalFactura } = require('../services/leerFactura');
@@ -28,6 +29,13 @@ const {
 // ── Integración features ──────────────────────────────────────────────────────
 const features = require('./features');
 
+// ── Slides presentación WIL ───────────────────────────────────────────────────
+const SLIDES_DIR = path.join(__dirname, '../assets/slides');
+const TOTAL_SLIDES = 9;
+// Cache file_id de Telegram para no re-subir los archivos cada vez.
+// Se llena automáticamente en el primer envío y se mantiene en memoria.
+const _slidesFileIdCache = {};
+
 const bot = new Telegraf(process.env.BOT_TOKEN);
 let LOGO_FILE_ID = process.env.LOGO_FILE_ID || null;
 const espComprobanteCliente = {};
@@ -46,12 +54,34 @@ const espFacturaDrv = {};
 const espConfirmar = {};
 const espTotalManual = {};
 const espPostulante = {};
+
+// driversLastSeen persiste en disco para sobrevivir reinicios del bot
 const driversLastSeen = {};
 
 const ADMIN_IDS = (process.env.ADMIN_TELEGRAM_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
 // SEGURIDAD: si no hay ADMIN_IDS configurados, NADIE es admin (antes daba acceso a todos)
 const esAdmin = id => ADMIN_IDS.length > 0 && ADMIN_IDS.includes(id.toString());
 const esDriver = id => !!drivers[id];
+
+// ── Multi-pedido: máx 2 activos por domi ─────────────────────────────────────
+function _pedidosActivosDomi(uid) {
+  if (!drivers[uid]) return [];
+  if (!drivers[uid].pedidosActivos) drivers[uid].pedidosActivos = [];
+  return drivers[uid].pedidosActivos;
+}
+function _tieneCapacidad(uid) { return _pedidosActivosDomi(uid).length < 2; }
+function _agregarPedidoActivo(uid, id) {
+  const arr = _pedidosActivosDomi(uid);
+  if (!arr.includes(id)) arr.push(id);
+  drivers[uid].pedidosActivos = arr;
+  drivers[uid].pedidoActual = id; // ← último tomado (para ETA/ubicación)
+}
+function _removerPedidoActivo(uid, id) {
+  if (!drivers[uid]) return;
+  drivers[uid].pedidosActivos = (drivers[uid].pedidosActivos || []).filter(x => x !== id);
+  // pedidoActual apunta al primero restante (o null)
+  drivers[uid].pedidoActual = drivers[uid].pedidosActivos[0] || null;
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // UTILS
@@ -71,19 +101,24 @@ const COP = n => {
 const parsearTotal = val => {
   if (val === null || val === undefined || val === '') return null;
   if (typeof val === 'number') return isNaN(val) ? null : Math.round(val);
-  const s = String(val).trim();
+  // Quitar signo pesos, espacios y guiones al inicio para normalizar
+  const s = String(val).trim().replace(/^\$\s*/, '').replace(/^-\$\s*/, '');
   const tieneComaDecimal = /,\d{1,2}$/.test(s);
   const tienePuntoDos = /\.\d{1,2}$/.test(s);
   const tienePuntoMiles = /\.\d{3}/.test(s);
 
   let limpio;
   if (tieneComaDecimal) {
+    // 16,000 → coma como decimal colombiano
     limpio = s.replace(/\./g, '').replace(/,\d+$/, '');
   } else if (tienePuntoMiles) {
+    // 16.000 → punto como separador de miles
     limpio = s.replace(/\./g, '');
   } else if (tienePuntoDos && !tienePuntoMiles) {
+    // 16.5 → decimal real, descartar decimales
     limpio = s.replace(/\.\d+$/, '');
   } else {
+    // 16000 o cualquier otro → quitar no-dígitos
     limpio = s.replace(/[^0-9]/g, '');
   }
   const n = Number(limpio.replace(/[^0-9]/g, ''));
@@ -98,7 +133,7 @@ function gmapsLinkDir(direccionCliente) {
 function tipoBadge(p) {
   if (!p) return '';
   if (p.tipo === 'paqueteria') return '📦 Paquetería';
-  if (p.tienda === 'EXPERTOS') return '💊 FarmaExpertos Copacabana';
+  if (p.tienda === 'EXPERTOS') return '💊 Drogueria FarmaExpertos Copacabana';
   if (p.tienda === 'CENTRAL') return '🏥  Drogueria Central Copacabana';
   return '🏪 WIL';
 }
@@ -211,6 +246,119 @@ function menuPublico() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// PRESENTACIÓN WIL — carrusel de slides
+// Reemplaza el antiguo envío de video.
+// ══════════════════════════════════════════════════════════════════════════════
+//
+// ESTRUCTURA ESPERADA:
+//   src/assets/slides/slide-1.jpg  …  slide-9.jpg
+//
+// Para generar las imágenes desde el .pptx ejecuta una sola vez:
+//   bash generar_slides.sh
+//
+// Primera ejecución: sube desde disco (~2-3 seg).
+// Siguientes:        usa file_id cacheado → instantáneo.
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function enviarPresentacionWil(ctx) {
+  const fs = require('fs');
+  const nombre = ctx.from.first_name || 'amigo';
+
+  const slidesDisponibles =
+    fs.existsSync(SLIDES_DIR) &&
+    fs.existsSync(path.join(SLIDES_DIR, 'slide_1.jpg'));
+
+  if (!slidesDisponibles) {
+    return ctx.reply(
+      `🛵 <b>ÚNETE AL EQUIPO WIL</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `En Domicilios WIL valoramos la puntualidad,\n` +
+      `la buena actitud y el trato cordial. 💪\n\n` +
+      `¿Listo para postularte?`,
+      {
+        parse_mode: 'HTML',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('✅ ¡Sí, me postulo!', 'iniciar_postulacion')],
+          [Markup.button.callback('↩️ Aún no, gracias',  'cancelar_postulacion')],
+        ])
+      }
+    );
+  }
+
+  // ── Mensaje de bienvenida ─────────────────────────────────────────────────
+  await ctx.reply(
+    `🛵 <b>¡Hola ${nombre}!</b>\n\n` +
+    `Desliza hacia abajo para conocer\n` +
+    `todo sobre trabajar con nosotros 👇`,
+    { parse_mode: 'HTML' }
+  );
+
+  // ── Slides 1–8 una por una ────────────────────────────────────────────────
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  for (let i = 1; i <= 8; i++) {
+    const key = String(i);
+    try {
+      if (_slidesFileIdCache[key]) {
+        await ctx.replyWithPhoto(_slidesFileIdCache[key]);
+      } else {
+        const filePath = path.join(SLIDES_DIR, `slide_${i}.jpg`);
+        if (!fs.existsSync(filePath)) {
+          console.warn(`⚠️  Slide ${i} no encontrada: ${filePath}`);
+          continue;
+        }
+        const msg = await ctx.replyWithPhoto({ source: filePath });
+        if (msg.photo?.length) {
+          _slidesFileIdCache[key] = msg.photo[msg.photo.length - 1].file_id;
+        }
+      }
+      await sleep(400); // pausa entre slides
+    } catch (e) {
+      console.error(`Slide ${i} error:`, e.message);
+    }
+  }
+
+  // ── Slide 9: CTA con botones ──────────────────────────────────────────────
+  const kb = Markup.inlineKeyboard([
+    [Markup.button.callback('✅ ¡Sí, me postulo!', 'iniciar_postulacion')],
+    [Markup.button.callback('↩️ Aún no, gracias',  'cancelar_postulacion')],
+  ]);
+
+  const captionCta =
+    `🛵 <b>¿Listo para unirte al equipo WIL?</b>\n\n` +
+    `Toca el botón y empieza tu postulación 👇`;
+
+  const key9      = '9';
+  const filePath9 = path.join(SLIDES_DIR, 'slide_9.jpg');
+
+  try {
+    if (_slidesFileIdCache[key9]) {
+      await ctx.replyWithPhoto(
+        _slidesFileIdCache[key9],
+        { caption: captionCta, parse_mode: 'HTML', ...kb }
+      );
+    } else if (fs.existsSync(filePath9)) {
+      const msg9 = await ctx.replyWithPhoto(
+        { source: filePath9 },
+        { caption: captionCta, parse_mode: 'HTML', ...kb }
+      );
+      if (msg9.photo?.length) {
+        _slidesFileIdCache[key9] = msg9.photo[msg9.photo.length - 1].file_id;
+      }
+    } else {
+      await ctx.reply(captionCta, { parse_mode: 'HTML', ...kb });
+    }
+  } catch (e) {
+    console.error('Slide 9 error:', e.message);
+    await ctx.reply(
+      `🛵 <b>¿Listo para unirte al equipo WIL?</b>\n\n¿Te gustaría postularte?`,
+      { parse_mode: 'HTML', ...kb }
+    ).catch(() => {});
+  }
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
 // CARDS PEDIDO  —  formato tabla monoespacio alineado
 // ══════════════════════════════════════════════════════════════════════════════
 const TW = 30;
@@ -241,7 +389,7 @@ function cardPedidoDriver(p, estado) {
   const ico = estado === 'PENDIENTE' ? '🟡' : estado === 'EN_PROCESO' ? '🔵' : '🟢';
   const totalNum = p.total ? parsearTotal(p.total) : 0;
   const totalStr = totalNum > 0 ? COP(totalNum) : (p.tienda ? 'Por confirmar' : 'Al facturar');
-  const domNum = (p.precioDomicilio && Number(p.precioDomicilio) > 0) ? Number(p.precioDomicilio) : 0;
+  const domNum = parsearTotal(p.precioDomicilio) || 0;
   const dirCliente = p.direccionCliente || p.direccion || '—';
 
   let filasProds = '';
@@ -274,6 +422,9 @@ function cardPedidoDriver(p, estado) {
     _fila('📍 ' + dirCliente)
   ];
   if (p.origen) lines.push(_fila('🔄 Origen: ' + p.origen));
+  // Mostrar referencia del sheet si existe
+  const refMostrar = p.notaSheet || p.referencia || '';
+  if (refMostrar) lines.push(_fila('📌 Ref: ' + refMostrar));
   lines.push(_sep(), _fila2('DESCRIPCION', 'TOTAL'), _sep(), filasProds, _sep());
   if (p.presupuesto) lines.push(_fila2('Presupuesto', p.presupuesto));
   if (domNum > 0) lines.push(_fila2('Domicilio', COP(domNum)));
@@ -566,9 +717,18 @@ function buildGmapsUrl(lugar, pedido, driverLat, driverLng) {
 // ══════════════════════════════════════════════════════════════════════════════
 function botonesCard(p, gmaps) {
   const id = p.id;
+  const esPaquete = p.tipo === 'paqueteria';
   const verRutaBtn = Markup.button.url('📍 Ver Ruta', gmaps);
 
   if (p.estado === 'EN_PROCESO') {
+    // Solo paquetería no tiene factura
+    if (esPaquete) {
+      return Markup.inlineKeyboard([
+        [Markup.button.callback('✅ Entregado', `entregar_${id}`), verRutaBtn],
+        [Markup.button.callback('❌ Cancelar pedido', `cancelar_order_${id}`)],
+      ]);
+    }
+    // WIL y farmacias siempre suben factura
     return Markup.inlineKeyboard([
       [Markup.button.callback('📸 Subir Factura', `factura_${id}`), verRutaBtn],
       [Markup.button.callback('✅ Entregado', `entregar_${id}`)],
@@ -663,20 +823,24 @@ bot.start(async ctx => {
     `📍 Copacabana, Antioquia 🇨🇴\n\n` +
     `¿Qué deseas hacer?`;
 
-  try {
-    if (LOGO_FILE_ID) {
-      await ctx.replyWithPhoto(LOGO_FILE_ID, { caption, parse_mode: 'HTML', ...menuPublico() });
-    } else {
-      const msg = await ctx.replyWithPhoto(
-        { source: require('path').join(__dirname, '../assets/logo.jpeg') },
-        { caption, parse_mode: 'HTML', ...menuPublico() }
-      );
-      LOGO_FILE_ID = msg.photo[msg.photo.length - 1].file_id;
-      console.log(`✅ LOGO_FILE_ID cacheado: ${LOGO_FILE_ID}`);
-    }
-  } catch (e) {
-    console.error('Logo /start error:', e.message);
+  // Responde el menú de inmediato; la foto se envía en paralelo y cachea el file_id
+  if (LOGO_FILE_ID) {
+    await ctx.replyWithPhoto(LOGO_FILE_ID, { caption, parse_mode: 'HTML', ...menuPublico() }).catch(async () => {
+      await ctx.reply(caption, { parse_mode: 'HTML', ...menuPublico() });
+    });
+  } else {
+    // Primero responde con texto para que el menú aparezca instantáneo
     await ctx.reply(caption, { parse_mode: 'HTML', ...menuPublico() });
+    // Luego sube la foto en background y cachea el file_id para la próxima vez
+    ctx.replyWithPhoto(
+      { source: require('path').join(__dirname, '../assets/logo.jpeg') },
+      { caption: '🛵 Domicilios WIL' }
+    ).then(msg => {
+      if (msg.photo?.length) {
+        LOGO_FILE_ID = msg.photo[msg.photo.length - 1].file_id;
+        console.log(`✅ LOGO_FILE_ID cacheado: ${LOGO_FILE_ID}`);
+      }
+    }).catch(e => console.error('Logo cache error:', e.message));
   }
 });
 
@@ -861,8 +1025,9 @@ bot.on('text', async ctx => {
       const tel    = drivers[uid].telefono || '';
       await cargarEntregasDesdeSheet().catch(() => {});
       const { entregas } = statsDriverPool(nombre);
+      const pedidos = await getPedidosDomiTodos(nombre);
       const caption = captionPerfilDomi(nombre, tel, entregas);
-      const kb      = keyboardPerfilInicio();
+      const kb      = keyboardPerfilInicio(pedidos);
       return features.enviarTarjetaPerfil(ctx, nombre, tel, entregas, caption, kb);
     }
     if (txt.includes('📍 Compartir Ubicación') || txt.includes('📍 Ubicación activa')) {
@@ -885,6 +1050,7 @@ bot.on('text', async ctx => {
         { parse_mode: 'HTML' }
       );
     }
+    // ── PARCHE 1: limpiar TODO el estado al cerrar sesión ──────────────────
     if (txt === '🚪 Cerrar Sesión') {
       if (drivers[uid]) {
         driversLastSeen[uid] = {
@@ -895,8 +1061,21 @@ bot.on('text', async ctx => {
           turnoGuardado: features.turnos[uid] || driversLastSeen[uid]?.turnoGuardado || null,
         };
       }
-      delete drivers[uid]; delete espClave[uid];
-      return ctx.reply(`👋 <b>Sesión cerrada.</b>`, { parse_mode: 'HTML', ...menuPublico() });
+      delete drivers[uid];
+      delete espClave[uid];
+      delete espFacturaDrv[uid];
+      delete espTotalManual[uid];
+      delete espConfirmar[uid];
+      delete espMsg[uid];
+      delete S[uid];
+      console.log(`🚪 Sesión cerrada: ${driversLastSeen[uid]?.nombre || uid}`);
+      // Borra los últimos ~80 mensajes de golpe (una sola llamada API)
+      const _idsEliminar = Array.from({ length: 80 }, (_, k) => mid - k).filter(id => id > 0);
+      try { await ctx.telegram.callApi('deleteMessages', { chat_id: ctx.chat.id, message_ids: _idsEliminar }); } catch (_) {}
+      return ctx.reply(
+        `🔐 <b>Sesión cerrada.</b>\n\nPresiona <b>Ingresar como Domiciliario</b> para volver a entrar.`,
+        { parse_mode: 'HTML', ...menuPublico() }
+      );
     }
   }
 
@@ -926,14 +1105,7 @@ bot.on('text', async ctx => {
   }
 
   if (txt === '🤝 Trabaja con Nosotros') {
-    delete espPostulante[uid];
-    espPostulante[uid] = { paso: 'nombre' };
-    return ctx.reply(
-      `🤝 <b>ÚNETE AL EQUIPO WIL</b>\n━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-      `¡Nos alegra tu interés en ser parte del equipo! 🛵\n\n` +
-      `📝 <b>Nombre Completo:</b>\n<i>Escribe tu nombre completo como aparece en la cédula.</i>`,
-      { parse_mode: 'HTML', ...Markup.removeKeyboard() }
-    );
+    return enviarPresentacionWil(ctx);
   }
 
   if (esAdmin(uid)) {
@@ -1148,9 +1320,23 @@ async function manejarAutenticacionAdmin(ctx, uid, clave, msgId) {
 async function manejarAutenticacion(ctx, uid, clave, msgId) {
   delete espClave[uid];
   try { await ctx.deleteMessage(msgId); } catch (_) { }
+  // Mensaje inmediato para que el domi sepa que está procesando
+  const msgCargando = await ctx.reply(
+    `⏳ <b>Verificando acceso...</b>
+<i>Por favor espera un momento.</i>`,
+    { parse_mode: 'HTML' }
+  ).catch(() => null);
   const r = await verificarClave(clave);
-  if (!r.valida) return ctx.reply(`❌ <b>Clave incorrecta.</b>\nPide una nueva al administrador.`, { parse_mode: 'HTML' });
-  drivers[uid] = { nombre: r.nombre, pedidoActual: null, loginTs: Date.now() };
+  // Borrar el mensaje de carga antes de responder
+  if (msgCargando?.message_id) {
+    try { await ctx.telegram.deleteMessage(ctx.chat.id, msgCargando.message_id); } catch (_) {}
+  }
+  if (!r.valida) {
+    console.log(`🔐 Login fallido uid=${uid}`);
+    return ctx.reply(`❌ <b>Clave incorrecta.</b>\nPide una nueva al administrador.`, { parse_mode: 'HTML' });
+  }
+  drivers[uid] = { nombre: r.nombre, pedidoActual: null, pedidosActivos: [], loginTs: Date.now() };
+  console.log(`✅ Login domi: ${r.nombre} (uid=${uid})`);
 
   await getSheetDrivers();
   const sheetEntry = _sheetCache.find(x => x.nombre === r.nombre);
@@ -1163,19 +1349,19 @@ async function manejarAutenticacion(ctx, uid, clave, msgId) {
   if (sheetEntry?.fotoUrl) {
     features.guardarFotoDomiUrl(r.nombre, sheetEntry.fotoUrl);
   } else {
-    // Busca assets/victor.jpeg, assets/juan.jpg, etc. por el nombre del domi
     features.autoDetectarFotoAssets(r.nombre);
   }
 
   await guardarTelegramDriver(r.fila, uid);
   const kb = await menuDriver(uid);
 
-  const esPrimerLogin = !driversLastSeen[uid]?.turnoGuardado;
+  // esPrimerLogin = nunca ha ingresado (sin registro previo)
+  const esPrimerLogin = !driversLastSeen[uid]?.ts;
 
   await ctx.reply(`🎉 <b>¡Acceso concedido!</b>\nHola <b>${r.nombre}</b> 👋`, { parse_mode: 'HTML', ...kb });
 
   if (esPrimerLogin) {
-    // Primera vez — pedir GPS y turno
+    // Primera vez en el día: pedir GPS y turno
     await ctx.reply(
       `📍 <b>Comparte tu ubicación en tiempo real</b>\n\n` +
       `Esto nos permite ver dónde estás y calcular rutas precisas.\n\n` +
@@ -1193,9 +1379,9 @@ async function manejarAutenticacion(ctx, uid, clave, msgId) {
       { parse_mode: 'HTML', ...features.keyboardTurno() }
     );
   } else {
-    // Reingreso — restaurar turno guardado silenciosamente
+    // Re-ingreso: restaurar turno silenciosamente sin molestar al domi
     const turnoGuardado = driversLastSeen[uid].turnoGuardado;
-    features.setTurno(uid, turnoGuardado);
+    if (turnoGuardado) features.setTurno(uid, turnoGuardado);
   }
 }
 
@@ -1227,17 +1413,16 @@ async function getSheetDrivers() {
     const sheets = google.sheets({ version: 'v4', auth: client });
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEETS_ID,
-      range: 'Domiciliarios!A:F'   // ← ampliado a F para incluir fotoUrl
+      range: 'Domiciliarios!A:F'
     });
     _sheetCache = (res.data.values || []).slice(1).filter(r => r[1]).map(r => ({
       telegramId: (r[0] || '').toString().trim(),
       nombre:     (r[1] || '').toString().trim(),
       telefono:   (r[4] || '').toString().trim(),
-      fotoUrl:    (r[5] || '').toString().trim(),   // ← columna F: ruta o URL de la foto
+      fotoUrl:    (r[5] || '').toString().trim(),
     }));
     _sheetCacheTs = Date.now();
 
-    // Registrar fotos en features para todos los domis del sheet
     _sheetCache.forEach(d => {
       if (d.fotoUrl) features.guardarFotoDomiUrl(d.nombre, d.fotoUrl);
     });
@@ -1245,15 +1430,10 @@ async function getSheetDrivers() {
   return _sheetCache;
 }
 
-// Cache de entregas por domi leído de Pedidos!F  { nombreLower: count }
 let _entregasCache   = {};
 let _entregasCacheTs = 0;
-const ENTREGAS_TTL   = 60 * 1000; // refresca cada 60 seg
+const ENTREGAS_TTL   = 60 * 1000;
 
-/**
- * Lee Pedidos!F (NOMBRE_DOMI) y cuenta filas por nombre exacto.
- * Resultado cacheado 60 segundos para no saturar la API.
- */
 async function cargarEntregasDesdeSheet() {
   if (Date.now() - _entregasCacheTs < ENTREGAS_TTL) return;
   try {
@@ -1261,14 +1441,18 @@ async function cargarEntregasDesdeSheet() {
     const authG  = new google.auth.GoogleAuth({ keyFile: './credentials.json', scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
     const client = await authG.getClient();
     const sheets = google.sheets({ version: 'v4', auth: client });
+    // Lee E(ESTADO) y P(NOMBRE_DOMI) — solo cuenta FINALIZADO
+    // Columnas E2:P = índice 0=E(ESTADO) ... índice 11=P(NOMBRE_DOMI)
     const res    = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEETS_ID,
-      range: 'Pedidos!P2:P',   // columna P = NOMBRE_DOMI, desde fila 2 (sin header)
+      range: 'Pedidos!E2:P',
     });
     const rows = res.data.values || [];
     const conteo = {};
     for (const r of rows) {
-      const nombre = (r[0] || '').toString().trim();
+      const estado = (r[0] || '').toString().trim().toUpperCase();
+      if (estado !== 'FINALIZADO') continue;
+      const nombre = (r[11] || '').toString().trim();
       if (!nombre) continue;
       const key = nombre.toLowerCase();
       conteo[key] = (conteo[key] || 0) + 1;
@@ -1283,10 +1467,8 @@ async function cargarEntregasDesdeSheet() {
 
 function statsDriverPool(nombre) {
   const ps = Object.values(pool).filter(p => p.estado === 'FINALIZADO' && p.domiciliario === nombre);
-  // Entregas históricas desde Pedidos!F (más confiable que pool en memoria)
   const key            = nombre.toLowerCase().trim();
   const entregasSheet  = _entregasCache[key] || 0;
-  // Evitar doble conteo: usar el mayor entre sheet y pool
   const entregas       = Math.max(entregasSheet, ps.length);
   return {
     entregas,
@@ -1303,8 +1485,8 @@ function tFmt(ms) {
   return mm > 0 ? `${h}h ${String(mm).padStart(2, '0')}min` : `${h}h`;
 }
 
-function buildCard(nombre, telegramId) {
-  cargarEntregasDesdeSheet().catch(() => {}); // refresh silencioso
+async function buildCard(nombre, telegramId) {
+  await cargarEntregasDesdeSheet().catch(() => {});
   const d = drivers[telegramId];
   const ahora = Date.now();
   const online = !!d;
@@ -1337,7 +1519,7 @@ function buildCard(nombre, telegramId) {
     return { text: cardText, gmapsLink: gmOffline };
   }
 
-  const enRuta = !!d.pedidoActual;
+  const enRuta = (d.pedidosActivos || []).length > 0;
   const sesionMs = d.loginTs ? (ahora - d.loginTs) : 0;
   const actMs = d.lastActivity ? (ahora - d.lastActivity) : sesionMs;
   const horaLogin = d.loginTs ? moment(d.loginTs).tz('America/Bogota').format('hh:mm A') : '—';
@@ -1386,16 +1568,22 @@ function buildCard(nombre, telegramId) {
       `    <i>La ruta parte desde la sede</i>\n`) +
     `\n`;
 
-  if (enRuta && pedido) {
-    cardText +=
-      `🛵 <b>Pedido en ruta</b>\n` +
-      `    🆔 ID:         <b>${d.pedidoActual}</b>\n` +
-      `    🏪 Negocio:    <b>${negocio}</b>\n` +
-      `    👤 Cliente:    <b>${cliente}</b>\n` +
-      `    📱 Teléfono:   <b>${telCliente}</b>\n` +
-      `    📍 Destino:    <b>${destino}</b>\n` +
-      `    💵 Domicilio:  <b>${valDom}</b>\n` +
-      `    ⏰ Tomado a las <b>${horaTomo}</b>\n\n`;
+  if (enRuta) {
+    const activos = d.pedidosActivos || [];
+    activos.forEach((pid, idx) => {
+      const pp = pool[pid] || null;
+      if (!pp) return;
+      const valD = pp.precioDomicilio ? COP(parsearTotal(pp.precioDomicilio) || pp.precioDomicilio) : '—';
+      cardText +=
+        `🛵 <b>Pedido ${idx + 1} de ${activos.length}</b>\n` +
+        `    🆔 ID:         <b>${pid}</b>\n` +
+        `    🏪 Negocio:    <b>${pp.negocioNombre || '—'}</b>\n` +
+        `    👤 Cliente:    <b>${pp.cliente || '—'}</b>\n` +
+        `    📱 Teléfono:   <b>${pp.telefono || '—'}</b>\n` +
+        `    📍 Destino:    <b>${pp.direccionCliente || pp.direccion || '—'}</b>\n` +
+        `    💵 Domicilio:  <b>${valD}</b>\n` +
+        `    ⏰ Tomado a las <b>${pp.horaTomo || '—'}</b>\n\n`;
+    });
   } else {
     const pendCount = Object.values(pool).filter(p => p.estado === 'PENDIENTE').length;
     cardText +=
@@ -1415,7 +1603,7 @@ function buildCard(nombre, telegramId) {
 }
 
 async function buildLista() {
-  await cargarEntregasDesdeSheet(); // refresca conteo desde Pedidos!F
+  await cargarEntregasDesdeSheet();
   const todosSheet = await getSheetDrivers();
   const idsOnline = new Set(Object.keys(drivers).map(String));
   const ahora = moment().tz('America/Bogota').format('hh:mm A');
@@ -1435,7 +1623,7 @@ async function buildLista() {
     `<i>Toca un nombre para ver el detalle</i>`;
 
   const online = Object.entries(drivers).map(([id, d]) => {
-    const badge = d.pedidoActual ? '🔵' : '🟢';
+    const badge = (d.pedidosActivos || []).length > 0 ? '🔵' : '🟢';
     return { telegramId: id, nombre: d.nombre, badge };
   });
 
@@ -1470,11 +1658,11 @@ bot.action(/^drv_det_(.+)$/, async ctx => {
   const sheet = _sheetCache.find(x => x.telegramId === telegramId);
   const nombre = d?.nombre || sheet?.nombre || 'Desconocido';
 
-  const { text: cardText, gmapsLink } = buildCard(nombre, telegramId);
+  const { text: cardText, gmapsLink } = await buildCard(nombre, telegramId);
 
   const btns = [];
   if (d) {
-    if (d.pedidoActual) {
+    if ((d.pedidosActivos || []).length > 0) {
       const p = pool[d.pedidoActual];
       const dLat = d.lat || null;
       const dLng = d.lng || null;
@@ -1533,30 +1721,76 @@ async function manejarMensajeMasivo(ctx, uid, txt) {
 // ══════════════════════════════════════════════════════════════════════════════
 // TRABAJA CON NOSOTROS
 // ══════════════════════════════════════════════════════════════════════════════
+function saludoHora() {
+  const h = moment().tz('America/Bogota').hour();
+  if (h >= 6  && h < 12) return 'Buenos días';
+  if (h >= 12 && h < 18) return 'Buenas tardes';
+  return 'Buenas noches';
+}
+
+function linkWhatsAppWill(nombre) {
+  const saludo  = saludoHora();
+  const numero  = process.env.WHATSAPP_WILL || '573012198994';
+  const mensaje = encodeURIComponent(
+    `${saludo} Don Will, mi nombre es ${nombre}. ` +
+    `Acabo de enviar mi postulación para ser parte del equipo de Domicilios WIL ` +
+    `y me gustaría agendar una reunión con usted para iniciar el proceso. ` +
+    `Muchas gracias por la oportunidad 🛵`
+  );
+  return `https://wa.me/${numero}?text=${mensaje}`;
+}
+
 async function manejarPostulante(ctx, uid, txt) {
   const s = espPostulante[uid];
   if (!s) return;
   switch (s.paso) {
-    case 'nombre':
-      if (txt.length < 3) return ctx.reply(`❌ Nombre muy corto.\nEscribe tu <b>nombre completo</b>:`, { parse_mode: 'HTML' });
-      s.nombre = txt; s.paso = 'cedula';
-      return ctx.reply(`✅ Nombre: <b>${txt}</b>\n\n1️⃣ <b>Cédula de ciudadanía:</b>\n<i>Solo el número, sin puntos ni espacios.</i>`, { parse_mode: 'HTML' });
+    case 'nombre': {
+      if (txt.length < 3) return ctx.reply(`❌ Nombre muy corto. Escribe tu <b>nombre completo</b>:`, { parse_mode: 'HTML' });
+      s.nombre = txt;
+      s.paso   = 'cedula';
+      return ctx.reply(
+        `✅ <b>${txt}</b>, ¡bienvenido!\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `<b>Paso 2 de 5</b> — Cédula 🪪\n\n` +
+        `Escribe tu número de cédula\n<i>(solo dígitos, sin puntos ni espacios)</i>`,
+        { parse_mode: 'HTML' }
+      );
+    }
     case 'cedula': {
       const ced = txt.replace(/\D/g, '');
-      if (ced.length < 6) return ctx.reply(`❌ Cédula inválida. Escribe solo los números (mín. 6 dígitos):`);
-      s.cedula = ced; s.paso = 'telefono';
-      return ctx.reply(`✅ Cédula: <b>${ced}</b>\n\n2️⃣ <b>Número de teléfono:</b>\n<i>Ej: 3001234567</i>`, { parse_mode: 'HTML' });
+      if (ced.length < 6) return ctx.reply(`❌ Número inválido. Escribe solo los dígitos de tu cédula:`);
+      s.cedula = ced;
+      s.paso   = 'telefono';
+      return ctx.reply(
+        `✅ Cédula registrada\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `<b>Paso 3 de 5</b> — Teléfono 📱\n\n` +
+        `Escribe tu número de celular\n<i>Ej: 3001234567</i>`,
+        { parse_mode: 'HTML' }
+      );
     }
     case 'telefono': {
       const tel = txt.replace(/\D/g, '');
-      if (tel.length < 7) return ctx.reply(`❌ Teléfono inválido. Escribe el número completo:`);
-      s.telefono = tel; s.paso = 'licencia';
-      return ctx.reply(`✅ Teléfono: <b>${tel}</b>\n\n3️⃣ <b>Foto de la LICENCIA de conducción</b> 📷\n<i>Envía una foto clara.</i>`, { parse_mode: 'HTML' });
+      if (tel.length < 7) return ctx.reply(`❌ Número inválido. Escribe tu celular completo:`);
+      s.telefono = tel;
+      s.paso     = 'licencia';
+      return ctx.reply(
+        `✅ Teléfono registrado\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `<b>Paso 4 de 5</b> — Documentos 📷\n\n` +
+        `📸 <b>Foto 1/3 — Licencia de conducción</b>\n` +
+        `Envía una foto clara donde se lea bien tu licencia (vigente).`,
+        { parse_mode: 'HTML' }
+      );
     }
     default:
       if (['licencia', 'tecnomecanica', 'seguro'].includes(s.paso)) {
-        const nombres = { licencia: '3️⃣ licencia', tecnomecanica: '4️⃣ tecnomecánica', seguro: '5️⃣ SOAT' };
-        return ctx.reply(`📷 Envíame una <b>foto</b> de tu ${nombres[s.paso]}.\n<i>Adjunta la imagen directamente en el chat.</i>`, { parse_mode: 'HTML' });
+        const msgs = {
+          licencia:      `📸 Envíame la foto de tu <b>Licencia de conducción</b> (vigente).`,
+          tecnomecanica: `📸 Envíame la foto de la <b>Tecnomecánica</b> vigente de tu moto.`,
+          seguro:        `📸 Envíame la foto del <b>SOAT</b> vigente de tu moto.`,
+        };
+        return ctx.reply(msgs[s.paso] + `\n<i>Adjunta la imagen directamente aquí.</i>`, { parse_mode: 'HTML' });
       }
   }
 }
@@ -1567,22 +1801,44 @@ async function manejarFotoPostulante(ctx, uid) {
   const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
   switch (s.paso) {
     case 'licencia':
-      s.fotoLicencia = fileId; s.paso = 'tecnomecanica';
-      return ctx.reply(`✅ Licencia recibida 📷\n\n4️⃣ <b>Foto de la TECNOMECÁNICA vigente</b> 📷`, { parse_mode: 'HTML' });
-    case 'tecnomecanica':
-      s.fotoTecnomecanica = fileId; s.paso = 'seguro';
-      return ctx.reply(`✅ Tecnomecánica recibida 📷\n\n5️⃣ <b>Foto del SOAT vigente</b> 📷`, { parse_mode: 'HTML' });
-    case 'seguro':
-      s.fotoSeguro = fileId; s.paso = 'confirmando';
+      s.fotoLicencia = fileId;
+      s.paso         = 'tecnomecanica';
       return ctx.reply(
-        `✅ SOAT recibido 📷\n\n━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `📋 <b>RESUMEN DE TU POSTULACIÓN</b>\n━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `🪪 Nombre: <b>${s.nombre}</b>\n🪪 Cédula: <b>${s.cedula}</b>\n📱 Teléfono: <b>${s.telefono}</b>\n` +
-        `📷 Licencia: ✅\n📷 Tecnomecánica: ✅\n📷 SOAT: ✅\n━━━━━━━━━━━━━━━━━━━━━━\n\n¿Todos los datos son correctos?`,
+        `✅ <b>Licencia recibida</b> 📷\n\n` +
+        `📸 <b>Foto 2/3 — Tecnomecánica</b>\n` +
+        `Ahora envía la foto de la tecnomecánica vigente de tu moto.`,
+        { parse_mode: 'HTML' }
+      );
+    case 'tecnomecanica':
+      s.fotoTecnomecanica = fileId;
+      s.paso              = 'seguro';
+      return ctx.reply(
+        `✅ <b>Tecnomecánica recibida</b> 📷\n\n` +
+        `📸 <b>Foto 3/3 — SOAT</b>\n` +
+        `Ya casi terminas. Envía la foto del SOAT vigente de tu moto.`,
+        { parse_mode: 'HTML' }
+      );
+    case 'seguro':
+      s.fotoSeguro = fileId;
+      s.paso       = 'confirmando';
+      return ctx.reply(
+        `✅ <b>SOAT recibido</b> 📷\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `<b>Paso 5 de 5</b> — Confirmación ✅\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `Revisa que todo esté correcto:\n\n` +
+        `👤 Nombre:        <b>${s.nombre}</b>\n` +
+        `🪪 Cédula:        <b>${s.cedula}</b>\n` +
+        `📱 Teléfono:      <b>${s.telefono}</b>\n` +
+        `📷 Licencia:      ✅\n` +
+        `📷 Tecnomecánica: ✅\n` +
+        `📷 SOAT:          ✅\n\n` +
+        `¿Todo correcto? Toca <b>Enviar postulación</b> para finalizar.`,
         {
-          parse_mode: 'HTML', ...Markup.inlineKeyboard([
+          parse_mode: 'HTML',
+          ...Markup.inlineKeyboard([
             [Markup.button.callback('✅ Enviar postulación', 'enviar_postulacion')],
-            [Markup.button.callback('❌ Cancelar', 'cancelar_postulacion')]
+            [Markup.button.callback('❌ Cancelar',           'cancelar_postulacion')],
           ])
         }
       );
@@ -1599,7 +1855,7 @@ bot.action('enviar_postulacion', async ctx => {
     await ctx.editMessageText(`⏳ <b>Enviando tu postulación...</b>`, {
       parse_mode: 'HTML', reply_markup: { inline_keyboard: [] }
     });
-  } catch (_) { }
+  } catch (_) {}
 
   try {
     await registrarPostulante({
@@ -1610,11 +1866,12 @@ bot.action('enviar_postulacion', async ctx => {
   } catch (e) {
     console.error('registrarPostulante error:', e.message);
     return ctx.reply(
-      `❌ <b>Error al guardar.</b>\nContáctanos: 📱 <b>${process.env.WHATSAPP_NUMERO || '3XXXXXXXXX'}</b>`,
+      `❌ <b>Error al guardar.</b>\nContáctanos: 📱 <b>${process.env.WHATSAPP_NUMERO || '3122006100'}</b>`,
       { parse_mode: 'HTML', ...menuPublico() }
     );
   }
 
+  const datosPostulante = { ...s };
   delete espPostulante[uid];
   const fecha = moment().tz('America/Bogota').format('DD/MM/YYYY hh:mm A');
 
@@ -1623,69 +1880,91 @@ bot.action('enviar_postulacion', async ctx => {
     const esIdValido = /^-?\d+$/.test(CANAL_DOM.trim());
     if (!esIdValido) {
       console.error(`❌ CANAL_DOMICILIARIOS_ID="${CANAL_DOM}" no es un ID numérico válido.`);
-      console.error(`   Los links t.me/+xxx o @username NO sirven para sendMessage.`);
-      console.error(`   Solución: agrega el bot al canal, luego envía un mensaje y visita:`);
-      console.error(`   https://api.telegram.org/bot${process.env.BOT_TOKEN}/getUpdates`);
-      console.error(`   Busca "chat":{"id": -XXXXXXXXXX} y usa ese número en .env`);
     } else {
-    const msgCanal =
-      `🆕 <b>NUEVA POSTULACIÓN</b>\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `👤 <b>${s.nombre}</b>\n` +
-      `🪪 Cédula:    <code>${s.cedula}</code>\n` +
-      `📱 Teléfono:  <code>${s.telefono}</code>\n` +
-      `🆔 Telegram:  <code>${uid}</code>\n` +
-      `📅 ${fecha}\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `<i>📊 Datos completos en Google Sheets → hoja domiciliarios_nuevos</i>`;
+      const msgCanal =
+        `🆕 <b>NUEVA POSTULACIÓN</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `👤 <b>${datosPostulante.nombre}</b>\n` +
+        `🪪 Cédula:   <code>${datosPostulante.cedula}</code>\n` +
+        `📱 Teléfono: <code>${datosPostulante.telefono}</code>\n` +
+        `🆔 Telegram: <code>${uid}</code>\n` +
+        `📅 ${fecha}\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `<i>📊 Datos completos en Google Sheets → hoja domiciliarios_nuevos</i>`;
+      try {
+        await bot.telegram.sendMessage(CANAL_DOM, msgCanal, { parse_mode: 'HTML' });
+      } catch (e) { console.error('Canal DOM mensaje:', e.message); }
 
-    try {
-      await bot.telegram.sendMessage(CANAL_DOM, msgCanal, { parse_mode: 'HTML' });
-    } catch (e) { console.error('Canal DOM mensaje:', e.message); }
-
-    const mediaGroup = [
-      { type: 'photo', media: s.fotoLicencia,      caption: `🪪 Licencia — ${s.nombre}` },
-      { type: 'photo', media: s.fotoTecnomecanica, caption: `🔧 Tecnomecánica — ${s.nombre}` },
-      { type: 'photo', media: s.fotoSeguro,         caption: `🛡️ SOAT — ${s.nombre}` }
-    ];
-
-    try {
-      await bot.telegram.sendMediaGroup(CANAL_DOM, mediaGroup);
-    } catch (e) {
-      console.error('Canal DOM álbum fotos:', e.message);
-      for (const [label, fileId] of [
-        ['🪪 Licencia', s.fotoLicencia],
-        ['🔧 Tecnomecánica', s.fotoTecnomecanica],
-        ['🛡️ SOAT', s.fotoSeguro]
-      ]) {
-        await bot.telegram.sendPhoto(CANAL_DOM, fileId, { caption: `${label} — ${s.nombre}` }).catch(() => {});
+      const mediaGroup = [
+        { type: 'photo', media: datosPostulante.fotoLicencia,      caption: `🪪 Licencia — ${datosPostulante.nombre}` },
+        { type: 'photo', media: datosPostulante.fotoTecnomecanica, caption: `🔧 Tecnomecánica — ${datosPostulante.nombre}` },
+        { type: 'photo', media: datosPostulante.fotoSeguro,        caption: `🛡️ SOAT — ${datosPostulante.nombre}` },
+      ];
+      try {
+        await bot.telegram.sendMediaGroup(CANAL_DOM, mediaGroup);
+      } catch (e) {
+        console.error('Canal DOM álbum fotos:', e.message);
+        for (const [label, fileId] of [
+          ['🪪 Licencia',      datosPostulante.fotoLicencia],
+          ['🔧 Tecnomecánica', datosPostulante.fotoTecnomecanica],
+          ['🛡️ SOAT',         datosPostulante.fotoSeguro],
+        ]) {
+          await bot.telegram.sendPhoto(CANAL_DOM, fileId, { caption: `${label} — ${datosPostulante.nombre}` }).catch(() => {});
+        }
       }
-    }
     }
   }
 
   const adminMsg =
     `🆕 <b>NUEVA POSTULACIÓN</b>\n━━━━━━━━━━━━━━━━━━━━━━\n` +
-    `👤 <b>${s.nombre}</b>\n🪪 ${s.cedula}\n📱 ${s.telefono}\n` +
+    `👤 <b>${datosPostulante.nombre}</b>\n🪪 ${datosPostulante.cedula}\n📱 ${datosPostulante.telefono}\n` +
     `🆔 Telegram: <code>${uid}</code>\n📅 ${fecha}`;
-
   for (const adminId of ADMIN_IDS) {
-    bot.telegram.sendMessage(adminId, adminMsg, { parse_mode: 'HTML' }).catch(() => { });
+    bot.telegram.sendMessage(adminId, adminMsg, { parse_mode: 'HTML' }).catch(() => {});
   }
 
+  const urlWill = linkWhatsAppWill(datosPostulante.nombre);
   return ctx.reply(
     `🎉 <b>¡Postulación enviada con éxito!</b>\n\n` +
-    `Uno de nuestros asesores se <b>contactará pronto</b> al <b>${s.telefono}</b>. 🛵\n\n` +
-    `<i>¡Gracias por querer ser parte del equipo WIL!</i>`,
-    { parse_mode: 'HTML', ...menuPublico() }
+    `Hola <b>${datosPostulante.nombre}</b>, tus documentos ya están en revisión. 🛵\n\n` +
+    `El siguiente paso es agendar una reunión con Don Will para conocerte y comenzar.\n\n` +
+    `Toca el botón para escribirle directamente por WhatsApp 👇`,
+    {
+      parse_mode: 'HTML',
+      ...Markup.inlineKeyboard([
+        [Markup.button.url('📲 Agendar cita con Will 🛵', urlWill)],
+      ])
+    }
+  );
+});
+
+bot.action('iniciar_postulacion', async ctx => {
+  const uid = ctx.from.id;
+  await ctx.answerCbQuery();
+  delete espPostulante[uid];
+  espPostulante[uid] = { paso: 'nombre' };
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch (_) {}
+  return ctx.reply(
+    `¡Perfecto! Vamos paso a paso, es muy sencillo 😊\n\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `<b>Paso 1 de 5</b> — Tu nombre 👤\n\n` +
+    `Escribe tu <b>nombre completo</b> como aparece en la cédula:`,
+    { parse_mode: 'HTML' }
   );
 });
 
 bot.action('cancelar_postulacion', async ctx => {
+  const nombre = ctx.from.first_name || 'amigo';
   delete espPostulante[ctx.from.id];
-  await ctx.answerCbQuery('❌ Cancelado');
-  try { await ctx.editMessageText(`❌ <b>Postulación cancelada.</b>`, { parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } }); } catch (_) { }
-  return ctx.reply('Puedes comenzar de nuevo cuando quieras. /start', menuPublico());
+  await ctx.answerCbQuery('¡Hasta pronto!');
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch (_) {}
+  return ctx.reply(
+    `¡Está bien, ${nombre}! 😊\n\n` +
+    `No hay ningún problema, tómate el tiempo que necesites.\n` +
+    `Cuando te sientas listo, con gusto te acompañamos en el proceso. 🛵\n\n` +
+    `¡Que tengas un excelente día!`,
+    { parse_mode: 'HTML', ...menuPublico() }
+  );
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1703,6 +1982,8 @@ function _normalizarPedido(p) {
     direccion: p.direccionCliente || p.direccion || '—',
     barrio: p.direccionCliente || p.direccion || '—',
     origen: p.origen || null,
+    notaSheet: p.notaSheet || p.nota || p.referencia || '',
+    referencia: p.referencia || p.nota || '',
     productos: p.productos || '—',
     total: parsearTotal(p.total),
     precioDomicilio: parsearTotal(p.precioDomicilio) || 0,
@@ -1775,7 +2056,6 @@ async function mostrarFinalizados(ctx) {
   const hoy = moment().tz('America/Bogota').format('DD/MM/YYYY');
   const todos = (await getPedidos('FINALIZADO').catch(() => [])).filter(p => p.fecha === hoy);
 
-  // Domi solo ve los suyos — admin ve todo
   const ps = esAdmin(uid)
     ? todos
     : todos.filter(p => (p.domiciliario || '').toLowerCase().trim() === (drivers[uid]?.nombre || '').toLowerCase().trim());
@@ -1812,9 +2092,10 @@ bot.action(/^tomar_(.+)$/, async ctx => {
 
   const d = drivers[uid];
   if (!d && !esAdmin(uid)) return ctx.reply('❌ Autentícate primero. Usa /start');
-  const domiciliario = d || { nombre: 'Admin', pedidoActual: null };
+  const domiciliario = d || { nombre: 'Admin', pedidoActual: null, pedidosActivos: [] };
 
-  if (domiciliario.pedidoActual) return ctx.answerCbQuery('⚠️ Ya tienes un pedido activo. Entrégalo primero.', true);
+  // Máximo 2 pedidos activos simultáneos
+  if (d && !_tieneCapacidad(uid)) return ctx.answerCbQuery('⚠️ Ya tienes 2 pedidos activos. Entrega uno primero.', true);
   if (pool[id] && pool[id].estado !== 'PENDIENTE') return ctx.answerCbQuery('⚠️ Ese pedido ya fue tomado.', true);
 
   if (!pool[id]) {
@@ -1827,7 +2108,8 @@ bot.action(/^tomar_(.+)$/, async ctx => {
   pool[id].estado = 'EN_PROCESO';
   pool[id].domiciliario = domiciliario.nombre;
   pool[id].horaTomo = moment().tz('America/Bogota').format('hh:mm A');
-  if (drivers[uid]) { drivers[uid].pedidoActual = id; drivers[uid].lastActivity = Date.now(); }
+  if (drivers[uid]) { _agregarPedidoActivo(uid, id); drivers[uid].lastActivity = Date.now(); }
+  console.log(`🛵 Pedido tomado: ${id} → ${domiciliario.nombre} ⏰ ${pool[id].horaTomo}`);
 
   await asignarDomiciliario(id, domiciliario.nombre).catch(e => console.error('asignarDomiciliario:', e.message));
 
@@ -1844,29 +2126,28 @@ bot.action(/^tomar_(.+)$/, async ctx => {
     );
   } catch (e) { console.error('edit tomar:', e.message); }
 
-  // Notificar al cliente con foto del domi (features)
-  if (p.clienteId) {
-    const telDomi = drivers[uid]?.telefono || '';
-    await features.notificarClientePedidoTomado(bot, p.clienteId, p, domiciliario.nombre, telDomi, p.horaTomo);
+  const telDomi = drivers[uid]?.telefono || '';
 
-    // Activar ETA si el cliente compartió ubicación
+  // Inyectar entregas del sheet en p para que features las muestre en la card
+  await cargarEntregasDesdeSheet().catch(() => {});
+  const _statsNotif = statsDriverPool(domiciliario.nombre);
+  p._entregasCount = _statsNotif.entregas;
+
+  // Cliente — misma llamada exacta que el canal (que sí funciona con foto)
+  if (p.clienteId) {
+    features.notificarClientePedidoTomado(
+      bot, p.clienteId, p, domiciliario.nombre, telDomi, p.horaTomo
+    ).catch(() => {});
+
     if (p.latCliente && p.lngCliente && dLat && dLng) {
       features.activarETA(bot, p.clienteId, id, dLat, dLng, p.latCliente, p.lngCliente).catch(() => {});
     }
   }
 
-  // Notificar canal WIL
+  // Canal — idéntico
   if (process.env.CANAL_PEDIDOS_ID) {
-    const dirCanal = p.direccionCliente || p.direccion || '—';
-    bot.telegram.sendMessage(process.env.CANAL_PEDIDOS_ID,
-      `🔵 <b>TOMADO — ${id}</b>\n━━━━━━━━━━━━━━━━━━\n` +
-      `🛵 <b>${domiciliario.nombre}</b>\n` +
-      `👤 ${p.cliente || '—'}  📱 ${p.telefono || '—'}\n` +
-      `📍 <a href="${gmapsLinkDir(dirCanal)}">${dirCanal}</a>\n` +
-      `🏪 ${p.negocioNombre || '—'}\n` +
-      `💵 Domicilio: <b>${COP(p.precioDomicilio || 0)}</b>\n` +
-      `⏰ ${p.horaTomo}`,
-      { parse_mode: 'HTML', disable_web_page_preview: true }
+    features.notificarClientePedidoTomado(
+      bot, process.env.CANAL_PEDIDOS_ID, p, domiciliario.nombre, telDomi, p.horaTomo
     ).catch(() => {});
   }
 
@@ -1885,7 +2166,6 @@ bot.action(/^factura_(.+)$/, async ctx => {
   const uid = ctx.from.id;
   const chatId = ctx.callbackQuery.message.chat.id;
   const msgId = ctx.callbackQuery.message.message_id;
-  // Mostrar spinner inmediato al cliente mientras procesa
   await ctx.answerCbQuery('⏳ Cargando factura...', false);
 
   if (!drivers[uid] && !esAdmin(uid)) return ctx.reply('❌ Autentícate primero.');
@@ -1895,8 +2175,8 @@ bot.action(/^factura_(.+)$/, async ctx => {
   if (!p || p.estado === 'PENDIENTE') {
     const domiciliario = drivers[uid] || { nombre: 'Admin', pedidoActual: null };
 
-    if (drivers[uid]?.pedidoActual && drivers[uid].pedidoActual !== id) {
-      return ctx.answerCbQuery('⚠️ Ya tienes un pedido activo.', true);
+    if (drivers[uid] && !_tieneCapacidad(uid) && !_pedidosActivosDomi(uid).includes(id)) {
+      return ctx.answerCbQuery('⚠️ Ya tienes 2 pedidos activos.', true);
     }
 
     if (!p) {
@@ -1910,7 +2190,7 @@ bot.action(/^factura_(.+)$/, async ctx => {
     p.estado = 'EN_PROCESO';
     p.domiciliario = domiciliario.nombre;
     p.horaTomo = moment().tz('America/Bogota').format('hh:mm A');
-    if (drivers[uid]) { drivers[uid].pedidoActual = id; drivers[uid].lastActivity = Date.now(); }
+    if (drivers[uid]) { _agregarPedidoActivo(uid, id); drivers[uid].lastActivity = Date.now(); }
     await asignarDomiciliario(id, domiciliario.nombre).catch(e => console.error('asignarDomiciliario factura:', e.message));
 
     if (process.env.CANAL_PEDIDOS_ID) {
@@ -1964,7 +2244,6 @@ bot.action(/^factura_(.+)$/, async ctx => {
 bot.on('photo', async ctx => {
   const uid = ctx.from.id;
 
-  // Foto de perfil del domi (caption "mi foto")
   const caption = (ctx.message.caption || '').toLowerCase().trim();
   if (drivers[uid] && (caption === 'mi foto' || caption === 'foto perfil')) {
     const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
@@ -1978,11 +2257,18 @@ bot.on('photo', async ctx => {
   if (espPostulante[uid] && ['licencia', 'tecnomecanica', 'seguro'].includes(espPostulante[uid].paso)) {
     await manejarFotoPostulante(ctx, uid); return;
   }
+
+  // ── PARCHE 2: guard de sesión antes de procesar factura ───────────────────
   if (espFacturaDrv[uid]) {
+    if (!drivers[uid] && !esAdmin(uid)) {
+      delete espFacturaDrv[uid];
+      return ctx.reply('❌ Sesión cerrada. Usa /start para autenticarte.', menuPublico());
+    }
     console.log(`📸 Foto recibida de domi ${uid} — procesando factura pedido ${espFacturaDrv[uid].pedidoId}`);
     await procesarFacturaDomiciliario(ctx, uid);
     return;
   }
+
   console.log(`📸 Foto recibida de uid=${uid} — espFacturaDrv: ${JSON.stringify(espFacturaDrv[uid])} | drivers: ${!!drivers[uid]} | espPostulante: ${!!espPostulante[uid]}`);
   if (espComprobanteCliente[uid]) { await procesarComprobanteCliente(ctx, uid); return; }
   const s = S[uid];
@@ -2226,11 +2512,17 @@ bot.action(/^corregir_total_(.+)$/, async ctx => {
   );
 });
 
+// ── PARCHE 3: guard de sesión al inicio de manejarTotalManual ────────────────
 async function manejarTotalManual(ctx, uid, txt) {
+  if (!drivers[uid] && !esAdmin(uid)) {
+    delete espTotalManual[uid];
+    return ctx.reply('❌ Sesión cerrada. Usa /start para autenticarte.', menuPublico());
+  }
+
   const { pedidoId, precioDomicilio, clienteId, fileId, pedido } = espTotalManual[uid];
-  const raw = txt.replace(/[^0-9.,]/g, '').trim();
-  const valor = parseFloat(raw.replace(/\./g, '').replace(/,/g, '.'));
-  if (!raw || isNaN(valor) || valor <= 0) return ctx.reply(`❌ Valor inválido. Escribe solo el número:\n<b>87500</b>`, { parse_mode: 'HTML' });
+  // parsearTotal maneja todos los formatos colombianos: 126000 / 126.000 / 126,000
+  const valor = parsearTotal(txt);
+  if (!valor || valor <= 0) return ctx.reply(`❌ Valor inválido. Escribe solo el número:\n<b>87500</b>`, { parse_mode: 'HTML' });
   delete espTotalManual[uid];
 
   const esCopa = esZonaCopacabana(pedido?.zona || pedido?.municipio || '', pedido?.barrio || '');
@@ -2342,7 +2634,7 @@ bot.action(/^entregar_(.+)$/, async ctx => {
   const uid = ctx.from.id;
   await ctx.answerCbQuery();
   if (!drivers[uid] && !esAdmin(uid)) return ctx.reply('❌ Autentícate primero.');
-  if (drivers[uid] && drivers[uid].pedidoActual !== id && !esAdmin(uid)) {
+  if (drivers[uid] && !_pedidosActivosDomi(uid).includes(id) && !esAdmin(uid)) {
     return ctx.answerCbQuery('⚠️ No puedes finalizar ese pedido.', true);
   }
 
@@ -2350,9 +2642,9 @@ bot.action(/^entregar_(.+)$/, async ctx => {
   try { hora = await marcarEntregado(id); } catch (e) { console.error('marcarEntregado:', e.message); }
 
   if (pool[id]) pool[id].estado = 'FINALIZADO';
-  if (drivers[uid]) drivers[uid].pedidoActual = null;
+  if (drivers[uid]) _removerPedidoActivo(uid, id);
+  console.log(`✅ Pedido entregado: ${id} por ${drivers[uid]?.nombre || 'Admin'} ⏰ ${hora || '—'}`);
 
-  // Desactivar ETA
   features.desactivarETA(bot, id).catch(() => {});
 
   let p = pool[id];
@@ -2403,7 +2695,6 @@ bot.action(/^entregar_(.+)$/, async ctx => {
     try { await ctx.editMessageText(resumenDriver, { parse_mode: 'HTML', disable_web_page_preview: true, reply_markup: { inline_keyboard: [] } }); } catch (_) { }
   }
 
-  // Notificar al cliente + encuesta mejorada
   if (p?.clienteId) {
     const dirCliente = p.direccionCliente || p.direccion || '—';
     const msgEntregado =
@@ -2470,7 +2761,8 @@ bot.action(/^cancelar_order_(.+)$/, async ctx => {
   await ctx.answerCbQuery();
   if (!esAdmin(uid) && !esDriver(uid)) return;
   if (pool[id]) pool[id].estado = 'CANCELADO';
-  if (drivers[uid]?.pedidoActual === id) drivers[uid].pedidoActual = null;
+  if (drivers[uid]) _removerPedidoActivo(uid, id);
+  console.log(`❌ Pedido cancelado: ${id} por uid=${uid}`);
   try { if (typeof cancelarPedido === 'function') await cancelarPedido(id); } catch (_) { }
   const clienteId = pool[id]?.clienteId;
   if (clienteId) {
@@ -2500,7 +2792,7 @@ async function mostrarOpcionesPedido(ctx) {
   delete S[ctx.from.id];
   return ctx.reply('¿De dónde quieres pedir?', Markup.inlineKeyboard([
     [Markup.button.callback('🏪 Domicilios WIL (general)', 'neg_wil')],
-    [Markup.button.callback('💊 FarmaExpertos Copacabana', 'neg_expertos')],
+    [Markup.button.callback('💊 Drogueria FarmaExpertos Copacabana', 'neg_expertos')],
     [Markup.button.callback('🏥 Drogueria Central Copacabana', 'neg_central')],
     [Markup.button.callback('📦 Paquetería', 'paqueteria')]
   ]));
@@ -2569,6 +2861,7 @@ async function procesarPaquete(ctx, uid) {
     direccion: s.barrioDestino || s.direccionDestino,
     precioDomicilio: dom, totalFinal: dom
   });
+  console.log(`📦 Nuevo paquete: ${id} | ${s.nombre} | ${s.origenBarrio} → ${s.barrioDestino || s.direccionDestino} | ${COP(dom)}`);
 
   await ctx.reply(
     `✅ <b>¡PAQUETE REGISTRADO!</b>\n\n🆔 <b>${id}</b>\n👤 ${s.nombre}  📱 ${s.telefono}\n` +
@@ -2600,9 +2893,26 @@ async function procesarPaquete(ctx, uid) {
     createdAt: Date.now()
   };
 
+  // Notificar al canal de pedidos
+  if (process.env.CANAL_PEDIDOS_ID) {
+    const msgCanal =
+      `📦 <b>NUEVO PAQUETE — ${id}</b>\n` +
+      `━━━━━━━━━━━━━━━━━━\n` +
+      `👤 ${s.nombre}  📱 ${s.telefono}\n` +
+      `🔄 Recoge en: <b>${s.origenBarrio}</b>\n` +
+      (s.puntoReferenciaOrigen ? `📌 Ref recogida: ${s.puntoReferenciaOrigen}\n` : '') +
+      `📍 Entrega en: <b>${s.barrioDestino || s.direccionDestino}</b>\n` +
+      (s.puntoReferenciaDestino ? `📌 Ref entrega: ${s.puntoReferenciaDestino}\n` : '') +
+      `📦 ${s.tipoPaquete}${s.pesoAprox ? ' (~' + s.pesoAprox + ')' : ''}: ${s.descripcion || '—'}\n` +
+      `━━━━━━━━━━━━━━━━━━\n` +
+      `🛵 Envío: <b>${COP(dom)}</b>\n` +
+      `⏰ ${moment().tz('America/Bogota').format('hh:mm A')}`;
+    bot.telegram.sendMessage(process.env.CANAL_PEDIDOS_ID, msgCanal, { parse_mode: 'HTML' }).catch(() => {});
+  }
+
   const { pend } = await getContadores();
   for (const [did, d] of Object.entries(drivers)) {
-    if (!d.pedidoActual && features.estaEnTurno(did)) {
+    if ((d.pedidosActivos || []).length < 2 && features.estaEnTurno(did)) {
       bot.telegram.sendMessage(did,
         `📦 <b>Nuevo paquete</b>\n🆕 <b>${id}</b>\n👤 ${s.nombre}  📱 ${s.telefono}\n` +
         `🔄 Recoge en: ${s.origenBarrio}\n📍 Entrega en: ${s.barrioDestino || s.direccionDestino}\n` +
@@ -2620,7 +2930,7 @@ async function procesarPaquete(ctx, uid) {
 // ══════════════════════════════════════════════════════════════════════════════
 const NEGOCIOS = {
   wil: { nombre: '🏪 Domicilios WIL', tienda: null },
-  expertos: { nombre: '💊 Drogueria Farma Expertos', tienda: 'EXPERTOS' },
+  expertos: { nombre: '💊 Drogueria FarmaExpertos', tienda: 'EXPERTOS' },
   central: { nombre: '🏥 Drogueria Central', tienda: 'CENTRAL' }
 };
 
@@ -2864,6 +3174,7 @@ async function manejarSesionCliente(ctx, uid, txt) {
       s.paqPeq = r.paqPeq || 0;
       s.paqMed = r.paqMed || 0;
       s.paqGran = r.paqGran || 0;
+      s.notaSheet = r.nota || dirRefSheet || ''; // referencia del sheet para la card
       if (s.negocio === 'wil') {
         s.paso = 'presupuesto';
         return ctx.reply(
@@ -2887,7 +3198,36 @@ async function manejarSesionCliente(ctx, uid, txt) {
 
     case 'pedido_libre': {
       await ctx.reply('🤖 Analizando tu pedido...');
-      const items = await extraerProductosIA(txt);
+      let items = await extraerProductosIA(txt);
+
+      // Parser local de respaldo: si la IA devuelve menos ítems de los
+      // que el texto sugiere, extraemos los faltantes con regex
+      const _parsearItemLocal = rawTxt => {
+        const resultados = [];
+        // separa por comas, " y ", " + "
+        const partes = rawTxt.split(/,|\sy\s|\s\+\s/).map(s => s.trim()).filter(Boolean);
+        for (const parte of partes) {
+          const match = parte.match(/^(\d+)\s+(.+)$/i);
+          if (match) {
+            resultados.push({ descripcion: match[2].trim(), cantidad: parseInt(match[1]) });
+          } else if (parte.length > 2) {
+            resultados.push({ descripcion: parte, cantidad: 1 });
+          }
+        }
+        return resultados;
+      };
+
+      // Contar cuántos separadores hay en el texto original
+      const _sepCount = (txt.match(/,|\sy\s|\s\+\s/g) || []).length;
+      if (items.length <= _sepCount) {
+        // La IA probablemente perdió ítems — usar parser local
+        const localItems = _parsearItemLocal(txt);
+        if (localItems.length > items.length) {
+          console.log(`🤖 IA devolvió ${items.length} ítems, parser local devolvió ${localItems.length} — usando local`);
+          items = localItems;
+        }
+      }
+
       if (!items.length) return ctx.reply(`😕 No pude identificar productos.\nIntenta: <i>"2 aceites, 1 arroz"</i>`, { parse_mode: 'HTML' });
       s.carrito = items; s.paso = 'confirmar_libre';
       let lista = '';
@@ -3059,6 +3399,7 @@ async function procesarPedido(ctx, uid) {
     return ctx.reply('❌ Error al registrar el pedido. Por favor intenta de nuevo o contáctanos.', menuPublico());
   }
 
+  console.log(`📦 Nuevo pedido: ${id} | ${s.nombre} | ${s.negocioNombre} | ${s.direccion} | ${s.metodoPago}`);
   await ctx.reply(facturaHTML(s, id) + `\n\n🆔 <b>${id}</b>\n<i>Guarda este ID para consultar tu pedido.</i>`, { parse_mode: 'HTML' });
 
   pool[id] = {
@@ -3073,6 +3414,8 @@ async function procesarPedido(ctx, uid) {
     direccionDetectada: s.barrioDetectado || '',
     direccion: s.direccion,
     barrio: s.direccion,
+    notaSheet: s.notaSheet || '',
+    referencia: s.referencia || '',
     presupuesto: s.presupuesto || null,
     zona: s.zona || '',
     municipio: s.municipio || '',
@@ -3095,10 +3438,9 @@ async function procesarPedido(ctx, uid) {
 
   const esTransferencia = s.metodoPago === 'TRANSFERENCIA';
 
-  // Notificar domiciliarios disponibles — solo los que están en turno
   const { pend } = await getContadores();
   for (const [did, d] of Object.entries(drivers)) {
-    if (!d.pedidoActual && features.estaEnTurno(did)) {
+    if ((d.pedidosActivos || []).length < 2 && features.estaEnTurno(did)) {
       bot.telegram.sendMessage(did,
         `🔴 <b>Nuevo pedido</b>\n🆕 <b>${id}</b>\n🏪 ${s.negocioNombre}\n` +
         `📍 ${s.direccion}\n💳 Pago: <b>${esTransferencia ? 'Transferencia Bancolombia' : 'Efectivo'}</b>\n` +
@@ -3195,60 +3537,78 @@ function facturaHTML(s, id) {
 // ══════════════════════════════════════════════════════════════════════════════
 // RECORDATORIO AUTOMÁTICO
 // ══════════════════════════════════════════════════════════════════════════════
-const _yaAlertados = new Set();
+// _yaAlertados eliminado — recordatorio envía cada ciclo sin filtro
 const _inactividadAlertada = new Set();
 
 async function enviarRecordatorio() {
-  const hoy = moment().tz('America/Bogota').format('DD/MM/YYYY');
-  const ahora = moment().tz('America/Bogota');
+  // Lee directo la hoja Pedidos columna E (ESTADO) de Google Sheets
+  // Filtra solo PENDIENTE — fuente única, sin funciones intermedias
+  try {
+    const { google } = require('googleapis');
+    const authG = new google.auth.GoogleAuth({
+      keyFile: './credentials.json',
+      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
+    });
+    const client = await authG.getClient();
+    const sheets = google.sheets({ version: 'v4', auth: client });
 
-  const psSheet = await pendientesSinAtender(10).catch(() => []);
-  const psPool = Object.values(pool).filter(p => {
-    if (p.estado !== 'PENDIENTE') return false;
-    const horaRef = p.hora || p.createdAt || null;
-    if (!horaRef) return true;
-    const t = p.createdAt
-      ? moment(p.createdAt)
-      : moment.tz(`${hoy} ${horaRef}`, 'DD/MM/YYYY hh:mm A', 'America/Bogota');
-    return t.isValid() && ahora.diff(t, 'minutes') >= 10;
-  });
+    // Columnas reales del sheet Pedidos:
+    // A(0)=ID  B(1)=NOMBRE_CLI  C(2)=TELEFONO  D(3)=METODO_PAGO
+    // E(4)=ESTADO  L(11)=DIRECCION  M(12)=HORA
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.GOOGLE_SHEETS_ID,
+      range: 'Pedidos!A2:M'
+    });
 
-  const todos = [...psSheet];
-  for (const pp of psPool) {
-    if (!todos.find(x => x.id === pp.id)) todos.push(pp);
-  }
+    const rows = res.data.values || [];
+    const pendientes = rows
+      .filter(r => (r[4] || '').toString().trim().toUpperCase() === 'PENDIENTE')
+      .map(r => ({
+        id:        (r[0]  || '').toString().trim(),
+        cliente:   (r[1]  || '').toString().trim(),
+        telefono:  (r[2]  || '').toString().trim(),
+        estado:    (r[4]  || '').toString().trim(),
+        direccion: (r[11] || '').toString().trim(),
+        hora:      (r[12] || '').toString().trim(),
+      }))
+      .filter(p => p.id); // descartar filas vacías
 
-  const nuevos = todos.filter(p => !_yaAlertados.has(p.id));
-  if (!nuevos.length) return;
+    if (!pendientes.length) return; // sin pendientes, sin ruido
 
-  nuevos.forEach(p => _yaAlertados.add(p.id));
-  setTimeout(() => nuevos.forEach(p => _yaAlertados.delete(p.id)), 20 * 60 * 1000);
+    // Armar mensaje
+    let msg = `⚠️ <b>PEDIDOS PENDIENTES SIN ATENDER</b>\n━━━━━━━━━━━━━━\n\n`;
+    pendientes.forEach(p => {
+      msg +=
+        `🔴 <b>${p.id}</b>\n` +
+        `👤 ${p.cliente || '—'}  📱 ${p.telefono || '—'}\n` +
+        `📍 ${p.direccion || '—'}\n` +
+        `⏰ ${p.hora || '—'}\n\n`;
+    });
 
-  let msg = `⚠️ <b>PEDIDOS SIN ATENDER (+10 min)</b>\n━━━━━━━━━━━━━━\n\n`;
-  nuevos.forEach(p => {
-    const t = moment.tz(`${hoy} ${p.hora}`, 'DD/MM/YYYY hh:mm A', 'America/Bogota');
-    const mins = ahora.diff(t, 'minutes');
-    const dirMostrar = p.direccionCliente || p.direccion || p.barrio || '—';
-    msg +=
-      `🔴 <b>${p.id}</b>\n` +
-      `👤 ${p.cliente || '—'}  📱 ${p.telefono || '—'}\n` +
-      `📍 ${dirMostrar}\n` +
-      `⏰ Hace <b>${mins} min</b>\n\n`;
-  });
+    const canalId = (process.env.CANAL_PEDIDOS_ID || '').trim();
+    console.log(`⏰ enviarRecordatorio: ${pendientes.length} pendientes | canal="${canalId}" | admins=${ADMIN_IDS.length} | domis=${Object.keys(drivers).length}`);
 
-  if (process.env.CANAL_PEDIDOS_ID) {
-    bot.telegram.sendMessage(process.env.CANAL_PEDIDOS_ID, msg, { parse_mode: 'HTML' }).catch(() => { });
-  }
-  for (const id of ADMIN_IDS) {
-    bot.telegram.sendMessage(id, msg, { parse_mode: 'HTML' }).catch(() => { });
-  }
-  for (const [did, d] of Object.entries(drivers)) {
-    if (!d.pedidoActual && features.estaEnTurno(did)) {
-      bot.telegram.sendMessage(did,
-        `🔴 <b>${nuevos.length}</b> pedido(s) sin atender más de 10 min\nRevisa 📋 <b>Pendientes</b>`,
-        { parse_mode: 'HTML' }
-      ).catch(() => { });
+    // Enviar a canal, admins y domis con capacidad
+    if (canalId) {
+      bot.telegram.sendMessage(canalId, msg, { parse_mode: 'HTML' })
+        .catch(e => console.error('enviarRecordatorio → canal ERROR:', e.message));
+    } else {
+      console.warn('⏰ enviarRecordatorio: CANAL_PEDIDOS_ID no configurado');
     }
+    for (const adminId of ADMIN_IDS) {
+      bot.telegram.sendMessage(adminId, msg, { parse_mode: 'HTML' })
+        .catch(e => console.error(`enviarRecordatorio → admin ${adminId} ERROR:`, e.message));
+    }
+    for (const [did, d] of Object.entries(drivers)) {
+      if ((d.pedidosActivos || []).length < 2) {
+        bot.telegram.sendMessage(did,
+          `🔴 <b>${pendientes.length}</b> pedido(s) PENDIENTE(s) sin atender\nRevisa 📋 <b>Pendientes</b>`,
+          { parse_mode: 'HTML' }
+        ).catch(e => console.error(`enviarRecordatorio → domi ${did} ERROR:`, e.message));
+      }
+    }
+  } catch (e) {
+    console.error('enviarRecordatorio error:', e.message);
   }
 }
 
@@ -3260,7 +3620,7 @@ async function revisarInactividad() {
   const UNA_HORA = 60 * 60 * 1000;
 
   for (const [did, d] of Object.entries(drivers)) {
-    if (d.pedidoActual) { _inactividadAlertada.delete(did); continue; }
+    if ((d.pedidosActivos || []).length > 0) { _inactividadAlertada.delete(did); continue; }
 
     const ultimaAct = d.lastActivity || d.loginTs || ahora;
     const inactivo = ahora - ultimaAct;
@@ -3312,8 +3672,8 @@ bot.action(/^asignar_(.+)_(.+)$/, async ctx => {
   if (!d) {
     return ctx.editMessageText(`❌ El domiciliario ya no está conectado.`, { parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } }).catch(() => { });
   }
-  if (d.pedidoActual) {
-    return ctx.editMessageText(`⚠️ <b>${d.nombre}</b> ya tiene el pedido <b>${d.pedidoActual}</b> activo.`, { parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } }).catch(() => { });
+  if (!_tieneCapacidad(driverId)) {
+    return ctx.editMessageText(`⚠️ <b>${d.nombre}</b> ya tiene 2 pedidos activos.`, { parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } }).catch(() => { });
   }
 
   if (!pool[pedidoId]) {
@@ -3333,7 +3693,7 @@ bot.action(/^asignar_(.+)_(.+)$/, async ctx => {
   p.estado = 'EN_PROCESO';
   p.domiciliario = d.nombre;
   p.horaTomo = moment().tz('America/Bogota').format('hh:mm A');
-  d.pedidoActual = pedidoId;
+  _agregarPedidoActivo(driverId, pedidoId);
   d.lastActivity = Date.now();
   _inactividadAlertada.delete(driverId);
 
@@ -3350,7 +3710,6 @@ bot.action(/^asignar_(.+)_(.+)$/, async ctx => {
   const dLng = drivers[driverId]?.lng || null;
   const gmaps = buildGmapsUrl(p.barrio || p.direccion || '', p, dLat, dLng);
 
-  // Notificar al domi
   bot.telegram.sendMessage(driverId,
     `👋 <b>Hola ${d.nombre},</b>\n\n` +
     `Te asignaron un nuevo pedido 🙏\n\n` +
@@ -3372,33 +3731,23 @@ bot.action(/^asignar_(.+)_(.+)$/, async ctx => {
     }
   ).catch(() => { });
 
-  // Notificar al cliente con foto del domi (features)
   if (p.clienteId) {
     const telDomi = d.telefono || '';
     await features.notificarClientePedidoTomado(bot, p.clienteId, p, d.nombre, telDomi, p.horaTomo);
 
-    // Activar ETA si el cliente tiene GPS
     if (p.latCliente && p.lngCliente && dLat && dLng) {
       features.activarETA(bot, p.clienteId, pedidoId, dLat, dLng, p.latCliente, p.lngCliente).catch(() => {});
     }
   }
 
-  // Notificar canal
+  // Enviar al canal la misma card con foto que recibe el cliente
   if (process.env.CANAL_PEDIDOS_ID) {
-    const dirCanal = p.direccionCliente || p.direccion || '—';
-    bot.telegram.sendMessage(process.env.CANAL_PEDIDOS_ID,
-      `🔵 <b>ASIGNADO — ${pedidoId}</b>\n` +
-      `🛵 <b>${d.nombre}</b>\n` +
-      `👤 ${p.cliente || '—'}  📱 ${p.telefono || '—'}\n` +
-      `📍 <a href="${gmapsLinkDir(dirCanal)}">${dirCanal}</a>\n⏰ ${p.horaTomo}`,
-      { parse_mode: 'HTML', disable_web_page_preview: true }
-    ).catch(() => { });
+    const telDomiCanal = d.telefono || '';
+    features.notificarClientePedidoTomado(
+      bot, process.env.CANAL_PEDIDOS_ID, p, d.nombre, telDomiCanal, p.horaTomo
+    ).catch(() => {});
   }
 });
-
-// ══════════════════════════════════════════════════════════════════════════════
-// INTEGRACIÓN FEATURES — registra encuesta mejorada, ETA, turnos, historial
-// ══════════════════════════════════════════════════════════════════════════════
 
 // ══════════════════════════════════════════════════════════════════════════════
 // MI PERFIL  —  tarjeta foto + historial con calendario de fechas
@@ -3459,16 +3808,58 @@ function keyboardCalendarioDomi(pedidos) {
 }
 
 function captionPerfilDomi(nombre, tel, totalEntregas) {
-  const ahora = moment().tz('America/Bogota').format('DD/MM/YYYY hh:mm A');
-  return (
-    `🛵 <b>${nombre}</b>\n` +
-    `━━━━━━━━━━━━━━━━━━\n` +
-    `📞 ${tel || '—'}\n` +
-    `✅ Estado: <b>Activo</b>\n` +
-    `📦 Total entregas: <b>${totalEntregas}</b>\n` +
-    `🕐 <i>${ahora}</i>\n\n` +
-    `Elige una opción:`
-  );
+  return `📅 <b>Selecciona un día para ver tus entregas</b>`;
+}
+
+function keyboardCalendarioMes(pedidos) {
+  const hoy    = moment().tz('America/Bogota');
+  const año    = hoy.year();
+  const mes    = hoy.month();
+  const diasMes = hoy.daysInMonth();
+  const diaHoy  = hoy.date();
+
+  const conteo = {};
+  for (const p of pedidos) {
+    let f = p.fecha;
+    if (!f && p.createdAt) f = moment(p.createdAt).tz('America/Bogota').format('DD/MM/YYYY');
+    if (f) conteo[f] = (conteo[f] || 0) + 1;
+  }
+
+  const rows = [];
+
+  const nombreMes = hoy.format('MMMM YYYY');
+  rows.push([Markup.button.callback(`📅 ${nombreMes.toUpperCase()}`, 'dperfil_noop')]);
+
+  rows.push(['L','M','X','J','V','S','D'].map(d =>
+    Markup.button.callback(d, 'dperfil_noop')
+  ));
+
+  const primerDia = moment({ year: año, month: mes, date: 1 }).isoWeekday() - 1;
+  let celdas = Array(primerDia).fill(null);
+
+  for (let d = 1; d <= diasMes; d++) {
+    celdas.push(d);
+  }
+
+  for (let i = 0; i < celdas.length; i += 7) {
+    const semana = celdas.slice(i, i + 7);
+    while (semana.length < 7) semana.push(null);
+    rows.push(semana.map(d => {
+      if (!d) return Markup.button.callback(' ', 'dperfil_noop');
+      const fechaStr = moment({ year: año, month: mes, date: d }).format('DD/MM/YYYY');
+      const n = conteo[fechaStr] || 0;
+      if (d > diaHoy) {
+        return Markup.button.callback(`· ${d}`, 'dperfil_noop');
+      } else if (n > 0) {
+        return Markup.button.callback(`✅${d}(${n})`, `dperfil_fecha_${fechaStr}`);
+      } else {
+        return Markup.button.callback(`${d}`, 'dperfil_noop');
+      }
+    }));
+  }
+
+  rows.push([Markup.button.callback('🔙 Volver al panel', 'dperfil_volver')]);
+  return Markup.inlineKeyboard(rows);
 }
 
 function captionDiaDomi(nombre, fecha, pedidosDia) {
@@ -3505,41 +3896,27 @@ function keyboardDiaDomi(pedidosDia) {
   return Markup.inlineKeyboard(rows);
 }
 
-function keyboardPerfilInicio() {
+function keyboardPerfilInicio(pedidos) {
+  if (pedidos && pedidos.length >= 0) return keyboardCalendarioMes(pedidos);
   return Markup.inlineKeyboard([
-    [Markup.button.callback('📊 Ver Historial por fecha', 'dperfil_historial')],
-    [Markup.button.callback('🔙 Volver al panel',         'dperfil_volver')],
+    [Markup.button.callback('🔙 Volver al panel', 'dperfil_volver')],
   ]);
 }
 
-// ── "📊 Ver Historial" → calendario de fechas (edita caption) ────────────────
+bot.action('dperfil_noop', async ctx => { await ctx.answerCbQuery(); });
+
 bot.action('dperfil_historial', async ctx => {
   const uid = ctx.from.id;
   await ctx.answerCbQuery('📅 Cargando...');
   if (!drivers[uid]) return;
   const nombre  = drivers[uid].nombre;
   const pedidos = await getPedidosDomiTodos(nombre);
-  if (!pedidos.length) {
-    const noKb = Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver', 'dperfil_inicio')]]);
-    return ctx.editMessageCaption(
-      `📊 <b>Historial de ${nombre}</b>\n━━━━━━━━━━━━━━━━━━\n<i>No hay entregas registradas aún.</i>`,
-      { parse_mode: 'HTML', ...noKb }
-    ).catch(() => ctx.editMessageText(
-      `📊 <b>Historial de ${nombre}</b>\n━━━━━━━━━━━━━━━━━━\n<i>No hay entregas registradas aún.</i>`,
-      { parse_mode: 'HTML', ...noKb }
-    ));
-  }
-  const capHist =
-    `📊 <b>Historial — ${nombre}</b>\n` +
-    `━━━━━━━━━━━━━━━━━━\n` +
-    `📦 Total: <b>${pedidos.length}</b> entregas\n\n` +
-    `📅 Elige una fecha para ver el detalle:`;
-  const kb = keyboardCalendarioDomi(pedidos);
-  await ctx.editMessageCaption(capHist, { parse_mode: 'HTML', ...kb })
-    .catch(() => ctx.editMessageText(capHist, { parse_mode: 'HTML', ...kb }));
+  const caption = captionPerfilDomi(nombre, null, 0);
+  const kb      = keyboardCalendarioMes(pedidos);
+  await ctx.editMessageCaption(caption, { parse_mode: 'HTML', ...kb })
+    .catch(() => ctx.editMessageText(caption, { parse_mode: 'HTML', ...kb }));
 });
 
-// ── Fecha específica → detalle de entregas (edita caption) ───────────────────
 bot.action(/^dperfil_fecha_(\d{2}\/\d{2}\/\d{4})$/, async ctx => {
   const uid   = ctx.from.id;
   const fecha = ctx.match[1];
@@ -3557,12 +3934,10 @@ bot.action(/^dperfil_fecha_(\d{2}\/\d{2}\/\d{4})$/, async ctx => {
     .catch(() => ctx.editMessageText(cap, { parse_mode: 'HTML', ...kb }));
 });
 
-// ── Popup detalle de un pedido individual ────────────────────────────────────
 bot.action(/^dperfil_pid_(.+)$/, async ctx => {
   const id = ctx.match[1];
   await ctx.answerCbQuery();
 
-  // Buscar primero en pool (tiene precioDomicilio correcto), luego en sheet
   let p = pool[id];
   if (!p) {
     const fromSheet = await getPedidos('ALL').then(ps => ps.find(x => x.id === id)).catch(() => null);
@@ -3604,7 +3979,6 @@ bot.action('dperfil_cerrar_msg', async ctx => {
   try { await ctx.deleteMessage(); } catch (_) {}
 });
 
-// ── Volver al caption de perfil original ─────────────────────────────────────
 bot.action('dperfil_inicio', async ctx => {
   const uid = ctx.from.id;
   await ctx.answerCbQuery();
@@ -3613,13 +3987,13 @@ bot.action('dperfil_inicio', async ctx => {
   const tel    = drivers[uid].telefono || '';
   await cargarEntregasDesdeSheet().catch(() => {});
   const { entregas } = statsDriverPool(nombre);
+  const pedidos = await getPedidosDomiTodos(nombre);
   const caption = captionPerfilDomi(nombre, tel, entregas);
-  const kb      = keyboardPerfilInicio();
+  const kb      = keyboardPerfilInicio(pedidos);
   await ctx.editMessageCaption(caption, { parse_mode: 'HTML', ...kb })
     .catch(() => ctx.editMessageText(caption, { parse_mode: 'HTML', ...kb }));
 });
 
-// ── Volver al panel principal ─────────────────────────────────────────────────
 bot.action('dperfil_volver', async ctx => {
   await ctx.answerCbQuery();
   try { await ctx.deleteMessage(); } catch (_) {}
@@ -3639,6 +4013,9 @@ features.integrar(bot, {
   registrarPedido,
 });
 
+// El cron se inicia aquí al cargar el módulo, sin esperar wilBot.launch()
+iniciarCron();
+
 // ══════════════════════════════════════════════════════════════════════════════
 // ARRANQUE
 // ══════════════════════════════════════════════════════════════════════════════
@@ -3657,9 +4034,15 @@ async function saludarAlArrancar() {
 }
 
 function iniciarCron() {
-  cron.schedule('*/10 * * * *', () => enviarRecordatorio().catch(e => console.error('cron pedidos:', e.message)), { timezone: 'America/Bogota' });
+  cron.schedule('*/5 * * * *', () => {
+    console.log(`⏰ [CRON] enviarRecordatorio — ${moment().tz('America/Bogota').format('hh:mm A')}`);
+    enviarRecordatorio().catch(e => console.error('cron pedidos ERROR:', e.message));
+  }, { timezone: 'America/Bogota' });
   cron.schedule('*/10 * * * *', () => revisarInactividad().catch(e => console.error('cron inactividad:', e.message)), { timezone: 'America/Bogota' });
-  console.log('⏰ Crons activos: pedidos (10 min) | inactividad drivers (10 min)');
+  console.log('⏰ Crons activos: pedidos (5 min) | inactividad drivers (10 min)');
+  // Disparar recordatorio al arrancar si hay pendientes
+  // Ejecutar poco después del arranque (bot ya listo)
+  setTimeout(() => enviarRecordatorio().catch(e => console.error('cron arranque:', e.message)), 5000);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
