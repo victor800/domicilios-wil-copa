@@ -17,3 +17,31 @@ wilBot.launch().then(async () => {
 
 process.once('SIGINT', () => wilBot.stop('SIGINT'));
 process.once('SIGTERM', () => wilBot.stop('SIGTERM'));
+
+// ⏰ Horario activo: 9am - 11pm hora Colombia (UTC-5)
+wilBot.use(async (ctx, next) => {
+  const hora = new Date().toLocaleString('en-US', { 
+    timeZone: 'America/Bogota', 
+    hour: 'numeric', 
+    hour12: false 
+  });
+  const h = parseInt(hora);
+  if (h >= 9 && h < 23) {
+    return next();
+  } else {
+    return ctx.reply('🌙 Estamos fuera de horario. Atendemos de 9am a 11pm.');
+  }
+});
+
+// 🔄 Keep-alive: ping cada 14 minutos
+setInterval(() => {
+  const hora = new Date().toLocaleString('en-US', {
+    timeZone: 'America/Bogota',
+    hour: 'numeric',
+    hour12: false
+  });
+  const h = parseInt(hora);
+  if (h >= 9 && h < 23) {
+    console.log(`✅ Bot activo - ${new Date().toLocaleString('es-CO', {timeZone: 'America/Bogota'})}`);
+  }
+}, 5 * 60 * 1000);
