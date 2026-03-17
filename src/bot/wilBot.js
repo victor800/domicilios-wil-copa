@@ -3160,33 +3160,37 @@ async function manejarSesionCliente(ctx, uid, txt) {
         { parse_mode: 'HTML' }
       );
 
-    case 'direccion': {
-      s.direccion = txt;
-      s.paso = 'esperando_ubi_cliente';
-      clienteUbicacion[uid] = { pedidoId: null, barrio: txt };
-      return ctx.reply(
-        cardPedidoCliente(s) +
-        `\n\n📍 <b>Comparte tu ubicación en tiempo real</b>\n\n` +
-        `Así el domiciliario llega directo a donde estás.\n` +
-        `👇 Toca 📎 → <b>Ubicación</b> → <b>Compartir en tiempo real</b>\n\n` +
-        `<i>Si prefieres continuar solo con la dirección:</i>`,
-        {
-          parse_mode: 'HTML',
-          ...Markup.inlineKeyboard([[Markup.button.callback('⏭ Continuar sin GPS', `cli_skip_ubi_${uid}`)]])
-        }
-      );
-    }
+    
 
-    case 'esperando_ubi_cliente': {
-      return ctx.reply(
-        `📍 Por favor comparte tu <b>ubicación en tiempo real</b>,\no toca <b>Continuar sin GPS</b> para avanzar.`,
-        {
-          parse_mode: 'HTML',
-          ...Markup.inlineKeyboard([[Markup.button.callback('⏭ Continuar sin GPS', `cli_skip_ubi_${uid}`)]])
-        }
-      );
+case 'direccion': {
+  s.direccion = txt;
+  s.paso = 'esperando_ubi_cliente';
+  clienteUbicacion[uid] = { pedidoId: null, barrio: txt };
+  return ctx.reply(
+    cardPedidoCliente(s) +
+    `\n\n📍 <b>¡Comparte tu ubicación en tiempo real!</b>\n\n` +
+    `El domiciliario sale directo a donde estás — sin llamadas ni confusión.\n\n` +
+    `👇 Toca el clip <b>📎</b> → <b>Ubicación</b> → <b>Compartir en tiempo real</b>\n` +
+    `Elige <b>8 horas</b> o <b>mientras uso la app</b>.\n\n` +
+    `<i>📌 Entre más precisa la ubicación, más rápida la entrega.</i>`,
+    {
+      parse_mode: 'HTML',
+      ...Markup.inlineKeyboard([[Markup.button.callback('📍 Ya la compartí ✅', `cli_skip_ubi_${uid}`)]])
     }
+  );
+}
 
+case 'esperando_ubi_cliente': {
+  return ctx.reply(
+    `📍 <b>Esperando tu ubicación...</b>\n\n` +
+    `Toca el clip <b>📎</b> → <b>Ubicación</b> → <b>Compartir en tiempo real</b>\n\n` +
+    `<i>Sin ubicación el domiciliario se guía solo por texto — puede haber demoras.</i>`,
+    {
+      parse_mode: 'HTML',
+      ...Markup.inlineKeyboard([[Markup.button.callback('📍 Ya la compartí ✅', `cli_skip_ubi_${uid}`)]])
+    }
+  );
+}
     case 'referencia': {
       s.referencia = txt.toLowerCase() === 'no' ? '' : txt;
       await ctx.reply('📍 Verificando dirección...', { parse_mode: 'HTML' });
