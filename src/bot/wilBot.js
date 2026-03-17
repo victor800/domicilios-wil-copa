@@ -69,7 +69,7 @@ function _pedidosActivosDomi(uid) {
   if (!drivers[uid].pedidosActivos) drivers[uid].pedidosActivos = [];
   return drivers[uid].pedidosActivos;
 }
-function _tieneCapacidad(uid) { return _pedidosActivosDomi(uid).length < 2; }
+function _tieneCapacidad(uid) { return _pedidosActivosDomi(uid).length < 3; }
 function _agregarPedidoActivo(uid, id) {
   const arr = _pedidosActivosDomi(uid);
   if (!arr.includes(id)) arr.push(id);
@@ -701,14 +701,27 @@ function buildGmapsUrl(lugar, pedido, driverLat, driverLng) {
   const origenLng = driverLng || PARQUE_COPA_LNG;
   const origen = `${origenLat},${origenLng}`;
 
+  // CASO 1: cliente compartió GPS → ruta directa a sus coords exactas
   if (pedido?.latCliente && pedido?.lngCliente) {
     return `https://www.google.com/maps/dir/${origen}/${pedido.latCliente},${pedido.lngCliente}`;
   }
 
-  const dirRaw = (pedido?.direccionCliente || pedido?.direccion || lugar || '').trim();
-  const dirCompleta = /antioquia|colombia|copacabana|medell/i.test(dirRaw)
-    ? dirRaw
-    : `${dirRaw}, Antioquia, Colombia`;
+  // CASO 2: sin GPS → texto enriquecido con municipio detectado por Nominatim
+  const dirBase = (pedido?.direccionEnriquecida || pedido?.direccionCliente || pedido?.direccion || lugar || '').trim();
+  const municipio = (pedido?.municipio || '').trim();
+  const zona = (pedido?.zona || '').trim();
+
+  let dirCompleta;
+  if (/antioquia|colombia|copacabana|medell|bello|envigado|itagü|itagui|sabaneta|girardota|barbosa/i.test(dirBase)) {
+    dirCompleta = dirBase;
+  } else if (municipio && municipio.length > 2) {
+    dirCompleta = `${dirBase}, ${municipio}, Antioquia, Colombia`;
+  } else if (zona && zona.length > 2) {
+    dirCompleta = `${dirBase}, ${zona}, Colombia`;
+  } else {
+    dirCompleta = `${dirBase}, Copacabana, Antioquia, Colombia`;
+  }
+
   return `https://www.google.com/maps/dir/${origen}/${encodeURIComponent(dirCompleta)}`;
 }
 
@@ -2788,14 +2801,30 @@ bot.action('ver_tarifas', async ctx => {
 
 bot.action('menu_pedido', async ctx => { await ctx.answerCbQuery(); return mostrarOpcionesPedido(ctx); });
 
+// REEMPLAZAR la función mostrarOpcionesPedido completa
+
 async function mostrarOpcionesPedido(ctx) {
   delete S[ctx.from.id];
-  return ctx.reply('¿De dónde quieres pedir?', Markup.inlineKeyboard([
-    [Markup.button.callback('🏪 Domicilios WIL (general)', 'neg_wil')],
-    [Markup.button.callback('💊 Drogueria FarmaExpertos Copacabana', 'neg_expertos')],
-    [Markup.button.callback('🏥 Drogueria Central Copacabana', 'neg_central')],
-    [Markup.button.callback('📦 Paquetería', 'paqueteria')]
-  ]));
+  return ctx.reply(
+    `🛵 <b>¿De dónde quieres pedir?</b>\n\n` +
+    `💊 <b>FarmaExpertos</b> — Cra 47 #51-69, Copacabana\n` +
+    `🏥 <b>Droguería Central</b> — Calle 52 #48-09, Copacabana`,
+    {
+      parse_mode: 'HTML',
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback('🏪 Domicilios WIL (general)', 'neg_wil')],
+        [
+          Markup.button.callback('💊 Pedir FarmaExpertos', 'neg_expertos'),
+          Markup.button.url('📍 Ver ubicación', 'https://www.google.com/maps/place/DROGUERIA+FARMA+EXPERTOS/@6.34911,-75.5087659,17z/data=!3m1!4b1!4m6!3m5!1s0x8e44256a915ed751:0x681e80949ed7b12c!8m2!3d6.34911!4d-75.506191!16s%2Fg%2F11gf033thc!5m2!1e4!1e2?entry=ttu&g_ep=EgoyMDI2MDMxMS4wIKXMDSoASAFQAw%3D%3D')
+        ],
+        [
+          Markup.button.callback('🏥 Pedir Drog. Central', 'neg_central'),
+          Markup.button.url('📍 Ver ubicación', 'https://www.google.com/maps/place/Droguer%C3%ADa+Central/@6.3485472,-75.509965,17z/data=!3m1!4b1!4m6!3m5!1s0x8e44256a5f0a09ef:0x77a16509423109b8!8m2!3d6.3485472!4d-75.5073901!16s%2Fg%2F11smqlhr3k!5m2!1e4!1e2?entry=ttu&g_ep=EgoyMDI2MDMxMS4wIKXMDSoASAFQAw%3D%3D')
+        ],
+        [Markup.button.callback('📦 Paquetería', 'paqueteria')]
+      ])
+    }
+  );
 }
 
 async function mostrarOpcionesPaqueteria(ctx) {
@@ -3365,6 +3394,18 @@ bot.action(/^pago_(.+)$/, async ctx => {
   await procesarPedido(ctx, ctx.from.id);
 });
 
+function _buildDirEnriquecida(s) {
+  const base = (s.direccion || '').trim();
+  const mun  = (s.municipio || '').trim();
+  const ref  = (s.referencia || '').trim();
+  if (!base) return '';
+  if (/antioquia|colombia|copacabana|medell|bello|envigado|itagü|itagui|sabaneta/i.test(base)) {
+    return ref ? `${base} (${ref})` : base;
+  }
+  const conMun = mun ? `${base}, ${mun}, Antioquia, Colombia` : `${base}, Copacabana, Antioquia, Colombia`;
+  return ref ? `${conMun} — Ref: ${ref}` : conMun;
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // PROCESAR PEDIDO
 // ══════════════════════════════════════════════════════════════════════════════
@@ -3411,6 +3452,7 @@ async function procesarPedido(ctx, uid) {
     telefono: s.telefono,
     clienteId: uid,
     direccionCliente: s.direccion,
+    direccionEnriquecida: _buildDirEnriquecida(s), 
     direccionDetectada: s.barrioDetectado || '',
     direccion: s.direccion,
     barrio: s.direccion,
