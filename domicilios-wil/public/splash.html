@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#00453d"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<title>Domicilios WIL</title>
+<link rel="manifest" href="/manifest.json"/>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{
+  height:100%;height:100dvh;width:100%;
+  overflow:hidden;background:#060d1a;
+  -webkit-font-smoothing:antialiased;
+}
+#splash{
+  position:fixed;inset:0;width:100%;height:100%;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+}
+#bg-img{
+  position:absolute;inset:0;width:100%;height:100%;
+  object-fit:cover;object-position:center;display:block;
+  opacity:0; /* empieza invisible, el JS lo muestra */
+}
+#overlay{
+  position:absolute;inset:0;width:100%;height:100%;
+  background:rgba(0,0,0,0.15);
+}
+#progress-wrap{
+  position:absolute;
+  bottom:calc(32px + env(safe-area-inset-bottom));
+  left:50%;transform:translateX(-50%);
+  width:120px;display:flex;flex-direction:column;
+  align-items:center;gap:10px;z-index:10;
+}
+#progress-bar{
+  width:120px;height:3px;
+  background:rgba(255,255,255,0.25);
+  border-radius:10px;overflow:hidden;
+}
+#progress-fill{
+  height:100%;width:0%;background:#4ade80;
+  border-radius:10px;transition:width 0.08s linear;
+}
+#skip-btn{
+  font-family:'Plus Jakarta Sans','Inter',sans-serif;
+  font-size:11px;font-weight:700;
+  color:rgba(255,255,255,0.7);background:rgba(0,0,0,0.35);
+  border:1px solid rgba(255,255,255,0.2);border-radius:20px;
+  padding:6px 16px;cursor:pointer;letter-spacing:0.04em;
+  transition:all 0.15s ease;-webkit-tap-highlight-color:transparent;
+}
+#skip-btn:active{transform:scale(0.94);background:rgba(0,0,0,0.55);}
+#debug{
+  position:absolute;top:12px;left:0;right:0;
+  text-align:center;font-size:10px;color:#fff;
+  background:rgba(255,0,0,0.6);padding:4px 8px;z-index:99;
+  font-family:monospace;
+}
+.fade-out{animation:fadeOut 0.4s ease forwards !important;}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes fadeOut{from{opacity:1}to{opacity:0}}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+</head>
+<body>
+
+<div id="splash">
+  <img id="bg-img" src="" alt=""/>
+  <div id="overlay"></div>
+  <div id="debug">Buscando imagen...</div>
+
+  <div id="progress-wrap">
+    <div id="progress-bar">
+      <div id="progress-fill"></div>
+    </div>
+    <button id="skip-btn" onclick="navegar()">Entrar ahora →</button>
+  </div>
+</div>
+
+<script>
+const rutas = [
+  '/icons/inicioapp.jpeg',
+  '/icons/inicioapp.jpg',
+  '/icons/InicioApp.jpeg',
+  '/icons/InicioApp.jpg',
+  '/icons/inicioApp.jpeg',
+  '/icons/inicioApp.jpg',
+  '/icons/Inicioapp.jpeg',
+  '/icons/Inicioapp.jpg',
+];
+
+const img = document.getElementById('bg-img');
+const dbg = document.getElementById('debug');
+let idx = 0;
+
+function probarRuta() {
+  if (idx >= rutas.length) {
+    dbg.textContent = '❌ No encontrada. Revisa nombre exacto del archivo en Git.';
+    dbg.style.background = 'rgba(180,0,0,0.9)';
+    return;
+  }
+  const ruta = rutas[idx];
+  dbg.textContent = `Probando (${idx+1}/${rutas.length}): ${ruta}`;
+  const test = new Image();
+  test.onload = () => {
+  // Primero quita la animación que bloquea opacity
+  img.style.animation = 'none';
+  img.style.opacity = '0';
+  
+  // Asigna el src
+  img.src = ruta;
+  
+  // Espera al siguiente frame para hacer fade in
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      img.style.transition = 'opacity 0.6s ease';
+      img.style.opacity = '1';
+    });
+  });
+
+  dbg.textContent = '✅ OK → ' + ruta;
+  dbg.style.background = 'rgba(0,130,0,0.8)';
+  setTimeout(() => { dbg.style.display = 'none'; }, 3000);
+};
+  test.onerror = () => { idx++; probarRuta(); };
+  test.src = ruta + '?t=' + Date.now();
+}
+
+probarRuta();
+
+const DURACION = 3000;
+const t0 = Date.now();
+const fill = document.getElementById('progress-fill');
+
+const timer = setInterval(() => {
+  const elapsed = Date.now() - t0;
+  fill.style.width = Math.min(100, (elapsed / DURACION) * 100) + '%';
+  if (elapsed >= DURACION) { clearInterval(timer); navegar(); }
+}, 60);
+
+function navegar() {
+  clearInterval(timer);
+  document.getElementById('splash').classList.add('fade-out');
+  setTimeout(() => {
+    window.location.replace('https://domicilios-wil.vercel.app/index.html');
+  }, 400);
+}
+</script>
+</body>
+</html>

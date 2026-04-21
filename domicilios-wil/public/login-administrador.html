@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html class="light" lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<meta name="theme-color" content="#003730"/>
+<title>Administración — Domicilios WIL</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<script>
+tailwind.config={darkMode:"class",theme:{extend:{colors:{primary:"#006970","pri-dark":"#003730","pri-light":"#00bcc9",secondary:"#4c56af",surface:"#f8f9fa","surf-low":"#f3f4f5","surf-high":"#e7e8e9","surf-white":"#ffffff","on-surface":"#191c1d","on-var":"#3c494b",outline:"#6c7a7b","out-var":"#bbc9cb",green:"#2a9d5c",amber:"#f59e0b",red:"#ba1a1a"},fontFamily:{head:["Plus Jakarta Sans"],body:["Inter"]},borderRadius:{DEFAULT:"0.25rem",lg:"0.5rem",xl:"0.75rem","2xl":"1rem","3xl":"1.5rem",full:"9999px"}}}}
+</script>
+<style>
+.material-symbols-outlined{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;font-size:24px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;word-wrap:normal;direction:ltr;-webkit-font-smoothing:antialiased}
+
+/* ── FONDO FOTO + OVERLAY ORIGINAL ── */
+body{
+  min-height:100dvh;
+  font-family:'Inter',sans-serif;
+  overflow-x:hidden;
+  position:relative;
+}
+body::before{
+  content:'';
+  position:fixed;inset:0;z-index:0;
+  background:url('icons/fondoExpertos.jpeg') center/cover no-repeat;
+}
+body::after{
+  content:'';
+  position:fixed;inset:0;z-index:1;
+  background:linear-gradient(145deg,rgba(0,55,48,.52) 0%,rgba(0,94,84,.38) 50%,rgba(0,105,112,.48) 100%);
+}
+/* todos los hijos directos del body van sobre el overlay */
+body>*{position:relative;z-index:2;}
+
+.grad-wil{background:linear-gradient(135deg,#006970 0%,#00a3b4 60%,#00bcc9 100%)}
+.glass{background:rgba(255,255,255,.12);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.glass-white{background:rgba(255,255,255,.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.logo-ring{box-shadow:0 0 0 4px rgba(0,188,201,.3),0 0 0 8px rgba(0,188,201,.1),0 8px 32px rgba(0,105,112,.4)}
+
+/* Partículas — z-index 2 para que queden sobre el overlay */
+.particle{position:fixed;border-radius:50%;animation:float 6s ease-in-out infinite;pointer-events:none;z-index:2;}
+@keyframes float{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-20px) rotate(180deg)}}
+
+/* Shimmer botón */
+.btn-shimmer{position:relative;overflow:hidden}
+.btn-shimmer::after{content:'';position:absolute;top:0;left:-100%;width:60%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.2),transparent);animation:shimmer 2.5s ease-in-out infinite}
+@keyframes shimmer{0%{left:-100%}100%{left:200%}}
+
+/* Input custom */
+.inp{width:100%!important;background:rgba(0,0,0,.45)!important;border:2px solid rgba(255,255,255,.55)!important;border-radius:.75rem!important;padding:13px 44px!important;font-size:15px!important;font-family:'Inter',sans-serif!important;color:#fff!important;outline:none!important;transition:all .2s!important;box-shadow:0 2px 12px rgba(0,0,0,.3)!important;-webkit-appearance:none!important;appearance:none!important}
+.inp::placeholder{color:rgba(255,255,255,.65)!important}
+.inp:focus{background:rgba(0,0,0,.55)!important;border-color:#00bcc9!important;box-shadow:0 0 0 3px rgba(0,188,201,.3),0 2px 12px rgba(0,0,0,.3)!important}
+.inp.inp-error{border-color:rgba(255,100,100,.9)!important;background:rgba(120,0,0,.4)!important;box-shadow:0 0 0 3px rgba(186,26,26,.25)!important;animation:shake .35s ease!important}
+.inp:-webkit-autofill,.inp:-webkit-autofill:hover,.inp:-webkit-autofill:focus{-webkit-text-fill-color:#fff!important;-webkit-box-shadow:0 0 0 1000px rgba(0,30,25,.95) inset!important}
+
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}50%{transform:translateX(-4px)}87%{transform:translateX(4px)}}
+
+/* Blink badge */
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+.blink{animation:blink 2s ease-in-out infinite}
+
+/* Mensajes error / ok */
+.msg-box{display:none;align-items:center;gap:8px;border-radius:.75rem;padding:11px 14px;font-size:12px;font-weight:700;margin-bottom:12px;animation:fadeUp .2s ease;}
+.msg-box.show{display:flex;}
+.msg-box.err{background:rgba(186,26,26,.2);border:1.5px solid rgba(186,26,26,.4);color:#ff8a80;}
+.msg-box.ok{background:rgba(42,157,92,.16);border:1.5px solid rgba(42,157,92,.35);color:#69e0a5;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+<!-- ── PARTÍCULAS ── -->
+<div class="particle w-3 h-3 bg-pri-light/80" style="top:8%;left:10%;animation-delay:0s;animation-duration:7s"></div>
+<div class="particle w-4 h-4 bg-pri-light/70" style="top:20%;right:8%;animation-delay:1s;animation-duration:9s"></div>
+<div class="particle w-2.5 h-2.5 bg-white/60" style="top:60%;left:5%;animation-delay:2s;animation-duration:6s"></div>
+<div class="particle w-3 h-3 bg-pri-light/75" style="bottom:25%;right:12%;animation-delay:.5s;animation-duration:8s"></div>
+<div class="particle w-3.5 h-3.5 bg-white/55" style="bottom:10%;left:20%;animation-delay:3s;animation-duration:7s"></div>
+<div class="particle w-2 h-2 bg-pri-light/85" style="top:45%;right:5%;animation-delay:1.5s;animation-duration:8s"></div>
+<div class="particle w-2.5 h-2.5 bg-white/50" style="top:75%;left:15%;animation-delay:4s;animation-duration:6s"></div>
+
+<!-- Blobs luz -->
+<div class="fixed top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-pri-light/35 rounded-full blur-3xl pointer-events-none" style="z-index:2;"></div>
+<div class="fixed bottom-0 right-0 w-64 h-64 bg-secondary/30 rounded-full blur-3xl pointer-events-none" style="z-index:2;"></div>
+<div class="fixed top-1/2 left-0 w-52 h-52 bg-pri-light/20 rounded-full blur-3xl pointer-events-none" style="z-index:2;"></div>
+
+<!-- ── HEADER ── -->
+<header class="relative flex items-center justify-between px-6 py-4" style="padding-top:calc(1rem + env(safe-area-inset-top))">
+  <div class="flex items-center gap-2.5">
+    <img src="icons/icon-192.png" alt="WIL" class="w-8 h-8 rounded-full object-cover border border-white/30"/>
+    <span class="font-head font-extrabold text-white text-sm tracking-wide">Domicilios WIL</span>
+  </div>
+  <div class="flex items-center gap-1.5 glass px-3 py-1.5 rounded-full border border-white/10">
+    <span class="w-1.5 h-1.5 rounded-full bg-green blink"></span>
+    <span class="text-[10px] font-bold text-white/80 uppercase tracking-widest">Acceso seguro</span>
+  </div>
+</header>
+
+<!-- ── MAIN ── -->
+<main class="relative flex-grow flex items-center justify-center px-5 py-6">
+  <div class="w-full max-w-sm">
+
+    <!-- LOGO HERO -->
+    <div class="flex flex-col items-center mb-8">
+      <div class="relative mb-5">
+        <div class="absolute inset-0 rounded-full bg-pri-light/20 blur-xl scale-150 pointer-events-none"></div>
+        <div class="absolute -inset-3 rounded-full border border-pri-light/20 animate-pulse pointer-events-none"></div>
+        <div class="absolute -inset-6 rounded-full border border-pri-light/10 pointer-events-none"></div>
+        <div class="relative w-24 h-24 rounded-full logo-ring border-2 border-pri-light/60 overflow-hidden">
+          <img src="icons/icon-192.png" alt="WIL" class="w-full h-full object-cover"/>
+        </div>
+        <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 grad-wil px-3 py-0.5 rounded-full flex items-center gap-1.5 shadow-lg whitespace-nowrap">
+          <span class="material-symbols-outlined text-white" style="font-size:11px;font-variation-settings:'FILL' 1">admin_panel_settings</span>
+          <span class="text-[9px] font-extrabold text-white uppercase tracking-widest">Admin</span>
+        </div>
+      </div>
+      <h1 class="font-head text-3xl font-extrabold text-white tracking-tight mb-1.5 text-center">
+        Panel de Control
+      </h1>
+      <p class="text-sm text-white/60 text-center font-medium">
+        Acceso exclusivo para administradores
+      </p>
+    </div>
+
+    <!-- BADGE ROL -->
+    <div class="mb-5 glass border border-white/15 rounded-2xl p-4 flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl grad-wil flex items-center justify-center flex-shrink-0 shadow-lg">
+        <span class="material-symbols-outlined text-white" style="font-size:20px;font-variation-settings:'FILL' 1">admin_panel_settings</span>
+      </div>
+      <div>
+        <p class="font-head font-bold text-white text-sm">Administrador</p>
+        <p class="text-[11px] text-white/55">WIL · Farma Expertos · Droguería Central</p>
+      </div>
+      <div class="ml-auto flex items-center gap-1.5 flex-shrink-0">
+        <span class="w-1.5 h-1.5 rounded-full bg-green blink"></span>
+        <span class="text-[9px] font-bold text-green/80 uppercase tracking-wide">Activo</span>
+      </div>
+    </div>
+
+    <!-- MENSAJES -->
+    <div class="msg-box err" id="msgErr">
+      <span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">error</span>
+      <span id="msgErrTxt">ID o clave incorrectos.</span>
+    </div>
+    <div class="msg-box ok" id="msgOk">
+      <span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">check_circle</span>
+      <span id="msgOkTxt">Acceso correcto. Ingresando…</span>
+    </div>
+
+    <!-- FORMULARIO -->
+    <div class="space-y-4 mb-5">
+
+      <!-- ID Domiciliario -->
+      <div class="relative">
+        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+          <span class="material-symbols-outlined text-white/40" style="font-size:18px">badge</span>
+        </div>
+        <input id="inputUser" type="text" placeholder="ID domiciliario (ej: WIL-009)"
+          class="inp" autocomplete="username" spellcheck="false"
+          oninput="clearMsgs()" onkeydown="if(event.key==='Enter')handleLogin()"/>
+      </div>
+
+      <!-- Clave -->
+      <div class="relative">
+        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+          <span class="material-symbols-outlined text-white/40" style="font-size:18px">lock</span>
+        </div>
+        <input id="inputPass" type="password" placeholder="Contraseña"
+          class="inp" autocomplete="current-password"
+          oninput="clearMsgs()" onkeydown="if(event.key==='Enter')handleLogin()"/>
+        <button type="button" onclick="togglePass()"
+          class="absolute inset-y-0 right-0 pr-4 flex items-center text-white/40 hover:text-white/70 transition-colors">
+          <span class="material-symbols-outlined" id="eyeIcon" style="font-size:18px">visibility</span>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- BOTÓN -->
+    <button onclick="handleLogin()" id="btnLogin"
+      class="w-full btn-shimmer grad-wil text-white py-4 rounded-2xl font-head font-extrabold text-base shadow-xl shadow-primary/30 active:scale-95 transition-all flex items-center justify-center gap-2.5 mb-4">
+      <svg id="btnSpinner" class="hidden animate-spin w-5 h-5 text-white" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+      </svg>
+      <span class="material-symbols-outlined text-white" id="btnIcon" style="font-size:20px;font-variation-settings:'FILL' 1">admin_panel_settings</span>
+      <span id="btnTxt">Ingresar al panel</span>
+    </button>
+
+    <!-- Separador -->
+    <div class="relative flex items-center justify-center mb-4">
+      <div class="w-full h-px bg-white/10"></div>
+      <span class="absolute px-3 text-[10px] font-bold text-white/30 uppercase tracking-widest" style="background:transparent">o</span>
+    </div>
+
+    <button onclick="window.location.href='index.html'"
+      class="w-full text-white/40 py-2 rounded-2xl font-body text-sm active:scale-95 transition-all flex items-center justify-center gap-2">
+      <span class="material-symbols-outlined text-white/30" style="font-size:16px">arrow_back</span>
+      Volver al inicio
+    </button>
+
+    <!-- Badges alianza -->
+    <div class="mt-8 flex flex-col items-center gap-3">
+      <p class="text-[9px] font-extrabold text-white/30 uppercase tracking-widest">Alianzas oficiales · Copacabana</p>
+      <div class="flex items-center gap-3">
+        <div class="glass border border-white/15 px-3 py-2 rounded-full flex items-center gap-2">
+          <span class="material-symbols-outlined text-green" style="font-size:13px;font-variation-settings:'FILL' 1">health_and_safety</span>
+          <span class="text-[10px] font-bold text-white/70">Farma Expertos</span>
+        </div>
+        <div class="w-1 h-1 rounded-full bg-white/20"></div>
+        <div class="glass border border-white/15 px-3 py-2 rounded-full flex items-center gap-2">
+          <span class="material-symbols-outlined text-blue-300" style="font-size:13px;font-variation-settings:'FILL' 1">medical_services</span>
+          <span class="text-[10px] font-bold text-white/70">Droguería Central</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- Footer -->
+<footer class="relative text-center py-4 px-6" style="padding-bottom:calc(1rem + env(safe-area-inset-bottom))">
+  <p class="text-[10px] text-white/25 font-medium">
+    © 2026 Domicilios WIL · Acceso restringido · Solo personal autorizado
+  </p>
+</footer>
+
+<!-- Badge desktop -->
+<div class="fixed bottom-5 right-5 hidden md:block" style="z-index:10;">
+  <div class="glass-white px-4 py-3 rounded-2xl border border-white/30 shadow-xl flex items-center gap-3">
+    <div class="w-9 h-9 rounded-full grad-wil flex items-center justify-center shadow-md">
+      <span class="material-symbols-outlined text-white" style="font-size:18px;font-variation-settings:'FILL' 1">admin_panel_settings</span>
+    </div>
+    <div>
+      <p class="text-[9px] font-bold text-outline uppercase tracking-wider leading-none mb-0.5">Portal Admin</p>
+      <p class="text-xs font-bold text-on-surface">WIL Control v2.4</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const SHEET_ID = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+
+/* ── OJO CLAVE ── */
+function togglePass(){
+  var inp=document.getElementById('inputPass');
+  var ico=document.getElementById('eyeIcon');
+  if(inp.type==='password'){inp.type='text';ico.textContent='visibility_off';}
+  else{inp.type='password';ico.textContent='visibility';}
+}
+
+/* ── MENSAJES ── */
+function showErr(txt){
+  document.getElementById('msgErrTxt').textContent=txt||'ID o clave incorrectos.';
+  document.getElementById('msgErr').classList.add('show');
+  document.getElementById('msgOk').classList.remove('show');
+  ['inputUser','inputPass'].forEach(function(id){
+    var el=document.getElementById(id);
+    el.classList.add('inp-error');
+    setTimeout(function(){el.classList.remove('inp-error');},600);
+  });
+}
+function showOk(txt){
+  document.getElementById('msgOkTxt').textContent=txt||'Acceso correcto. Ingresando…';
+  document.getElementById('msgOk').classList.add('show');
+  document.getElementById('msgErr').classList.remove('show');
+}
+function clearMsgs(){
+  document.getElementById('msgErr').classList.remove('show');
+  document.getElementById('msgOk').classList.remove('show');
+}
+
+/* ── ESTADO BOTÓN ── */
+function setLoading(v){
+  var btn=document.getElementById('btnLogin');
+  var sp=document.getElementById('btnSpinner');
+  var ico=document.getElementById('btnIcon');
+  btn.disabled=v;
+  btn.style.opacity=v?'0.7':'1';
+  sp.classList.toggle('hidden',!v);
+  ico.style.display=v?'none':'inline-block';
+  document.getElementById('btnTxt').textContent=v?'Validando…':'Ingresar al panel';
+}
+
+/* ── PARSEO CSV ── */
+function parseCSVLine(line){
+  var cols=[],cur='',inQ=false;
+  for(var i=0;i<line.length;i++){
+    var ch=line[i];
+    if(ch==='"'){inQ=!inQ;}
+    else if(ch===','&&!inQ){cols.push(cur.trim());cur='';}
+    else{cur+=ch;}
+  }
+  cols.push(cur.trim());
+  return cols.map(function(c){return c.replace(/^"|"$/g,'').trim();});
+}
+
+/* ── HANDLE LOGIN ── */
+var _busy = false;
+
+async function handleLogin(){
+  if(_busy) return;
+  clearMsgs();
+
+  var rawId = document.getElementById('inputUser').value.trim();
+  var rawPw = document.getElementById('inputPass').value.trim();
+
+  if(!rawId){ document.getElementById('inputUser').focus(); showErr('Ingresa tu ID de domiciliario.'); return; }
+  if(!rawPw){ document.getElementById('inputPass').focus(); showErr('Ingresa tu clave.'); return; }
+
+  _busy = true;
+  setLoading(true);
+
+  try{
+    // Misma URL que usa el panel — gviz/tq funciona con hojas públicas
+    var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
+            + '/gviz/tq?tqx=out:csv&sheet=Domiciliarios&t=' + Date.now();
+
+    var res = await fetch(url, { signal: AbortSignal.timeout(12000) });
+
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+
+    var raw = await res.text();
+
+    // Si Google devuelve HTML (hoja no pública o error) — detectar
+    if(raw.trim().slice(0,5).toLowerCase().startsWith('<')){
+      throw new Error('Hoja no accesible. Comparte el Sheet como público (ver).');
+    }
+
+    // Parsear CSV — cada línea es una fila
+    var lines = raw.split('\n').map(function(l){ return l.replace(/\r/g,''); }).filter(function(l){ return l.trim() !== ''; });
+
+    // Línea 0 = encabezado, datos desde línea 1
+    var datos = lines.slice(1);
+
+    // DEBUG: mostrar en consola lo que lee
+    console.log('[WIL Login] Filas leídas:', datos.length);
+    datos.forEach(function(l, i){
+      var c = parseCSVLine(l);
+      console.log('Fila '+(i+1)+' | A=«'+c[0]+'» C=«'+c[2]+'»');
+    });
+    console.log('[WIL Login] Usuario ingresado: «'+rawId+'» Clave: «'+rawPw+'»');
+
+    var match = null;
+    for(var i = 0; i < datos.length; i++){
+      var cols    = parseCSVLine(datos[i]);
+      // Col A = ID_DOMI, Col C = CLAVE
+      var sId = (cols[0] || '').replace(/\r|\n|\t/g,'').trim();
+      var sPw = (cols[2] || '').replace(/\r|\n|\t/g,'').trim();
+
+      if(!sId) continue;
+
+      var idOk = sId.toLowerCase() === rawId.toLowerCase();
+      var pwOk = sPw === rawPw;
+
+      console.log('  Compare «'+sId+'» vs «'+rawId+'» =', idOk, '| «'+sPw+'» vs «'+rawPw+'» =', pwOk);
+
+      if(idOk && pwOk){
+        match = {
+          id     : sId,
+          nombre : (cols[1] || '').trim(),
+          tel    : (cols[3] || '').trim(),
+          foto   : (cols[4] || '').trim(),
+          activo : (cols[5] || '').trim(),
+        };
+        break;
+      }
+    }
+
+    if(!match){
+      showErr('ID o clave incorrectos. Acceso denegado.');
+      setLoading(false);
+      _busy = false;
+      return;
+    }
+
+    // ✅ Acceso confirmado
+    sessionStorage.setItem('wil_admin', JSON.stringify({
+      id: match.id, nombre: match.nombre,
+      tel: match.tel, foto: match.foto,
+      loginAt: new Date().toISOString()
+    }));
+
+    showOk('¡Hola ' + (match.nombre.split(' ')[0] || match.id) + '! Acceso correcto. Ingresando…');
+    setTimeout(function(){ location.href = 'panel-administrador.html'; }, 1400);
+
+  } catch(e){
+    var msg = 'Error de conexión. Intenta de nuevo.';
+    if(e.name === 'TimeoutError' || e.name === 'AbortError') msg = 'Tiempo agotado. Verifica tu conexión.';
+    else if(e.message && e.message.length < 140) msg = e.message;
+    showErr(msg);
+    setLoading(false);
+    _busy = false;
+  }
+}
+
+document.addEventListener('keydown', function(e){ if(e.key === 'Enter') handleLogin(); });
+</script>
+</body>
+</html>

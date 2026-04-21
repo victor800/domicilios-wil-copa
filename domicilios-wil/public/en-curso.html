@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#005e54"/>
+<title>En Curso — WIL</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;font-family:'Inter',sans-serif;background:#fff8f1;color:#1e1b17;overflow:hidden;-webkit-font-smoothing:antialiased}
+.material-symbols-outlined{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;font-size:22px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;direction:ltr;-webkit-font-smoothing:antialiased}
+
+/* Header */
+.hdr{position:fixed;top:0;left:0;right:0;z-index:100;height:60px;padding-top:env(safe-area-inset-top);display:flex;align-items:center;justify-content:space-between;padding-left:16px;padding-right:16px;background:rgba(0,94,84,.9);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.hdr-left{display:flex;align-items:center;gap:10px}
+.hdr-title{font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:15px;color:#fff}
+.hdr-badge{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;color:#fff;letter-spacing:.03em}
+.hdr-avatar{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.2);border:2px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;font-size:16px;overflow:hidden}
+
+/* Mapa */
+.map-wrap{position:fixed;top:0;left:0;right:0;bottom:0;z-index:0}
+.map-wrap iframe{width:100%;height:100%;border:none}
+.map-overlay{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,94,84,.15) 0%,transparent 20%,transparent 65%,#fff8f1 100%);pointer-events:none}
+
+/* Floating nav info */
+.nav-pill{position:absolute;top:calc(60px + env(safe-area-inset-top) + 12px);left:16px;right:16px;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);border-radius:20px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 24px rgba(0,0,0,.12);border:1px solid rgba(255,255,255,.5)}
+.nav-pill-left{display:flex;align-items:center;gap:12px}
+.nav-pill-ico{width:44px;height:44px;border-radius:14px;background:#e0f2f1;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.nav-pill-ico .material-symbols-outlined{font-size:24px;color:#005e54}
+.nav-pill-title{font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:15px;color:#1e1b17}
+.nav-pill-sub{font-size:12px;color:#6f7976;margin-top:2px}
+.nav-pill-dist{background:#e0f2f1;color:#005e54;font-weight:800;font-size:12px;padding:5px 12px;border-radius:20px}
+
+/* Quick actions */
+.quick-btns{position:absolute;top:calc(60px + env(safe-area-inset-top) + 96px);left:16px;right:16px;z-index:50;display:flex;gap:10px}
+.quick-btn{flex:1;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border:1px solid rgba(190,201,197,.4);border-radius:16px;padding:12px 8px;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;transition:all .15s;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.quick-btn:hover{background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.12)}
+.quick-btn:active{transform:scale(.96)}
+.quick-btn .material-symbols-outlined{font-size:22px;color:#00453d}
+.quick-btn-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6f7976}
+
+/* Bottom card */
+.bottom-card{position:fixed;bottom:0;left:0;right:0;z-index:80;background:#fff8f1;border-radius:28px 28px 0 0;box-shadow:0 -8px 32px rgba(0,69,61,.12);padding:20px 20px calc(20px + env(safe-area-inset-bottom));max-width:480px;margin:0 auto}
+.bc-handle{width:36px;height:4px;background:#bec9c5;border-radius:2px;margin:0 auto 18px}
+.bc-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px}
+.bc-title{font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:18px;color:#1e1b17}
+.bc-negocio{font-size:13px;color:#6f7976;margin-top:3px}
+.bc-badge{background:#00453d;color:#fff;border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;white-space:nowrap}
+.bc-badge.transfer{background:#005a7b}
+
+.bc-rows{display:flex;flex-direction:column;gap:12px;margin-bottom:18px}
+.bc-row{display:flex;gap:12px;align-items:flex-start}
+.bc-row .material-symbols-outlined{font-size:20px;color:#006d2f;flex-shrink:0;margin-top:1px}
+.bc-row-lbl{font-size:10.5px;font-weight:700;color:#6f7976;text-transform:uppercase;letter-spacing:.05em}
+.bc-row-val{font-size:13.5px;font-weight:500;color:#1e1b17;margin-top:2px;line-height:1.4}
+
+/* Totales */
+.bc-totals{background:#f4ede5;border-radius:14px;padding:12px 14px;margin-bottom:18px;display:flex;flex-direction:column;gap:6px}
+.bc-total-row{display:flex;justify-content:space-between;font-size:13px}
+.bc-total-row .k{color:#6f7976;font-weight:500}
+.bc-total-row .v{font-weight:700;color:#1e1b17}
+.bc-total-row.main .k{font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:14px;color:#1e1b17}
+.bc-total-row.main .v{font-family:'Plus Jakarta Sans',sans-serif;font-weight:900;font-size:17px;color:#006d2f}
+.bc-sep{border:none;border-top:1px dashed #bec9c5;margin:2px 0}
+
+/* Slider entregar */
+.slider-wrap{position:relative;height:60px;background:#eee7df;border-radius:30px;display:flex;align-items:center;padding:5px;overflow:hidden;cursor:pointer;user-select:none}
+.slider-track-fill{position:absolute;left:5px;height:50px;background:rgba(0,109,47,.15);border-radius:25px;transition:width .1s;pointer-events:none}
+.slider-hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:13px;color:#6f7976;letter-spacing:.06em;text-transform:uppercase;pointer-events:none;transition:opacity .2s}
+.slider-thumb{width:50px;height:50px;border-radius:25px;background:#006d2f;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,109,47,.4);flex-shrink:0;z-index:10;transition:transform .1s}
+.slider-thumb .material-symbols-outlined{font-size:26px}
+.slider-wrap.done{background:#006d2f}
+.slider-wrap.done .slider-hint{color:#fff;opacity:1}
+
+/* Bottom Nav */
+.bnav{position:fixed;bottom:0;left:0;right:0;z-index:200;background:transparent;display:none}
+
+@keyframes rot{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="hdr">
+  <div class="hdr-left">
+    <button style="width:36px;height:36px;border-radius:50%;border:none;background:transparent;color:rgba(255,255,255,.8);cursor:pointer;display:flex;align-items:center;justify-content:center" onclick="history.back()">
+      <span class="material-symbols-outlined">arrow_back</span>
+    </button>
+    <div>
+      <div class="hdr-title">Domicilios WIL</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div style="text-align:right">
+      <div style="font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.6)">En curso</div>
+      <div class="hdr-badge" id="hdr-id">Pedido #—</div>
+    </div>
+    <div class="hdr-avatar">🛵</div>
+  </div>
+</header>
+
+<!-- Mapa -->
+<div class="map-wrap">
+  <iframe
+    id="mapa"
+    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d7952!2d-75.5078!3d6.3497!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8e44256f5aa76089%3A0x1d1ea9dd9d9b2957!2sCopacabana%2C%20Antioquia!5e0!3m2!1ses!2sco!4v1710000000000"
+    loading="lazy" referrerpolicy="no-referrer-when-downgrade">
+  </iframe>
+  <div class="map-overlay"></div>
+</div>
+
+<!-- Nav Pill -->
+<div class="nav-pill">
+  <div class="nav-pill-left">
+    <div class="nav-pill-ico">
+      <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">directions_bike</span>
+    </div>
+    <div>
+      <div class="nav-pill-title" id="eta-txt">Calculando ruta...</div>
+      <div class="nav-pill-sub" id="eta-sub">Ruta a destino</div>
+    </div>
+  </div>
+  <div class="nav-pill-dist" id="dist-badge">— km</div>
+</div>
+
+<!-- Quick Actions -->
+<div class="quick-btns">
+  <button class="quick-btn" id="btn-llamar" onclick="llamarCliente()">
+    <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">call</span>
+    <span class="quick-btn-lbl">Llamar</span>
+  </button>
+  <button class="quick-btn" onclick="abrirMaps()">
+    <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">map</span>
+    <span class="quick-btn-lbl">Ver Ruta</span>
+  </button>
+  <button class="quick-btn" onclick="abrirWhatsapp()">
+    <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">chat</span>
+    <span class="quick-btn-lbl">WhatsApp</span>
+  </button>
+</div>
+
+<!-- Bottom Card -->
+<div class="bottom-card" id="bottom-card">
+  <div class="bc-handle"></div>
+
+  <div class="bc-header">
+    <div>
+      <div class="bc-title">Detalles de Entrega</div>
+      <div class="bc-negocio" id="bc-negocio">—</div>
+    </div>
+    <div class="bc-badge" id="bc-pago-badge">EFECTIVO</div>
+  </div>
+
+  <div class="bc-rows">
+    <div class="bc-row">
+      <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">location_on</span>
+      <div>
+        <div class="bc-row-lbl">Dirección del cliente</div>
+        <div class="bc-row-val" id="bc-dir">—</div>
+      </div>
+    </div>
+    <div class="bc-row">
+      <span class="material-symbols-outlined">person</span>
+      <div>
+        <div class="bc-row-lbl">Cliente</div>
+        <div class="bc-row-val" id="bc-cliente">—</div>
+      </div>
+    </div>
+    <div class="bc-row">
+      <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">shopping_bag</span>
+      <div>
+        <div class="bc-row-lbl">Productos</div>
+        <div class="bc-row-val" id="bc-productos">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bc-totals">
+    <div class="bc-total-row">
+      <span class="k">🧾 Productos</span>
+      <span class="v" id="tot-prods">Por confirmar</span>
+    </div>
+    <hr class="bc-sep"/>
+    <div class="bc-total-row">
+      <span class="k">🛵 Tu ganancia</span>
+      <span class="v" id="tot-dom">—</span>
+    </div>
+    <div class="bc-total-row main">
+      <span class="k">💵 COBRAR AL CLIENTE</span>
+      <span class="v" id="tot-total">Por confirmar</span>
+    </div>
+  </div>
+
+  <!-- Slider Entregar -->
+  <div class="slider-wrap" id="slider" onmousedown="startSlide(event)" ontouchstart="startSlide(event)">
+    <div class="slider-track-fill" id="slider-fill"></div>
+    <div class="slider-hint" id="slider-hint">← Deslizar para entregar →</div>
+    <div class="slider-thumb" id="slider-thumb">
+      <span class="material-symbols-outlined">chevron_right</span>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/api';
+const params = new URLSearchParams(location.search);
+const pedidoId = params.get('id') || localStorage.getItem('wil_pedido_activo') || 'WIL-001';
+
+// Demo data (se reemplaza con datos reales de la API)
+const DEMO = {
+  id: pedidoId,
+  negocioNombre: '💊 Droguería FarmaExpertos',
+  cliente: 'María García — 📱 3001234567',
+  telefono: '3001234567',
+  direccion: 'Barrio Asunción, Casa 12, Copacabana',
+  productos: 'Acetaminofén 500mg × 2 — Losartán 50mg × 1',
+  total: 42800,
+  domicilio: 5800,
+  metodoPago: 'EFECTIVO',
+  latCliente: 6.3510, lngCliente: -75.5055,
+};
+
+function COP(n) {
+  return '$' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+async function cargarPedido() {
+  let p = DEMO;
+  try {
+    const res = await fetch(`${API}/pedido?id=${pedidoId}`);
+    if (res.ok) p = await res.json();
+  } catch(e) { /* usar demo */ }
+
+  document.getElementById('hdr-id').textContent = 'Pedido #' + (p.id || pedidoId).slice(-4);
+  document.getElementById('bc-negocio').textContent = p.negocioNombre || '—';
+  document.getElementById('bc-dir').textContent = p.direccion || '—';
+  document.getElementById('bc-cliente').textContent = p.cliente || '—';
+  document.getElementById('bc-productos').textContent = p.productos || '—';
+
+  const prods = p.total && p.domicilio ? p.total - p.domicilio : null;
+  document.getElementById('tot-prods').textContent = prods ? COP(prods) : 'Por confirmar';
+  document.getElementById('tot-dom').textContent = p.domicilio ? COP(p.domicilio) : '—';
+  document.getElementById('tot-total').textContent = p.total ? COP(p.total) : 'Por confirmar';
+
+  const badge = document.getElementById('bc-pago-badge');
+  if (p.metodoPago === 'TRANSFERENCIA') {
+    badge.textContent = 'TRANSFERENCIA';
+    badge.classList.add('transfer');
+  }
+
+  // ETA
+  if (p.latCliente && p.lngCliente) {
+    calcularETA(p.latCliente, p.lngCliente);
+  } else {
+    document.getElementById('eta-txt').textContent = '~15 min estimados';
+    document.getElementById('dist-badge').textContent = '~1.5 km';
+  }
+
+  // Guardar tel para llamar
+  window._telCliente = p.telefono || '';
+  window._pedidoData = p;
+}
+
+async function calcularETA(lat2, lng2) {
+  try {
+    const lat1 = 6.3497, lng1 = -75.5078; // sede
+    const url = `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=false`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data?.routes?.[0]) {
+      const km = (data.routes[0].distance / 1000).toFixed(1);
+      const mins = Math.round(data.routes[0].duration / 60);
+      document.getElementById('eta-txt').textContent = `~${mins} min restantes`;
+      document.getElementById('dist-badge').textContent = `${km} km`;
+      document.getElementById('eta-sub').textContent = 'Ruta optimizada al cliente';
+    }
+  } catch(e) {
+    document.getElementById('eta-txt').textContent = '~15 min estimados';
+    document.getElementById('dist-badge').textContent = '~km';
+  }
+}
+
+function llamarCliente() {
+  const tel = window._telCliente;
+  if (tel) window.location.href = `tel:${tel}`;
+}
+
+function abrirMaps() {
+  const p = window._pedidoData || DEMO;
+  const dir = encodeURIComponent((p.direccion || '') + ', Antioquia, Colombia');
+  window.open(`https://www.google.com/maps/search/?api=1&query=${dir}`, '_blank');
+}
+
+function abrirWhatsapp() {
+  const tel = window._telCliente?.replace(/\D/g,'');
+  if (tel) window.open(`https://wa.me/57${tel}`, '_blank');
+}
+
+// ── SLIDER ENTREGAR ────────────────────────────────────────────
+let sliding = false, startX = 0, currentX = 0, maxX = 0;
+
+function startSlide(e) {
+  const slider = document.getElementById('slider');
+  const thumb = document.getElementById('slider-thumb');
+  maxX = slider.offsetWidth - thumb.offsetWidth - 10;
+  sliding = true;
+  startX = (e.touches ? e.touches[0].clientX : e.clientX);
+  document.addEventListener('mousemove', onSlide);
+  document.addEventListener('touchmove', onSlide, {passive:false});
+  document.addEventListener('mouseup', endSlide);
+  document.addEventListener('touchend', endSlide);
+}
+
+function onSlide(e) {
+  if (!sliding) return;
+  if (e.cancelable) e.preventDefault();
+  const x = (e.touches ? e.touches[0].clientX : e.clientX);
+  currentX = Math.max(0, Math.min(x - startX, maxX));
+  const thumb = document.getElementById('slider-thumb');
+  const fill = document.getElementById('slider-fill');
+  const hint = document.getElementById('slider-hint');
+  thumb.style.transform = `translateX(${currentX}px)`;
+  fill.style.width = (currentX + 50) + 'px';
+  hint.style.opacity = 1 - (currentX / maxX);
+  if (currentX >= maxX - 5) confirmarEntrega();
+}
+
+function endSlide() {
+  if (!sliding) return;
+  sliding = false;
+  document.removeEventListener('mousemove', onSlide);
+  document.removeEventListener('touchmove', onSlide);
+  document.removeEventListener('mouseup', endSlide);
+  document.removeEventListener('touchend', endSlide);
+  if (currentX < maxX - 5) resetSlider();
+}
+
+function resetSlider() {
+  const thumb = document.getElementById('slider-thumb');
+  const fill = document.getElementById('slider-fill');
+  const hint = document.getElementById('slider-hint');
+  thumb.style.transition = 'transform .3s';
+  fill.style.transition = 'width .3s';
+  hint.style.transition = 'opacity .3s';
+  thumb.style.transform = 'translateX(0)';
+  fill.style.width = '50px';
+  hint.style.opacity = '1';
+  setTimeout(() => {
+    thumb.style.transition = '';
+    fill.style.transition = '';
+    hint.style.transition = '';
+  }, 300);
+  currentX = 0;
+}
+
+async function confirmarEntrega() {
+  sliding = false;
+  const slider = document.getElementById('slider');
+  const hint = document.getElementById('slider-hint');
+  slider.classList.add('done');
+  hint.textContent = '✅ ¡Entregado!';
+  hint.style.opacity = '1';
+
+  try {
+    await fetch(`${API}/entregar`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ pedidoId, domiToken: localStorage.getItem('wil_domi_token') })
+    });
+  } catch(e) { /* continuar igual */ }
+
+  setTimeout(() => {
+    window.location.href = 'pendientes.html';
+  }, 1500);
+}
+
+// Init
+cargarPedido();
+</script>
+</body>
+</html>

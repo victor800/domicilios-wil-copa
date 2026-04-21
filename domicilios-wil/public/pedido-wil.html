@@ -1,0 +1,2260 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#006970"/>
+<title>Pedir — Domicilios WIL</title>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icons/icon-192.png"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --p:#006970;--p2:#00a3b4;--p3:#00bcc9;
+  --pl:rgba(0,105,112,.09);--plb:rgba(0,105,112,.18);
+  --surf:#f0f4f7;--w:#ffffff;--w2:#f8fafb;--w3:#eef1f5;
+  --on:#18222e;--on2:#3d5068;--on3:#7a8fa6;
+  --gr:#16a34a;--rd:#dc2626;--am:#d97706;
+  --r-2xl:22px;--r-xl:17px;--r-lg:13px;--r-md:10px;
+  --sh:0 2px 10px rgba(0,60,80,.07);
+  --sh2:0 6px 24px rgba(0,60,80,.11);
+  --sh3:0 12px 40px rgba(0,60,80,.15);
+}
+html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(--surf);color:var(--on);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+.sym{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;font-size:22px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;direction:ltr;-webkit-font-smoothing:antialiased;font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24}
+.sym.f{font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24}
+.hidden{display:none!important}
+.spacer{height:16px}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pingDot{0%{transform:scale(1);opacity:.75}70%{transform:scale(2.4);opacity:0}100%{opacity:0}}
+@keyframes rot{to{transform:rotate(360deg)}}
+@keyframes tickerScroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.spin{display:inline-block;width:16px;height:16px;border:2.5px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:rot .7s linear infinite;vertical-align:middle}
+.spin.dk{border-color:rgba(0,105,112,.2);border-top-color:var(--p)}
+
+/* ── MODAL CHAT FLOTANTE ── */
+#chatModalOv{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);display:none;align-items:flex-end;justify-content:center;padding-bottom:env(safe-area-inset-bottom)}
+#chatModalOv.open{display:flex}
+#chatModal{width:100%;max-width:480px;background:#fff;border-radius:26px 26px 0 0;max-height:88dvh;display:flex;flex-direction:column;box-shadow:0 -10px 50px rgba(0,0,0,.22);animation:slideUpSheet .3s cubic-bezier(.22,1,.36,1)}
+#chatModal .chat-hdr{padding:14px 16px 10px;border-bottom:1px solid #f0f3f6;display:flex;align-items:center;gap:10px;flex-shrink:0}
+#chatModal .chat-hdr-av{width:38px;height:38px;border-radius:50%;background:var(--pl);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:var(--p);flex-shrink:0}
+#chatModal .chat-hdr-info{flex:1;min-width:0}
+#chatModal .chat-hdr-name{font-size:14px;font-weight:800;color:var(--on)}
+#chatModal .chat-hdr-estado{font-size:10px;color:var(--on3);display:flex;align-items:center;gap:4px;margin-top:2px}
+#chatModal .chat-close{width:32px;height:32px;border-radius:50%;border:none;background:#f0f4f7;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+/* FAB chat */
+#chatFab{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px)+74px);right:16px;z-index:1500;display:none;cursor:pointer}
+#chatFab-inner{width:54px;height:54px;border-radius:50%;background:#006970;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 20px rgba(0,105,112,.5);position:relative;transition:.15s}
+#chatFab-inner:active{transform:scale(.92)}
+#chatFab-badge{position:absolute;top:-3px;right:-3px;min-width:19px;height:19px;border-radius:99px;background:#ef4444;color:#fff;font-size:10px;font-weight:900;display:none;align-items:center;justify-content:center;padding:0 4px;border:2px solid #fff;box-shadow:0 2px 6px rgba(239,68,68,.4)}
+
+/* HEADER */
+.hdr{position:fixed;top:0;left:0;right:0;z-index:200;height:56px;padding:0 14px;padding-top:env(safe-area-inset-top);display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.94);backdrop-filter:blur(24px);border-bottom:1px solid rgba(0,105,112,.08);box-shadow:0 1px 8px rgba(0,60,80,.06)}
+.hdr-back{width:34px;height:34px;border-radius:50%;border:none;background:var(--pl);color:var(--p);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s}
+.hdr-back:active{transform:scale(.88)}
+.hdr-logo{width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid rgba(0,105,112,.18)}
+.hdr-title{font-weight:800;font-size:15px;color:var(--on);flex:1;letter-spacing:-.01em}
+.hdr-loc{display:flex;align-items:center;gap:4px;background:var(--pl);border:1px solid var(--plb);border-radius:99px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:700;color:var(--p);white-space:nowrap;flex-shrink:0;max-width:118px;overflow:hidden;text-overflow:ellipsis}
+.hdr-loc .sym{font-size:13px}
+
+/* BOTTOM NAV */
+.bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;z-index:200;background:rgba(255,255,255,.97);backdrop-filter:blur(20px);border-top:1px solid rgba(0,105,112,.07);border-radius:20px 20px 0 0;display:flex;padding:6px 8px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -4px 24px rgba(0,60,80,.08)}
+.bi{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 4px;border-radius:12px;cursor:pointer;border:none;background:transparent;color:var(--on3);transition:.18s}
+.bi.active{background:var(--pl);color:var(--p)}
+.bi .sym{font-size:21px}
+.bi-lbl{font-size:9px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+
+/* MAIN */
+.main{padding-top:calc(56px + env(safe-area-inset-top));padding-bottom:calc(74px + env(safe-area-inset-bottom));max-width:480px;margin:0 auto}
+.view{display:none;animation:fadeUp .24s cubic-bezier(.22,1,.36,1) both}
+.view.active{display:block}
+
+/* HERO */
+.hero{padding:22px 16px 10px;position:relative;overflow:hidden}
+.hero-bg{position:absolute;top:-60px;right:-50px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(0,188,201,.13),transparent 65%);pointer-events:none}
+.hero-pill{display:inline-flex;align-items:center;gap:5px;background:var(--pl);border:1px solid var(--plb);border-radius:99px;padding:3px 10px;font-size:10.5px;font-weight:700;color:var(--p);margin-bottom:10px}
+.hero-pill .sym{font-size:12px}
+.hero-h1{font-size:28px;font-weight:900;color:var(--on);line-height:1.1;letter-spacing:-.02em;margin-bottom:6px}
+.hero-h1 span{color:var(--p);font-style:italic}
+.hero-sub{font-size:13px;color:var(--on3);font-weight:500;line-height:1.55}
+
+/* FILTROS */
+.filters{display:flex;gap:7px;padding:14px 16px 4px;overflow-x:auto;scrollbar-width:none}
+.filters::-webkit-scrollbar{display:none}
+.fpill{display:flex;align-items:center;gap:5px;padding:7px 14px;border-radius:99px;border:1.5px solid #dce3ea;background:var(--w);font-size:12px;font-weight:700;color:var(--on2);cursor:pointer;white-space:nowrap;flex-shrink:0;transition:.18s;box-shadow:var(--sh)}
+.fpill .sym{font-size:14px}
+.fpill.active{background:var(--p);border-color:var(--p);color:#fff;box-shadow:0 4px 14px rgba(0,105,112,.28)}
+
+/* SEC */
+.sec-row{display:flex;align-items:center;padding:14px 16px 10px}
+.sec-lbl{font-size:13px;font-weight:800;color:var(--on);display:flex;align-items:center;gap:6px;flex:1}
+.sec-lbl .sym{font-size:16px;color:var(--p)}
+.sec-ver-mas{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:var(--p);background:var(--pl);border:1px solid var(--plb);border-radius:99px;padding:4px 10px;cursor:pointer;white-space:nowrap;transition:.15s;flex-shrink:0}
+.sec-ver-mas:active{background:var(--plb)}
+.sec-ver-mas .sym{font-size:12px}
+
+/* ════════════════════════════════════
+   FARMACIAS — GRID (sin carousel)
+════════════════════════════════════ */
+.farm-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 16px 4px}
+.farm-card{border-radius:18px;overflow:hidden;background:var(--w);border:1.5px solid rgba(0,0,0,.05);box-shadow:var(--sh2);cursor:pointer;transition:transform .18s,box-shadow .18s;display:flex;flex-direction:column}
+.farm-card:active{transform:scale(.96);box-shadow:var(--sh)}
+.farm-card-img{position:relative;height:110px;overflow:hidden;flex-shrink:0}
+.farm-card-img img{width:100%;height:100%;object-fit:cover;object-position:center}
+.farm-card-img-fallback{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:44px}
+.farm-card-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.65) 0%,rgba(0,0,0,.05) 55%)}
+.farm-card-badge{position:absolute;top:8px;left:8px;background:rgba(22,163,74,.9);backdrop-filter:blur(6px);border-radius:99px;padding:2px 7px;font-size:8.5px;font-weight:800;color:#fff;display:flex;align-items:center;gap:2px;z-index:1}
+.farm-card-badge .sym{font-size:9px}
+.farm-card-cat{position:absolute;bottom:8px;left:8px;z-index:1;background:rgba(255,255,255,.18);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.3);border-radius:99px;padding:2px 8px;font-size:9px;font-weight:800;color:#fff;display:flex;align-items:center;gap:3px}
+.farm-card-cat .sym{font-size:10px}
+.farm-card-body{padding:10px 11px 12px;flex:1;display:flex;flex-direction:column;gap:6px}
+.farm-card-name{font-size:12.5px;font-weight:900;color:var(--on);letter-spacing:-.01em;line-height:1.2}
+.farm-card-addr{font-size:9.5px;color:var(--on3);font-weight:500;display:flex;align-items:flex-start;gap:2px;line-height:1.35}
+.farm-card-addr .sym{font-size:10px;color:var(--p);flex-shrink:0;margin-top:1px}
+.farm-card-tags{display:flex;flex-wrap:wrap;gap:3px}
+.farm-ctag{font-size:8.5px;font-weight:700;padding:2px 6px;border-radius:5px}
+.farm-ctag-t{background:rgba(0,105,112,.08);color:var(--p)}
+.farm-ctag-g{background:rgba(22,163,74,.08);color:#16a34a}
+.farm-ctag-a{background:rgba(217,119,6,.08);color:#92400e}
+.farm-card-btn{width:100%;padding:8px;border-radius:9px;border:none;background:var(--p);color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;box-shadow:0 2px 8px rgba(0,105,112,.22);transition:.15s;margin-top:auto}
+.farm-card-btn:active{background:var(--p2)}
+.farm-card-btn .sym{font-size:13px}
+
+/* ════════════════════════════════════
+   CATEGORÍAS TICKER
+════════════════════════════════════ */
+.cats-ticker-outer{position:relative;overflow:hidden;padding:0 0 16px}
+.cats-ticker-outer::before,.cats-ticker-outer::after{content:'';position:absolute;top:0;bottom:16px;width:32px;z-index:2;pointer-events:none}
+.cats-ticker-outer::before{left:0;background:linear-gradient(to right,var(--surf) 30%,transparent)}
+.cats-ticker-outer::after{right:0;background:linear-gradient(to left,var(--surf) 30%,transparent)}
+.cats-ticker-track{display:flex;gap:10px;width:max-content;padding:2px 16px 2px;animation:tickerScroll 32s linear infinite}
+.cats-ticker-track:hover{animation-play-state:paused}
+.cat-real-pill{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:10px 15px 10px 12px;background:var(--w);border:1.5px solid #dde6ed;border-radius:16px;cursor:pointer;box-shadow:var(--sh);transition:.18s;white-space:nowrap}
+.cat-real-pill:active{transform:scale(.93);box-shadow:none;border-color:var(--p)}
+.cat-real-ico{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px}
+.cat-real-name{font-size:13px;font-weight:800;color:var(--on);letter-spacing:-.01em}
+.cat-real-sub{font-size:10px;color:var(--on3);font-weight:500;margin-top:1px}
+
+/* ════════════════════════════════════
+   BARRIOS — scroll con flechas
+════════════════════════════════════ */
+.scroll-section{position:relative;padding:0 0 14px}
+.scroll-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:10;width:32px;height:32px;border-radius:50%;border:1.5px solid #dce3ea;background:rgba(255,255,255,.96);backdrop-filter:blur(8px);box-shadow:0 2px 12px rgba(0,60,80,.14);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;flex-shrink:0}
+.scroll-arrow:active{transform:translateY(-50%) scale(.9)}
+.scroll-arrow .sym{font-size:17px;color:var(--on2)}
+.scroll-arrow.left{left:6px}
+.scroll-arrow.right{right:6px}
+.scroll-arrow:disabled{opacity:.3;pointer-events:none}
+.scroll-track-wrap{overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-behavior:smooth;padding:4px 16px 4px}
+.scroll-track-wrap::-webkit-scrollbar{display:none}
+.scroll-track{display:flex;gap:10px;width:max-content}
+
+/* BARRIO CARD — sin precio */
+.barrio-card{flex-shrink:0;width:138px;background:var(--w);border:1.5px solid #e2eaef;border-radius:16px;overflow:hidden;box-shadow:var(--sh);cursor:pointer;transition:transform .15s,box-shadow .15s}
+.barrio-card:active{transform:scale(.95);box-shadow:none}
+.barrio-card-top{height:5px}
+.barrio-card-body{padding:11px 12px 13px}
+.barrio-card-zone{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;opacity:.75}
+.barrio-card-name{font-size:12.5px;font-weight:900;color:var(--on);line-height:1.25;margin-bottom:8px}
+.barrio-card-btn{display:flex;align-items:center;gap:4px;width:100%;padding:6px 8px;border-radius:8px;border:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:9.5px;font-weight:800;color:#fff;cursor:pointer;justify-content:center;transition:.15s}
+.barrio-card-btn .sym{font-size:11px}
+
+/* METRO CARD */
+.metro-card{flex-shrink:0;width:155px;background:var(--w);border:1.5px solid #e2eaef;border-radius:16px;overflow:hidden;box-shadow:var(--sh);cursor:pointer;transition:transform .15s,box-shadow .15s}
+.metro-card:active{transform:scale(.95);box-shadow:none}
+.metro-card-top{height:5px;background:var(--p)}
+.metro-card-body{padding:11px 12px 13px}
+.metro-card-muni{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--on3);margin-bottom:3px}
+.metro-card-name{font-size:12.5px;font-weight:900;color:var(--on);line-height:1.2;margin-bottom:3px}
+.metro-card-sector{font-size:10px;color:var(--on3);font-weight:500;margin-bottom:8px;line-height:1.3}
+.metro-card-btn{display:flex;align-items:center;gap:4px;width:100%;padding:6px 8px;border-radius:8px;border:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:9.5px;font-weight:800;color:#fff;background:var(--p);cursor:pointer;justify-content:center;box-shadow:0 2px 8px rgba(0,105,112,.25);transition:.15s}
+.metro-card-btn .sym{font-size:11px}
+
+/* ════════════════════════════════════
+   MODAL VER TODOS
+════════════════════════════════════ */
+.modal-overlay{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);display:flex;align-items:flex-end;justify-content:center;padding-bottom:env(safe-area-inset-bottom)}
+.modal-overlay.hidden{display:none!important}
+.modal-sheet{width:100%;max-width:480px;background:#fff;border-radius:26px 26px 0 0;max-height:88dvh;display:flex;flex-direction:column;box-shadow:0 -10px 50px rgba(0,0,0,.22);animation:slideUpSheet .3s cubic-bezier(.22,1,.36,1)}
+@keyframes slideUpSheet{from{transform:translateY(80px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-handle{width:36px;height:4px;background:#e0e4e8;border-radius:4px;margin:13px auto 0;flex-shrink:0}
+.modal-hdr{padding:14px 18px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f0f3f6;flex-shrink:0}
+.modal-hdr-tit{font-size:16px;font-weight:900;color:var(--on);display:flex;align-items:center;gap:7px}
+.modal-hdr-tit .sym{font-size:18px;color:var(--p)}
+.modal-close{width:32px;height:32px;border-radius:50%;border:none;background:#f0f4f7;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.modal-close .sym{font-size:16px;color:var(--on3)}
+.modal-body{overflow-y:auto;padding:14px 14px 20px;flex:1}
+.modal-body::-webkit-scrollbar{width:3px}
+.modal-body::-webkit-scrollbar-thumb{background:#c8d4dc;border-radius:3px}
+.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+/* card en modal */
+.modal-barrio-card{background:var(--w2);border:1.5px solid #e2eaef;border-radius:14px;overflow:hidden;cursor:pointer;transition:transform .15s;box-shadow:0 1px 4px rgba(0,60,80,.06)}
+.modal-barrio-card:active{transform:scale(.96)}
+.modal-barrio-card-top{height:4px}
+.modal-barrio-card-body{padding:10px 11px 11px}
+.modal-barrio-card-zone{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.7;margin-bottom:3px}
+.modal-barrio-card-name{font-size:12px;font-weight:900;color:var(--on);line-height:1.25;margin-bottom:8px}
+.modal-barrio-card-btn{width:100%;padding:7px 6px;border-radius:8px;border:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:800;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px;transition:.15s}
+.modal-barrio-card-btn .sym{font-size:12px}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:calc(84px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(20px);z-index:3000;background:#18222e;color:#fff;border-radius:14px;padding:12px 18px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;box-shadow:0 8px 28px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;white-space:nowrap;max-width:calc(100vw - 40px)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
+.toast .sym{font-size:16px;color:var(--p3)}
+
+/* ════ PEDIDO LIBRE / PAQUETERÍA ════ */
+.wil-libre{margin:0 16px 10px;border-radius:var(--r-2xl);overflow:hidden;background:linear-gradient(135deg,#004851 0%,#006970 50%,#00a3b4 100%);cursor:pointer;position:relative;box-shadow:var(--sh3);transition:transform .15s}
+.wil-libre:active{transform:scale(.985)}
+.wil-libre-shine{position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.07) 0%,transparent 55%);pointer-events:none}
+.wil-libre-dots{position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(circle,rgba(255,255,255,.055) 1px,transparent 1px);background-size:16px 16px}
+.wil-libre-body{padding:22px 20px;position:relative;z-index:1;display:flex;align-items:center;gap:16px}
+.wl-emo{font-size:58px;line-height:1;flex-shrink:0;filter:drop-shadow(0 4px 16px rgba(0,0,0,.25))}
+.wl-txt .wl-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.22);border-radius:99px;padding:3px 10px;font-size:10px;font-weight:700;color:rgba(255,255,255,.9);margin-bottom:8px}
+.wl-badge .sym{font-size:11px}
+.wl-tit{font-size:18px;font-weight:900;color:#fff;line-height:1.2;letter-spacing:-.015em;margin-bottom:5px}
+.wl-sub{font-size:11.5px;color:rgba(255,255,255,.65);line-height:1.5;font-weight:500;margin-bottom:14px}
+.wl-cta{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.26);border-radius:99px;padding:7px 14px;font-size:12px;font-weight:800;color:#fff}
+.wl-cta .sym{font-size:15px}
+
+.wil-paq{margin:0 16px 8px;border-radius:var(--r-2xl);overflow:hidden;background:linear-gradient(135deg,#1e2d4a 0%,#2d4070 55%,#3d5490 100%);cursor:pointer;position:relative;box-shadow:var(--sh2);transition:transform .15s}
+.wil-paq:active{transform:scale(.985)}
+.wil-paq-shine{position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.06) 0%,transparent 55%);pointer-events:none}
+.wil-paq-body{padding:20px 20px;position:relative;z-index:1;display:flex;align-items:center;gap:14px}
+.wp-emo{font-size:50px;line-height:1;flex-shrink:0;filter:drop-shadow(0 4px 14px rgba(0,0,0,.3))}
+.wp-txt .wp-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:99px;padding:3px 10px;font-size:10px;font-weight:700;color:rgba(255,255,255,.88);margin-bottom:7px}
+.wp-badge .sym{font-size:11px}
+.wp-tit{font-size:16px;font-weight:900;color:#fff;line-height:1.2;letter-spacing:-.015em;margin-bottom:4px}
+.wp-sub{font-size:11px;color:rgba(255,255,255,.6);line-height:1.5;font-weight:500;margin-bottom:12px}
+.wp-cta{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:99px;padding:6px 13px;font-size:11.5px;font-weight:800;color:#fff}
+.wp-cta .sym{font-size:14px}
+
+/* FORM CARDS */
+.card{background:var(--w);border:1.5px solid #e2e9ef;border-radius:var(--r-xl);margin:0 16px 12px;padding:16px;box-shadow:var(--sh)}
+.card-tit{font-size:14px;font-weight:800;color:var(--on);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.card-tit .sym{font-size:18px;color:var(--p)}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:11px;font-weight:700;color:var(--on3);margin-bottom:5px;letter-spacing:.04em;text-transform:uppercase}
+.field input,.field textarea{width:100%;border:1.5px solid #dce3ea;border-radius:var(--r-lg);padding:11px 13px;font-size:14px;font-family:'Plus Jakarta Sans',sans-serif;color:var(--on);background:#fff;outline:none;transition:.15s;resize:none}
+.field input::placeholder,.field textarea::placeholder{color:var(--on3)}
+.field input:focus,.field textarea:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(0,105,112,.08)}
+.field textarea{min-height:76px}
+.field-note{font-size:10.5px;color:var(--on3);margin-top:4px;font-weight:500}
+.yn-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.yn-btn{padding:13px 8px;border-radius:var(--r-lg);border:1.5px solid #dce3ea;background:#f8fafb;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;color:var(--on2);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;transition:.18s}
+.yn-btn .sym{font-size:22px;color:var(--on3)}
+.yn-btn.sel{border-color:var(--p);background:var(--pl);color:var(--p)}
+.yn-btn.sel .sym{color:var(--p)}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{padding:8px 14px;border-radius:99px;border:1.5px solid #dce3ea;background:#f8fafb;font-size:13px;font-weight:700;color:var(--on2);cursor:pointer;transition:.15s;white-space:nowrap}
+.chip.sel{border-color:var(--p);background:var(--pl);color:var(--p)}
+.chip.otro{border-style:dashed}
+.prod-list{display:flex;flex-direction:column;gap:7px;margin-bottom:12px}
+.prod-item{display:flex;align-items:center;gap:8px;background:#f8fafb;border-radius:var(--r-md);padding:9px 12px;border:1px solid #edf0f3}
+.prod-name{flex:1;font-size:13px;font-weight:600;color:var(--on)}
+.qty-row{display:flex;align-items:center;gap:6px}
+.qty-btn{width:26px;height:26px;border-radius:50%;border:none;background:var(--pl);color:var(--p);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;line-height:1}
+.qty-n{font-size:13px;font-weight:700;min-width:18px;text-align:center}
+.prod-del{width:26px;height:26px;border-radius:50%;border:none;background:#fef2f2;color:var(--rd);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.prod-del .sym{font-size:14px}
+.add-row{display:flex;gap:8px;align-items:center}
+.add-inp{flex:1;border:1.5px solid #dce3ea;border-radius:var(--r-lg);padding:10px 13px;font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;color:var(--on);background:#fff;outline:none;transition:.15s}
+.add-inp::placeholder{color:var(--on3)}
+.add-inp:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(0,105,112,.08)}
+.add-btn{width:40px;height:40px;border-radius:50%;border:none;background:var(--p);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 3px 10px rgba(0,105,112,.25)}
+.add-btn .sym{font-size:20px}
+.loc-strip{background:rgba(0,105,112,.05);border:1.5px solid rgba(0,105,112,.16);border-radius:var(--r-lg);padding:10px 12px;display:flex;align-items:center;gap:10px;margin-bottom:12px;cursor:pointer;transition:.15s}
+.loc-strip:active{background:rgba(0,105,112,.1)}
+.loc-ico{width:34px;height:34px;border-radius:50%;background:var(--p);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.loc-ico .sym{font-size:16px;color:#fff}
+.loc-tit{font-size:12.5px;font-weight:700;color:var(--p)}
+.loc-sub{font-size:11px;color:var(--on3);margin-top:1px}
+.loc-st{font-size:11px;font-weight:700}
+.loc-st.ok{color:var(--gr)}.loc-st.loading{color:var(--am)}.loc-st.err{color:var(--rd)}
+.pago-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pago-c{border:1.5px solid #dce3ea;border-radius:var(--r-lg);padding:14px 10px;cursor:pointer;text-align:center;background:#f8fafb;transition:.18s}
+.pago-c.sel{border-color:var(--p);background:var(--pl)}
+.pago-ico{font-size:26px;margin-bottom:5px}
+.pago-lbl{font-size:12.5px;font-weight:800;color:var(--on)}
+.pago-sub{font-size:10px;color:var(--on3);margin-top:2px}
+.act-row{padding:12px 16px 4px;display:flex;gap:10px}
+.btn-b{flex:1;padding:13px;border-radius:var(--r-lg);border:1.5px solid #dce3ea;background:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;color:var(--on2);cursor:pointer;transition:.15s}
+.btn-n{flex:2;padding:13px;border-radius:var(--r-lg);border:none;background:var(--p);font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:800;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 4px 16px rgba(0,105,112,.3);transition:.15s}
+.btn-n:active{transform:scale(.97)}.btn-n:disabled{opacity:.5;pointer-events:none}
+.btn-n .sym{font-size:17px}
+.btn-full{width:100%;padding:14px;border-radius:var(--r-lg);border:none;background:var(--p);font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:800;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 4px 16px rgba(0,105,112,.28);transition:.15s}
+.btn-full:active{transform:scale(.97)}
+.btn-full.gr{background:#16a34a;box-shadow:0 4px 16px rgba(22,163,74,.28)}
+.btn-full.dk{background:var(--on);box-shadow:none}
+.btn-full .sym{font-size:18px}
+.factura{background:var(--w);border:1.5px solid #e2e9ef;border-radius:var(--r-xl);margin:0 16px;padding:18px;box-shadow:var(--sh2)}
+.fac-hdr{display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:14px;border-bottom:1.5px dashed #e2e9ef}
+.fac-logo{width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid rgba(0,105,112,.2)}
+.fac-tit{font-size:14px;font-weight:800;color:var(--on)}
+.fac-sub{font-size:10px;color:var(--on3);margin-top:2px}
+.fac-row{display:flex;justify-content:space-between;align-items:flex-start;padding:7px 0;border-bottom:1px solid #f0f3f6}
+.fac-lbl{font-size:11px;color:var(--on3);font-weight:500;flex-shrink:0;padding-right:12px}
+.fac-val{font-size:12px;color:var(--on);font-weight:700;text-align:right;flex:1}
+.fac-items{margin:8px 0;background:#f8fafb;border-radius:var(--r-md);padding:10px 12px}
+.fac-item{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:var(--on2)}
+.fac-nota{background:#fffbeb;border:1px solid rgba(217,119,6,.2);border-radius:var(--r-md);padding:10px 12px;font-size:11px;color:#92400e;margin-top:12px;line-height:1.5;display:flex;align-items:flex-start;gap:6px}
+.fac-nota .sym{font-size:14px;color:var(--am);flex-shrink:0;margin-top:1px}
+.succ-wrap{display:flex;flex-direction:column;align-items:center;padding:36px 24px 20px;text-align:center}
+.succ-ring{width:78px;height:78px;border-radius:50%;background:rgba(22,163,74,.1);border:2px solid rgba(22,163,74,.25);display:flex;align-items:center;justify-content:center;margin-bottom:18px;box-shadow:0 0 0 10px rgba(22,163,74,.06)}
+.succ-ring .sym{font-size:36px;color:#16a34a}
+.succ-tit{font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:7px}
+.succ-sub{font-size:13px;color:var(--on3);line-height:1.6;max-width:280px;margin-bottom:20px;font-weight:500}
+.id-badge{background:linear-gradient(135deg,var(--pl),rgba(0,188,201,.04));border:1.5px solid var(--plb);border-radius:var(--r-xl);padding:22px 20px;margin:0 16px 16px;text-align:center}
+.id-badge-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on3);margin-bottom:10px}
+.id-badge-code{font-size:32px;font-weight:900;letter-spacing:.12em;color:var(--p);font-feature-settings:'tnum'}
+.id-badge-sub{font-size:11.5px;color:var(--on3);margin-top:8px;font-weight:500}
+.id-badge-copy{display:inline-flex;align-items:center;gap:5px;margin-top:12px;background:var(--p);border-radius:99px;padding:7px 16px;font-size:12px;font-weight:800;color:#fff;border:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;box-shadow:0 3px 10px rgba(0,105,112,.25)}
+.id-badge-copy .sym{font-size:15px}
+
+/* RASTREADOR */
+.wil-domi-icon{background:none!important;border:none!important;box-shadow:none!important}
+@keyframes wilPulse{0%{transform:scale(1);opacity:.85}70%{transform:scale(2.2);opacity:0}100%{opacity:0}}
+#rt-empty{position:relative;height:calc(100dvh - 56px - env(safe-area-inset-top) - 70px - env(safe-area-inset-bottom));min-height:400px;overflow:hidden}
+#rt-empty-map{width:100%;height:100%;z-index:0}
+.rt-live-chip{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:500;pointer-events:none;background:rgba(255,255,255,.95);backdrop-filter:blur(16px);border-radius:99px;padding:7px 18px;display:flex;align-items:center;gap:9px;box-shadow:0 4px 20px rgba(0,60,80,.18);white-space:nowrap}
+.rt-live-dot{width:9px;height:9px;border-radius:50%;background:#16a34a;flex-shrink:0;position:relative}
+.rt-live-dot::after{content:'';position:absolute;inset:-4px;border-radius:50%;background:rgba(22,163,74,.25);animation:wilPulse 1.6s ease-in-out infinite}
+#rtConsultarBtn{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);z-index:600;white-space:nowrap;background:linear-gradient(135deg,#006970,#00a3b4);border:none;border-radius:99px;cursor:pointer;padding:14px 24px;display:flex;align-items:center;gap:10px;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:800;color:#fff;box-shadow:0 8px 28px rgba(0,105,112,.45)}
+#rtConsultarBtn{animation:none;padding:0;background:transparent;box-shadow:none;width:calc(100% - 48px);max-width:340px}
+.swipe-track{position:relative;width:100%;height:54px;background:linear-gradient(135deg,#006970,#00a3b4);border-radius:99px;overflow:hidden;box-shadow:0 8px 28px rgba(0,105,112,.45)}
+.swipe-thumb{position:absolute;left:4px;top:4px;width:46px;height:46px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:grab;touch-action:none;transition:left .38s cubic-bezier(.22,1,.36,1);box-shadow:0 3px 12px rgba(0,0,0,.22);z-index:2;user-select:none}
+.swipe-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:6px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:800;color:#fff;pointer-events:none;padding-left:54px}
+.swipe-label .sym{font-size:15px;opacity:.8}
+@keyframes swipeShimmer{0%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
+@keyframes motoHint{
+  0%,100%{left:4px}
+  20%{left:28px}
+  40%{left:52px}
+  55%{left:38px}
+  70%{left:58px}
+  85%{left:18px}
+}
+.swipe-track::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent);animation:swipeShimmer 2.4s ease-in-out infinite;pointer-events:none}
+#rtPopupOverlay{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.5);display:none;align-items:flex-end;justify-content:center;padding-bottom:env(safe-area-inset-bottom);backdrop-filter:blur(4px)}
+#rtPopupOverlay.open{display:flex}
+#rtPopup{width:100%;max-width:480px;background:#fff;border-radius:28px 28px 0 0;padding:0 0 24px;box-shadow:0 -8px 40px rgba(0,0,0,.22);animation:slideUpPopup .3s cubic-bezier(.22,1,.36,1)}
+@keyframes slideUpPopup{from{transform:translateY(60px);opacity:0}to{transform:translateY(0);opacity:1}}
+.rt-popup-handle{width:36px;height:4px;background:#e0e4e6;border-radius:4px;margin:14px auto 0}
+.rt-popup-header{padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f0f3f6}
+.rt-popup-title{font-size:17px;font-weight:900;color:#18222e;font-family:'Plus Jakarta Sans',sans-serif}
+.rt-popup-close{width:32px;height:32px;border-radius:50%;border:none;background:#f0f4f7;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.rt-popup-body{padding:18px 20px 4px}
+.rt-popup-label{font-size:11px;font-weight:700;color:#7a8fa6;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px}
+.rt-popup-inp-row{display:flex;gap:10px;align-items:center}
+.rt-popup-inp{flex:1;background:#f0f4f7;border:2px solid transparent;border-radius:14px;padding:14px 16px;font-family:'Plus Jakarta Sans',sans-serif;font-size:18px;font-weight:800;color:#006970;outline:none;letter-spacing:.06em;text-transform:uppercase;transition:.15s}
+.rt-popup-inp::placeholder{color:rgba(0,105,112,.3);font-weight:500;font-size:14px;letter-spacing:0;text-transform:none}
+.rt-popup-inp:focus{border-color:rgba(0,105,112,.3);background:#fff}
+.rt-popup-buscar{width:52px;height:52px;flex-shrink:0;border-radius:14px;border:none;background:#006970;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,105,112,.4);transition:.13s}
+.rt-popup-buscar:active{transform:scale(.92)}
+.rt-popup-buscar .sym{font-size:22px}
+.rt-popup-error{margin-top:10px;background:#fef2f2;border-radius:10px;padding:10px 14px;font-size:12px;color:#dc2626;font-weight:600;display:flex;align-items:center;gap:6px}
+#rt-result{display:none;flex-direction:column}
+.rt-result-map-wrap{position:relative;height:62vw;max-height:320px;min-height:220px;overflow:hidden;flex-shrink:0}
+#wilMapResult{width:100%;height:100%;z-index:0}
+#rtMapEtaOverlay{display:none;position:absolute;top:12px;right:12px;z-index:500;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);border-radius:16px;padding:8px 14px;box-shadow:0 4px 16px rgba(0,0,0,.15);flex-direction:column;align-items:center;min-width:58px;text-align:center}
+#rtValidatedRow{position:absolute;bottom:10px;left:10px;right:10px;z-index:500;display:flex;align-items:center;gap:8px;flex-wrap:wrap;pointer-events:none}
+.rt-steps{display:flex;justify-content:space-between;align-items:flex-start;position:relative}
+.rt-steps-line-bg{position:absolute;top:14px;left:0;right:0;height:2px;background:#e7e8e9}
+.rt-steps-line-fill{position:absolute;top:14px;left:0;height:2px;background:linear-gradient(90deg,#006970,#65d000);border-radius:2px;transition:width 1.4s cubic-bezier(.22,1,.36,1)}
+@keyframes stepShimmer{0%{background-position:200% center}100%{background-position:-200% center}}
+.rt-steps-line-fill.loading{background:linear-gradient(90deg,#006970 0%,#65d000 40%,#a8e063 50%,#65d000 60%,#006970 100%);background-size:200% auto;animation:stepShimmer 2s linear infinite;}
+.rt-step-lbl-active{font-size:8px;font-weight:800;color:#006970;text-align:center;line-height:1.2;margin-top:3px;background:rgba(0,105,112,.08);border-radius:6px;padding:2px 5px;white-space:nowrap;max-width:64px;overflow:hidden;text-overflow:ellipsis;}
+.rt-step{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:6px}
+.rt-step-dot{width:28px;height:28px;border-radius:50%;background:#e7e8e9;display:flex;align-items:center;justify-content:center;transition:.3s}
+.rt-step-dot .sym{font-size:13px;color:#9aa5ae}
+.rt-step-lbl{font-size:9px;font-weight:700;color:#9aa5ae;text-align:center;line-height:1.2}
+.rt-ping{position:absolute;inset:0;border-radius:50%;display:block}
+.rt-ping-base{position:relative;width:9px;height:9px;border-radius:50%;display:block}
+.rt-estado-lbl{font-size:13px;font-weight:800}
+.cli-av{width:34px;height:34px;border-radius:50%;background:var(--pl);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:800;color:var(--p);font-family:'Plus Jakarta Sans',sans-serif;overflow:hidden}
+.cli-av img{width:100%;height:100%;object-fit:cover;object-position:center 20%}
+.cli-s-dot{width:8px;height:8px;border-radius:50%;border:1.5px solid var(--w);flex-shrink:0}
+.cli-s-dot.online{background:#16a34a}.cli-s-dot.offline{background:var(--on3)}
+#cliMsgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:6px;background:#f6f8fa;max-height:300px;min-height:160px}
+#cliMsgs::-webkit-scrollbar{width:3px}
+#cliMsgs::-webkit-scrollbar-thumb{background:#c8d4dc;border-radius:3px}
+.cmsg-wrap{display:flex;align-items:flex-end;gap:5px}
+.cmsg-wrap.out{flex-direction:row-reverse}
+.cmsg-av-s{width:22px;height:22px;border-radius:50%;background:var(--p);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.55rem;font-weight:800;color:#fff;font-family:'Plus Jakarta Sans',sans-serif}
+.cmsg-av-s.domi{background:#4c56af}
+.cmsg-col{display:flex;flex-direction:column;max-width:72%;min-width:0}
+.cmsg-out{background:var(--p);color:#fff;border-radius:14px 14px 4px 14px;padding:8px 12px 6px;font-size:12.5px;line-height:1.45;overflow-wrap:break-word;font-weight:500}
+.cmsg-in{background:#fff;color:var(--on);border-radius:14px 14px 14px 4px;padding:8px 12px 6px;font-size:12.5px;line-height:1.45;overflow-wrap:break-word;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.cmsg-meta{font-size:9px;margin-top:3px;display:flex;align-items:center;gap:3px;white-space:nowrap}
+.cmsg-meta.out{justify-content:flex-end;color:rgba(0,105,112,.5)}
+.cmsg-meta.in{color:var(--on3)}
+.tick-sent{color:rgba(0,105,112,.35);font-size:11px!important}
+.tick-read{color:var(--p);font-size:11px!important}
+.ccli-date{text-align:center;margin:4px 0 6px}
+.ccli-date span{background:#dde6ec;color:var(--on3);font-size:9px;font-weight:700;padding:2px 12px;border-radius:20px}
+#cliTypingWrap{display:none;align-items:center;gap:6px;padding:6px 12px 8px;background:#f6f8fa}
+.tdot{width:5px;height:5px;border-radius:50%;background:#c8d4dc;animation:tbounce 1.2s ease-in-out infinite}
+.tdot:nth-child(2){animation-delay:.2s}.tdot:nth-child(3){animation-delay:.4s}
+@keyframes tbounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+#cliInputRow{padding:8px 10px;background:#fff;border-top:1px solid #eef1f5;display:flex;gap:6px;align-items:flex-end}
+#cliInput{flex:1;border:1.5px solid #dce3ea;border-radius:18px;padding:8px 13px;font-size:13px;outline:none;font-family:'Plus Jakarta Sans',sans-serif;resize:none;max-height:70px;overflow-y:auto;background:#f8fafb;line-height:1.4;color:var(--on)}
+#cliInput::placeholder{color:var(--on3)}
+#cliInput:focus{border-color:var(--p);background:#fff}
+.cli-img-btn{width:32px;height:32px;border-radius:50%;border:none;background:#f0f3f6;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+#cliSendBtn{width:36px;height:36px;background:var(--p);border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 3px 10px rgba(0,105,112,.25)}
+#cliSendBtn .sym{font-size:16px;color:#fff}
+#cliImgInput{display:none}
+.stars-row{display:flex;gap:10px;justify-content:center;font-size:34px;margin-bottom:14px}
+.star{cursor:pointer;opacity:.3;transition:.15s}
+.star.on{opacity:1}
+.rt-rating-wrap{background:#fff;border-radius:18px;padding:18px;text-align:center;box-shadow:0 4px 18px rgba(0,40,60,.07);border:1.5px solid #edf0f3}
+
+/* ════════════════════════════════════
+   PRODUCTOS EN RASTREADOR - SIEMPRE VISIBLES CON VER MÁS
+════════════════════════════════════ */
+.rt-productos-wrap{padding:0 14px 4px}
+.rt-productos-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.rt-productos-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#9aa5ae;display:flex;align-items:center;gap:5px}
+.rt-productos-lbl .sym{font-size:12px;color:var(--p)}
+.rt-productos-count{font-size:9px;font-weight:700;color:var(--on3)}
+.rt-prod-item{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f3f5f7}
+.rt-prod-item:last-child{border-bottom:none}
+.rt-prod-ico{width:26px;height:26px;border-radius:7px;background:rgba(0,105,112,.07);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.rt-prod-info{flex:1;min-width:0}
+.rt-prod-name{font-size:11.5px;font-weight:700;color:#18222e;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rt-prod-meta{font-size:9.5px;color:#9aa5ae;font-weight:500;margin-top:1px}
+.rt-prod-precio{font-size:11px;font-weight:800;color:var(--p);flex-shrink:0}
+.rt-ver-mas-btn{width:100%;margin-top:6px;padding:7px 10px;border-radius:9px;border:1.5px solid var(--plb);background:var(--pl);font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;color:var(--p);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:.15s}
+.rt-ver-mas-btn:active{background:var(--plb)}
+.rt-ver-mas-btn .sym{font-size:13px}
+</style>
+</head>
+<body>
+
+  <!-- FAB chat flotante -->
+<div id="chatFab" onclick="abrirChatModal()">
+  <div id="chatFab-inner">
+    <span class="sym f" style="font-size:24px;color:#fff">chat</span>
+    <span id="chatFab-badge">0</span>
+  </div>
+</div>
+
+<!-- Modal chat flotante -->
+<div id="chatModalOv" onclick="if(event.target===this)cerrarChatModal()">
+  <div id="chatModal">
+    <div style="width:36px;height:4px;background:#e0e4e8;border-radius:4px;margin:12px auto 0;flex-shrink:0"></div>
+    <div class="chat-hdr">
+      <div class="chat-hdr-av" id="chatModalAv">🛵</div>
+      <div class="chat-hdr-info">
+        <div class="chat-hdr-name" id="chatModalNombre">Domiciliario WIL</div>
+        <div class="chat-hdr-estado">
+          <span class="cli-s-dot offline" id="chatModalDot"></span>
+          <span id="chatModalEstado">Esperando asignación…</span>
+        </div>
+      </div>
+      <a id="chatModalCall" href="#" style="display:none;width:34px;height:34px;border-radius:50%;background:rgba(22,163,74,.1);align-items:center;justify-content:center;text-decoration:none;flex-shrink:0">
+        <span class="sym f" style="font-size:16px;color:#16a34a">phone</span>
+      </a>
+      <button class="chat-close" onclick="cerrarChatModal()">
+        <span class="sym" style="font-size:16px;color:#7a8fa6">close</span>
+      </button>
+    </div>
+    <!-- Mensajes -->
+    <div id="chatModalMsgs" style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:6px;background:#f6f8fa;min-height:200px;max-height:55dvh">
+      <div class="ccli-date"><span>Hoy</span></div>
+    </div>
+    <!-- Typing -->
+    <div id="chatModalTyping" style="display:none;align-items:center;gap:6px;padding:6px 12px 4px;background:#f6f8fa">
+      <div class="cmsg-av-s domi" style="width:20px;height:20px">🛵</div>
+      <div style="background:#fff;border-radius:12px;padding:7px 11px;display:flex;gap:4px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+        <div class="tdot"></div><div class="tdot"></div><div class="tdot"></div>
+      </div>
+    </div>
+    <!-- Input -->
+    <div style="padding:8px 10px;background:#fff;border-top:1px solid #eef1f5;display:flex;gap:6px;align-items:flex-end;flex-shrink:0">
+      <textarea id="chatModalInput" rows="1" placeholder="Escribe un mensaje…"
+        style="flex:1;border:1.5px solid #dce3ea;border-radius:18px;padding:8px 13px;font-size:13px;outline:none;font-family:'Plus Jakarta Sans',sans-serif;resize:none;max-height:70px;overflow-y:auto;background:#f8fafb;line-height:1.4;color:var(--on)"
+        oninput="cliAutoResize(this)"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();chatModalEnviar()}"></textarea>
+      <button onclick="chatModalEnviar()" style="width:36px;height:36px;background:var(--p);border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 3px 10px rgba(0,105,112,.25)">
+        <span class="sym f" style="font-size:16px;color:#fff">send</span>
+      </button>
+    </div>
+  </div>
+</div>
+<!-- TOAST -->
+<div class="toast" id="globalToast">
+  <span class="sym f" id="globalToastIcon">info</span>
+  <span id="globalToastMsg">Mensaje</span>
+</div>
+
+<!-- MODAL TODOS LOS BARRIOS -->
+<div class="modal-overlay hidden" id="modalBarrios" onclick="if(event.target===this)cerrarModal('modalBarrios')">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-hdr">
+      <div class="modal-hdr-tit"><span class="sym f">location_city</span>Barrios de Copacabana</div>
+      <button class="modal-close" onclick="cerrarModal('modalBarrios')"><span class="sym">close</span></button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-grid" id="modalBarriosGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL TODOS MEDELLÍN -->
+<div class="modal-overlay hidden" id="modalMetro" onclick="if(event.target===this)cerrarModal('modalMetro')">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-hdr">
+      <div class="modal-hdr-tit"><span class="sym f">map</span>Área Metropolitana</div>
+      <button class="modal-close" onclick="cerrarModal('modalMetro')"><span class="sym">close</span></button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-grid" id="modalMetroGrid"></div>
+    </div>
+  </div>
+</div>
+
+<header class="hdr">
+  <button class="hdr-back" onclick="goBack()"><span class="sym" style="font-size:18px">arrow_back</span></button>
+  <img class="hdr-logo" src="icons/icon-192.png" alt="WIL"/>
+  <span class="hdr-title" id="hdrTitle">Domicilios WIL</span>
+  <button class="hdr-loc" id="hdrLoc" onclick="captarUbicacion()">
+    <span class="sym">location_on</span>
+    <span id="hdrLocTxt" style="overflow:hidden;text-overflow:ellipsis">Mi ubicación</span>
+  </button>
+</header>
+
+<main class="main">
+
+<!-- ════ INICIO ════ -->
+<div class="view active" id="view-inicio">
+  <div class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-pill"><span class="sym f" style="font-size:12px">delivery_dining</span>Copacabana y Área Metro</div>
+    <div class="hero-h1">¿Qué necesitas<br/><span>hoy?</span> 🛵</div>
+    <p class="hero-sub">Droguerias aliadas, mercado, restaurantes o envíos. Con un domi WIL.</p>
+  </div>
+
+  <div class="filters">
+    <button class="fpill active" id="fp-todos" onclick="filtrar('todos')"><span class="sym f" style="font-size:14px">apps</span>Todo</button>
+    <button class="fpill" id="fp-farmacias" onclick="filtrar('farmacias')"><span class="sym f" style="font-size:14px">local_pharmacy</span>Farmacias</button>
+    <button class="fpill" id="fp-domicilios" onclick="filtrar('domicilios')"><span class="sym f" style="font-size:14px">shopping_bag</span>Domicilios</button>
+    <button class="fpill" id="fp-rastrear" onclick="navTo('rastrear')"><span class="sym" style="font-size:14px">search</span>Rastrear</button>
+  </div>
+
+  <!-- ════ FARMACIAS — grid 2 columnas, sin carousel ════ -->
+  <div id="sec-farmacias">
+    <div class="sec-row"><div class="sec-lbl"><span class="sym f">local_pharmacy</span>Droguerías aliadas</div></div>
+    <div class="farm-grid">
+
+      <!-- Droguería Central -->
+     <div class="farm-card" onclick="irAFarmacia('pedido-farmacia.html?tienda=central')">
+
+
+        <div class="farm-card-img" style="background:linear-gradient(135deg,#003d45,#006970)">
+          <img src="icons/central-si.jpeg" alt="Droguería Central" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+          <div class="farm-card-img-fallback" style="display:none">🏢</div>
+          <div class="farm-card-overlay"></div>
+          <div class="farm-card-badge"><span class="sym f" style="font-size:9px">verified</span>Aliada WIL</div>
+          <span class="farm-card-cat"><span class="sym f" style="font-size:10px">local_pharmacy</span>Droguería</span>
+        </div>
+        <div class="farm-card-body">
+          <div class="farm-card-name">Droguería Central</div>
+          <div class="farm-card-addr"><span class="sym">location_on</span>Calle 52 #48-09, Copacabana</div>
+          <div class="farm-card-tags">
+            <span class="farm-ctag farm-ctag-t">7am – 10pm</span>
+            <span class="farm-ctag farm-ctag-g">Genéricos</span>
+            <span class="farm-ctag farm-ctag-a">Cosméticos</span>
+          </div>
+          <button class="farm-card-btn"><span class="sym f" style="font-size:13px">shopping_cart</span>Pedir aquí</button>
+        </div>
+      </div>
+
+      <!-- Farma Expertos -->
+      <div class="farm-card" onclick="irAFarmacia('pedido-farmacia.html?tienda=expertos')">
+
+
+        <div class="farm-card-img" style="background:linear-gradient(135deg,#00352c,#006955)">
+          <img src="icons/expertos-si.jpeg" alt="Farma Expertos" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+          <div class="farm-card-img-fallback" style="display:none">🏪</div>
+          <div class="farm-card-overlay"></div>
+          <div class="farm-card-badge"><span class="sym f" style="font-size:9px">verified</span>Aliada WIL</div>
+          <span class="farm-card-cat"><span class="sym f" style="font-size:10px">medication</span>Droguería</span>
+        </div>
+        <div class="farm-card-body">
+          <div class="farm-card-name">Farma Expertos</div>
+          <div class="farm-card-addr"><span class="sym">location_on</span>Cra 47 #51-69, Copacabana</div>
+          <div class="farm-card-tags">
+            <span class="farm-ctag farm-ctag-t">7am – 9pm</span>
+            <span class="farm-ctag farm-ctag-g">Formulados</span>
+            <span class="farm-ctag farm-ctag-t">Inyectología</span>
+          </div>
+          <button class="farm-card-btn"><span class="sym f" style="font-size:13px">shopping_cart</span>Pedir aquí</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ════ DOMICILIOS ════ -->
+  <div id="sec-domicilios">
+
+    <!-- CATEGORÍAS -->
+    <div class="sec-row" style="padding-bottom:8px">
+      <div class="sec-lbl"><span class="sym f">grid_view</span>¿Qué quieres pedir?</div>
+      <button class="sec-ver-mas" onclick="mostrarProximamente()"><span class="sym f">storefront</span>Ver más</button>
+    </div>
+    <div class="cats-ticker-outer">
+      <div class="cats-ticker-track" id="catsTicker">
+        <!-- Set 1 -->
+        <div class="cat-real-pill" onclick="startLibreConCat('Supermercado / Tienda')"><div class="cat-real-ico" style="background:#e8f5e9">🛒</div><div><div class="cat-real-name">Mercado</div><div class="cat-real-sub">Tiendas y supermercados</div></div></div>
+        <div class="cat-real-pill" onclick="startLibreConCat('Restaurante / Comida')"><div class="cat-real-ico" style="background:#fff3e0">🍔</div><div><div class="cat-real-name">Comida</div><div class="cat-real-sub">Restaurantes y locales</div></div></div>
+        <div class="cat-real-pill" onclick="startLibreConCat('Frutas y verduras')"><div class="cat-real-ico" style="background:#f1f8e9">🍅</div><div><div class="cat-real-name">Frutas y verduras</div><div class="cat-real-sub">Mercado fresco</div></div></div>
+        <div class="cat-real-pill" onclick="startLibreConCat('Panadería / Pastelería')"><div class="cat-real-ico" style="background:#fffde7">🥐</div><div><div class="cat-real-name">Panadería</div><div class="cat-real-sub">Pan y pastelería</div></div></div>
+        <div class="cat-real-pill" onclick="startLibreConCat('Licores y bebidas')"><div class="cat-real-ico" style="background:#fce4ec">🍷</div><div><div class="cat-real-name">Licores</div><div class="cat-real-sub">Bebidas y licorería</div></div></div>
+        <div class="cat-real-pill" onclick="startLibreConCat('Aseo y hogar')"><div class="cat-real-ico" style="background:#e3f2fd">🧴</div><div><div class="cat-real-name">Aseo y hogar</div><div class="cat-real-sub">Limpieza y cuidado</div></div></div>
+        <div class="cat-real-pill" onclick="startLibreConCat('Medicamentos / Droguería')"><div class="cat-real-ico" style="background:#fce4ec">💊</div><div><div class="cat-real-name">Medicamentos</div><div class="cat-real-sub">Farmacias y droguerías</div></div></div>
+        <div class="cat-real-pill" onclick="startLibreConCat('Mascotas')"><div class="cat-real-ico" style="background:#f3e5f5">🐾</div><div><div class="cat-real-name">Mascotas</div><div class="cat-real-sub">Alimentos y accesorios</div></div></div>
+        <div class="cat-real-pill" onclick="startLibreConCat('Cafetería / Café')"><div class="cat-real-ico" style="background:#efebe9">☕</div><div><div class="cat-real-name">Café</div><div class="cat-real-sub">Cafeterías y bebidas</div></div></div>
+        <div class="cat-real-pill" onclick="startLibreConCat('Farmacia / Medicamentos')"><div class="cat-real-ico" style="background:#e0f2f1">🩺</div><div><div class="cat-real-name">Salud</div><div class="cat-real-sub">Equipos y cuidado personal</div></div></div>
+        <!-- Set 2 duplicado -->
+        <div class="cat-real-pill" onclick="startLibreConCat('Supermercado / Tienda')"><div class="cat-real-ico" style="background:#e8f5e9">🛒</div><div><div class="cat-real-name">Mercado</div><div class="cat-real-sub">Tiendas y supermercados</div></div></div>
+        <div class="cat-real-pill" onclick="startLibreConCat('Restaurante / Comida')"><div class="cat-real-ico" style="background:#fff3e0">🍔</div><div><div class="cat-real-name">Comida</div><div class="cat-real-sub">Restaurantes y locales</div></div></div>
+        <div class="cat-real-pill" onclick="startLibreConCat('Frutas y verduras')"><div class="cat-real-ico" style="background:#f1f8e9">🍅</div><div><div class="cat-real-name">Frutas y verduras</div><div class="cat-real-sub">Mercado fresco</div></div></div>
+        <div class="cat-real-pill" onclick="startLibreConCat('Panadería / Pastelería')"><div class="cat-real-ico" style="background:#fffde7">🥐</div><div><div class="cat-real-name">Panadería</div><div class="cat-real-sub">Pan y pastelería</div></div></div>
+        <div class="cat-real-pill" onclick="startLibreConCat('Licores y bebidas')"><div class="cat-real-ico" style="background:#fce4ec">🍷</div><div><div class="cat-real-name">Licores</div><div class="cat-real-sub">Bebidas y licorería</div></div></div>
+        <div class="cat-real-pill" onclick="startLibreConCat('Aseo y hogar')"><div class="cat-real-ico" style="background:#e3f2fd">🧴</div><div><div class="cat-real-name">Aseo y hogar</div><div class="cat-real-sub">Limpieza y cuidado</div></div></div>
+        <div class="cat-real-pill" onclick="startLibreConCat('Medicamentos / Droguería')"><div class="cat-real-ico" style="background:#fce4ec">💊</div><div><div class="cat-real-name">Medicamentos</div><div class="cat-real-sub">Farmacias y droguerías</div></div></div>
+        <div class="cat-real-pill" onclick="startLibreConCat('Mascotas')"><div class="cat-real-ico" style="background:#f3e5f5">🐾</div><div><div class="cat-real-name">Mascotas</div><div class="cat-real-sub">Alimentos y accesorios</div></div></div>
+        <div class="cat-real-pill" onclick="startLibreConCat('Cafetería / Café')"><div class="cat-real-ico" style="background:#efebe9">☕</div><div><div class="cat-real-name">Café</div><div class="cat-real-sub">Cafeterías y bebidas</div></div></div>
+        <div class="cat-real-pill" onclick="startLibreConCat('Farmacia / Medicamentos')"><div class="cat-real-ico" style="background:#e0f2f1">🩺</div><div><div class="cat-real-name">Salud</div><div class="cat-real-sub">Equipos y cuidado personal</div></div></div>
+      </div>
+    </div>
+
+    <!-- PEDIDO LIBRE -->
+    <div class="wil-libre" onclick="startLibre()">
+      <div class="wil-libre-shine"></div><div class="wil-libre-dots"></div>
+      <div class="wil-libre-body"><span class="wl-emo">🛍️</span>
+        <div class="wl-txt">
+          <div class="wl-badge"><span class="sym f" style="font-size:11px">bolt</span>Sin restricciones</div>
+          <div class="wl-tit">Pedido Libre WIL</div>
+          <div class="wl-sub">Mercado, tienda, restaurante… tú dices dónde y qué necesitas.</div>
+          <span class="wl-cta"><span class="sym" style="font-size:15px">arrow_forward</span>Hacer pedido</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAQUETERÍA -->
+    <div class="wil-paq" onclick="startPaquete()">
+      <div class="wil-paq-shine"></div>
+      <div class="wil-paq-body"><span class="wp-emo">📦</span>
+        <div class="wp-txt">
+          <div class="wp-badge"><span class="sym f" style="font-size:11px">package_2</span>Envíos y mensajería</div>
+          <div class="wp-tit">Paquetería por Zona</div>
+          <div class="wp-sub">Caldas, Sabaneta, Itagüí, Envigado, La Estrella y más. Tarifa según distancia.</div>
+          <span class="wp-cta"><span class="sym" style="font-size:14px">arrow_forward</span>Ver zonas</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ BARRIOS DE COPACABANA — scroll con flechas ════ -->
+    <div class="sec-row" style="padding-top:20px;padding-bottom:8px">
+      <div class="sec-lbl"><span class="sym f">location_city</span>Barrios de Copacabana</div>
+      <button class="sec-ver-mas" onclick="abrirModal('modalBarrios')"><span class="sym f">list</span>Ver todos</button>
+    </div>
+    <div class="scroll-section">
+      <button class="scroll-arrow left" id="barriosLeft" onclick="scrollSection('barriosTrack',-1)">
+        <span class="sym">chevron_left</span>
+      </button>
+      <div class="scroll-track-wrap" id="barriosTrack">
+        <div class="scroll-track" id="barriosContent"></div>
+      </div>
+      <button class="scroll-arrow right" id="barriosRight" onclick="scrollSection('barriosTrack',1)">
+        <span class="sym">chevron_right</span>
+      </button>
+    </div>
+
+    <!-- ════ ÁREA METROPOLITANA — scroll con flechas ════ -->
+    <div class="sec-row" style="padding-bottom:8px">
+      <div class="sec-lbl"><span class="sym f">map</span>Área Metropolitana</div>
+      <button class="sec-ver-mas" onclick="abrirModal('modalMetro')"><span class="sym f">list</span>Ver todos</button>
+    </div>
+    <div class="scroll-section">
+      <button class="scroll-arrow left" id="metroLeft" onclick="scrollSection('metroTrack',-1)">
+        <span class="sym">chevron_left</span>
+      </button>
+      <div class="scroll-track-wrap" id="metroTrack">
+        <div class="scroll-track" id="metroContent"></div>
+      </div>
+      <button class="scroll-arrow right" id="metroRight" onclick="scrollSection('metroTrack',1)">
+        <span class="sym">chevron_right</span>
+      </button>
+    </div>
+
+    <div class="spacer"></div>
+  </div>
+</div>
+
+<!-- ════ LIBRE P1 ════ -->
+<div class="view" id="view-libre-1">
+  <div style="padding:20px 16px 8px"><div style="font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:4px">Pedido Libre 🛍️</div><div style="font-size:13px;color:var(--on3);font-weight:500">Paso 1 de 3 — Comercio y presupuesto</div></div>
+  <div class="card">
+    <div class="card-tit"><span class="sym f">storefront</span>¿Ya tienes el comercio?</div>
+    <div class="yn-grid">
+      <button class="yn-btn" id="yn-si" onclick="selectComercio(true)"><span class="sym f" style="font-size:22px">check_circle</span>Sí, ya sé dónde</button>
+      <button class="yn-btn" id="yn-no" onclick="selectComercio(false)"><span class="sym f" style="font-size:22px">help</span>El domi busca</button>
+    </div>
+    <div id="comercio-field" class="field hidden"><label>Nombre del comercio</label><input type="text" id="comercio-nombre" placeholder="Ej: Éxito Copacabana, Tienda Don Pedro…"/></div>
+  </div>
+  <div class="card">
+    <div class="card-tit"><span class="sym f">payments</span>¿Cuánto tienes disponible?</div>
+    <div class="chips">
+      <div class="chip" onclick="selectBudget(30000,this)">$30.000</div>
+      <div class="chip" onclick="selectBudget(50000,this)">$50.000</div>
+      <div class="chip" onclick="selectBudget(80000,this)">$80.000</div>
+      <div class="chip" onclick="selectBudget(100000,this)">$100.000</div>
+      <div class="chip" onclick="selectBudget(120000,this)">$120.000</div>
+      <div class="chip" onclick="selectBudget(150000,this)">$150.000</div>
+      <div class="chip otro" onclick="selectBudgetOtro()">✏️ Otro valor</div>
+    </div>
+    <div class="field hidden" id="otro-budget-field" style="margin-top:10px"><label>Escribe el valor</label><input type="number" id="otro-budget-input" placeholder="65000" oninput="state.presupuesto=parseInt(this.value)||0"/></div>
+  </div>
+  <div class="act-row"><button class="btn-b" onclick="showView('view-inicio')">Atrás</button><button class="btn-n" onclick="goLibre2()"><span class="sym" style="font-size:17px">arrow_forward</span>Continuar</button></div>
+</div>
+
+<!-- LIBRE P2 -->
+<div class="view" id="view-libre-2">
+  <div style="padding:20px 16px 8px"><div style="font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:4px">Pedido Libre 🛍️</div><div style="font-size:13px;color:var(--on3);font-weight:500">Paso 2 de 3 — Tu lista de productos</div></div>
+  <div class="card">
+    <div class="card-tit"><span class="sym f">shopping_cart</span>¿Qué necesitas?</div>
+    <div class="prod-list" id="productList"></div>
+    <div class="add-row"><input class="add-inp" type="text" id="newProductInput" placeholder="Agregar producto o ítem…" onkeydown="if(event.key==='Enter')addProduct()"/><button class="add-btn" onclick="addProduct()"><span class="sym" style="font-size:20px;color:#fff">add</span></button></div>
+  </div>
+  <div class="act-row"><button class="btn-b" onclick="showView('view-libre-1')">Atrás</button><button class="btn-n" onclick="goLibre3()"><span class="sym" style="font-size:17px">arrow_forward</span>Continuar</button></div>
+</div>
+
+<!-- LIBRE P3 -->
+<div class="view" id="view-libre-3">
+  <div style="padding:20px 16px 8px"><div style="font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:4px">Pedido Libre 🛍️</div><div style="font-size:13px;color:var(--on3);font-weight:500">Paso 3 de 3 — ¿Dónde te entregamos?</div></div>
+  <div class="card">
+    <div class="card-tit"><span class="sym f">location_on</span>Dirección de entrega</div>
+    <div class="loc-strip" onclick="captarUbicacion()">
+      <div class="loc-ico"><span class="sym">my_location</span></div>
+      <div style="flex:1"><div class="loc-tit">Captar mi ubicación GPS</div><div class="loc-sub" id="locBannerSub">Toca para detectar automáticamente</div></div>
+      <span class="loc-st" id="locStatus">→</span>
+    </div>
+    <div class="field"><label>Dirección completa *</label><input type="text" id="libre-direccion" placeholder="Calle 50 #45-23, Barrio El Centro"/><div class="field-note">Incluye calle, número y barrio</div></div>
+    <div class="field"><label>Referencia del lugar</label><input type="text" id="libre-referencia" placeholder="Casa azul con reja, frente al parque, piso 2…"/></div>
+    <div class="field"><label>Tu nombre *</label><input type="text" id="libre-nombre" placeholder="Nombre completo"/></div>
+    <div class="field"><label>Teléfono *</label><input type="tel" id="libre-telefono" placeholder="310 123 4567"/></div>
+  </div>
+  <div class="card">
+    <div class="card-tit"><span class="sym f">payments</span>Método de pago</div>
+    <div class="pago-grid">
+      <div class="pago-c" id="pago-efectivo" onclick="selectPago('EFECTIVO')"><div class="pago-ico">💵</div><div class="pago-lbl">Efectivo</div><div class="pago-sub">Al entregar</div></div>
+      <div class="pago-c" id="pago-transferencia" onclick="selectPago('TRANSFERENCIA')"><div class="pago-ico">🏦</div><div class="pago-lbl">Transferencia</div><div class="pago-sub">Bancolombia</div></div>
+    </div>
+  </div>
+  <div class="act-row"><button class="btn-b" onclick="showView('view-libre-2')">Atrás</button><button class="btn-n" onclick="generarFacturaLibre()"><span class="sym" style="font-size:17px">receipt_long</span>Ver resumen</button></div>
+</div>
+
+<!-- FACTURA LIBRE -->
+<div class="view" id="view-factura-libre">
+  <div style="padding:20px 16px 8px"><div style="font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:4px">Confirmar pedido 📋</div><div style="font-size:13px;color:var(--on3);font-weight:500">Revisa bien antes de confirmar</div></div>
+  <div class="factura">
+    <div class="fac-hdr"><img class="fac-logo" src="icons/icon-192.png" alt="WIL"/><div><div class="fac-tit">Domicilios WIL</div><div class="fac-sub" id="factura-fecha">Copacabana</div></div></div>
+    <div class="fac-row"><div class="fac-lbl">Comercio</div><div class="fac-val" id="factura-comercio-val">—</div></div>
+    <div class="fac-row"><div class="fac-lbl">Presupuesto</div><div class="fac-val" id="factura-presupuesto">—</div></div>
+    <div class="fac-items" id="factura-productos-list"></div>
+    <div class="fac-row"><div class="fac-lbl">📍 Dirección</div><div class="fac-val" id="factura-direccion">—</div></div>
+    <div class="fac-row"><div class="fac-lbl">🗺️ Referencia</div><div class="fac-val" id="factura-referencia">—</div></div>
+    <div class="fac-row"><div class="fac-lbl">👤 Recibe</div><div class="fac-val" id="factura-nombre">—</div></div>
+    <div class="fac-row"><div class="fac-lbl">📱 Teléfono</div><div class="fac-val" id="factura-telefono">—</div></div>
+    <div class="fac-row"><div class="fac-lbl">💳 Pago</div><div class="fac-val" id="factura-pago">—</div></div>
+    <div class="fac-nota"><span class="sym">info</span>El domiciliario confirmará disponibilidad antes de comprar.</div>
+  </div>
+  <div class="act-row"><button class="btn-b" onclick="showView('view-libre-3')">Editar</button><button class="btn-n" id="btnConfirmarLibre" onclick="enviarPedido('libre')"><span class="sym f" style="font-size:17px">check_circle</span>Confirmar pedido</button></div>
+  <div class="spacer"></div>
+</div>
+
+<!-- PAQUETE FORM -->
+<div class="view" id="view-paquete-form">
+  <div style="padding:20px 16px 8px"><div style="font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:4px">Envío por Zona 📦</div><div style="font-size:13px;color:var(--on3);font-weight:500" id="pq-form-sub">Completa los datos del envío</div></div>
+  <div class="card"><div class="card-tit"><span class="sym f">package_2</span>¿Qué envías?</div><div class="field"><label>Descripción del paquete</label><textarea id="paquete-descripcion" placeholder="Ropa, documentos, mercancía, regalo…"></textarea></div></div>
+  <div class="card">
+    <div class="card-tit"><span class="sym f">location_on</span>Dirección de entrega</div>
+    <div class="field"><label>Dirección completa *</label><input type="text" id="paquete-direccion" placeholder="Cra 43 #18-20, Barrio El Poblado, Medellín"/><div class="field-note">Incluye calle, número, barrio y ciudad</div></div>
+    <div class="field"><label>Referencia</label><input type="text" id="paquete-referencia" placeholder="Frente al Éxito, edificio azul, piso 3…"/></div>
+    <div class="field"><label>Nombre quien recibe *</label><input type="text" id="paquete-nombre" placeholder="Nombre completo"/></div>
+    <div class="field"><label>Teléfono *</label><input type="tel" id="paquete-telefono" placeholder="310 123 4567"/></div>
+  </div>
+  <div class="card"><div class="card-tit"><span class="sym f">payments</span>Método de pago</div><div class="pago-grid"><div class="pago-c" id="pago-efectivo-p" onclick="selectPagoPaquete('EFECTIVO')"><div class="pago-ico">💵</div><div class="pago-lbl">Efectivo</div></div><div class="pago-c" id="pago-transferencia-p" onclick="selectPagoPaquete('TRANSFERENCIA')"><div class="pago-ico">🏦</div><div class="pago-lbl">Transferencia</div></div></div></div>
+  <div class="act-row"><button class="btn-b" onclick="showView('view-inicio')">Atrás</button><button class="btn-n" onclick="generarFacturaPaquete()"><span class="sym" style="font-size:17px">receipt_long</span>Ver resumen</button></div>
+</div>
+
+<!-- FACTURA PAQUETE -->
+<div class="view" id="view-factura-paquete">
+  <div style="padding:20px 16px 8px"><div style="font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:4px">Confirmar envío 📦</div><div style="font-size:13px;color:var(--on3);font-weight:500">Revisa bien antes de confirmar</div></div>
+  <div class="factura">
+    <div class="fac-hdr"><img class="fac-logo" src="icons/icon-192.png" alt="WIL"/><div><div class="fac-tit">Domicilios WIL</div></div></div>
+    <div class="fac-row"><div class="fac-lbl">Destino</div><div class="fac-val" id="fp-zona">—</div></div>
+    <div class="fac-row"><div class="fac-lbl">Descripción</div><div class="fac-val" id="fp-desc">—</div></div>
+    <div class="fac-row"><div class="fac-lbl">📍 Dirección</div><div class="fac-val" id="fp-dir">—</div></div>
+    <div class="fac-row"><div class="fac-lbl">🗺️ Referencia</div><div class="fac-val" id="fp-ref">—</div></div>
+    <div class="fac-row"><div class="fac-lbl">👤 Recibe</div><div class="fac-val" id="fp-nombre">—</div></div>
+    <div class="fac-row"><div class="fac-lbl">📱 Teléfono</div><div class="fac-val" id="fp-tel">—</div></div>
+    <div class="fac-row"><div class="fac-lbl">💳 Pago</div><div class="fac-val" id="fp-pago">—</div></div>
+    <div class="fac-nota"><span class="sym">info</span>La tarifa se calcula según la distancia real. El domi te confirmará el valor antes de partir.</div>
+  </div>
+  <div class="act-row"><button class="btn-b" onclick="showView('view-paquete-form')">Editar</button><button class="btn-n" id="btnConfirmarPaquete" onclick="enviarPedido('paquete')"><span class="sym f" style="font-size:17px">check_circle</span>Confirmar envío</button></div>
+  <div class="spacer"></div>
+</div>
+
+<!-- CONFIRMADO -->
+<div class="view" id="view-confirmado">
+  <div class="succ-wrap">
+    <div class="succ-ring"><span class="sym f">check_circle</span></div>
+    <div class="succ-tit">¡Pedido enviado! 🛵</div>
+    <p class="succ-sub" id="success-msg">Tu pedido fue recibido. Un domiciliario te contactará pronto.</p>
+  </div>
+  <div class="id-badge">
+    <div class="id-badge-lbl">Tu código de pedido</div>
+    <div class="id-badge-code" id="idPedidoDisplay">—</div>
+    <div class="id-badge-sub">📸 Guárdalo para rastrear y chatear con el domi</div>
+    <button class="id-badge-copy" onclick="copiarId()"><span class="sym" style="font-size:15px">content_copy</span>Copiar código</button>
+  </div>
+  <div style="padding:0 16px 16px;display:flex;flex-direction:column;gap:10px">
+    <button class="btn-full gr" onclick="irARastrear()"><span class="sym" style="font-size:18px;color:#fff">search</span>Rastrear este pedido</button>
+    <button class="btn-full dk" onclick="showView('view-inicio');resetAll()"><span class="sym" style="font-size:18px">home</span>Volver al inicio</button>
+  </div>
+</div>
+
+<!-- RASTREADOR -->
+<div class="view" id="view-rastrear" style="padding-bottom:0;overflow:hidden">
+  <div id="rt-empty">
+    <div id="rt-empty-map"></div>
+    <div id="rtConsultarBtn">
+      <div class="swipe-track" id="swipeTrack">
+        <div class="swipe-thumb" id="swipeThumb">🛵</div>
+        <div class="swipe-label">
+          <span id="rtConsultarTxt">Consultar mi pedido</span>
+          <span class="sym">chevron_right</span>
+          <span class="sym" style="opacity:.4">chevron_right</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="rtPopupOverlay" onclick="if(event.target===this)rtCerrarPopup()">
+    <div id="rtPopup">
+      <div class="rt-popup-handle"></div>
+      <div class="rt-popup-header">
+        <span class="rt-popup-title">🔍 Rastrear pedido</span>
+        <button class="rt-popup-close" onclick="rtCerrarPopup()"><span class="sym" style="font-size:16px;color:#7a8fa6">close</span></button>
+      </div>
+      <div class="rt-popup-body">
+        <div class="rt-popup-label">Ingresa tu código de pedido</div>
+        <div class="rt-popup-inp-row">
+<input class="rt-popup-inp" id="rastrearInput" type="text" placeholder="Ej: 456" maxlength="3" .../>
+          <button class="rt-popup-buscar" id="btnRastrear" onclick="rastrearPedido()"><span class="sym" style="font-size:22px">search</span></button>
+        </div>
+        <div id="rastrearError" class="hidden"><div class="rt-popup-error">❌ No encontramos ese código. Verifica e intenta de nuevo.</div></div>
+      </div>
+    </div>
+  </div>
+  <div id="rt-result">
+    <div class="rt-result-map-wrap">
+      <div id="wilMapResult"></div>
+      <div id="rtMapEtaOverlay">
+        <div style="font-size:8px;font-weight:700;color:#7a8fa6;text-transform:uppercase;letter-spacing:.07em;margin-bottom:2px">Llega en</div>
+        <div style="font-size:24px;font-weight:900;color:#006970;line-height:1;font-family:'Plus Jakarta Sans',sans-serif"><span id="rtMapEtaMins">—</span></div>
+        <div style="font-size:9px;font-weight:600;color:#7a8fa6;margin-top:1px">min</div>
+      </div>
+      <div id="rtValidatedRow" style="display:none">
+        <div style="background:rgba(255,255,255,.95);border-radius:99px;padding:4px 12px;display:flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(0,0,0,.12)"><span class="sym f" style="font-size:12px;color:#006970">verified</span><span style="font-size:11px;font-weight:700;color:#006970;font-family:'Plus Jakarta Sans',sans-serif">Código validado</span></div>
+        <div style="background:rgba(255,255,255,.95);border-radius:99px;padding:4px 12px;box-shadow:0 2px 8px rgba(0,0,0,.12)"><span style="font-size:10.5px;font-weight:700;color:#4c56af;font-family:'Plus Jakarta Sans',sans-serif" id="rtPartnerName">Domicilios WIL</span></div>
+      </div>
+    </div>
+    <div style="padding:10px 12px 20px;display:flex;flex-direction:column;gap:10px">
+      <div style="background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 4px 18px rgba(0,40,60,.09);border:1.5px solid #edf0f3">
+
+        <!-- Card resumen financiero -->
+<div style="margin:0 12px 10px;background:#fff;border:1.5px solid #e2e9ef;border-radius:16px;overflow:hidden;box-shadow:0 2px 10px rgba(0,60,80,.07)">
+  <div style="padding:12px 14px 8px;border-bottom:1px solid #f0f3f6;display:flex;align-items:center;gap:7px">
+    <span style="font-size:13px;font-weight:800;color:#18222e;display:flex;align-items:center;gap:6px">
+      <span class="sym f" style="font-size:16px;color:#006970">receipt_long</span>Resumen del pedido
+    </span>
+  </div>
+  <div style="padding:10px 14px" id="rtResumenProductosCard"></div>
+  <div style="padding:8px 14px;background:#f8fafb;border-top:1px solid #f0f3f6;display:flex;flex-direction:column;gap:6px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:11px;color:#7a8fa6;font-weight:600">Subtotal productos</span>
+      <span style="font-size:12px;font-weight:800;color:#18222e" id="rtSubtotalVal">—</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:11px;color:#7a8fa6;font-weight:600">Domicilio · <span id="rtZonaLbl">—</span></span>
+      <span style="font-size:12px;font-weight:800;color:#18222e" id="rtDomiVal">—</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;border-top:1.5px dashed #e2e9ef;padding-top:8px;margin-top:2px">
+      <span style="font-size:13px;font-weight:900;color:#18222e">Total</span>
+      <span style="font-size:14px;font-weight:900;color:#006970" id="rtTotalVal">—</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:11px;color:#7a8fa6;font-weight:600">Método de pago</span>
+      <span style="font-size:12px;font-weight:700;color:#18222e" id="rtPagoVal">—</span>
+    </div>
+  </div>
+</div>
+        <!-- ════════════════════════════════════════════════════════
+             CORRECCIÓN BUG #2: DOMI CARD — eliminados los botones
+             de llamada y mensaje del header superior.
+             Solo quedan en el footer (cliChatWrap) para no duplicar.
+        ════════════════════════════════════════════════════════ -->
+        <div id="domiCard" style="display:none;background:linear-gradient(135deg,#003d45 0%,#006970 55%,#008a94 100%);padding:13px 14px 11px">
+  <div style="display:flex;align-items:center;gap:12px">
+    <div style="position:relative;flex-shrink:0">
+      <div id="domiFotoWrap" style="width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.18);border:2.5px solid rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff;overflow:hidden;font-family:'Plus Jakarta Sans',sans-serif">🛵</div>
+      <div style="position:absolute;bottom:-2px;right:-2px;background:#fff;color:#006970;font-size:8px;font-weight:800;padding:2px 5px;border-radius:99px;box-shadow:0 1px 3px rgba(0,0,0,.18);white-space:nowrap" id="domiRatingBadge">4.8 ★</div>
+    </div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.6);margin-bottom:2px">Tu repartidor</div>
+      <div id="domiNombre" style="font-size:16px;font-weight:900;color:#fff;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</div>
+      <div id="domiEstadoTxt" style="font-size:10.5px;color:rgba(255,255,255,.72);font-weight:500;margin-top:1px">Asignando…</div>
+    </div>
+    <!-- WhatsApp cliente + llamada domi -->
+    <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;align-items:center">
+      <a id="domiWABtn" href="#" target="_blank" style="display:none;width:34px;height:34px;border-radius:50%;background:#25D366;align-items:center;justify-content:center;text-decoration:none;box-shadow:0 2px 8px rgba(37,211,102,.4)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+      </a>
+      <a id="domiCallBtn" href="#" style="display:none;width:34px;height:34px;border-radius:50%;background:rgba(22,163,74,.9);align-items:center;justify-content:center;text-decoration:none">
+        <span class="sym f" style="font-size:16px;color:#fff">phone</span>
+      </a>
+    </div>
+  </div>
+</div>
+
+        <div style="position:sticky;top:0;z-index:10;background:#fff;padding:10px 14px 0;border-bottom:1px solid #f0f3f6;border-radius:20px 20px 0 0">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:7px">
+              <div style="position:relative;width:9px;height:9px;flex-shrink:0"><span id="estadoPing" class="rt-ping"></span><span id="estadoPingBase" class="rt-ping-base"></span></div>
+              <span id="estadoLabel" class="rt-estado-lbl"></span>
+            </div>
+            <button onclick="minimizarResult()" style="width:32px;height:32px;border-radius:50%;border:none;background:#f0f4f7;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,.08)"><span class="sym" style="font-size:18px;color:#7a8fa6">keyboard_arrow_down</span></button>
+          </div>
+          <div id="ri-id-display" style="font-size:10px;color:#7a8fa6;font-weight:600;margin-bottom:10px"></div>
+          <div style="position:relative">
+            <div class="rt-steps">
+              <div class="rt-steps-line-bg"></div>
+              <div id="rtStepLine" class="rt-steps-line-fill" style="width:0%"></div>
+              <div class="rt-step"><div id="step0" class="rt-step-dot"><span class="sym f" style="font-size:12px">receipt_long</span></div><span id="step0lbl" class="rt-step-lbl">Recibido</span></div>
+              <div class="rt-step"><div id="step1" class="rt-step-dot"><span class="sym f" style="font-size:12px">inventory_2</span></div><span id="step1lbl" class="rt-step-lbl">Confirmado</span></div>
+              <div class="rt-step"><div id="step2" class="rt-step-dot"><span class="sym f" style="font-size:12px">delivery_dining</span></div><span id="step2lbl" class="rt-step-lbl">En camino</span></div>
+              <div class="rt-step"><div id="step3" class="rt-step-dot"><span class="sym f" style="font-size:12px">home</span></div><span id="step3lbl" class="rt-step-lbl">Entregado</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ════════════════════════════════════════════════════════
+             CORRECCIÓN BUG #3: PRODUCTOS SIEMPRE VISIBLES
+             rtItemsGrid ahora solo muestra fecha/dirección/horas.
+             Los productos van en su propia sección con ver más.
+        ════════════════════════════════════════════════════════ -->
+        <div id="rtItemsGrid" style="padding:12px 14px 0"></div>
+
+        <!-- Sección productos visible — con ver más -->
+        <div id="rtProductosSection" class="rt-productos-wrap" style="display:none">
+          <div class="rt-productos-header">
+            <div class="rt-productos-lbl"><span class="sym f">shopping_cart</span>Productos del pedido</div>
+            <div class="rt-productos-count" id="rtProductosCount"></div>
+          </div>
+          <div id="rtProductosList"></div>
+          <button id="rtVerMasBtn" class="rt-ver-mas-btn" style="display:none" onclick="rtToggleVerMas()">
+            <span class="sym" id="rtVerMasIco">expand_more</span>
+            <span id="rtVerMasTxt">Ver más</span>
+          </button>
+        </div>
+
+        <!-- Card resumen total — diseño limpio -->
+
+        <!-- ════════════════════════════════════════════════════════
+             CORRECCIÓN BUG #2 (footer): Solo chat con badge de
+             notificación + llamada. Sin duplicar íconos del header.
+        ════════════════════════════════════════════════════════ -->
+        <div id="cliChatWrap" style="display:none;border-top:1px solid #f0f3f6">
+          <div id="cliDomiHdr" style="cursor:pointer;padding:10px 14px;background:rgba(0,105,112,.04);border-bottom:1px solid rgba(0,105,112,.08);display:flex;align-items:center;gap:10px" onclick="toggleClienteChat()">
+            <div class="cli-av" id="cliDomiAv">🛵</div>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:5px"><span style="font-weight:800;font-size:12px;color:var(--on)" id="cliDomiNombre">Domiciliario WIL</span><span style="font-size:9px;font-weight:700;background:rgba(0,105,112,.1);color:#006970;padding:1px 6px;border-radius:99px">Chatear con el domi</span></div>
+              <div style="font-size:10px;color:var(--on3);display:flex;align-items:center;gap:4px;margin-top:1px"><span class="cli-s-dot offline" id="cliStatusDot"></span><span id="cliDomiEstado">Esperando asignación…</span></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <!-- Badge de mensajes pendientes -->
+              <div id="cliBadge" style="background:#dc2626;color:#fff;border-radius:10px;min-width:18px;height:18px;font-size:9px;font-weight:800;display:none;align-items:center;justify-content:center;padding:0 4px">0</div>
+              <!-- Llamada — solo aquí, no duplicada arriba -->
+              <a id="cliLlamarBtnChat" href="#" onclick="event.stopPropagation()" style="width:30px;height:30px;border-radius:50%;background:rgba(22,163,74,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;text-decoration:none"><span class="sym f" style="font-size:15px;color:#16a34a">phone</span></a>
+              <!-- Chat icon -->
+              <span class="sym" id="cliChatChevron" style="font-size:16px;color:#7a8fa6">expand_more</span>
+            </div>
+          </div>
+          <div id="cliBox" style="display:none;flex-direction:column;overflow:hidden;background:#fff;border:1.5px solid rgba(0,105,112,.15);border-top:none;border-radius:0 0 13px 13px">
+            <div id="cliMsgs"><div class="ccli-date"><span>Hoy</span></div></div>
+            <div id="cliTypingWrap"><div class="cmsg-av-s domi" style="width:20px;height:20px;font-size:.55rem">🛵</div><div style="background:#fff;border-radius:12px;padding:7px 11px;display:flex;gap:4px;box-shadow:0 1px 4px rgba(0,0,0,.06)"><div class="tdot"></div><div class="tdot"></div><div class="tdot"></div></div></div>
+            <div id="cliInputRow">
+              <button class="cli-img-btn" onclick="document.getElementById('cliImgInput').click()"><span class="sym f" style="font-size:16px;color:var(--on3)">image</span></button>
+              <input type="file" id="cliImgInput" accept="image/*"/>
+              <textarea id="cliInput" rows="1" placeholder="Escribe un mensaje…" oninput="cliAutoResize(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();cliEnviarMensaje()}"></textarea>
+              <button id="cliSendBtn" onclick="cliEnviarMensaje()"><span class="sym f" style="font-size:16px;color:#fff">send</span></button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="seccionCalificar" style="display:none">
+        <div class="rt-rating-wrap">
+          <div style="font-size:14px;font-weight:800;color:#18222e;margin-bottom:4px">¿Cómo fue tu experiencia?</div>
+          <div style="font-size:12px;color:#7a8fa6;margin-bottom:16px;font-weight:500">Tu calificación ayuda a mejorar el servicio</div>
+          <div class="stars-row"><span class="star" onclick="setCalif(1)" id="se1">⭐</span><span class="star" onclick="setCalif(2)" id="se2">⭐</span><span class="star" onclick="setCalif(3)" id="se3">⭐</span><span class="star" onclick="setCalif(4)" id="se4">⭐</span><span class="star" onclick="setCalif(5)" id="se5">⭐</span></div>
+          <button class="btn-full" id="btnCalificar" disabled onclick="enviarCalificacion()" style="opacity:.5">Enviar calificación</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<nav class="bnav">
+  <button class="bi" onclick="window.location.href='index.html'"><span class="sym">home</span><span class="bi-lbl">Inicio</span></button>
+  <button class="bi active" id="nav-pedir" onclick="navTo('pedir')"><span class="sym f">shopping_bag</span><span class="bi-lbl">Pedir</span></button>
+  <button class="bi" id="nav-rastrear" onclick="navTo('rastrear')"><span class="sym">search</span><span class="bi-lbl">Rastrear</span></button>
+  <button class="bi" onclick="window.location.href='soporte.html'"><span class="sym">person</span><span class="bi-lbl">Soporte</span></button>
+</nav>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+var API_BASE='/api';
+var COPA_LAT=6.3475,COPA_LNG=-75.5025;
+
+/* ── BARRIOS COPACABANA ── */
+var BARRIOS_COPA=[
+  {n:'Asunción',z:'Zona 1',c:'#006970'},
+  {n:'Fátima',z:'Zona 1',c:'#006970'},
+  {n:'Mirador Azul',z:'Zona 1',c:'#006970'},
+  {n:'Azulita Parte Baja',z:'Zona 1',c:'#006970'},
+  {n:'Cristo Rey (bajo)',z:'Zona 1',c:'#006970'},
+  {n:'Horizontes',z:'Zona 1',c:'#006970'},
+  {n:'Miraflores',z:'Zona 1',c:'#006970'},
+  {n:'Misericordia',z:'Zona 1',c:'#006970'},
+  {n:'Mojón',z:'Zona 1',c:'#006970'},
+  {n:'Obrero',z:'Zona 1',c:'#006970'},
+  {n:'Pedregal Parte Baja',z:'Zona 1',c:'#006970'},
+  {n:'Pedrera',z:'Zona 1',c:'#006970'},
+  {n:'San Francisco',z:'Zona 1',c:'#006970'},
+  {n:'Shangay',z:'Zona 1',c:'#006970'},
+  {n:'Simón Bolívar',z:'Zona 1',c:'#006970'},
+  {n:'Tobón Quintero',z:'Zona 1',c:'#006970'},
+  {n:'Monte Verde',z:'Zona 1',c:'#006970'},
+  {n:'Remanso',z:'Zona 1',c:'#006970'},
+  {n:'Yarumito Parte Baja',z:'Zona 1',c:'#006970'},
+  {n:'Canoas (baja)',z:'Zona 1',c:'#006970'},
+  {n:'Piedras Blancas',z:'Zona 1',c:'#006970'},
+  {n:'Porvenir',z:'Zona 1',c:'#006970'},
+  {n:'Recreo',z:'Zona 1',c:'#006970'},
+  {n:'Calorcol',z:'Zona 2',c:'#00a3b4'},
+  {n:'Azulita Parte Alta',z:'Zona 2',c:'#00a3b4'},
+  {n:'Villas de Copacabana',z:'Zona 2',c:'#00a3b4'},
+  {n:'Tablazo',z:'Zona 2',c:'#00a3b4'},
+  {n:'Canoas (alta)',z:'Zona 2',c:'#00a3b4'},
+  {n:'Cristo Rey (alto)',z:'Zona 2',c:'#00a3b4'},
+  {n:'Pedregal Parte Alta',z:'Zona 2',c:'#00a3b4'},
+  {n:'Colinas del Pedregal',z:'Zona 2',c:'#00a3b4'},
+  {n:'Vegas Interiores',z:'Zona 2',c:'#00a3b4'},
+  {n:'Yarumito Empedrado',z:'Zona 2',c:'#00a3b4'},
+  {n:'Yarumito Cancha Nueva',z:'Zona 2',c:'#00a3b4'},
+  {n:'Vegas Parte Alta',z:'Zona 2',c:'#00a3b4'},
+  {n:'Edificios Amarillos',z:'Zona 2',c:'#00a3b4'},
+  {n:'Montesión',z:'Zona 2',c:'#00a3b4'},
+  {n:'Jardín de la Margarita',z:'Zona 2',c:'#00a3b4'},
+  {n:'Reservas San Juan 1',z:'Zona 2',c:'#00a3b4'},
+  {n:'Posada del Viento',z:'Zona 2',c:'#00a3b4'},
+  {n:'Rosa de los Vientos',z:'Zona 2',c:'#00a3b4'},
+  {n:'Vicenza',z:'Zona 2',c:'#00a3b4'},
+  {n:'Reservas San Juan 2',z:'Zona 2',c:'#00a3b4'},
+  {n:'Vegas Parte Baja',z:'Zona especial',c:'#d97706'},
+  {n:'Barrio María',z:'Zona 3',c:'#2d4070'},
+  {n:'El Paraíso (portería)',z:'Zona 3',c:'#2d4070'},
+  {n:'Torre del Bosque',z:'Zona 3',c:'#2d4070'},
+  {n:'Edif. Poblado Norte',z:'Zona 3',c:'#2d4070'},
+  {n:'San Juan Campestre',z:'Zona 3',c:'#2d4070'},
+  {n:'Vía Machado',z:'Zona 4',c:'#92400e'},
+  {n:'Canteras',z:'Zona 4',c:'#92400e'},
+  {n:'Villanueva',z:'Zona 4',c:'#92400e'},
+  {n:'Villa Roca',z:'Zona 4',c:'#92400e'},
+  {n:'San Juan',z:'Zona 4',c:'#92400e'},
+  {n:'Guasimalito',z:'Zona especial',c:'#d97706'},
+  {n:'Machado',z:'Zona especial',c:'#d97706'},
+  {n:'Unidades Machado',z:'Zona 5',c:'#dc2626'},
+  {n:'Arboleda del Campo',z:'Zona 5',c:'#dc2626'},
+  {n:'Fontidueño',z:'Zona 5',c:'#dc2626'},
+  {n:'Navarra',z:'Zona 5',c:'#dc2626'},
+  {n:'Niquía Parte Baja',z:'Zona 5',c:'#dc2626'},
+  {n:'Unidades Navarra',z:'Zona 5',c:'#dc2626'},
+  {n:'Parque de Girardota',z:'Zona norte',c:'#7c3aed'},
+  {n:'Toledo Campestre',z:'Zona norte',c:'#7c3aed'},
+  {n:'Parque de Bello',z:'Zona norte',c:'#7c3aed'},
+  {n:'Fabricato',z:'Zona norte',c:'#7c3aed'},
+  {n:'Unidades de Madera',z:'Zona norte',c:'#7c3aed'},
+];
+
+/* ── MEDELLÍN ── */
+var MEDELLIN_BARRIOS=[
+  {b:'El Poblado',s:'Zona Sur',m:'Medellín'},{b:'Laureles',s:'Zona Occidental',m:'Medellín'},{b:'Envigado Centro',s:'Envigado',m:'Envigado'},
+  {b:'Sabaneta',s:'Sur del Valle',m:'Sabaneta'},{b:'Itagüí Centro',s:'Zona Industrial',m:'Itagüí'},{b:'La Estrella',s:'Sur Metro',m:'La Estrella'},
+  {b:'Caldas',s:'Municipio sur',m:'Caldas'},{b:'Belén',s:'Zona Sur-Occidente',m:'Medellín'},{b:'El Centro',s:'Centro Histórico',m:'Medellín'},
+  {b:'Estadio',s:'Zona Occidental',m:'Medellín'},{b:'Aranjuez',s:'Zona Nororiental',m:'Medellín'},{b:'Castilla',s:'Zona Noroccidental',m:'Medellín'},
+  {b:'Robledo',s:'Zona Noroccidental',m:'Medellín'},{b:'San Javier',s:'Zona Occidental',m:'Medellín'},{b:'La América',s:'Zona Occidental',m:'Medellín'},
+  {b:'Buenos Aires',s:'Zona Suroriental',m:'Medellín'},{b:'Guayabal',s:'Zona Sur',m:'Medellín'},{b:'La Candelaria',s:'Centro',m:'Medellín'},
+  {b:'Manrique',s:'Zona Nororiental',m:'Medellín'},{b:'Santa Cruz',s:'Zona Nororiental',m:'Medellín'},{b:'Villa Hermosa',s:'Zona Suroriental',m:'Medellín'},
+  {b:'El Nogal',s:'Poblado Alto',m:'Medellín'},{b:'Astorga',s:'Laureles',m:'Medellín'},{b:'Conquistadores',s:'Laureles',m:'Medellín'},
+  {b:'Los Colores',s:'Laureles',m:'Medellín'},{b:'Calasanz',s:'Belén',m:'Medellín'},{b:'Aguacatala',s:'El Poblado',m:'Medellín'},
+  {b:'Ciudad del Río',s:'Sur',m:'Medellín'},{b:'El Tesoro',s:'El Poblado',m:'Medellín'},{b:'Patio Bonito',s:'Laureles',m:'Medellín'},
+  {b:'Bello Centro',s:'Norte Metro',m:'Bello'},{b:'Niquía',s:'Bello Sur',m:'Bello'},{b:'Madera',s:'Bello',m:'Bello'},
+  {b:'La Cumbre',s:'Envigado',m:'Envigado'},{b:'El Esmeraldal',s:'Envigado',m:'Envigado'},{b:'Zúñiga',s:'Envigado',m:'Envigado'},
+  {b:'Ditaires',s:'Itagüí',m:'Itagüí'},{b:'Las Acacias',s:'Itagüí',m:'Itagüí'},{b:'San Pío',s:'Itagüí',m:'Itagüí'},
+  {b:'Las Mercedes',s:'Sabaneta',m:'Sabaneta'},{b:'Pan de Azúcar',s:'Sabaneta',m:'Sabaneta'},{b:'María Auxiliadora',s:'Sabaneta',m:'Sabaneta'},
+];
+
+/* ── RENDER BARRIOS (scroll track) ── */
+function buildBarriosScroll(){
+  var el=document.getElementById('barriosContent');
+  if(!el)return;
+  el.innerHTML=BARRIOS_COPA.map(function(b){
+    return '<div class="barrio-card" onclick="startLibreConBarrio(\''+b.n.replace(/'/g,"\\'")+'\')">'
+      +'<div class="barrio-card-top" style="background:'+b.c+'"></div>'
+      +'<div class="barrio-card-body">'
+      +'<div class="barrio-card-zone" style="color:'+b.c+'">'+b.z+'</div>'
+      +'<div class="barrio-card-name">'+b.n+'</div>'
+      +'<button class="barrio-card-btn" style="background:'+b.c+';box-shadow:0 2px 8px '+b.c+'55">'
+      +'<span class="sym f" style="font-size:11px">shopping_bag</span>Pedir aquí</button>'
+      +'</div></div>';
+  }).join('');
+}
+
+/* ── RENDER METRO (scroll track) ── */
+function buildMetroScroll(){
+  var el=document.getElementById('metroContent');
+  if(!el)return;
+  el.innerHTML=MEDELLIN_BARRIOS.map(function(b){
+    return '<div class="metro-card" onclick="startPaqueteDirecto(\''+b.m.toLowerCase().replace(/\s/g,'-')+'\',\''+b.b+', '+b.m+'\')">'
+      +'<div class="metro-card-top"></div>'
+      +'<div class="metro-card-body">'
+      +'<div class="metro-card-muni">'+b.m+'</div>'
+      +'<div class="metro-card-name">'+b.b+'</div>'
+      +'<div class="metro-card-sector">'+b.s+'</div>'
+      +'<button class="metro-card-btn"><span class="sym f" style="font-size:11px">package_2</span>Enviar aquí</button>'
+      +'</div></div>';
+  }).join('');
+}
+
+/* ── RENDER MODAL BARRIOS ── */
+function buildModalBarrios(){
+  var el=document.getElementById('modalBarriosGrid');
+  if(!el||el.childElementCount>0)return;
+  el.innerHTML=BARRIOS_COPA.map(function(b){
+    return '<div class="modal-barrio-card" onclick="cerrarModal(\'modalBarrios\');startLibreConBarrio(\''+b.n.replace(/'/g,"\\'")+'\');">'
+      +'<div class="modal-barrio-card-top" style="background:'+b.c+'"></div>'
+      +'<div class="modal-barrio-card-body">'
+      +'<div class="modal-barrio-card-zone" style="color:'+b.c+'">'+b.z+'</div>'
+      +'<div class="modal-barrio-card-name">'+b.n+'</div>'
+      +'<button class="modal-barrio-card-btn" style="background:'+b.c+'">'
+      +'<span class="sym f" style="font-size:12px">shopping_bag</span>Hacer pedido</button>'
+      +'</div></div>';
+  }).join('');
+}
+
+/* ── RENDER MODAL METRO ── */
+function buildModalMetro(){
+  var el=document.getElementById('modalMetroGrid');
+  if(!el||el.childElementCount>0)return;
+  el.innerHTML=MEDELLIN_BARRIOS.map(function(b){
+    return '<div class="modal-barrio-card" onclick="cerrarModal(\'modalMetro\');startPaqueteDirecto(\''+b.m.toLowerCase().replace(/\s/g,'-')+'\',\''+b.b+', '+b.m+'\');">'
+      +'<div class="modal-barrio-card-top" style="background:var(--p)"></div>'
+      +'<div class="modal-barrio-card-body">'
+      +'<div class="modal-barrio-card-zone" style="color:var(--on3)">'+b.m+' · '+b.s+'</div>'
+      +'<div class="modal-barrio-card-name">'+b.b+'</div>'
+      +'<button class="modal-barrio-card-btn" style="background:var(--p)">'
+      +'<span class="sym f" style="font-size:12px">package_2</span>Enviar aquí</button>'
+      +'</div></div>';
+  }).join('');
+}
+
+/* ── SCROLL FLECHAS ── */
+function scrollSection(trackId,dir){
+  var track=document.getElementById(trackId);
+  if(!track)return;
+  track.scrollBy({left:dir*220,behavior:'smooth'});
+}
+
+/* ── MODALES ── */
+function abrirModal(id){
+  if(id==='modalBarrios')buildModalBarrios();
+  if(id==='modalMetro')buildModalMetro();
+  document.getElementById(id).classList.remove('hidden');
+  document.body.style.overflow='hidden';
+}
+function cerrarModal(id){
+  document.getElementById(id).classList.add('hidden');
+  document.body.style.overflow='';
+}
+
+/* ── TOAST ── */
+var _toastTimer=null;
+function mostrarToast(msg,icon){
+  var t=document.getElementById('globalToast');
+  var ic=document.getElementById('globalToastIcon');
+  var m=document.getElementById('globalToastMsg');
+  if(ic)ic.textContent=icon||'info';
+  if(m)m.textContent=msg;
+  t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer=setTimeout(function(){t.classList.remove('show');},3200);
+}
+function mostrarProximamente(){
+  mostrarToast('Próximamente: listado completo de comercios','store');
+}
+
+/* ── MAPAS ── */
+var mapEmpty=null,mapResult=null;
+var domiMarkersEmpty={};
+var domiMarkerResult=null,destMarkerResult=null;
+var routeLayerResult=null,routeLayerResultTop=null;
+
+function makeTileLayer(m){L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:20,minZoom:3,subdomains:'abcd',detectRetina:true,attribution:''}).addTo(m);}
+
+function iconDomi(nombre,esPropio){
+  var n=(nombre||'Domi').split(' ')[0].substring(0,10);
+  var color=esPropio?'linear-gradient(135deg,#1a7a3a,#2a9d5c)':'linear-gradient(135deg,#006970,#00bcc9)';
+  var sombra=esPropio?'rgba(42,157,92,.55)':'rgba(0,105,112,.5)';
+  var sz=esPropio?48:38;
+  var html='<div style="position:relative;width:'+sz+'px;text-align:center">'
+    +'<div style="position:absolute;top:-9px;left:50%;transform:translateX(-50%);white-space:nowrap;background:rgba(0,105,112,.9);color:#fff;font-size:9px;font-weight:800;padding:2px 6px;border-radius:6px;pointer-events:none">'+n+'</div>'
+    +'<div style="position:absolute;inset:-4px;border-radius:50%;background:rgba(0,105,112,.18);animation:wilPulse 2s ease-in-out infinite"></div>'
+    +'<div style="position:relative;width:'+sz+'px;height:'+sz+'px;border-radius:50%;background:'+color+';border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:'+(esPropio?22:16)+'px;box-shadow:0 5px 18px '+sombra+'">🛵</div>'
+    +'</div>';
+  return L.divIcon({html:html,className:'',iconSize:[sz,sz+14],iconAnchor:[sz/2,sz/2+7]});
+}
+function iconDestino(){
+  var html='<div style="position:relative;width:38px;text-align:center">'
+    +'<div style="position:absolute;inset:-3px;border-radius:50%;background:rgba(76,86,175,.2);animation:wilPulse 2.2s ease-in-out infinite"></div>'
+    +'<div style="position:relative;width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#4c56af,#7c83d6);border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 4px 14px rgba(76,86,175,.45)">📍</div>'
+    +'</div>';
+  return L.divIcon({html:html,className:'',iconSize:[38,38],iconAnchor:[19,19]});
+}
+
+(function initMapVacio(){
+  mapEmpty=L.map('rt-empty-map',{center:[6.34911,-75.50619],zoom:15,zoomControl:true,attributionControl:false});
+  makeTileLayer(mapEmpty);
+  var _rLat=6.34911,_rLng=-75.50619;
+  L.circle([_rLat,_rLng],{radius:600,color:'#16a34a',weight:1.8,fillColor:'#16a34a',fillOpacity:.06,dashArray:'7,5',interactive:false}).addTo(mapEmpty);
+  var _DEMO_NOMBRES=['Carlos','Andrés','Diego','Julián'];
+  var _DEMO_DELAYS=[0,0.3,0.7,1.1];
+  var _demoPosIni=[
+    {lat:6.3505,lng:-75.5048},
+    {lat:6.3478,lng:-75.5030},
+    {lat:6.3462,lng:-75.5075},
+    {lat:6.3520,lng:-75.5012}
+  ];
+  function _makeDemoIcon(nombre,delay){
+    return L.divIcon({
+      html:'<div style="position:relative;width:36px;text-align:center">'
+        +'<div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);white-space:nowrap;background:rgba(0,105,112,.88);color:#fff;font-size:8.5px;font-weight:800;padding:1px 5px;border-radius:5px">'+nombre+'</div>'
+        +'<div style="position:absolute;inset:-3px;border-radius:50%;background:rgba(22,163,74,.2);animation:wilPulse 2.4s ease-in-out infinite;animation-delay:'+delay+'s"></div>'
+        +'<div style="position:relative;width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#006970,#00bcc9);border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 3px 10px rgba(0,105,112,.45)">🛵</div>'
+        +'</div>',
+      className:'',iconSize:[36,46],iconAnchor:[18,23]
+    });
+  }
+  var _demoMarkers=_demoPosIni.map(function(pos,i){
+    return L.marker([pos.lat,pos.lng],{
+      icon:_makeDemoIcon(_DEMO_NOMBRES[i],_DEMO_DELAYS[i]),
+      zIndexOffset:300,
+      interactive:false
+    }).addTo(mapEmpty);
+  });
+  
+  function _nudge(base,rango){return base+(Math.random()*rango*2-rango);}
+  setInterval(function(){
+    _demoMarkers.forEach(function(marker){
+      var cur=marker.getLatLng();
+      var newLat=_rLat+(_nudge(cur.lat-_rLat,0.0015));
+      var newLng=_rLng+(_nudge(cur.lng-_rLng,0.0025));
+      var dlat=newLat-_rLat,dlng=newLng-_rLng;
+      var dist=Math.sqrt(dlat*dlat+dlng*dlng);
+      var maxDist=0.0045;
+      if(dist>maxDist){newLat=_rLat+dlat/dist*maxDist;newLng=_rLng+dlng/dist*maxDist;}
+      marker.setLatLng([newLat,newLng]);
+    });
+  },5000);
+})();
+
+async function fetchDomisActivosEmpty(){
+  try{
+    var r=await fetch(API_BASE+'/wil?action=domis-activos');
+    var data=await r.json();
+    if(!data.ok||!data.domis)return;
+    var idsVivos=new Set();
+    data.domis.forEach(function(d){
+      idsVivos.add(d.id);
+      var lat=parseFloat(d.lat),lng=parseFloat(d.lng);
+      if(isNaN(lat)||isNaN(lng))return;
+      if(domiMarkersEmpty[d.id]){domiMarkersEmpty[d.id].setLatLng([lat,lng]);}
+      else{var m=L.marker([lat,lng],{icon:iconDomi(d.nombre,false),zIndexOffset:500}).bindPopup('<b>'+(d.nombre||d.id)+'</b><br>🛵 En servicio').addTo(mapEmpty);domiMarkersEmpty[d.id]=m;}
+    });
+    Object.keys(domiMarkersEmpty).forEach(function(id){if(!idsVivos.has(id)){mapEmpty.removeLayer(domiMarkersEmpty[id]);delete domiMarkersEmpty[id];}});
+  }catch(e){}
+}
+
+window._initMapResult=function(pedido){
+  if(mapResult){
+    setTimeout(function(){mapResult.invalidateSize();},200);
+    // Actualizar marcador domi si tiene nueva ubicación
+    if(pedido.domiLat&&pedido.domiLng&&domiMarkerResult){
+      domiMarkerResult.setLatLng([parseFloat(pedido.domiLat),parseFloat(pedido.domiLng)]);
+    }
+    return;
+  }
+  mapResult=L.map('wilMapResult',{
+    zoomControl:true,attributionControl:false,dragging:true,
+    scrollWheelZoom:false,doubleClickZoom:false,touchZoom:true,keyboard:false
+  }).setView([COPA_LAT,COPA_LNG],14);
+  makeTileLayer(mapResult);
+  setTimeout(function(){mapResult.invalidateSize();},300);
+
+  // Origen SIEMPRE Copacabana sede
+  var orLat=pedido.origenLat||COPA_LAT;
+  var orLng=pedido.origenLng||COPA_LNG;
+
+  // Marcador domi (en Copacabana si no hay GPS del domi)
+  if(pedido.domiLat&&pedido.domiLng){
+    var dLat=parseFloat(pedido.domiLat),dLng=parseFloat(pedido.domiLng);
+    if(!isNaN(dLat)&&!isNaN(dLng)){
+      orLat=dLat;orLng=dLng;
+      domiMarkerResult=L.marker([dLat,dLng],{
+        icon:iconDomi(pedido.domiciliario,true),zIndexOffset:1000
+      }).addTo(mapResult);
+    }
+  } else {
+    // Mostrar marcador sede Copacabana
+    domiMarkerResult=L.marker([COPA_LAT,COPA_LNG],{
+      icon:iconDomi(pedido.domiciliario||'WIL',true),zIndexOffset:1000
+    }).addTo(mapResult).bindPopup('📍 Sede Copacabana');
+  }
+
+  // Mostrar ETA del backend si ya viene calculado
+  if(pedido.tiempoMin){
+    var etaOverlay=document.getElementById('rtMapEtaOverlay');
+    var etaMinEl=document.getElementById('rtMapEtaMins');
+    if(etaMinEl)etaMinEl.textContent=pedido.tiempoMin>0?pedido.tiempoMin:'¡Ya!';
+    if(etaOverlay)etaOverlay.style.display='flex';
+  }
+
+  // Colocar destino y trazar ruta
+  var dirRaw=(pedido&&pedido.direccion)||'';
+  var coordsM=dirRaw.match(/\[(-?\d+\.\d+),\s*(-?\d+\.\d+)\]/);
+
+  function colocarDestino(latD,lngD){
+    if(destMarkerResult){mapResult.removeLayer(destMarkerResult);}
+    destMarkerResult=L.marker([latD,lngD],{icon:iconDestino()})
+      .addTo(mapResult)
+      .bindPopup('<b>'+((pedido&&pedido.cliente)||'Cliente')+'</b><br>📍 Destino')
+      .openPopup();
+    var bounds=L.latLngBounds([[orLat,orLng],[latD,lngD]]);
+    mapResult.fitBounds(bounds,{paddingTopLeft:[20,80],paddingBottomRight:[20,20],maxZoom:16});
+    trazarRutaResult(orLat,orLng,latD,lngD,pedido);
+  }
+
+  if(coordsM){
+    colocarDestino(parseFloat(coordsM[1]),parseFloat(coordsM[2]));
+  } else if(pedido&&pedido.direccion){
+    var dir=pedido.direccion.replace(/\s*\[.+\]/,'').replace(/\s*\(Ref:[^)]+\)/,'').trim();
+    if(dir){
+      fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(dir+' Copacabana Antioquia Colombia')+'&format=json&limit=1',
+        {headers:{'User-Agent':'DomiciliosWIL/1.0'}})
+        .then(function(r){return r.json();})
+        .then(function(d){if(d&&d[0])colocarDestino(parseFloat(d[0].lat),parseFloat(d[0].lon));})
+        .catch(function(){});
+    }
+  }
+};
+async function trazarRutaResult(latO,lngO,latD,lngD,pedido){
+  var url='https://router.project-osrm.org/route/v1/driving/'+lngO+','+latO+';'+lngD+','+latD+'?overview=full&geometries=geojson';
+  try{
+    var r=await fetch(url);var data=await r.json();
+    if(!data.routes||!data.routes[0])return;
+    var coords=data.routes[0].geometry.coordinates;
+    var latLngs=coords.map(function(c){return[c[1],c[0]];});
+    var dur=Math.round(data.routes[0].duration/60);
+    if(routeLayerResult){mapResult.removeLayer(routeLayerResult);routeLayerResult=null;}
+    if(routeLayerResultTop){mapResult.removeLayer(routeLayerResultTop);routeLayerResultTop=null;}
+    routeLayerResult=L.polyline(latLngs,{color:'#fff',weight:9,opacity:.6,lineCap:'round',lineJoin:'round'}).addTo(mapResult);
+    routeLayerResultTop=L.polyline(latLngs,{color:'#006970',weight:5,opacity:.92,lineCap:'round',lineJoin:'round'}).addTo(mapResult);
+    var etaOverlay=document.getElementById('rtMapEtaOverlay');
+    var etaMinEl=document.getElementById('rtMapEtaMins');
+    function setEta(v){if(etaMinEl)etaMinEl.textContent=v;if(etaOverlay)etaOverlay.style.display='flex';}
+    setEta(dur>0?dur:'¡Ya!');
+    var remaining=dur;
+    var _etaCd=setInterval(function(){if(remaining>0){remaining--;setEta(remaining>0?remaining:'¡Ya!');}else clearInterval(_etaCd);},60000);
+  }catch(e){
+    if(routeLayerResultTop){mapResult.removeLayer(routeLayerResultTop);}
+    routeLayerResultTop=L.polyline([[latO,lngO],[latD,lngD]],{color:'#006970',weight:4,opacity:.7,dashArray:'8,6'}).addTo(mapResult);
+  }
+}
+
+var _domiPollUbicTimer=null;
+function iniciarPollUbicacionDomi(pedido){
+  clearInterval(_domiPollUbicTimer);
+  if(!pedido||!pedido.idDomi)return;
+  function _actualizarPosicion(lat,lng){
+    if(!mapResult)return;
+    if(domiMarkerResult){domiMarkerResult.setLatLng([lat,lng]);}
+    else{domiMarkerResult=L.marker([lat,lng],{icon:iconDomi(pedido.domiciliario,true),zIndexOffset:1000}).addTo(mapResult);}
+    var dirRaw=pedido.direccion||'';
+    var coordsM=dirRaw.match(/\[(-?\d+\.\d+),\s*(-?\d+\.\d+)\]/);
+    if(coordsM){
+      var latD=parseFloat(coordsM[1]),lngD=parseFloat(coordsM[2]);
+      trazarRutaResult(lat,lng,latD,lngD,pedido);
+      var bounds=L.latLngBounds([[lat,lng],[latD,lngD]]);
+      mapResult.fitBounds(bounds,{paddingTopLeft:[20,60],paddingBottomRight:[20,20],maxZoom:16});
+    }
+  }
+  _domiPollUbicTimer=setInterval(function(){
+    fetch(API_BASE+'/wil?action=domi-location-get&domiId='+encodeURIComponent(pedido.idDomi))
+      .then(function(r){return r.json();})
+      .then(function(data){
+        if(!data.ok||!data.lat||!data.lng)return;
+        var lat=parseFloat(data.lat),lng=parseFloat(data.lng);
+        if(isNaN(lat)||isNaN(lng))return;
+        _actualizarPosicion(lat,lng);
+      }).catch(function(){});
+  },10000);
+}
+
+/* ── STATE ── */
+var state={comercioTiene:null,comercioNombre:'',presupuesto:0,productos:[],direccion:'',referencia:'',nombre:'',telefono:'',metodoPago:null,metodoPagoPaquete:null,coords:null,barrio:'',precioDomicilio:0,paqueteZona:'',paqueteZonaNombre:'',idPedido:null,califActual:0,pedidoRastreado:null,categoriaPreset:''};
+var historial=['view-inicio'];
+
+/* ── NAVEGACIÓN ── */
+function navTo(tab){
+  document.querySelectorAll('.bi').forEach(function(b){b.classList.remove('active');});
+  if(tab==='pedir'){document.getElementById('nav-pedir').classList.add('active');if(document.querySelector('.view.active').id==='view-rastrear')showView('view-inicio');}
+  else if(tab==='rastrear'){document.getElementById('nav-rastrear').classList.add('active');showView('view-rastrear');setTimeout(function(){if(mapEmpty)mapEmpty.invalidateSize();},250);setTimeout(function(){if(mapEmpty)mapEmpty.invalidateSize();},600);}
+}
+
+function showView(id){
+  document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
+  document.getElementById(id).classList.add('active');
+  if(historial[historial.length-1]!==id)historial.push(id);
+  window.scrollTo(0,0);updateHeader(id);syncNav(id);
+  if(id==='view-rastrear'&&mapEmpty){setTimeout(function(){mapEmpty.invalidateSize();},200);setTimeout(function(){mapEmpty.invalidateSize();},700);}
+}
+
+function syncNav(id){
+  var piderViews=['view-inicio','view-libre-1','view-libre-2','view-libre-3','view-factura-libre','view-paquete-form','view-factura-paquete','view-confirmado'];
+  document.querySelectorAll('.bi').forEach(function(b){b.classList.remove('active');});
+  if(piderViews.indexOf(id)!==-1)document.getElementById('nav-pedir').classList.add('active');
+  else if(id==='view-rastrear')document.getElementById('nav-rastrear').classList.add('active');
+}
+
+function goBack(){
+  if(historial.length>1){historial.pop();var prev=historial[historial.length-1];document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});document.getElementById(prev).classList.add('active');window.scrollTo(0,0);updateHeader(prev);syncNav(prev);}
+  else{window.location.href='index.html';}
+}
+
+function updateHeader(id){
+  var names={'view-inicio':'Domicilios WIL','view-libre-1':'Pedido Libre','view-libre-2':'Pedido Libre','view-libre-3':'Pedido Libre','view-factura-libre':'Confirmar pedido','view-paquete-form':'Envío por Zona','view-factura-paquete':'Confirmar envío','view-confirmado':'¡Pedido enviado!','view-rastrear':'Rastrear pedido'};
+  document.getElementById('hdrTitle').textContent=names[id]||'Domicilios WIL';
+  document.getElementById('hdrLoc').style.display=(id==='view-inicio')?'flex':'none';
+}
+
+/* ── FILTROS ── */
+function filtrar(tipo){
+  document.querySelectorAll('.fpill').forEach(function(b){b.classList.remove('active');});
+  document.getElementById('fp-'+tipo).classList.add('active');
+  var sf=document.getElementById('sec-farmacias'),sd=document.getElementById('sec-domicilios');
+  if(tipo==='todos'){sf.classList.remove('hidden');sd.classList.remove('hidden');}
+  else if(tipo==='farmacias'){sf.classList.remove('hidden');sd.classList.add('hidden');}
+  else if(tipo==='domicilios'){sf.classList.add('hidden');sd.classList.remove('hidden');}
+  else if(tipo==='rastrear'){navTo('rastrear');}
+}
+
+/* ── COMERCIOS ── */
+function irAFarmacia(cual){window.location.href=cual;}
+
+function startLibre(){state.categoriaPreset='';showView('view-libre-1');}
+function startLibreConCat(cat){state.categoriaPreset=cat;state.comercioTiene=false;document.getElementById('yn-si').classList.remove('sel');document.getElementById('yn-no').classList.add('sel');document.getElementById('comercio-field').classList.add('hidden');showView('view-libre-2');}
+function startLibreConBarrio(barrio){state.barrio=barrio;showView('view-libre-1');}
+function startPaquete(){showView('view-paquete-form');}
+function startPaqueteDirecto(id,nombre){state.paqueteZona=id;state.paqueteZonaNombre=nombre;document.getElementById('pq-form-sub').textContent='Destino: '+nombre+' · Tarifa según distancia';showView('view-paquete-form');}
+
+/* ── GPS ── */
+function captarUbicacion(){
+  var statusEl=document.getElementById('locStatus'),subEl=document.getElementById('locBannerSub');
+  if(!navigator.geolocation){if(statusEl){statusEl.textContent='✗';statusEl.className='loc-st err';}return;}
+  if(statusEl){statusEl.textContent='⟳';statusEl.className='loc-st loading';}
+  if(subEl)subEl.textContent='Captando GPS…';
+  navigator.geolocation.getCurrentPosition(function(pos){
+    state.coords={lat:pos.coords.latitude,lng:pos.coords.longitude};
+    fetch('https://nominatim.openstreetmap.org/reverse?lat='+pos.coords.latitude+'&lon='+pos.coords.longitude+'&format=json&accept-language=es',{headers:{'User-Agent':'DomiciliosWIL/1.0'}})
+      .then(function(r){return r.json();}).then(function(data){
+        var a=data.address||{};state.barrio=a.neighbourhood||a.suburb||a.village||a.city_district||a.city||'';
+        var dirEl=document.getElementById('libre-direccion');
+        if(dirEl&&!dirEl.value.trim()){var calle=(a.road||a.street||'').trim(),num=(a.house_number||'').trim(),ciudad=(a.city||a.town||a.municipality||'Copacabana').trim();dirEl.value=[calle+(num?' #'+num:''),state.barrio,ciudad].filter(Boolean).join(', ');}
+        if(statusEl){statusEl.textContent='✓';statusEl.className='loc-st ok';}
+        if(subEl)subEl.textContent=state.barrio?('📍 '+state.barrio):'Ubicación capturada';
+        document.getElementById('hdrLocTxt').textContent=state.barrio||'Ubicación OK';
+      }).catch(function(){if(statusEl){statusEl.textContent='✓';statusEl.className='loc-st ok';}if(subEl)subEl.textContent='GPS capturado';});
+  },function(){if(statusEl){statusEl.textContent='✗';statusEl.className='loc-st err';}if(subEl)subEl.textContent='No se pudo captar';},{enableHighAccuracy:true,timeout:12000});
+}
+
+/* ── FORM LIBRE ── */
+function selectComercio(tiene){state.comercioTiene=tiene;document.getElementById('yn-si').classList.toggle('sel',tiene);document.getElementById('yn-no').classList.toggle('sel',!tiene);document.getElementById('comercio-field').classList.toggle('hidden',!tiene);}
+function selectBudget(val,el){state.presupuesto=val;document.querySelectorAll('.chip').forEach(function(c){c.classList.remove('sel');});el.classList.add('sel');document.getElementById('otro-budget-field').classList.add('hidden');}
+function selectBudgetOtro(){document.querySelectorAll('.chip').forEach(function(c){c.classList.remove('sel');});document.querySelector('.chip.otro').classList.add('sel');document.getElementById('otro-budget-field').classList.remove('hidden');document.getElementById('otro-budget-input').focus();}
+function goLibre2(){if(state.comercioTiene===null){mostrarToast('¿Ya tienes el comercio o el domi busca?','help');return;}if(!state.presupuesto){mostrarToast('Selecciona tu presupuesto.','payments');return;}state.comercioNombre=document.getElementById('comercio-nombre').value;showView('view-libre-2');}
+function addProduct(){var inp=document.getElementById('newProductInput'),nombre=inp.value.trim();if(!nombre)return;state.productos.push({nombre:nombre,qty:1});inp.value='';renderProductos();}
+function renderProductos(){var list=document.getElementById('productList');list.innerHTML='';state.productos.forEach(function(p,i){var div=document.createElement('div');div.className='prod-item';div.innerHTML='<div class="prod-name">'+p.nombre+'</div><div class="qty-row"><button class="qty-btn" onclick="changeQty('+i+',-1)">−</button><span class="qty-n">'+p.qty+'</span><button class="qty-btn" onclick="changeQty('+i+',1)">+</button></div><button class="prod-del" onclick="removeProduct('+i+')"><span class="sym" style="font-size:14px">delete</span></button>';list.appendChild(div);});}
+function changeQty(i,d){state.productos[i].qty=Math.max(1,state.productos[i].qty+d);renderProductos();}
+function removeProduct(i){state.productos.splice(i,1);renderProductos();}
+function goLibre3(){if(!state.productos.length){mostrarToast('Agrega al menos un producto.','shopping_cart');return;}showView('view-libre-3');}
+function selectPago(m){state.metodoPago=m;document.getElementById('pago-efectivo').classList.toggle('sel',m==='EFECTIVO');document.getElementById('pago-transferencia').classList.toggle('sel',m==='TRANSFERENCIA');}
+function generarFacturaLibre(){
+  var dir=document.getElementById('libre-direccion').value.trim(),ref=document.getElementById('libre-referencia').value.trim();
+  var nom=document.getElementById('libre-nombre').value.trim(),tel=document.getElementById('libre-telefono').value.trim();
+  if(!dir){mostrarToast('Ingresa la dirección completa.','location_on');return;}if(!nom||!tel){mostrarToast('Completa tu nombre y teléfono.','person');return;}if(!state.metodoPago){mostrarToast('Selecciona método de pago.','payments');return;}
+  state.direccion=dir;state.referencia=ref;state.nombre=nom;state.telefono=tel;
+  document.getElementById('factura-comercio-val').textContent=state.comercioTiene&&state.comercioNombre?state.comercioNombre:state.comercioTiene?'El domiciliario confirma':'El domiciliario busca';
+  document.getElementById('factura-presupuesto').textContent=formatCOP(state.presupuesto);
+  document.getElementById('factura-direccion').textContent=dir;document.getElementById('factura-referencia').textContent=ref||'—';
+  document.getElementById('factura-nombre').textContent=nom;document.getElementById('factura-telefono').textContent=tel;
+  document.getElementById('factura-pago').textContent=state.metodoPago==='EFECTIVO'?'💵 Efectivo':'🏦 Transferencia';
+  document.getElementById('factura-fecha').textContent=new Date().toLocaleDateString('es-CO',{day:'numeric',month:'long'});
+  var ph='';state.productos.forEach(function(p){ph+='<div class="fac-item"><span>'+p.nombre+'</span><span>×'+p.qty+'</span></div>';});
+  document.getElementById('factura-productos-list').innerHTML=ph;
+  showView('view-factura-libre');
+}
+
+/* ── PAQUETE ── */
+function selectPagoPaquete(m){state.metodoPagoPaquete=m;document.getElementById('pago-efectivo-p').classList.toggle('sel',m==='EFECTIVO');document.getElementById('pago-transferencia-p').classList.toggle('sel',m==='TRANSFERENCIA');}
+function generarFacturaPaquete(){
+  var dir=document.getElementById('paquete-direccion').value.trim(),ref=document.getElementById('paquete-referencia').value.trim();
+  var nom=document.getElementById('paquete-nombre').value.trim(),tel=document.getElementById('paquete-telefono').value.trim();
+  if(!dir||!nom||!tel){mostrarToast('Completa dirección, nombre y teléfono.','warning');return;}if(!state.metodoPagoPaquete){mostrarToast('Selecciona método de pago.','payments');return;}
+  state.nombre=nom;state.telefono=tel;state.direccion=dir;state.referencia=ref;state.metodoPago=state.metodoPagoPaquete;
+  document.getElementById('fp-zona').textContent=state.paqueteZonaNombre||'Zona seleccionada';
+  document.getElementById('fp-desc').textContent=document.getElementById('paquete-descripcion').value.trim()||'No especificado';
+  document.getElementById('fp-dir').textContent=dir;document.getElementById('fp-ref').textContent=ref||'—';
+  document.getElementById('fp-nombre').textContent=nom;document.getElementById('fp-tel').textContent=tel;
+  document.getElementById('fp-pago').textContent=state.metodoPagoPaquete==='EFECTIVO'?'💵 Efectivo':'🏦 Transferencia';
+  showView('view-factura-paquete');
+}
+
+/* ── ENVIAR PEDIDO ── */
+async function enviarPedido(tipo){
+  var btnId = tipo === 'libre' ? 'btnConfirmarLibre' : 'btnConfirmarPaquete';
+  var btn   = document.getElementById(btnId);
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Enviando…';
+ 
+  /* ── Dirección completa ── */
+  var dirCompleta = state.direccion;
+  if(state.referencia)   dirCompleta += ' — Ref: ' + state.referencia;
+  if(state.barrio && dirCompleta.indexOf(state.barrio) === -1)
+    dirCompleta += ', ' + state.barrio;
+  if(state.coords && state.coords.lat)
+    dirCompleta += ' [' + state.coords.lat.toFixed(5) + ',' + state.coords.lng.toFixed(5) + ']';
+ 
+  var now   = new Date();
+  var hora  = now.toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit', hour12:true});
+  var fecha = now.toLocaleDateString('es-CO', {day:'2-digit', month:'2-digit', year:'numeric'});
+  var id    = String(Math.floor(100 + Math.random() * 900));  // 3 dígitos: 100-999
+ 
+  /* ── Construir filas A→S (igual que pedido-farmacia) ── */
+  var rows = [];
+ 
+  if(tipo === 'libre' && state.productos && state.productos.length){
+ 
+    state.productos.forEach(function(p, i){
+      if(i === 0){
+        // Fila principal: todos los datos del pedido
+        rows.push([
+          id,                                                          // A ID_PEDIDO
+          state.nombre,                                                // B NOMBRE_CLI
+          state.telefono,                                              // C TELEFONO
+          state.metodoPago,                                            // D METODO_PAGO
+          'Pendiente',                                                 // E ESTADO
+          '',                                                          // F IMAGEN_TRANSFERENCIA
+          p.nombre,                                                    // G PRODUCTO
+          '',                                                          // H MARCA
+          p.qty,                                                       // I CANTIDAD
+          '',                                                          // J V/U
+          '',                                                          // K V/TOTAL
+          dirCompleta,                                                 // L DIRECCION
+          hora,                                                        // M HORA
+          fecha,                                                       // N FECHA
+          'Presupuesto: $' + (state.presupuesto||0).toLocaleString('es-CO'),  // O TOTAL
+          '',                                                          // P NOMBRE_DOMI
+          '',                                                          // Q HORA_TOMO_PEDIDO
+          '',                                                          // R HORA_ENTREGO
+          ''                                                           // S CALIFICACION
+        ]);
+      } else {
+        // Filas adicionales: solo producto
+        rows.push([
+          '','','','','','',
+          p.nombre, '', p.qty, '', '',
+          '','','','','','','',''
+        ]);
+      }
+    });
+ 
+    // Comercio como nota extra si aplica
+    if(state.comercioTiene && state.comercioNombre){
+      rows.push([
+        '','','','','','',
+        'Comercio: ' + state.comercioNombre, '', 1, '', '',
+        '','','','','','','',''
+      ]);
+    }
+ 
+  } else {
+    // Paquetería o pedido sin lista de productos
+    var descripcion = tipo === 'paquete'
+      ? (document.getElementById('paquete-descripcion').value.trim() || 'Paquete')
+      : 'Pedido libre sin productos';
+ 
+    rows.push([
+      id,                                                              // A
+      state.nombre,                                                    // B
+      state.telefono,                                                  // C
+      state.metodoPago,                                                // D
+      'Pendiente',                                                     // E
+      '',                                                              // F
+      descripcion,                                                     // G
+      '',                                                              // H
+      1,                                                               // I
+      '',                                                              // J
+      '',                                                              // K
+      dirCompleta,                                                     // L
+      hora,                                                            // M
+      fecha,                                                           // N
+      tipo === 'paquete'
+        ? 'Destino: ' + (state.paqueteZonaNombre||'Zona') + ' · Por confirmar'
+        : 'Por confirmar',                                             // O
+      '',                                                              // P
+      '',                                                              // Q
+      '',                                                              // R
+      ''                                                               // S
+    ]);
+  }
+ 
+  try{
+    /* ── Mismo endpoint que pedido-farmacia ── */
+    var res = await fetch(API_BASE + '/wil?action=pedido-farmacia', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rows:       rows,
+        id:         id,
+        sede:       'wil-libre',        // identifica el origen en el sheet
+        nombre:     state.nombre,
+        telefono:   state.telefono,
+        total:      state.presupuesto || 0,
+        domicilio:  0,
+        zona:       state.barrio || 'Copacabana',
+        direccion:  dirCompleta,
+        metodoPago: state.metodoPago,
+        coords:     state.coords || null
+      })
+    });
+ 
+    var data = await res.json();
+    if(!data.ok) throw new Error(data.error || 'Error desconocido');
+ 
+    /* ── Éxito: mostrar código igual que farmacia ── */
+    state.idPedido = id;
+    document.getElementById('idPedidoDisplay').textContent  = id;
+    document.getElementById('success-msg').textContent =
+      'Pedido #' + id + ' registrado. Un domiciliario te contactará al ' + state.telefono + '.';
+    showView('view-confirmado');
+ 
+  } catch(e){
+    btn.disabled = false;
+    btn.innerHTML = '<span class="sym f" style="font-size:17px">check_circle</span>Confirmar '
+                  + (tipo === 'libre' ? 'pedido' : 'envío');
+    mostrarToast('Error al enviar: ' + e.message, 'error');
+  }
+}
+/* ── RASTREADOR ── */
+var STEP_MAP={'Pendiente':0,'Confirmado':1,'En camino':2,'Entregado':3,'Cancelado':0};
+function rtActualizarStepper(estado){
+  var paso=STEP_MAP[estado]!==undefined?STEP_MAP[estado]:0;
+  var porcentajes=[8,36,68,97];
+  var lineEl=document.getElementById('rtStepLine');
+  lineEl.classList.remove('loading');lineEl.style.transition='none';lineEl.style.width='0%';
+  setTimeout(function(){lineEl.style.transition='width 1.4s cubic-bezier(.22,1,.36,1)';lineEl.style.width=porcentajes[paso]+'%';if(paso<3){setTimeout(function(){lineEl.classList.add('loading');},1500);}},80);
+  var STEP_LABELS=['Recibido','Confirmado','En camino','Entregado'];
+  var ESTADO_LABELS={'Pendiente':'Recibido','Confirmado':'Confirmado','En camino':'En camino','Entregado':'Entregado'};
+  for(var i=0;i<=3;i++){
+    var dot=document.getElementById('step'+i),lbl=document.getElementById('step'+i+'lbl'),iconEl=dot.querySelector('.sym');
+    var prevActiveLbl=dot.parentNode.querySelector('.rt-step-lbl-active');if(prevActiveLbl)prevActiveLbl.remove();
+    if(i<paso){dot.style.background='#65d000';dot.style.border='none';dot.style.boxShadow='0 2px 8px rgba(101,208,0,.35)';if(iconEl){iconEl.style.color='#fff';iconEl.style.fontVariationSettings="'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24";}lbl.style.color='#65d000';lbl.style.fontWeight='800';lbl.textContent=STEP_LABELS[i];}
+    else if(i===paso){dot.style.background='#fff';dot.style.border='2.5px solid #006970';dot.style.boxShadow='0 0 0 5px rgba(0,105,112,.12)';if(iconEl){iconEl.style.color='#006970';iconEl.style.fontVariationSettings="'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24";}lbl.style.color='#006970';lbl.style.fontWeight='900';lbl.textContent=ESTADO_LABELS[estado]||STEP_LABELS[i];var activeLbl=document.createElement('span');activeLbl.className='rt-step-lbl-active';activeLbl.textContent='● '+(ESTADO_LABELS[estado]||estado);dot.parentNode.appendChild(activeLbl);}
+    else{dot.style.background='#e7e8e9';dot.style.border='none';dot.style.boxShadow='';if(iconEl){iconEl.style.color='#9aa5ae';iconEl.style.fontVariationSettings="'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24";}lbl.style.color='#9aa5ae';lbl.style.fontWeight='700';lbl.textContent=STEP_LABELS[i];}
+  }
+}
+
+function minimizarResult(){
+  document.getElementById('rt-result').style.display='none';document.getElementById('rt-empty').style.display='block';
+  setTimeout(function(){if(mapEmpty)mapEmpty.invalidateSize();},200);
+  var btn=document.getElementById('rtConsultarBtn'),p=state.pedidoRastreado,txt=document.getElementById('rtConsultarTxt');
+  if(p&&txt){var nombre=p.domiciliario?p.domiciliario.replace(/\s*\([^)]+\)/,'').trim().split(' ')[0]:'';txt.textContent=(nombre?nombre+' · ':'')+(p.estado||'Ver pedido');}
+}
+function rtAbrirPopup(){document.getElementById('rtPopupOverlay').classList.add('open');setTimeout(function(){document.getElementById('rastrearInput').focus();},300);}
+function rtCerrarPopup(){document.getElementById('rtPopupOverlay').classList.remove('open');}
+
+(function initSwipe(){
+  var thumb=document.getElementById('swipeThumb'),track=document.getElementById('swipeTrack');
+  if(!thumb||!track)return;
+  var drag=false,startX=0,baseLeft=0;
+  function maxSlide(){return track.offsetWidth-thumb.offsetWidth-8;}
+  function start(e){drag=true;baseLeft=parseFloat(thumb.style.left)||4;startX=e.touches?e.touches[0].clientX:e.clientX;thumb.style.transition='none';}
+  function move(e){if(!drag)return;e.preventDefault();var dx=(e.touches?e.touches[0].clientX:e.clientX)-startX;var nl=Math.max(4,Math.min(baseLeft+dx,maxSlide()+4));thumb.style.left=nl+'px';}
+  function end(){if(!drag)return;drag=false;var cl=parseFloat(thumb.style.left)||4;if(cl>maxSlide()*0.70){thumb.style.transition='left .15s';thumb.style.left=(maxSlide()+4)+'px';setTimeout(function(){rtAbrirPopup();thumb.style.transition='left .4s cubic-bezier(.22,1,.36,1)';thumb.style.left='4px';},160);}else{thumb.style.transition='left .4s cubic-bezier(.22,1,.36,1)';thumb.style.left='4px';}}
+  setInterval(function(){
+    if(drag)return;
+    thumb.style.transition='none';
+    thumb.style.animation='motoHint 1.4s cubic-bezier(.22,1,.36,1) forwards';
+    setTimeout(function(){thumb.style.animation='none';thumb.style.left='4px';},1450);
+  },4000);
+  thumb.addEventListener('mousedown',start);
+  thumb.addEventListener('touchstart',start,{passive:true});
+  document.addEventListener('mousemove',move);
+  document.addEventListener('touchmove',move,{passive:false});
+  document.addEventListener('mouseup',end);
+  document.addEventListener('touchend',end);
+})();
+
+/* ════════════════════════════════════
+   CORRECCIÓN BUG #3 — RENDER PRODUCTOS EN RASTREADOR
+   Siempre visibles con "Ver más" para más de 3 productos
+════════════════════════════════════ */
+var _rtProductosTodos=[];
+var _rtProductosMostrandoTodos=false;
+var RT_PROD_VISIBLE_DEFAULT=3;
+
+function rtRenderProductos(productosTxt){
+  var sec=document.getElementById('rtProductosSection');
+  var lista=document.getElementById('rtProductosList');
+  var countEl=document.getElementById('rtProductosCount');
+  var btnVerMas=document.getElementById('rtVerMasBtn');
+  if(!productosTxt||productosTxt==='—'||!productosTxt.trim()){sec.style.display='none';return;}
+
+  // Separar por " | " — soporta cualquier espaciado
+  var items=productosTxt.split(/\s*\|\s*/)
+    .map(function(s){return s.trim();})
+    .filter(function(s){return s.length>1;});
+  if(!items.length){sec.style.display='none';return;}
+
+  _rtProductosTodos=items;
+  _rtProductosMostrandoTodos=false;
+  sec.style.display='block';
+  countEl.textContent=items.length+' artículo'+(items.length!==1?'s':'');
+
+  function buildItem(item){
+    // Extraer precio si existe
+    var precioMatch=item.match(/=\s*\$?([\d.,]+)\s*(COP)?/i);
+    var precio=precioMatch?'$'+precioMatch[1]+' COP':'';
+    // Quitar precio del texto
+    var sinPrecio=item.replace(/\s*=\s*\$?[\d.,]+\s*(COP)?/i,'').trim();
+    // Extraer cantidad
+    var qtyMatch=sinPrecio.match(/\s+x(\d+)\s*$/i);
+    var qty=qtyMatch?'×'+qtyMatch[1]:'';
+    // Quitar cantidad del nombre
+    var nombre=sinPrecio.replace(/\s+x\d+\s*$/i,'').trim();
+    // Extraer laboratorio/marca entre paréntesis
+    var labMatch=nombre.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+    var lab=labMatch?labMatch[2]:'';
+    if(labMatch)nombre=labMatch[1].trim();
+    
+    // Detectar si es ítem de domicilio (para estilo diferenciado)
+    var isDomi=nombre.toLowerCase().startsWith('domicilio');
+    
+    var metaParts=[];
+    if(lab) metaParts.push(lab);
+    if(qty) metaParts.push(qty);
+    var meta=metaParts.join(' · ');
+    
+    return '<div class="rt-prod-item" style="'+(isDomi?'border-top:1.5px dashed #e2e9ef;margin-top:6px;padding-top:8px;':'')+'">'
+      +'<div class="rt-prod-ico" style="background:'+(isDomi?'rgba(0,105,112,.1)':'rgba(0,105,112,.07)')+';">'+(isDomi?'🛵':'🛒')+'</div>'
+      +'<div class="rt-prod-info">'
+        +'<div class="rt-prod-name">'+cliEsc(nombre)+'</div>'
+        +(meta?'<div class="rt-prod-meta">'+meta+'</div>':'')
+      +'</div>'
+      +(precio?'<div class="rt-prod-precio">'+precio+'</div>':'')
+      +'</div>';
+  }
+
+  window._rtBuildItem=buildItem;
+  window._rtVisDefault=RT_PROD_VISIBLE_DEFAULT;
+
+  if(items.length>RT_PROD_VISIBLE_DEFAULT){
+    lista.innerHTML=items.slice(0,RT_PROD_VISIBLE_DEFAULT).map(buildItem).join('');
+    btnVerMas.style.display='flex';
+    document.getElementById('rtVerMasTxt').textContent='Ver más ('+(items.length-RT_PROD_VISIBLE_DEFAULT)+' más)';
+    document.getElementById('rtVerMasIco').textContent='expand_more';
+  } else {
+    lista.innerHTML=items.map(buildItem).join('');
+    btnVerMas.style.display='none';
+  }
+}
+
+function rtToggleVerMas(){
+  _rtProductosMostrandoTodos=!_rtProductosMostrandoTodos;
+  var lista=document.getElementById('rtProductosList');
+  var btnTxt=document.getElementById('rtVerMasTxt');
+  var btnIco=document.getElementById('rtVerMasIco');
+  var items=_rtProductosTodos;
+  var buildItem=window._rtBuildItem||function(item){return '<div class="rt-prod-item">'+cliEsc(item)+'</div>';};
+  var vis=window._rtVisDefault||RT_PROD_VISIBLE_DEFAULT;
+  
+  if(_rtProductosMostrandoTodos){
+    lista.innerHTML=items.map(buildItem).join('');
+    btnTxt.textContent='Ver menos';
+    btnIco.textContent='expand_less';
+  } else {
+    lista.innerHTML=items.slice(0,vis).map(buildItem).join('');
+    btnTxt.textContent='Ver más ('+(items.length-vis)+' más)';
+    btnIco.textContent='expand_more';
+  }
+}
+
+function setCalif(n){state.califActual=n;for(var i=1;i<=5;i++){var el=document.getElementById('se'+i);if(el)el.classList.toggle('on',i<=n);}var btn=document.getElementById('btnCalificar');btn.disabled=false;btn.style.opacity='1';}
+async function enviarCalificacion(){if(!state.califActual||!state.pedidoRastreado)return;var btn=document.getElementById('btnCalificar');btn.textContent='Enviando…';btn.disabled=true;try{await fetch(API_BASE+'/wil?action=calificar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:state.pedidoRastreado.id,calificacion:state.califActual})});document.getElementById('seccionCalificar').style.display='none';mostrarToast('¡Gracias! '+'⭐'.repeat(state.califActual),'star');}catch(e){btn.textContent='Enviar calificación';btn.disabled=false;}}
+function copiarId(){if(!state.idPedido)return;if(navigator.clipboard)navigator.clipboard.writeText(state.idPedido).then(function(){mostrarToast('Código copiado: '+state.idPedido,'content_copy');});else mostrarToast('Tu código: '+state.idPedido,'info');}
+function irARastrear(){navTo('rastrear');var inp=document.getElementById('rastrearInput');if(inp&&state.idPedido){inp.value=state.idPedido;rtAbrirPopup();setTimeout(rastrearPedido,200);}else rtAbrirPopup();}
+function formatCOP(n){return '$'+(n||0).toLocaleString('es-CO');}
+function resetAll(){state={comercioTiene:null,comercioNombre:'',presupuesto:0,productos:[],direccion:'',referencia:'',nombre:'',telefono:'',metodoPago:null,metodoPagoPaquete:null,coords:null,barrio:'',precioDomicilio:0,paqueteZona:'',paqueteZonaNombre:'',idPedido:null,califActual:0,pedidoRastreado:null,categoriaPreset:''};historial=['view-inicio'];clearInterval(cliPollTimer);clearInterval(_domiPollUbicTimer);}
+
+/* ── CHAT CLIENTE ── */
+var cliChatAbierto=false,cliMensajes=[],cliUnread=0,cliLastMsgId=0,cliPollTimer=null,cliPedidoId=null;
+function cliStorageKey(id){return 'wil_clchat_'+id;}
+function cliPersistir(){if(!cliPedidoId)return;try{localStorage.setItem(cliStorageKey(cliPedidoId),JSON.stringify({msgs:cliMensajes,lastId:cliLastMsgId}));}catch(e){}}
+function cliCargarPersistido(id){try{var raw=localStorage.getItem(cliStorageKey(id));if(!raw)return;var data=JSON.parse(raw);cliMensajes=data.msgs||[];cliLastMsgId=data.lastId||0;if(!cliMensajes.length)return;var msgs=document.getElementById('cliMsgs');msgs.innerHTML='<div class="ccli-date"><span>Conversación anterior</span></div>';cliMensajes.forEach(function(m){_cliRenderDOM(m);});msgs.insertAdjacentHTML('beforeend','<div class="ccli-date"><span>Nuevos</span></div>');}catch(e){}}
+function _cliRenderDOM(m){var msgs=document.getElementById('cliMsgs');var p=state.pedidoRastreado;var cliIni=p&&p.cliente?p.cliente.charAt(0).toUpperCase():'C';var domiIni=p&&p.domiciliario?p.domiciliario.replace(/\s*\([^)]+\)/,'').trim().charAt(0).toUpperCase():'🛵';if(m.tipo==='out'){msgs.insertAdjacentHTML('beforeend','<div class="cmsg-wrap out"><div class="cmsg-av-s">'+cliIni+'</div><div class="cmsg-col"><div class="cmsg-out">'+cliEsc(m.texto||'')+'</div><div class="cmsg-meta out"><span>'+(m.hora||'')+'</span>'+(m.leido?'<span class="sym tick-read" style="font-size:11px;line-height:1">done_all</span>':'<span class="sym tick-sent" style="font-size:11px;line-height:1">done</span>')+'</div></div></div>');}else if(m.tipo==='in'){msgs.insertAdjacentHTML('beforeend','<div class="cmsg-wrap"><div class="cmsg-av-s domi">'+domiIni+'</div><div class="cmsg-col"><div class="cmsg-in">'+cliEsc(m.texto||'')+'</div><div class="cmsg-meta in"><span>'+(m.hora||'')+'</span></div></div></div>');}}
+function cliActivarChat(pedido){if(!pedido||!pedido.id)return;cliPedidoId=pedido.id;iniciarPollUbicacionDomi(pedido);var wrap=document.getElementById('cliChatWrap');if(!pedido.domiciliario){wrap.style.display='none';return;}wrap.style.display='block';var nombreDomi=(pedido.domiciliario||'').replace(/\s*\([^)]+\)/,'').trim();document.getElementById('cliDomiNombre').textContent=nombreDomi||'Domiciliario WIL';document.getElementById('cliDomiAv').textContent=nombreDomi?nombreDomi.charAt(0).toUpperCase():'🛵';if(pedido.telefonoDomi){var lc=document.getElementById('cliLlamarBtnChat');if(lc)lc.href='tel:'+pedido.telefonoDomi;}var et={'En camino':'🛵 En camino hacia ti','Confirmado':'✅ Pedido confirmado','Entregado':'🏠 Entregado'};document.getElementById('cliDomiEstado').textContent=et[pedido.estado]||(pedido.estado||'');document.getElementById('cliStatusDot').className='cli-s-dot offline';cliMensajes=[];cliLastMsgId=0;document.getElementById('cliMsgs').innerHTML='<div class="ccli-date"><span>Hoy</span></div>';cliCargarPersistido(pedido.id);clearInterval(cliPollTimer);cliPollTimer=setInterval(function(){fetch(API_BASE+'/wil?action=chat-poll&idPedido='+encodeURIComponent(cliPedidoId)+'&lastId='+cliLastMsgId+'&lado=cliente').then(function(r){return r.json();}).then(function(data){if(!data.ok)return;var dot=document.getElementById('cliStatusDot');if(typeof data.domiOnline!=='undefined')dot.className='cli-s-dot '+(data.domiOnline?'online':'offline');var tw=document.getElementById('cliTypingWrap');if(data.domiTyping)tw.style.display='flex';else tw.style.display='none';if(data.mensajes&&data.mensajes.length){data.mensajes.forEach(function(m){if(m.tipo==='in'){cliLastMsgId=Math.max(cliLastMsgId,m.id||0);var msg={tipo:'in',texto:m.texto,hora:m.hora,leido:false};cliMensajes.push(msg);_cliRenderDOM(msg);if(!cliChatAbierto){cliUnread++;cliActualizarBadge();if(navigator.vibrate)navigator.vibrate(80);}else document.getElementById('cliMsgs').scrollTop=99999;}});cliPersistir();}if(data.leidos){document.querySelectorAll('.tick-sent').forEach(function(t){t.classList.remove('tick-sent');t.classList.add('tick-read');t.textContent='done_all';});cliMensajes.forEach(function(m){if(m.tipo==='out')m.leido=true;});cliPersistir();}}).catch(function(){});},4000);}
+function cliActualizarBadge(){var badge=document.getElementById('cliBadge');if(cliUnread>0){badge.textContent=cliUnread>9?'9+':cliUnread;badge.style.display='flex';}else badge.style.display='none';}
+function abrirChatDirecto(){var wrap=document.getElementById('cliChatWrap');if(wrap)wrap.style.display='block';if(!cliChatAbierto)toggleClienteChat();setTimeout(function(){if(wrap)wrap.scrollIntoView({behavior:'smooth',block:'start'});},120);}
+function toggleClienteChat(){cliChatAbierto=!cliChatAbierto;var box=document.getElementById('cliBox'),chv=document.getElementById('cliChatChevron');if(cliChatAbierto){box.style.display='flex';if(chv)chv.textContent='expand_less';cliUnread=0;cliActualizarBadge();setTimeout(function(){document.getElementById('cliMsgs').scrollTop=99999;},60);document.getElementById('cliInput').focus();}else{box.style.display='none';if(chv)chv.textContent='expand_more';}}
+function cliEnviarMensaje(){var input=document.getElementById('cliInput'),txt=(input.value||'').trim();if(!txt||!cliPedidoId)return;input.value='';input.style.height='auto';var now=new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true});var m={tipo:'out',texto:txt,hora:now,leido:false};cliMensajes.push(m);_cliRenderDOM(m);document.getElementById('cliMsgs').scrollTop=99999;cliPersistir();var p=state.pedidoRastreado;fetch(API_BASE+'/wil?action=chat-mensaje-cliente',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idPedido:cliPedidoId,mensaje:txt,hora:now,cliente:p?(p.cliente||'Cliente'):'Cliente',telefono:p?(p.telefono||''):''})}).catch(function(){});}
+function cliAutoResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,70)+'px';}
+function cliEsc(t){return(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');}
+
+/* ── RASTREAR PEDIDO COMPLETO ── */
+async function rastrearPedido(){
+  var id=document.getElementById('rastrearInput').value.trim().toUpperCase();
+  if(id.length<3){mostrarToast('Ingresa un código válido.','error');return;}
+  var btn=document.getElementById('btnRastrear');
+  btn.innerHTML='<span class="spin" style="border-color:rgba(255,255,255,.3);border-top-color:#fff"></span>';btn.disabled=true;
+  document.getElementById('rastrearError').classList.add('hidden');document.getElementById('rtValidatedRow').style.display='none';
+  clearInterval(cliPollTimer);
+  try{
+    var res=await fetch(API_BASE+'/wil?action=rastrear&id='+encodeURIComponent(id));
+    var data=await res.json();
+    btn.innerHTML='<span class="sym" style="font-size:22px">search</span>';btn.disabled=false;
+    if(!data.ok||!data.pedido){document.getElementById('rastrearError').classList.remove('hidden');return;}
+    var p=data.pedido;state.pedidoRastreado=p;
+    rtCerrarPopup();document.getElementById('rt-empty').style.display='none';document.getElementById('rt-result').style.display='flex';
+    setTimeout(function(){window._initMapResult(p);},100);
+    document.getElementById('rtValidatedRow').style.display='flex';document.getElementById('rtPartnerName').textContent=p.tienda||'Domicilios WIL';
+    var COLS={'Pendiente':'#f59e0b','Confirmado':'#3b82f6','En camino':'#8b5cf6','Entregado':'#16a34a','Cancelado':'#dc2626'};
+    var col=p.estadoColor||COLS[p.estado]||'#006970';
+    var pb=document.getElementById('estadoPingBase'),pp=document.getElementById('estadoPing');
+    pb.style.background=col;pp.style.background=col;pp.style.animation=(p.estado==='En camino'||p.estado==='Confirmado')?'pingDot 1.5s ease-in-out infinite':'none';
+    document.getElementById('estadoLabel').textContent=p.estadoLabel||p.estado||'—';document.getElementById('estadoLabel').style.color=col;
+    document.getElementById('ri-id-display').textContent='Pedido #'+(p.id||'').replace('WIL-2026-','');
+    rtActualizarStepper(p.estado);
+
+    var dc=document.getElementById('domiCard');
+    if(p.domiciliario){
+      dc.style.display='block';
+      var nombreDomi=p.domiciliario.replace(/\s*\([^)]+\)/,'').trim();
+      document.getElementById('domiNombre').textContent=nombreDomi;
+      var avEl=document.getElementById('domiFotoWrap');
+      if(p.fotoDomi){
+        var src=p.fotoDomi.startsWith('http')?p.fotoDomi:'icons/'+p.fotoDomi;
+        avEl.innerHTML='<img src="'+src+'" style="width:100%;height:100%;object-fit:cover;object-position:center 20%" onerror="this.parentElement.textContent=\''+nombreDomi.charAt(0).toUpperCase()+'\'">';
+      } else {
+        avEl.textContent=nombreDomi.charAt(0).toUpperCase();
+      }
+      var estadoTxtMap={'En camino':'En camino hacia ti 🛵','Confirmado':'Pedido confirmado ✅','Entregado':'Entregado 🏠'};
+      document.getElementById('domiEstadoTxt').textContent=estadoTxtMap[p.estado]||(p.estado||'');
+      var telCliente=p.telefono||'';
+      var telDomi=p.telefonoDomi||'';
+      var waBtn=document.getElementById('domiWABtn');
+      var callBtn=document.getElementById('domiCallBtn');
+      if(waBtn&&telCliente){
+        waBtn.href='https://wa.me/57'+telCliente.replace(/\D/g,'');
+        waBtn.style.display='flex';
+      }
+      if(callBtn&&telDomi){
+        callBtn.href='tel:'+telDomi;
+        callBtn.style.display='flex';
+      }
+      if(p.telefonoDomi){
+        var lc=document.getElementById('cliLlamarBtnChat');
+        if(lc)lc.href='tel:'+p.telefonoDomi;
+      }
+    }else{
+      dc.style.display='none';
+    }
+
+    /* ── Filas de info: fecha, dirección, horas ── */
+    var bento=document.getElementById('rtItemsGrid');
+    bento.innerHTML='';
+    var resumenRows=[
+      {ico:'📅',bg:'rgba(0,105,112,.07)',lbl:'Fecha',val:(p.fecha||'')+(p.hora?' · '+p.hora:'')},
+      {ico:'📍',bg:'rgba(76,86,175,.07)',lbl:'Dirección',val:(p.direccion||'').replace(/\s*\[[\d.,\s-]+\]/,'').replace(/\s*\(Ref:[^)]+\)/,'').trim()}
+    ];
+    if(p.horaTomoPedido)resumenRows.push({ico:'⏱',bg:'rgba(22,163,74,.07)',lbl:'Tomado',val:p.horaTomoPedido});
+    if(p.horaEntrego)resumenRows.push({ico:'✅',bg:'rgba(101,208,0,.07)',lbl:'Entregado',val:p.horaEntrego});
+    resumenRows.forEach(function(row){
+      if(!row.val||row.val==='—')return;
+      bento.insertAdjacentHTML('beforeend',
+        '<div style="display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid #f3f5f7">'+
+        '<div style="width:28px;height:28px;border-radius:8px;background:'+row.bg+';display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;margin-top:1px">'+row.ico+'</div>'+
+        '<div style="flex:1;min-width:0"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#9aa5ae;margin-bottom:1px">'+row.lbl+'</div>'+
+        '<div style="font-size:12.5px;font-weight:700;color:#18222e;line-height:1.35;word-break:break-word">'+cliEsc(row.val)+'</div></div></div>');
+    });
+
+    /* ── Renderizar productos con ver más ── */
+    rtRenderProductos(p.productos||'');
+
+    document.getElementById('rtPagoVal').textContent=(p.metodoPago||'').includes('TRANSFER')?'🏦 Transferencia':'💵 Efectivo';
+    var totalStr=p.total||'';
+    var totalNum=parseInt((totalStr).replace(/[^\d]/g,''))||0;
+    var todosItems=(p.productos||'').split(/\s*\|\s*/).map(function(s){return s.trim();}).filter(function(s){return s.length>1;});
+    var prodItems=todosItems.filter(function(s){return !s.toLowerCase().startsWith('domicilio');});
+    var domiItem=todosItems.filter(function(s){return s.toLowerCase().startsWith('domicilio');})[0]||'';
+    var vtotalArr=(p['v/total']||p.vtotal||'').split(/\s*\|\s*/).map(function(s){return parseInt((s||'').replace(/[^\d]/g,''))||0;});
+    var subtotal=vtotalArr.reduce(function(a,b){return a+b;},0);
+    var domiNum=0;
+    if(domiItem){
+      var dm=domiItem.match(/=\s*\$?([\d.,]+)/);
+      if(dm)domiNum=parseInt(dm[1].replace(/[.,]/g,'').replace('.',''))||0;
+    }
+    if(!domiNum&&totalNum&&subtotal)domiNum=totalNum-subtotal;
+    var cardHtml='';
+    prodItems.forEach(function(item){
+      var precioMatch=item.match(/=\s*\$?([\d.,]+)\s*(COP)?/i);
+      var precio=precioMatch?'$'+precioMatch[1]+' COP':'';
+      var sinPrecio=item.replace(/\s*=\s*\$?[\d.,]+\s*(COP)?/i,'').trim();
+      var qtyMatch=sinPrecio.match(/\s+x(\d+)\s*$/i);
+      var qty=qtyMatch?'×'+qtyMatch[1]:'';
+      var nombre=sinPrecio.replace(/\s+x\d+\s*$/i,'').replace(/\s*\([^)]+\)\s*$/,'').trim();
+      cardHtml+='<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:7px 0;border-bottom:1px solid #f3f4f6">'
+        +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:12.5px;font-weight:700;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+cliEsc(nombre)+'</div>'
+          +(qty?'<div style="font-size:10px;color:#9ca3af;font-weight:600;margin-top:1px">'+qty+'</div>':'')
+        +'</div>'
+        +(precio?'<div style="font-size:12px;font-weight:800;color:#111827;flex-shrink:0;margin-left:10px">'+precio+'</div>':'')
+        +'</div>';
+    });
+    document.getElementById('rtResumenProductosCard').innerHTML=cardHtml;
+    document.getElementById('rtSubtotalVal').textContent=subtotal>0?'$'+subtotal.toLocaleString('es-CO')+' COP':'—';
+    document.getElementById('rtDomiVal').textContent=domiNum>0?'$'+domiNum.toLocaleString('es-CO')+' COP':'—';
+    var zonaM=domiItem.match(/\(([^)]+)\)/);
+    if(zonaM)document.getElementById('rtZonaLbl').textContent=zonaM[1];
+    var totalDisplay=totalStr;
+    if(!totalStr||totalStr.includes('/')||isNaN(parseInt(totalStr.replace(/[^\d]/g,'')))){
+      var calc=subtotal+domiNum;
+      totalDisplay=calc>0?'$'+calc.toLocaleString('es-CO')+' COP':'—';
+    }
+    document.getElementById('rtTotalVal').textContent=totalDisplay;
+    document.getElementById('seccionCalificar').style.display=(p.estado==='Entregado'&&!p.calificacion)?'block':'none';
+    cliActivarChat(p);window.scrollTo({top:0,behavior:'smooth'});
+    mostrarChatFab(p);
+  }catch(e){btn.innerHTML='<span class="sym" style="font-size:22px">search</span>';btn.disabled=false;document.getElementById('rastrearError').classList.remove('hidden');console.error('rastrear:',e);}
+}
+
+function mostrarChatFab(pedido){
+  var fab=document.getElementById('chatFab');
+  if(!pedido||!pedido.domiciliario){fab.style.display='none';return;}
+  fab.style.display='block';
+  var nombre=(pedido.domiciliario||'').replace(/\s*\([^)]+\)/,'').trim();
+  document.getElementById('chatModalNombre').textContent=nombre||'Domiciliario WIL';
+  document.getElementById('chatModalAv').textContent=nombre?nombre.charAt(0).toUpperCase():'🛵';
+  if(pedido.telefonoDomi){
+    var callBtn=document.getElementById('chatModalCall');
+    callBtn.href='tel:'+pedido.telefonoDomi;
+    callBtn.style.display='flex';
+  }
+  var et={'En camino':'🛵 En camino','Confirmado':'✅ Confirmado','Entregado':'🏠 Entregado'};
+  document.getElementById('chatModalEstado').textContent=et[pedido.estado]||(pedido.estado||'');
+}
+
+var _chatModalAbierto=false;
+
+function abrirChatModal(){
+  _chatModalAbierto=true;
+  document.getElementById('chatModalOv').classList.add('open');
+  var src=document.getElementById('cliMsgs');
+  var dst=document.getElementById('chatModalMsgs');
+  if(src&&dst)dst.innerHTML=src.innerHTML;
+  setTimeout(function(){dst.scrollTop=99999;},60);
+  cliUnread=0;
+  cliActualizarBadge();
+  document.getElementById('chatFab-badge').style.display='none';
+  document.getElementById('chatModalInput').focus();
+}
+function cerrarChatModal(){
+  _chatModalAbierto=false;
+  document.getElementById('chatModalOv').classList.remove('open');
+}
+function chatModalEnviar(){
+  var input=document.getElementById('chatModalInput');
+  var txt=(input.value||'').trim();
+  if(!txt||!cliPedidoId)return;
+  input.value='';
+  input.style.height='auto';
+  var now=new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true});
+  var m={tipo:'out',texto:txt,hora:now,leido:false};
+  cliMensajes.push(m);
+  _cliRenderDOM(m);
+  var dst=document.getElementById('chatModalMsgs');
+  var p=state.pedidoRastreado;
+  var ini=p&&p.cliente?p.cliente.charAt(0).toUpperCase():'C';
+  dst.insertAdjacentHTML('beforeend',
+    '<div class="cmsg-wrap out"><div class="cmsg-av-s">'+ini+'</div>'
+    +'<div class="cmsg-col"><div class="cmsg-out">'+cliEsc(txt)+'</div>'
+    +'<div class="cmsg-meta out"><span>'+now+'</span></div></div></div>');
+  dst.scrollTop=99999;
+  cliPersistir();
+  fetch(API_BASE+'/wil?action=chat-mensaje-cliente',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({idPedido:cliPedidoId,mensaje:txt,hora:now,
+      cliente:p?(p.cliente||'Cliente'):'Cliente',
+      telefono:p?(p.telefono||''):''})
+  }).catch(function(){});
+}
+
+var _origCliActualizarBadge=cliActualizarBadge;
+cliActualizarBadge=function(){
+  _origCliActualizarBadge();
+  var badge=document.getElementById('chatFab-badge');
+  if(cliUnread>0){
+    badge.textContent=cliUnread>9?'9+':cliUnread;
+    badge.style.display='flex';
+    if(_chatModalAbierto){
+      var src=document.getElementById('cliMsgs');
+      var dst=document.getElementById('chatModalMsgs');
+      if(src&&dst)dst.innerHTML=src.innerHTML;
+      dst.scrollTop=99999;
+    }
+  } else {
+    badge.style.display='none';
+  }
+};
+
+document.addEventListener('DOMContentLoaded',function(){
+  buildBarriosScroll();
+  buildMetroScroll();
+  var imgInput=document.getElementById('cliImgInput');if(!imgInput)return;
+  imgInput.addEventListener('change',function(){var file=this.files[0];if(!file||!cliPedidoId)return;var reader=new FileReader();reader.onload=function(e){var dataUrl=e.target.result;var now=new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true});var msgs=document.getElementById('cliMsgs');var p=state.pedidoRastreado,ini=p&&p.cliente?p.cliente.charAt(0).toUpperCase():'C';msgs.insertAdjacentHTML('beforeend','<div class="cmsg-wrap out"><div class="cmsg-av-s">'+ini+'</div><div class="cmsg-col"><div style="border-radius:12px 12px 3px 12px;overflow:hidden;max-width:150px;cursor:pointer" onclick="cliVerImagen(this.querySelector(\'img\').src)"><img src="'+dataUrl+'" style="width:100%;display:block"/></div><div class="cmsg-meta out"><span>'+now+'</span></div></div></div>');msgs.scrollTop=99999;var fd=new FormData();fd.append('file',file);fd.append('idPedido',cliPedidoId);fd.append('hora',now);fd.append('lado','cliente');fetch(API_BASE+'/wil?action=chat-imagen',{method:'POST',body:fd}).catch(function(){});};reader.readAsDataURL(file);this.value='';});
+  var params=new URLSearchParams(window.location.search);
+  var cod=params.get('rastrear');
+  if(cod){
+    navTo('rastrear');
+    setTimeout(function(){
+      var inp=document.getElementById('rastrearInput');
+      if(inp){inp.value=cod;rtAbrirPopup();setTimeout(rastrearPedido,300);}
+    },600);
+  }
+});
+function cliVerImagen(src){var ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';ov.onclick=function(){document.body.removeChild(ov);};var img=document.createElement('img');img.src=src;img.style.cssText='max-width:100%;max-height:90dvh;border-radius:12px';ov.appendChild(img);document.body.appendChild(ov);}
+
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(console.warn);}
+
+/* ═══════════════════════════════════════════════
+   📅 VERIFICACIÓN DE HORARIO — se ejecuta al cargar
+═══════════════════════════════════════════════ */
+const SHEET_ID_WIL = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+
+async function verificarHorarioCliente() {
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID_WIL}/gviz/tq?tqx=out:csv&sheet=HorarioEspecial&cachebust=${Date.now()}`;
+    const r   = await fetch(url, { cache: 'no-store' });
+    if (!r.ok) return;
+    const text  = await r.text();
+    const lines = text.trim().split('\n').slice(1).filter(Boolean);
+
+    const ahora = new Date();
+    let bloqueActivo = null;
+
+    lines.forEach(line => {
+      const cols = line.split(',').map(c => c.replace(/^"|"$/g,'').trim());
+      const fi = normFechaCliente(cols[0]);
+      const hi = normHoraCliente(cols[1]);
+      const ff = normFechaCliente(cols[2]);
+      const hf = normHoraCliente(cols[3]);
+      const mo = cols[4] || '';
+      if (!fi || !ff) return;
+      const ini = new Date(fi + 'T' + hi + ':00');
+      const fin = new Date(ff + 'T' + hf + ':00');
+      if (isNaN(ini) || isNaN(fin)) return;
+      if (ahora >= ini && ahora <= fin && !bloqueActivo) {
+        bloqueActivo = { ini, fin, motivo: mo };
+      }
+    });
+
+    if (bloqueActivo) mostrarOverlayNoDisp(bloqueActivo);
+
+  } catch(e) {
+    console.warn('[horario cliente]:', e.message);
+  }
+}
+
+function normFechaCliente(s) {
+  s = (s || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (m) {
+    const yr = m[3].length === 2 ? '20' + m[3] : m[3];
+    return yr + '-' + m[1].padStart(2,'0') + '-' + m[2].padStart(2,'0');
+  }
+  return '';
+}
+
+function normHoraCliente(s) {
+  s = (s || '').trim();
+  if (/^\d{1,2}:\d{2}$/.test(s)) return s.padStart(5,'0');
+  const am = s.match(/(\d{1,2}):(\d{2})\s*(am|pm)/i);
+  if (am) {
+    let h = parseInt(am[1]);
+    if (am[3].toLowerCase() === 'pm' && h < 12) h += 12;
+    if (am[3].toLowerCase() === 'am' && h === 12) h = 0;
+    return String(h).padStart(2,'0') + ':' + am[2];
+  }
+  return '00:00';
+}
+
+function mostrarOverlayNoDisp(bloque) {
+  // Quitar overlay viejo si existe
+  const viejo = document.getElementById('wil-no-disp-overlay');
+  if (viejo) viejo.remove();
+
+  const finFmt = bloque.fin.toLocaleDateString('es-CO', {
+    weekday: 'long', day: 'numeric', month: 'long'
+  }) + ' · ' + bloque.fin.toLocaleTimeString('es-CO', {
+    hour: '2-digit', minute: '2-digit', hour12: true
+  });
+
+  const motivo = bloque.motivo || 'El servicio no está disponible en este momento.';
+
+  const overlay = document.createElement('div');
+  overlay.id = 'wil-no-disp-overlay';
+  overlay.style.cssText = `
+    position:fixed;inset:0;z-index:9999;
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    background:linear-gradient(160deg,#003d42 0%,#005a60 45%,#007f8c 100%);
+    padding:32px 20px;text-align:center;overflow-y:auto;
+    font-family:'Plus Jakarta Sans',sans-serif;
+  `;
+
+  overlay.innerHTML = `
+    <div style="max-width:360px;width:100%;">
+
+      <!-- Moto animada -->
+      <div style="margin-bottom:24px;animation:wilFloatMoto 3s ease-in-out infinite;">
+        <svg width="140" height="140" viewBox="0 0 160 160" fill="none">
+          <circle cx="80" cy="80" r="80" fill="rgba(255,255,255,.08)"/>
+          <circle cx="80" cy="80" r="60" fill="rgba(255,255,255,.06)"/>
+          <ellipse cx="55" cy="108" rx="18" ry="18" stroke="rgba(255,255,255,.7)" stroke-width="5" fill="none"/>
+          <ellipse cx="110" cy="108" rx="18" ry="18" stroke="rgba(255,255,255,.7)" stroke-width="5" fill="none"/>
+          <path d="M73 108 L90 108" stroke="rgba(255,255,255,.5)" stroke-width="4" stroke-linecap="round"/>
+          <path d="M68 108 L68 88 L88 75 L115 75 L125 88 L110 90 L110 108" stroke="rgba(255,255,255,.85)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M88 75 L82 88 L110 88" stroke="rgba(255,255,255,.6)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <circle cx="118" cy="68" r="8" fill="rgba(255,255,255,.3)" stroke="rgba(255,255,255,.7)" stroke-width="3"/>
+          <text x="30" y="62" font-size="18" fill="rgba(255,255,255,.5)" font-weight="800">z</text>
+          <text x="44" y="50" font-size="14" fill="rgba(255,255,255,.4)" font-weight="800">z</text>
+          <text x="55" y="40" font-size="10" fill="rgba(255,255,255,.3)" font-weight="800">z</text>
+        </svg>
+      </div>
+
+      <!-- Card -->
+      <div style="background:rgba(255,255,255,.12);backdrop-filter:blur(16px);
+                  border-radius:28px;padding:28px 22px;border:1px solid rgba(255,255,255,.15);">
+
+        <div style="width:56px;height:56px;border-radius:18px;background:rgba(255,255,255,.18);
+                    display:flex;align-items:center;justify-content:center;
+                    margin:0 auto 16px;font-size:28px;">🛵</div>
+
+        <h2 style="font-weight:900;font-size:22px;color:#fff;margin-bottom:8px;line-height:1.2;">
+          No estamos disponibles
+        </h2>
+
+        <p style="font-size:13px;color:rgba(255,255,255,.85);margin-bottom:6px;line-height:1.55;">
+          ${motivo}
+        </p>
+
+        <p style="font-size:12px;color:rgba(255,255,255,.6);margin-bottom:24px;">
+          Volvemos el <b style="color:rgba(255,255,255,.9);">${finFmt}</b> 🙌
+        </p>
+
+        <!-- Programar pedido -->
+        <a href="pedido-wil.html?modo=programar"
+           onclick="document.getElementById('wil-no-disp-overlay').remove();return false;"
+           style="display:flex;align-items:center;justify-content:center;gap:9px;
+                  width:100%;padding:15px;background:#fff;color:#005a60;
+                  border-radius:18px;font-weight:900;font-size:14px;
+                  text-decoration:none;box-shadow:0 6px 24px rgba(0,0,0,.25);
+                  margin-bottom:10px;transition:transform .15s;"
+           onmousedown="this.style.transform='scale(.97)'"
+           onmouseup="this.style.transform=''">
+          <span style="font-size:20px;">📋</span>
+          Programar pedido
+        </a>
+
+        <!-- Cerrar (solo para quien ya sabe el código) -->
+        <button onclick="document.getElementById('wil-no-disp-overlay').remove()"
+          style="width:100%;padding:11px;background:rgba(255,255,255,.08);
+                 color:rgba(255,255,255,.65);border:1.5px solid rgba(255,255,255,.18);
+                 border-radius:14px;font-family:'Plus Jakarta Sans',sans-serif;
+                 font-weight:700;font-size:12px;cursor:pointer;">
+          Tengo un código — rastrear pedido
+        </button>
+      </div>
+
+      <p style="font-size:10px;color:rgba(255,255,255,.35);margin-top:16px;">
+        Domicilios WIL · Copacabana, Antioquia
+      </p>
+    </div>
+
+    <style>
+      @keyframes wilFloatMoto {
+        0%,100% { transform: translateY(0); }
+        50%      { transform: translateY(-14px); }
+      }
+    </style>
+  `;
+
+  document.body.appendChild(overlay);
+}
+
+// Ejecutar al cargar
+verificarHorarioCliente();
+</script>
+</body>
+</html>

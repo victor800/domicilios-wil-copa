@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<meta name="theme-color" content="#006970"/>
+<title>Trabaja con WIL — Domicilios WIL</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<script>
+tailwind.config={darkMode:"class",theme:{extend:{colors:{primary:"#006970","pri-dark":"#003730","pri-light":"#00bcc9",secondary:"#4c56af",surface:"#f8f9fa","surf-low":"#f3f4f5","surf-high":"#e7e8e9","surf-white":"#ffffff","on-surface":"#191c1d","on-var":"#3c494b",outline:"#6c7a7b","out-var":"#bbc9cb",green:"#2a9d5c",amber:"#f59e0b",red:"#ba1a1a",teal:"#00bcc9"},fontFamily:{head:["Plus Jakarta Sans"],body:["Inter"]},borderRadius:{DEFAULT:"0.25rem",lg:"0.5rem",xl:"0.75rem","2xl":"1rem","3xl":"1.5rem",full:"9999px"}}}}
+</script>
+<style>
+.material-symbols-outlined{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;font-size:24px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;word-wrap:normal;direction:ltr;-webkit-font-smoothing:antialiased}
+.grad-wil{background:linear-gradient(135deg,#006970 0%,#00a3b4 60%,#00bcc9 100%)}
+.grad-hero{background:linear-gradient(145deg,#003730 0%,#005e54 50%,#006970 100%)}
+.grad-wa{background:linear-gradient(135deg,#25d366 0%,#128c7e 100%)}
+.glass{background:rgba(255,255,255,.15);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+body{min-height:100dvh;font-family:'Inter',sans-serif;background:#f8f9fa}
+
+.step-circle{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:15px;transition:all .3s;flex-shrink:0}
+.step-circle.active{background:linear-gradient(135deg,#006970,#00bcc9);color:#fff;box-shadow:0 4px 16px rgba(0,105,112,.35)}
+.step-circle.done{background:#2a9d5c;color:#fff}
+.step-circle.inactive{background:#e7e8e9;color:#6c7a7b}
+.step-line{flex:1;height:2px;transition:background .3s}
+.step-line.done{background:#2a9d5c}
+.step-line.inactive{background:#e7e8e9}
+
+.view{display:none;animation:fadeUp .3s ease both}
+.view.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* FIX: Inputs — !important para sobreescribir Tailwind forms plugin */
+.campo{width:100%!important;background:#f3f4f5!important;border:1.5px solid #e7e8e9!important;border-radius:.75rem!important;padding:12px 14px!important;font-size:14px!important;font-family:'Inter',sans-serif!important;color:#191c1d!important;outline:none!important;transition:all .2s!important;box-shadow:none!important;-webkit-appearance:none!important;appearance:none!important}
+.campo:focus{background:#fff!important;border-color:#006970!important;box-shadow:0 0 0 3px rgba(0,105,112,.1)!important}
+.campo::placeholder{color:#8e8e93!important}
+
+.vehicle-card{border:2px solid #e7e8e9;border-radius:1rem;padding:14px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:12px;background:#fff}
+.vehicle-card:hover{border-color:#00bcc9;background:#f0fdfe}
+.vehicle-card.selected{border-color:#006970;background:rgba(0,105,112,.06);box-shadow:0 0 0 3px rgba(0,105,112,.1)}
+
+.upload-zone{border:2px dashed #bbc9cb;border-radius:1rem;padding:28px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;cursor:pointer;transition:all .2s;background:#fff}
+.upload-zone:hover{border-color:#006970;background:#f0fdfe}
+.upload-zone.has-file{border-color:#2a9d5c;background:rgba(42,157,92,.04)}
+
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+.blink{animation:blink 2s ease-in-out infinite}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="fixed top-0 w-full z-50 bg-white/90 backdrop-blur-xl border-b border-gray-200 shadow-sm">
+  <div class="max-w-2xl mx-auto flex items-center justify-between px-5 py-3" style="padding-top:calc(0.75rem + env(safe-area-inset-top))">
+    <div class="flex items-center gap-3">
+      <img src="icons/icon-192.png" alt="WIL" class="w-9 h-9 rounded-full object-cover" style="border:2px solid rgba(0,105,112,.2)"/>
+      <div>
+        <p style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;color:#006970;font-size:14px;line-height:1.2">Domicilios WIL</p>
+        <p style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase;letter-spacing:.08em">Trabaja con nosotros</p>
+      </div>
+    </div>
+    <button onclick="window.location.href='index.html'"
+      style="display:flex;align-items:center;gap:5px;color:#3a3a3c;font-size:12px;font-weight:700;padding:7px 12px;border-radius:999px;border:1.5px solid #bbc9cb;background:#fff;cursor:pointer">
+      <span class="material-symbols-outlined" style="font-size:16px">arrow_back</span>
+      Inicio
+    </button>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="grad-hero pb-10 px-5 relative overflow-hidden" style="padding-top:calc(5rem + env(safe-area-inset-top))">
+  <div style="position:absolute;right:-64px;top:-64px;width:256px;height:256px;background:rgba(0,188,201,.12);border-radius:50%;filter:blur(48px);pointer-events:none"></div>
+  <div class="max-w-2xl mx-auto relative" style="z-index:1">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:14px">
+      <div class="blink" style="width:6px;height:6px;border-radius:50%;background:#00bcc9"></div>
+      <span style="font-size:10px;font-weight:800;color:#00bcc9;text-transform:uppercase;letter-spacing:.1em">Convocatoria abierta</span>
+    </div>
+    <h1 style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:900;color:#fff;font-size:28px;line-height:1.2;margin-bottom:10px">
+      Únete al equipo<br/><span style="color:#00bcc9">WIL 🛵</span>
+    </h1>
+    <p style="color:rgba(255,255,255,.7);font-size:13px;line-height:1.6;margin-bottom:16px">
+      Sé parte de la red de domiciliarios más confiable de Copacabana. Trabaja con el respaldo de
+      <span style="color:#00bcc9;font-weight:600">Droguería Farma Expertos</span> y
+      <span style="color:rgba(255,255,255,.9);font-weight:600">Droguería Central</span>.
+    </p>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <div class="glass" style="border:1px solid rgba(255,255,255,.15);padding:5px 12px;border-radius:999px;display:flex;align-items:center;gap:6px">
+        <span class="material-symbols-outlined" style="font-size:14px;color:#00bcc9;font-variation-settings:'FILL' 1">payments</span>
+        <span style="font-size:11px;font-weight:700;color:#fff">Pagos rápidos</span>
+      </div>
+      <div class="glass" style="border:1px solid rgba(255,255,255,.15);padding:5px 12px;border-radius:999px;display:flex;align-items:center;gap:6px">
+        <span class="material-symbols-outlined" style="font-size:14px;color:#00bcc9;font-variation-settings:'FILL' 1">schedule</span>
+        <span style="font-size:11px;font-weight:700;color:#fff">Horarios flexibles</span>
+      </div>
+      <div class="glass" style="border:1px solid rgba(255,255,255,.15);padding:5px 12px;border-radius:999px;display:flex;align-items:center;gap:6px">
+        <span class="material-symbols-outlined" style="font-size:14px;color:#00bcc9;font-variation-settings:'FILL' 1">star</span>
+        <span style="font-size:11px;font-weight:700;color:#fff">Bonos por calificación</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STEPS BAR -->
+<div style="background:#fff;border-bottom:1px solid #e7e8e9;position:sticky;top:calc(60px + env(safe-area-inset-top));z-index:40">
+  <div class="max-w-2xl mx-auto" style="padding:14px 20px;display:flex;align-items:center;gap:6px">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+      <div class="step-circle active" id="sc1">1</div>
+      <span style="font-size:9px;font-weight:800;color:#006970;text-transform:uppercase;letter-spacing:.05em">Personal</span>
+    </div>
+    <div class="step-line done" id="sl1"></div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+      <div class="step-circle inactive" id="sc2">2</div>
+      <span style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase;letter-spacing:.05em">Vehículo</span>
+    </div>
+    <div class="step-line inactive" id="sl2"></div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+      <div class="step-circle inactive" id="sc3">3</div>
+      <span style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase;letter-spacing:.05em">Documentos</span>
+    </div>
+    <div class="step-line inactive" id="sl3"></div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+      <div class="step-circle inactive" id="sc4">4</div>
+      <span style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase;letter-spacing:.05em">Confirmar</span>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<main class="max-w-2xl mx-auto px-4 py-6" style="padding-bottom:120px">
+
+  <!-- ═══ PASO 1: DATOS PERSONALES ═══ -->
+  <div class="view active" id="view1">
+    <div style="background:#fff;border-radius:24px;padding:24px;box-shadow:0 1px 8px rgba(0,0,0,.06);border:1px solid #e7e8e9;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+        <div class="grad-wil" style="width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <span class="material-symbols-outlined" style="font-size:20px;color:#fff;font-variation-settings:'FILL' 1">person</span>
+        </div>
+        <div>
+          <p style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;color:#191c1d;font-size:15px">Datos personales</p>
+          <p style="font-size:12px;color:#6c7a7b">Información básica de contacto</p>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#6c7a7b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Nombre completo *</label>
+          <input type="text" id="p1_nombre" class="campo" placeholder="Ej: Juan Carlos Pérez García"/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label style="display:block;font-size:11px;font-weight:700;color:#6c7a7b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Cédula *</label>
+            <input type="number" id="p1_cedula" class="campo" placeholder="1234567890"/>
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;font-weight:700;color:#6c7a7b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Fecha nacimiento *</label>
+            <input type="date" id="p1_fecha" class="campo"/>
+          </div>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#6c7a7b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Teléfono celular *</label>
+          <input type="tel" id="p1_tel" class="campo" placeholder="+57 310 123 4567"/>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#6c7a7b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Correo electrónico</label>
+          <input type="email" id="p1_email" class="campo" placeholder="tucorreo@gmail.com"/>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#6c7a7b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Barrio / Sector *</label>
+          <input type="text" id="p1_barrio" class="campo" placeholder="Ej: Centro, La Macarena…"/>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#6c7a7b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Dirección de residencia</label>
+          <input type="text" id="p1_dir" class="campo" placeholder="Calle 50 #45-23, Copacabana"/>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end">
+      <button onclick="irPaso(2)" class="grad-wil" style="color:#fff;padding:12px 28px;border-radius:16px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:14px;border:none;cursor:pointer;box-shadow:0 4px 14px rgba(0,105,112,.28);display:flex;align-items:center;gap:8px;transition:all .2s" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">
+        Siguiente
+        <span class="material-symbols-outlined" style="font-size:18px;color:#fff">arrow_forward</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══ PASO 2: VEHÍCULO ═══ -->
+  <div class="view" id="view2">
+    <div style="background:#fff;border-radius:24px;padding:24px;box-shadow:0 1px 8px rgba(0,0,0,.06);border:1px solid #e7e8e9;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+        <div class="grad-wil" style="width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <span class="material-symbols-outlined" style="font-size:20px;color:#fff;font-variation-settings:'FILL' 1">two_wheeler</span>
+        </div>
+        <div>
+          <p style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;color:#191c1d;font-size:15px">Tipo de vehículo</p>
+          <p style="font-size:12px;color:#6c7a7b">¿Con qué vas a hacer los domicilios?</p>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
+        <div class="vehicle-card selected" id="vc_moto" onclick="selectVehicle(this,'Motocicleta')">
+          <div style="width:42px;height:42px;border-radius:12px;background:rgba(0,105,112,.08);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <span class="material-symbols-outlined" style="font-size:22px;color:#006970">moped</span>
+          </div>
+          <div style="flex:1">
+            <p style="font-weight:700;color:#191c1d;font-size:14px">Motocicleta</p>
+            <p style="font-size:11.5px;color:#6c7a7b">Ideal para entregas rápidas y largas distancias</p>
+          </div>
+          <span class="material-symbols-outlined" id="chk_moto" style="font-size:20px;color:#006970;font-variation-settings:'FILL' 1">check_circle</span>
+        </div>
+
+        <div class="vehicle-card" id="vc_bici" onclick="selectVehicle(this,'Bicicleta')">
+          <div style="width:42px;height:42px;border-radius:12px;background:#f3f4f5;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <span class="material-symbols-outlined" style="font-size:22px;color:#6c7a7b">pedal_bike</span>
+          </div>
+          <div style="flex:1">
+            <p style="font-weight:700;color:#191c1d;font-size:14px">Bicicleta</p>
+            <p style="font-size:11.5px;color:#6c7a7b">Zonas urbanas céntricas</p>
+          </div>
+          <span class="material-symbols-outlined" id="chk_bici" style="font-size:20px;color:#bbc9cb">radio_button_unchecked</span>
+        </div>
+
+        <div class="vehicle-card" id="vc_auto" onclick="selectVehicle(this,'Automóvil')">
+          <div style="width:42px;height:42px;border-radius:12px;background:#f3f4f5;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <span class="material-symbols-outlined" style="font-size:22px;color:#6c7a7b">directions_car</span>
+          </div>
+          <div style="flex:1">
+            <p style="font-weight:700;color:#191c1d;font-size:14px">Automóvil</p>
+            <p style="font-size:11.5px;color:#6c7a7b">Pedidos de gran volumen</p>
+          </div>
+          <span class="material-symbols-outlined" id="chk_auto" style="font-size:20px;color:#bbc9cb">radio_button_unchecked</span>
+        </div>
+      </div>
+
+      <div id="campos-vehiculo" style="border-top:1px solid #e7e8e9;padding-top:16px;display:flex;flex-direction:column;gap:12px">
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#6c7a7b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Placa del vehículo *</label>
+          <input type="text" id="p2_placa" class="campo" placeholder="Ej: AKY-123" style="text-transform:uppercase"/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label style="display:block;font-size:11px;font-weight:700;color:#6c7a7b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Marca</label>
+            <input type="text" id="p2_marca" class="campo" placeholder="Ej: Yamaha"/>
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;font-weight:700;color:#6c7a7b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Año</label>
+            <input type="number" id="p2_modelo" class="campo" placeholder="2020"/>
+          </div>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#6c7a7b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Color</label>
+          <input type="text" id="p2_color" class="campo" placeholder="Ej: Negro"/>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:space-between">
+      <button onclick="irPaso(1)" style="padding:12px 20px;border-radius:16px;border:2px solid #bbc9cb;background:#fff;color:#3a3a3c;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s">
+        <span class="material-symbols-outlined" style="font-size:18px">arrow_back</span>Atrás
+      </button>
+      <button onclick="irPaso(3)" class="grad-wil" style="color:#fff;padding:12px 28px;border-radius:16px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:14px;border:none;cursor:pointer;box-shadow:0 4px 14px rgba(0,105,112,.28);display:flex;align-items:center;gap:8px">
+        Siguiente<span class="material-symbols-outlined" style="font-size:18px;color:#fff">arrow_forward</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══ PASO 3: DOCUMENTOS ═══ -->
+  <div class="view" id="view3">
+    <div style="background:#fff;border-radius:24px;padding:24px;box-shadow:0 1px 8px rgba(0,0,0,.06);border:1px solid #e7e8e9;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+        <div class="grad-wil" style="width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <span class="material-symbols-outlined" style="font-size:20px;color:#fff;font-variation-settings:'FILL' 1">description</span>
+        </div>
+        <div>
+          <p style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;color:#191c1d;font-size:15px">Documentos requeridos</p>
+          <p style="font-size:12px;color:#6c7a7b">Sube fotos legibles de tus documentos</p>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:16px">
+
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#6c7a7b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Foto de perfil *</label>
+          <div class="upload-zone" id="uz_foto" onclick="document.getElementById('f_foto').click()">
+            <span class="material-symbols-outlined" style="font-size:32px;color:#006970;font-variation-settings:'FILL' 1">add_a_photo</span>
+            <p style="font-weight:700;color:#191c1d;font-size:13px;text-align:center">Tu foto reciente</p>
+            <p style="font-size:11px;color:#6c7a7b;text-align:center">JPG o PNG · Máx 5MB</p>
+            <p style="font-size:11px;color:#2a9d5c;font-weight:700;display:none" id="lbl_foto">✓ Foto cargada</p>
+          </div>
+          <input type="file" id="f_foto" accept="image/*" style="display:none" onchange="marcarArchivo('uz_foto','lbl_foto',this)"/>
+        </div>
+
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#6c7a7b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Cédula de ciudadanía *</label>
+          <div class="upload-zone" id="uz_cedula" onclick="document.getElementById('f_cedula').click()">
+            <span class="material-symbols-outlined" style="font-size:32px;color:#006970;font-variation-settings:'FILL' 1">badge</span>
+            <p style="font-weight:700;color:#191c1d;font-size:13px;text-align:center">Foto ambas caras</p>
+            <p style="font-size:11px;color:#6c7a7b;text-align:center">PDF, JPG o PNG · Máx 5MB</p>
+            <p style="font-size:11px;color:#2a9d5c;font-weight:700;display:none" id="lbl_cedula">✓ Cédula cargada</p>
+          </div>
+          <input type="file" id="f_cedula" accept="image/*,application/pdf" style="display:none" onchange="marcarArchivo('uz_cedula','lbl_cedula',this)"/>
+        </div>
+
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#6c7a7b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Licencia de conducir *</label>
+          <div class="upload-zone" id="uz_licencia" onclick="document.getElementById('f_licencia').click()">
+            <span class="material-symbols-outlined" style="font-size:32px;color:#006970;font-variation-settings:'FILL' 1">id_card</span>
+            <p style="font-weight:700;color:#191c1d;font-size:13px;text-align:center">Vigente y legible</p>
+            <p style="font-size:11px;color:#6c7a7b;text-align:center">PDF, JPG o PNG · Máx 5MB</p>
+            <p style="font-size:11px;color:#2a9d5c;font-weight:700;display:none" id="lbl_licencia">✓ Licencia cargada</p>
+          </div>
+          <input type="file" id="f_licencia" accept="image/*,application/pdf" style="display:none" onchange="marcarArchivo('uz_licencia','lbl_licencia',this)"/>
+        </div>
+
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#6c7a7b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">SOAT <span style="font-weight:400;text-transform:none">(opcional)</span></label>
+          <div class="upload-zone" id="uz_soat" onclick="document.getElementById('f_soat').click()">
+            <span class="material-symbols-outlined" style="font-size:32px;color:#bbc9cb">shield</span>
+            <p style="font-weight:700;color:#191c1d;font-size:13px;text-align:center">Seguro obligatorio</p>
+            <p style="font-size:11px;color:#6c7a7b;text-align:center">PDF, JPG o PNG · Máx 5MB</p>
+            <p style="font-size:11px;color:#2a9d5c;font-weight:700;display:none" id="lbl_soat">✓ SOAT cargado</p>
+          </div>
+          <input type="file" id="f_soat" accept="image/*,application/pdf" style="display:none" onchange="marcarArchivo('uz_soat','lbl_soat',this)"/>
+        </div>
+
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:space-between">
+      <button onclick="irPaso(2)" style="padding:12px 20px;border-radius:16px;border:2px solid #bbc9cb;background:#fff;color:#3a3a3c;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:6px">
+        <span class="material-symbols-outlined" style="font-size:18px">arrow_back</span>Atrás
+      </button>
+      <button onclick="irPaso(4)" class="grad-wil" style="color:#fff;padding:12px 28px;border-radius:16px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:14px;border:none;cursor:pointer;box-shadow:0 4px 14px rgba(0,105,112,.28);display:flex;align-items:center;gap:8px">
+        Revisar solicitud<span class="material-symbols-outlined" style="font-size:18px;color:#fff">arrow_forward</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══ PASO 4: CONFIRMAR ═══ -->
+  <div class="view" id="view4">
+    <div style="background:#fff;border-radius:24px;padding:24px;box-shadow:0 1px 8px rgba(0,0,0,.06);border:1px solid #e7e8e9;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+        <div class="grad-wil" style="width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <span class="material-symbols-outlined" style="font-size:20px;color:#fff;font-variation-settings:'FILL' 1">receipt_long</span>
+        </div>
+        <div>
+          <p style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;color:#191c1d;font-size:15px">Resumen de solicitud</p>
+          <p style="font-size:12px;color:#6c7a7b">Verifica tus datos antes de enviar</p>
+        </div>
+      </div>
+      <div id="resumenDatos"></div>
+
+      <!-- Términos -->
+      <div style="margin-top:16px;display:flex;align-items:flex-start;gap:10px;background:#f3f4f5;border-radius:14px;padding:14px">
+        <input type="checkbox" id="chkTerminos" style="margin-top:2px;width:16px;height:16px;accent-color:#006970;flex-shrink:0;cursor:pointer"/>
+        <label for="chkTerminos" style="font-size:12px;color:#3a3a3c;line-height:1.5;cursor:pointer">
+          Acepto los <span style="color:#006970;font-weight:700">términos y condiciones</span> de Domicilios WIL y autorizo el tratamiento de mis datos personales para el proceso de vinculación.
+        </label>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:space-between;margin-bottom:14px">
+      <button onclick="irPaso(3)" style="padding:12px 20px;border-radius:16px;border:2px solid #bbc9cb;background:#fff;color:#3a3a3c;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:6px">
+        <span class="material-symbols-outlined" style="font-size:18px">arrow_back</span>Editar
+      </button>
+      <button onclick="enviarSolicitud()" id="btnEnviar" class="grad-wil" style="color:#fff;padding:12px 28px;border-radius:16px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:14px;border:none;cursor:pointer;box-shadow:0 4px 14px rgba(0,105,112,.28);display:flex;align-items:center;gap:8px">
+        <span class="material-symbols-outlined" style="font-size:18px;color:#fff;font-variation-settings:'FILL' 1">send</span>
+        <span id="btnEnviarTxt">Enviar solicitud</span>
+      </button>
+    </div>
+
+    <!-- Nota WA -->
+    <div style="background:rgba(42,157,92,.07);border:1px solid rgba(42,157,92,.2);border-radius:16px;padding:14px;display:flex;align-items:flex-start;gap:10px">
+      <span class="material-symbols-outlined" style="font-size:20px;color:#2a9d5c;flex-shrink:0;font-variation-settings:'FILL' 1">info</span>
+      <p style="font-size:12px;color:#3a3a3c;line-height:1.5">
+        También puedes <span style="font-weight:700;color:#2a9d5c">agendar una cita</span> directamente con Don WIL por WhatsApp antes de enviar. Él te orientará en el proceso.
+      </p>
+    </div>
+  </div>
+
+  <!-- ═══ PASO 5: ÉXITO ═══ -->
+  <div class="view" id="view5">
+    <div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:40px 16px">
+      <div style="width:72px;height:72px;border-radius:50%;background:#2a9d5c;display:flex;align-items:center;justify-content:center;margin-bottom:20px;box-shadow:0 8px 24px rgba(42,157,92,.3)">
+        <span class="material-symbols-outlined" style="font-size:36px;color:#fff;font-variation-settings:'FILL' 1">check_circle</span>
+      </div>
+      <h2 style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:900;font-size:24px;color:#191c1d;margin-bottom:8px">¡Solicitud enviada! 🛵</h2>
+      <p style="font-size:13px;color:#6c7a7b;line-height:1.6;max-width:280px;margin-bottom:24px">
+        Tu postulación fue recibida. El equipo WIL revisará tu información y te contactará en las próximas <strong>24–48 horas</strong> al número registrado.
+      </p>
+
+      <!-- Botón WA grande -->
+      <a id="btnWaExito" href="#" target="_blank"
+        style="width:100%;max-width:300px;background:linear-gradient(135deg,#25d366 0%,#128c7e 100%);color:#fff;padding:16px 24px;border-radius:16px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:15px;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:12px;box-shadow:0 8px 24px rgba(37,211,102,.35);margin-bottom:14px;transition:all .2s">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        Agenda cita con Don WIL
+      </a>
+
+      <button onclick="window.location.href='index.html'" style="color:#6c7a7b;font-size:13px;font-weight:700;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:8px">
+        <span class="material-symbols-outlined" style="font-size:18px">home</span>
+        Volver al inicio
+      </button>
+    </div>
+  </div>
+
+</main>
+
+<!-- BOTÓN WHATSAPP FLOTANTE -->
+<a id="waFloat"
+   href="https://wa.me/573XXXXXXXXX?text=Hola%20Don%20WIL%2C%20quiero%20agendar%20una%20cita%20para%20postularme%20como%20domiciliario%20%F0%9F%9B%B5"
+   target="_blank"
+   style="position:fixed;bottom:calc(24px + env(safe-area-inset-bottom));right:20px;z-index:200;display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,#25d366 0%,#128c7e 100%);border-radius:999px;padding:13px 18px;box-shadow:0 8px 24px rgba(37,211,102,.4);color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:13px;text-decoration:none;white-space:nowrap;transition:all .2s">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+  Agenda cita con Don WIL
+</a>
+
+<script>
+var pasoActual = 1;
+var vehiculoSeleccionado = 'Motocicleta';
+
+function irPaso(n) {
+  if(n > pasoActual && !validarPaso(pasoActual)) return;
+  pasoActual = n;
+  document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('active'); });
+  document.getElementById('view'+n).classList.add('active');
+  window.scrollTo({top:0, behavior:'smooth'});
+  actualizarSteps(n);
+  if(n===4) construirResumen();
+  if(n===5) document.getElementById('waFloat').style.display='none';
+}
+
+function actualizarSteps(n) {
+  for(var i=1;i<=4;i++){
+    var sc = document.getElementById('sc'+i);
+    sc.className = 'step-circle ' + (i<n?'done':i===n?'active':'inactive');
+    if(i<n) sc.innerHTML='<span class="material-symbols-outlined" style="font-size:18px">check</span>';
+    else sc.textContent=i;
+    if(i<4){
+      document.getElementById('sl'+i).className='step-line '+(i<n?'done':'inactive');
+    }
+  }
+}
+
+function validarPaso(n) {
+  if(n===1){
+    if(!document.getElementById('p1_nombre').value.trim()||
+       !document.getElementById('p1_cedula').value.trim()||
+       !document.getElementById('p1_tel').value.trim()||
+       !document.getElementById('p1_barrio').value.trim()){
+      alert('Por favor completa los campos obligatorios (*)');
+      return false;
+    }
+  }
+  if(n===3){
+    if(!document.getElementById('f_foto').files.length||
+       !document.getElementById('f_cedula').files.length){
+      alert('Por favor sube al menos tu foto de perfil y cédula.');
+      return false;
+    }
+  }
+  return true;
+}
+
+function selectVehicle(el, tipo) {
+  vehiculoSeleccionado = tipo;
+  ['moto','bici','auto'].forEach(function(k){
+    document.getElementById('vc_'+k).classList.remove('selected');
+    document.getElementById('chk_'+k).textContent='radio_button_unchecked';
+    document.getElementById('chk_'+k).style.color='#bbc9cb';
+    document.getElementById('chk_'+k).style.fontVariationSettings="'FILL' 0";
+  });
+  el.classList.add('selected');
+  var id = el.id.replace('vc_','');
+  document.getElementById('chk_'+id).textContent='check_circle';
+  document.getElementById('chk_'+id).style.color='#006970';
+  document.getElementById('chk_'+id).style.fontVariationSettings="'FILL' 1";
+  document.getElementById('campos-vehiculo').style.display = tipo==='Bicicleta'?'none':'flex';
+}
+
+function marcarArchivo(zoneId, lblId, input) {
+  if(input.files.length){
+    document.getElementById(zoneId).classList.add('has-file');
+    document.getElementById(lblId).style.display='block';
+  }
+}
+
+function construirResumen() {
+  var datos = [
+    ['Nombre',    document.getElementById('p1_nombre').value||'—'],
+    ['Cédula',    document.getElementById('p1_cedula').value||'—'],
+    ['Teléfono',  document.getElementById('p1_tel').value||'—'],
+    ['Correo',    document.getElementById('p1_email').value||'No ingresado'],
+    ['Barrio',    document.getElementById('p1_barrio').value||'—'],
+    ['Dirección', document.getElementById('p1_dir').value||'No ingresada'],
+    ['Vehículo',  vehiculoSeleccionado],
+    ['Placa',     document.getElementById('p2_placa').value||(vehiculoSeleccionado==='Bicicleta'?'N/A':'—')],
+    ['Marca/Color',(document.getElementById('p2_marca').value||'—')+' / '+(document.getElementById('p2_color').value||'—')],
+  ];
+  var html='';
+  datos.forEach(function(d){
+    html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-bottom:1px solid #f0f0f0">'
+      +'<span style="font-size:12px;color:#6c7a7b;font-weight:600;flex-shrink:0;padding-right:12px">'+d[0]+'</span>'
+      +'<span style="font-size:12px;font-weight:700;color:#191c1d;text-align:right">'+d[1]+'</span>'
+      +'</div>';
+  });
+  document.getElementById('resumenDatos').innerHTML=html;
+
+  var nombre = document.getElementById('p1_nombre').value.trim()||'postulante';
+  var tel    = document.getElementById('p1_tel').value.trim();
+  var msg    = encodeURIComponent('Hola Don WIL, soy '+nombre+' ('+tel+'). Acabo de enviar mi solicitud para ser domiciliario WIL 🛵. ¿Cuándo podríamos hablar?');
+  document.getElementById('btnWaExito').href = 'https://wa.me/573XXXXXXXXX?text='+msg;
+}
+
+function enviarSolicitud() {
+  if(!document.getElementById('chkTerminos').checked){
+    alert('Debes aceptar los términos y condiciones para continuar.');
+    return;
+  }
+  var btn = document.getElementById('btnEnviar');
+  var txt = document.getElementById('btnEnviarTxt');
+  txt.textContent='Enviando...';
+  btn.disabled=true;
+  btn.style.opacity='0.8';
+  setTimeout(function(){ irPaso(5); }, 1200);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#006970"/>
+<title>WIL — Domi en línea</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --p:#006970;--p2:#00a3b4;
+  --gr:#16a34a;--rd:#dc2626;--am:#d97706;
+  --on:#18222e;--on3:#7a8fa6;
+  --surf:#f0f4f7;--w:#fff;
+}
+html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(--surf);color:var(--on);-webkit-font-smoothing:antialiased}
+.sym{font-family:'Material Symbols Rounded';font-size:22px;line-height:1;display:inline-block}
+
+/* ── LOGIN ── */
+#loginScreen{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100vh;padding:32px 24px;gap:24px;
+}
+.login-logo{
+  width:80px;height:80px;border-radius:50%;
+  background:linear-gradient(135deg,#004851,#006970);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 8px 32px rgba(0,105,112,.35);font-size:36px;
+}
+.login-title{font-size:24px;font-weight:900;color:var(--on);text-align:center;letter-spacing:-.02em}
+.login-sub{font-size:13px;color:var(--on3);text-align:center;font-weight:500;margin-top:-12px}
+.login-card{
+  background:var(--w);border-radius:20px;padding:24px;
+  box-shadow:0 4px 24px rgba(0,40,60,.1);width:100%;max-width:340px;
+  display:flex;flex-direction:column;gap:14px;
+}
+.field-lbl{font-size:10px;font-weight:700;color:var(--on3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+.field-inp{
+  width:100%;background:#f0f4f7;border:none;border-radius:12px;
+  padding:13px 16px;font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:15px;font-weight:700;color:var(--on);outline:none;transition:.15s;
+}
+.field-inp:focus{box-shadow:0 0 0 3px rgba(0,105,112,.15)}
+.btn-login{
+  width:100%;padding:15px;border-radius:14px;border:none;
+  background:var(--p);color:#fff;font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:15px;font-weight:800;cursor:pointer;
+  box-shadow:0 4px 16px rgba(0,105,112,.3);transition:.15s;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.btn-login:active{transform:scale(.97)}
+.login-err{
+  background:#fef2f2;border-radius:10px;padding:10px 14px;
+  font-size:12px;color:var(--rd);font-weight:600;text-align:center;display:none;
+}
+
+/* ── TRACKER ── */
+#trackerScreen{display:none;flex-direction:column;min-height:100vh}
+
+/* Header */
+.tr-hdr{
+  padding:calc(14px + env(safe-area-inset-top)) 18px 14px;
+  background:linear-gradient(135deg,#003d45,#006970);
+  display:flex;align-items:center;gap:14px;
+}
+.tr-av{
+  width:46px;height:46px;border-radius:50%;flex-shrink:0;
+  background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.3);
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;font-weight:900;color:#fff;overflow:hidden;
+  font-family:'Plus Jakarta Sans',sans-serif;
+}
+.tr-hdr-info{flex:1;min-width:0}
+.tr-hdr-name{font-size:16px;font-weight:900;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tr-hdr-sub{font-size:11px;color:rgba(255,255,255,.65);font-weight:500;margin-top:2px}
+.tr-logout{
+  width:36px;height:36px;border-radius:50%;border:none;
+  background:rgba(255,255,255,.14);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.tr-logout .sym{font-size:18px;color:#fff}
+
+/* Status card */
+.tr-status{
+  margin:16px;border-radius:20px;padding:20px;
+  background:var(--w);box-shadow:0 4px 20px rgba(0,40,60,.08);
+}
+.tr-status-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.tr-toggle{
+  display:flex;align-items:center;gap:10px;cursor:pointer;
+  background:none;border:none;padding:0;font-family:'Plus Jakarta Sans',sans-serif;
+}
+.tr-toggle-track{
+  width:52px;height:28px;border-radius:99px;
+  background:#e2e9ef;position:relative;transition:.25s;flex-shrink:0;
+}
+.tr-toggle-track.on{background:var(--gr)}
+.tr-toggle-thumb{
+  position:absolute;top:3px;left:3px;
+  width:22px;height:22px;border-radius:50%;
+  background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.2);
+  transition:.25s;
+}
+.tr-toggle-track.on .tr-toggle-thumb{left:27px}
+.tr-toggle-lbl{font-size:14px;font-weight:800;color:var(--on)}
+
+/* GPS coords display */
+.tr-coords{
+  background:#f0f4f7;border-radius:13px;padding:12px 14px;
+  display:flex;align-items:center;gap:10px;
+}
+.tr-coords-dot{
+  width:10px;height:10px;border-radius:50%;background:#9aa5ae;flex-shrink:0;transition:.3s;
+}
+.tr-coords-dot.live{background:var(--gr);box-shadow:0 0 0 4px rgba(22,163,74,.2);animation:pulse 1.5s ease-in-out infinite}
+.tr-coords-dot.err{background:var(--rd)}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(22,163,74,.4)}50%{box-shadow:0 0 0 7px rgba(22,163,74,0)}}
+.tr-coords-txt{font-size:11.5px;font-weight:700;color:var(--on3);font-feature-settings:'tnum'}
+.tr-coords-txt span{color:var(--on);font-size:12px}
+
+/* Stats */
+.tr-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 16px}
+.tr-stat{
+  background:var(--w);border-radius:16px;padding:14px;
+  box-shadow:0 2px 10px rgba(0,40,60,.06);text-align:center;
+}
+.tr-stat-val{font-size:22px;font-weight:900;color:var(--p);margin-bottom:2px}
+.tr-stat-lbl{font-size:10px;font-weight:700;color:var(--on3);text-transform:uppercase;letter-spacing:.06em}
+
+/* Log */
+.tr-log{margin:16px;background:var(--w);border-radius:16px;padding:14px;box-shadow:0 2px 10px rgba(0,40,60,.06)}
+.tr-log-title{font-size:11px;font-weight:700;color:var(--on3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px}
+.tr-log-list{display:flex;flex-direction:column;gap:5px;max-height:140px;overflow-y:auto}
+.tr-log-item{font-size:11.5px;color:var(--on3);display:flex;gap:8px;align-items:flex-start}
+.tr-log-item .ts{color:var(--on3);flex-shrink:0;font-feature-settings:'tnum'}
+.tr-log-item .msg{flex:1}
+.tr-log-item.ok .msg{color:var(--gr)}
+.tr-log-item.err .msg{color:var(--rd)}
+.tr-log-item.info .msg{color:var(--p)}
+
+/* Footer info */
+.tr-footer{
+  margin:0 16px 32px;text-align:center;
+  font-size:11px;color:var(--on3);font-weight:500;line-height:1.6;
+}
+</style>
+</head>
+<body>
+
+<!-- ══ LOGIN ══ -->
+<div id="loginScreen">
+  <div class="login-logo">🛵</div>
+  <div>
+    <div class="login-title">Domicilios WIL</div>
+    <div class="login-sub">Panel del domiciliario</div>
+  </div>
+  <div class="login-card">
+    <div>
+      <div class="field-lbl">Tu ID de domi</div>
+      <input class="field-inp" id="loginId" type="text" placeholder="Ej: D01" autocomplete="off"
+        style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"/>
+    </div>
+    <div>
+      <div class="field-lbl">Clave</div>
+      <input class="field-inp" id="loginClave" type="password" placeholder="••••••"
+        onkeydown="if(event.key==='Enter')doLogin()"/>
+    </div>
+    <div class="login-err" id="loginErr"></div>
+    <button class="btn-login" id="btnLogin" onclick="doLogin()">
+      <span class="sym" style="font-size:20px">login</span>Ingresar
+    </button>
+  </div>
+</div>
+
+<!-- ══ TRACKER ══ -->
+<div id="trackerScreen">
+  <div class="tr-hdr">
+    <div class="tr-av" id="trAv">?</div>
+    <div class="tr-hdr-info">
+      <div class="tr-hdr-name" id="trNombre">—</div>
+      <div class="tr-hdr-sub">Domicilios WIL · Copacabana</div>
+    </div>
+    <button class="tr-logout" onclick="doLogout()">
+      <span class="sym">logout</span>
+    </button>
+  </div>
+
+  <!-- Toggle en línea -->
+  <div class="tr-status">
+    <div class="tr-status-top">
+      <button class="tr-toggle" onclick="toggleOnline()">
+        <div class="tr-toggle-track" id="toggleTrack">
+          <div class="tr-toggle-thumb"></div>
+        </div>
+        <span class="tr-toggle-lbl" id="toggleLbl">Estoy desconectado</span>
+      </button>
+      <span style="font-size:22px" id="statusEmoji">😴</span>
+    </div>
+
+    <!-- Coordenadas en vivo -->
+    <div class="tr-coords">
+      <div class="tr-coords-dot" id="coordDot"></div>
+      <div class="tr-coords-txt" id="coordTxt">GPS esperando permiso…</div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="tr-stats">
+    <div class="tr-stat">
+      <div class="tr-stat-val" id="statEnvios">0</div>
+      <div class="tr-stat-lbl">Envíos hoy</div>
+    </div>
+    <div class="tr-stat">
+      <div class="tr-stat-val" id="statUlt">—</div>
+      <div class="tr-stat-lbl">Última update</div>
+    </div>
+  </div>
+
+  <!-- Log de actividad -->
+  <div class="tr-log">
+    <div class="tr-log-title">Actividad reciente</div>
+    <div class="tr-log-list" id="logList">
+      <div class="tr-log-item info"><span class="ts">—</span><span class="msg">Esperando que te pongas en línea…</span></div>
+    </div>
+  </div>
+
+  <div class="tr-footer">
+    Tu ubicación se comparte con WIL<br>solo cuando estás en línea.<br>
+    <strong>Intervalo: cada 6 segundos</strong>
+  </div>
+</div>
+
+<script>
+var API_BASE = '/api';
+var domiData = null;
+var isOnline = false;
+var gpsTimer = null;
+var enviosHoy = 0;
+var lastLat = null, lastLng = null;
+
+// ── LOGIN ────────────────────────────────────────────────────────────────
+async function doLogin() {
+  var id    = document.getElementById('loginId').value.trim();
+  var clave = document.getElementById('loginClave').value.trim();
+  var err   = document.getElementById('loginErr');
+  var btn   = document.getElementById('btnLogin');
+
+  if (!id || !clave) { showErr('Completa ID y clave.'); return; }
+  btn.innerHTML = '<span style="display:inline-block;width:16px;height:16px;border:2.5px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle"></span> Entrando…';
+  btn.disabled = true;
+  err.style.display = 'none';
+
+  try {
+    var res  = await fetch(API_BASE + '/wil?action=domi-login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id, clave })
+    });
+    var data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Error de acceso');
+
+    domiData = data.domi;
+    // Guardar sesión en localStorage
+    localStorage.setItem('wil_domi', JSON.stringify(domiData));
+    iniciarTracker();
+  } catch(e) {
+    showErr(e.message);
+    btn.innerHTML = '<span class="sym" style="font-size:20px">login</span>Ingresar';
+    btn.disabled = false;
+  }
+}
+
+function showErr(msg) {
+  var err = document.getElementById('loginErr');
+  err.textContent = '❌ ' + msg;
+  err.style.display = 'block';
+}
+
+function doLogout() {
+  setOffline();
+  localStorage.removeItem('wil_domi');
+  domiData = null;
+  document.getElementById('trackerScreen').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('loginId').value = '';
+  document.getElementById('loginClave').value = '';
+}
+
+// ── INICIAR TRACKER ──────────────────────────────────────────────────────
+function iniciarTracker() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('trackerScreen').style.display = 'flex';
+
+  var inicial = (domiData.nombre || domiData.id).charAt(0).toUpperCase();
+  document.getElementById('trAv').textContent     = inicial;
+  document.getElementById('trNombre').textContent = domiData.nombre || domiData.id;
+
+  addLog('info', 'Sesión iniciada como ' + (domiData.nombre || domiData.id));
+
+  // Pedir permiso GPS inmediatamente
+  pedirGPS();
+}
+
+// ── TOGGLE EN LÍNEA ──────────────────────────────────────────────────────
+function toggleOnline() {
+  if (!isOnline) setOnline();
+  else setOffline();
+}
+
+function setOnline() {
+  isOnline = true;
+  document.getElementById('toggleTrack').classList.add('on');
+  document.getElementById('toggleLbl').textContent = '¡Estoy en línea! 🛵';
+  document.getElementById('statusEmoji').textContent = '🟢';
+  addLog('ok', 'Ahora en línea — compartiendo ubicación');
+  // Enviar inmediatamente y luego cada 6s
+  enviarUbicacion();
+  gpsTimer = setInterval(enviarUbicacion, 6000);
+}
+
+function setOffline() {
+  isOnline = false;
+  clearInterval(gpsTimer);
+  document.getElementById('toggleTrack').classList.remove('on');
+  document.getElementById('toggleLbl').textContent = 'Estoy desconectado';
+  document.getElementById('statusEmoji').textContent = '😴';
+  document.getElementById('coordDot').className = 'tr-coords-dot';
+  addLog('info', 'Desconectado — ubicación no compartida');
+}
+
+// ── GPS ─────────────────────────────────────────────────────────────────
+function pedirGPS() {
+  if (!navigator.geolocation) {
+    document.getElementById('coordTxt').innerHTML = '<span>GPS no disponible en este dispositivo</span>';
+    document.getElementById('coordDot').classList.add('err');
+    return;
+  }
+  navigator.geolocation.watchPosition(
+    function(pos) {
+      lastLat = pos.coords.latitude;
+      lastLng = pos.coords.longitude;
+      var acc = Math.round(pos.coords.accuracy);
+      document.getElementById('coordTxt').innerHTML =
+        '<span>' + lastLat.toFixed(5) + ', ' + lastLng.toFixed(5) + '</span>'
+        + ' · ±' + acc + 'm';
+      document.getElementById('coordDot').classList.remove('err');
+      if (isOnline) document.getElementById('coordDot').classList.add('live');
+    },
+    function(e) {
+      document.getElementById('coordTxt').innerHTML = '<span style="color:#dc2626">GPS bloqueado: ' + e.message + '</span>';
+      document.getElementById('coordDot').className = 'tr-coords-dot err';
+      addLog('err', 'GPS error: ' + e.message);
+    },
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+  );
+}
+
+// ── ENVIAR UBICACIÓN ─────────────────────────────────────────────────────
+async function enviarUbicacion() {
+  if (!isOnline || !domiData) return;
+
+  if (lastLat === null || lastLng === null) {
+    addLog('err', 'Sin GPS — esperando señal…');
+    return;
+  }
+
+  try {
+    var res = await fetch(API_BASE + '/wil?action=domi-location', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        domiId: domiData.id,
+        nombre: domiData.nombre,
+        lat: lastLat,
+        lng: lastLng,
+      })
+    });
+    var data = await res.json();
+
+    if (data.ok) {
+      enviosHoy++;
+      var ahora = new Date().toLocaleTimeString('es-CO', {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});
+      document.getElementById('statEnvios').textContent = enviosHoy;
+      document.getElementById('statUlt').textContent    = ahora.split(' ')[0]; // solo hora
+      if (enviosHoy % 10 === 1) { // log cada 10 envíos para no saturar
+        addLog('ok', 'Ubicación enviada — ' + lastLat.toFixed(4) + ', ' + lastLng.toFixed(4));
+      }
+    } else {
+      addLog('err', 'Error servidor: ' + (data.error || 'desconocido'));
+    }
+  } catch(e) {
+    addLog('err', 'Sin conexión: ' + e.message.slice(0,40));
+  }
+}
+
+// ── LOG ──────────────────────────────────────────────────────────────────
+function addLog(tipo, msg) {
+  var list = document.getElementById('logList');
+  var ts   = new Date().toLocaleTimeString('es-CO', {hour:'2-digit',minute:'2-digit',hour12:true});
+  var item = document.createElement('div');
+  item.className = 'tr-log-item ' + tipo;
+  item.innerHTML = '<span class="ts">' + ts + '</span><span class="msg">' + msg + '</span>';
+  list.prepend(item);
+  // Máximo 20 entradas
+  while (list.children.length > 20) list.removeChild(list.lastChild);
+}
+
+// ── AUTO-LOGIN si hay sesión guardada ────────────────────────────────────
+(function(){
+  var saved = localStorage.getItem('wil_domi');
+  if (saved) {
+    try {
+      domiData = JSON.parse(saved);
+      iniciarTracker();
+    } catch(e) { localStorage.removeItem('wil_domi'); }
+  }
+})();
+</script>
+<style>
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</body>
+</html>

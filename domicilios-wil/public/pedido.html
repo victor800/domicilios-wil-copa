@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Domicilios WIL</title>
+<meta name="theme-color" content="#075E54">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;height:100dvh;width:100%;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0B141A;overflow:hidden}
+:root{
+  --green:#00A884;--green-dk:#008069;--teal:#025144;
+  --hdr:#202C33;--bg:#0B141A;--inp:#202C33;
+  --panel:#111B21;--out:#005C4B;--in:#202C33;
+  --txt:#E9EDEF;--txt2:#8696A0;--txt3:#667781;
+  --border:#2A3942;--tick:#53BDEB;--icon:#AEBAC1;
+  --hover:rgba(255,255,255,.05);--danger:#F15C6D;--warn:#F0B429;
+  --ri:8px 8px 8px 0;--ro:8px 8px 0 8px;
+}
+#app{width:100%;height:100%;height:100dvh;display:flex;flex-direction:column;background:var(--bg);overflow:hidden}
+
+/* ── HEADER ── */
+#hdr{background:var(--hdr);display:flex;align-items:center;gap:10px;
+  padding:8px 12px;padding-top:max(8px,env(safe-area-inset-top));
+  flex-shrink:0;border-bottom:1px solid var(--border);min-height:56px;z-index:10}
+#av{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#00A884,#025144);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;cursor:pointer}
+#hdr-info{flex:1;min-width:0;cursor:pointer}
+#hdr-name{font-size:15px;font-weight:500;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hdr-status{font-size:12px;color:var(--txt2);display:flex;align-items:center;gap:4px;margin-top:1px}
+#sdot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ── CHAT AREA ── */
+#chat{flex:1;overflow-y:auto;overflow-x:hidden;padding:6px 8px 4px;
+  display:flex;flex-direction:column;gap:1px;scroll-behavior:smooth;
+  background-color:var(--bg);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect width='200' height='200' fill='%230B141A'/%3E%3Cg fill='none' stroke='%23182229' stroke-width='1.3' opacity='.6'%3E%3Crect x='8' y='8' width='26' height='18' rx='5'/%3E%3Cpath d='M11 26 L8 32 L18 28'/%3E%3C/g%3E%3C/svg%3E");
+  background-size:200px}
+#chat::-webkit-scrollbar{width:5px}
+#chat::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:3px}
+
+/* ── MENSAJES ── */
+.date-chip{align-self:center;background:rgba(17,27,33,.9);color:var(--txt2);
+  font-size:11px;font-weight:500;padding:3px 9px;border-radius:6px;
+  margin:6px 0 3px;border:1px solid rgba(255,255,255,.06)}
+.mrow{display:flex;animation:mi .18s cubic-bezier(.25,.46,.45,.94)}
+@keyframes mi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.mrow.out{justify-content:flex-end}
+.mrow.in{justify-content:flex-start}
+.bbl{max-width:82%;padding:6px 8px 5px;font-size:13.5px;line-height:1.5;
+  color:var(--txt);word-break:break-word;position:relative;box-shadow:0 1px 2px rgba(0,0,0,.3)}
+.mrow.out .bbl{background:var(--out);border-radius:var(--ro)}
+.mrow.in  .bbl{background:var(--in);border-radius:var(--ri)}
+.mrow.in  .bbl::before{content:'';position:absolute;top:0;left:-8px;
+  width:0;height:0;border-top:8px solid var(--in);border-left:8px solid transparent}
+.mrow.out .bbl::after{content:'';position:absolute;top:0;right:-8px;
+  width:0;height:0;border-top:8px solid var(--out);border-right:8px solid transparent}
+.bbl p{margin:0}
+.bbl strong{font-weight:600;color:#E9EDEF}
+.bbl em{font-style:italic;opacity:.85}
+.bbl a{color:var(--green);text-decoration:none}
+.bmeta{display:flex;align-items:center;justify-content:flex-end;gap:3px;
+  margin-top:3px;float:right;clear:both;font-size:11px;color:var(--txt3);margin-left:6px}
+.tick{width:14px;height:14px;fill:var(--tick)}
+.sep-line{border:none;border-top:1px solid rgba(255,255,255,.1);margin:4px 0}
+
+/* ── BOTONES INLINE ── */
+.btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.btn{border:none;padding:7px 13px;border-radius:18px;font-size:13px;font-weight:500;
+  cursor:pointer;transition:all .15s;white-space:nowrap;outline:none}
+.btn-p{background:var(--green);color:#fff}
+.btn-p:hover{background:var(--green-dk)}
+.btn-p:active{transform:scale(.96)}
+.btn-s{background:rgba(0,168,132,.15);color:var(--green);border:1px solid rgba(0,168,132,.3)}
+.btn-s:hover{background:rgba(0,168,132,.22)}
+.btn-g{background:rgba(255,255,255,.07);color:var(--txt);border:1px solid rgba(255,255,255,.1)}
+.btn-g:hover{background:rgba(255,255,255,.12)}
+.btn-d{background:rgba(241,92,109,.15);color:var(--danger);border:1px solid rgba(241,92,109,.3)}
+.btn:disabled{opacity:.4;pointer-events:none}
+
+/* ── CHIPS (opciones grandes) ── */
+.chips{display:flex;flex-direction:column;gap:6px;margin-top:8px;width:100%}
+.chip{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);
+  border-radius:10px;padding:11px 14px;cursor:pointer;
+  display:flex;align-items:center;gap:10px;
+  transition:all .15s;font-size:13.5px;color:var(--txt)}
+.chip:hover{background:rgba(0,168,132,.1);border-color:rgba(0,168,132,.4)}
+.chip:active{transform:scale(.98)}
+.chip.sel{background:rgba(0,168,132,.15);border-color:var(--green)}
+.chip-ico{font-size:20px;flex-shrink:0}
+.chip-txt{flex:1}
+.chip-title{font-weight:500}
+.chip-sub{font-size:11.5px;color:var(--txt2);margin-top:1px}
+
+/* ── LISTA PRODUCTOS ── */
+.prod-list{display:flex;flex-direction:column;gap:5px;margin-top:8px;width:100%}
+.prod-item{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+  border-radius:8px;padding:9px 12px;cursor:pointer;transition:all .15s;
+  display:flex;justify-content:space-between;align-items:center}
+.prod-item:hover{background:rgba(0,168,132,.1);border-color:rgba(0,168,132,.3)}
+.prod-item:active{transform:scale(.98)}
+.prod-nombre{font-size:13px;font-weight:500;color:var(--txt);flex:1;margin-right:8px}
+.prod-lab{font-size:11px;color:var(--txt2);margin-top:1px}
+.prod-precio{font-size:13.5px;font-weight:600;color:var(--green);white-space:nowrap}
+
+/* ── CARRITO ── */
+.cart-item{background:rgba(0,168,132,.07);border:1px solid rgba(0,168,132,.2);
+  border-radius:8px;padding:8px 12px;display:flex;justify-content:space-between;
+  align-items:center;font-size:13px;color:var(--txt)}
+.cart-item-info{flex:1}
+.cart-item-desc{font-weight:500}
+.cart-item-sub{color:var(--txt2);font-size:11.5px;margin-top:2px}
+.cart-item-total{font-weight:600;color:var(--green)}
+.cart-remove{background:none;border:none;color:var(--danger);font-size:16px;
+  cursor:pointer;padding:4px;border-radius:50%;transition:background .15s}
+.cart-remove:hover{background:rgba(241,92,109,.15)}
+
+/* ── FACTURA (alineada izquierda) ── */
+.fac-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;
+  padding:14px;font-size:12.5px;font-family:'Courier New',monospace;
+  color:var(--txt);text-align:left;line-height:1.6;overflow-x:auto}
+.fac-card .fac-title{text-align:center;font-weight:700;font-size:13px;
+  color:var(--green);margin-bottom:8px;letter-spacing:.5px}
+.fac-card .fac-sep{border-top:1px dashed rgba(255,255,255,.2);margin:6px 0}
+.fac-card .fac-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.fac-card .fac-row .fac-k{color:var(--txt2);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fac-card .fac-row .fac-v{font-weight:600;color:var(--txt);white-space:nowrap}
+.fac-card .fac-row.total .fac-k{color:var(--txt);font-weight:600}
+.fac-card .fac-row.total .fac-v{color:var(--green);font-size:14px}
+.fac-card .fac-prod{padding:2px 0;color:var(--txt)}
+.fac-card .fac-prod .fac-prod-name{font-weight:500}
+.fac-card .fac-prod .fac-prod-det{color:var(--txt2);font-size:11.5px}
+.fac-card .fac-badge{display:inline-block;background:rgba(0,168,132,.15);
+  color:var(--green);border:1px solid rgba(0,168,132,.3);
+  border-radius:5px;padding:2px 7px;font-size:11px;margin-top:4px}
+
+/* ── TYPING INDICATOR ── */
+.typing{display:flex;gap:4px;align-items:center;padding:10px 14px}
+.typing span{width:8px;height:8px;border-radius:50%;background:var(--txt2);
+  animation:ty .9s ease-in-out infinite}
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+@keyframes ty{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+
+/* ── INPUT BAR ── */
+#bar{background:var(--inp);display:flex;align-items:flex-end;gap:8px;
+  padding:6px 8px;padding-bottom:max(6px,env(safe-area-inset-bottom));
+  flex-shrink:0;border-top:1px solid var(--border)}
+#inp{flex:1;background:rgba(255,255,255,.06);border:none;border-radius:20px;
+  padding:9px 14px;font-size:14px;color:var(--txt);outline:none;
+  resize:none;max-height:100px;min-height:38px;line-height:1.4;
+  font-family:inherit}
+#inp::placeholder{color:var(--txt3)}
+#send{width:40px;height:40px;border-radius:50%;border:none;
+  background:var(--green);cursor:pointer;display:flex;align-items:center;
+  justify-content:center;flex-shrink:0;transition:all .15s}
+#send:hover{background:var(--green-dk)}
+#send:active{transform:scale(.92)}
+#send svg{width:20px;height:20px;fill:#fff}
+
+/* ── SEARCH INPUT ── */
+.search-wrap{position:relative;margin-top:8px;width:100%}
+.search-inp{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+  border-radius:10px;padding:9px 12px 9px 36px;font-size:14px;color:var(--txt);
+  outline:none;font-family:inherit;transition:border .15s}
+.search-inp:focus{border-color:rgba(0,168,132,.5)}
+.search-inp::placeholder{color:var(--txt3)}
+.search-ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);
+  color:var(--txt3);font-size:16px;pointer-events:none}
+
+/* ── SPINNER ── */
+.spin{display:inline-block;width:16px;height:16px;
+  border:2px solid rgba(0,168,132,.3);border-top-color:var(--green);
+  border-radius:50%;animation:rot .7s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+/* ── MÉTODO DE PAGO (actualiza mismo bubble) ── */
+.pago-opts{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.pago-btn{flex:1;min-width:120px;border:2px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.04);border-radius:10px;padding:12px 10px;
+  cursor:pointer;text-align:center;transition:all .15s;color:var(--txt)}
+.pago-btn:hover{border-color:var(--green);background:rgba(0,168,132,.1)}
+.pago-btn.sel{border-color:var(--green);background:rgba(0,168,132,.15)}
+.pago-btn .pago-ico{font-size:22px;display:block;margin-bottom:4px}
+.pago-btn .pago-label{font-size:12.5px;font-weight:500}
+
+/* ── CANTIDAD SELECTOR ── */
+.cant-sel{display:flex;align-items:center;gap:10px;margin-top:8px}
+.cant-btn{width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.15);
+  background:rgba(255,255,255,.06);color:var(--txt);font-size:18px;font-weight:600;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.cant-btn:hover{background:rgba(0,168,132,.15);border-color:var(--green)}
+.cant-val{font-size:20px;font-weight:600;color:var(--txt);min-width:28px;text-align:center}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:rgba(0,0,0,.85);color:#fff;padding:8px 16px;border-radius:20px;
+  font-size:13px;opacity:0;transition:all .25s;pointer-events:none;z-index:99;white-space:nowrap}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+  <div id="hdr">
+    <div id="av">🛵</div>
+    <div id="hdr-info">
+      <div id="hdr-name">Domicilios WIL</div>
+      <div id="hdr-status">
+        <span id="sdot"></span>
+        <span id="hdr-sub">Copacabana, Antioquia</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHAT -->
+  <div id="chat"></div>
+
+  <!-- BARRA DE ENTRADA -->
+  <div id="bar">
+    <textarea id="inp" placeholder="Escribe un mensaje..." rows="1"></textarea>
+    <button id="send">
+      <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+    </button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// DOMICILIOS WIL — Bot Web  v3
+// ══════════════════════════════════════════════════════════════
+const API = '/api';
+
+// ── Estado de sesión ──────────────────────────────────────────
+const S = {
+  paso: 'inicio',
+  negocio: null,        // 'wil' | 'expertos' | 'central'
+  negocioNombre: '',
+  tienda: null,         // 'EXPERTOS' | 'CENTRAL' | null
+  nombre: '',
+  telefono: '',
+  direccion: '',
+  referencia: '',
+  barrioDetectado: '',
+  zona: '',
+  municipio: '',
+  precioDomicilio: 0,
+  presupuesto: null,
+  carrito: [],          // [{descripcion,laboratorio,unidad,cantidad,precioUnitario,subtotal}]
+  prodSel: null,        // producto seleccionado esperando cantidad
+  metodoPago: null,
+  pagoMsgId: null,      // id del bubble de método de pago para editarlo
+};
+
+const NEGOCIOS = {
+  wil:      { nombre: '🏪 Domicilios WIL (general)', tienda: null },
+  expertos: { nombre: '💊 Droguería FarmaExpertos',  tienda: 'EXPERTOS' },
+  central:  { nombre: '🏥 Droguería Central',         tienda: 'CENTRAL' },
+};
+
+// ── Utilidades ────────────────────────────────────────────────
+function COP(n) {
+  if (!n && n !== 0) return '$0';
+  return '$' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+function ts() {
+  return new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true});
+}
+let _msgId = 0;
+function uid() { return 'msg_' + (++_msgId); }
+
+// ── Scroll ────────────────────────────────────────────────────
+const chat = document.getElementById('chat');
+function scrollDown() { setTimeout(() => chat.scrollTo({top:chat.scrollHeight,behavior:'smooth'}), 50); }
+
+// ── Toast ─────────────────────────────────────────────────────
+function toast(msg, ms=2200) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), ms);
+}
+
+// ── Insertar mensaje ──────────────────────────────────────────
+function addMsg(html, dir='in', id=null) {
+  const row = document.createElement('div');
+  row.className = `mrow ${dir}`;
+  if (id) row.id = id;
+  row.innerHTML = `<div class="bbl">${html}<div class="bmeta">${ts()}</div></div>`;
+  chat.appendChild(row);
+  scrollDown();
+  return row;
+}
+
+// Editar bubble existente (para método de pago)
+function editMsg(id, html) {
+  const row = document.getElementById(id);
+  if (!row) return;
+  const bbl = row.querySelector('.bbl');
+  if (!bbl) return;
+  const meta = bbl.querySelector('.bmeta');
+  const metaHTML = meta ? meta.outerHTML : `<div class="bmeta">${ts()}</div>`;
+  bbl.innerHTML = html + metaHTML;
+  scrollDown();
+}
+
+// ── Typing indicator ─────────────────────────────────────────
+function showTyping() {
+  const row = document.createElement('div');
+  row.className = 'mrow in'; row.id = 'typing';
+  row.innerHTML = `<div class="bbl"><div class="typing"><span></span><span></span><span></span></div></div>`;
+  chat.appendChild(row); scrollDown();
+}
+function hideTyping() {
+  const t = document.getElementById('typing');
+  if (t) t.remove();
+}
+async function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+async function botReply(html, ms=600) {
+  showTyping();
+  await delay(ms);
+  hideTyping();
+  return addMsg(html, 'in');
+}
+
+// ── Render botones ────────────────────────────────────────────
+function renderBtns(opciones) {
+  // opciones: [{label, cb, style?}]
+  const wrap = document.createElement('div');
+  wrap.className = 'btns';
+  opciones.forEach(o => {
+    const b = document.createElement('button');
+    b.className = `btn ${o.style || 'btn-p'}`;
+    b.textContent = o.label;
+    b.onclick = o.cb;
+    wrap.appendChild(b);
+  });
+  return wrap.outerHTML;
+}
+function renderChips(opciones) {
+  return '<div class="chips">' +
+    opciones.map(o =>
+      `<div class="chip" onclick="${o.fn}()">
+        <span class="chip-ico">${o.ico}</span>
+        <div class="chip-txt">
+          <div class="chip-title">${o.label}</div>
+          ${o.sub ? `<div class="chip-sub">${o.sub}</div>` : ''}
+        </div>
+      </div>`
+    ).join('') + '</div>';
+}
+
+// ── FACTURA HTML (alineada izquierda) ─────────────────────────
+function renderFactura(s, id) {
+  const esWIL = !s.tienda;
+  const sub = s.carrito.reduce((a, i) => a + (i.subtotal || 0), 0);
+  const dom = s.precioDomicilio || 0;
+  const tot = esWIL ? null : sub + dom;
+  const ahora = ts();
+
+  let prods = '';
+  s.carrito.forEach(item => {
+    prods += `<div class="fac-prod">
+      <div class="fac-prod-name">• ${item.descripcion}</div>
+      ${!esWIL && item.precioUnitario > 0
+        ? `<div class="fac-prod-det">${item.cantidad}× ${COP(item.precioUnitario)} = ${COP(item.subtotal)}</div>`
+        : `<div class="fac-prod-det">Cant: ${item.cantidad}</div>`
+      }
+    </div>`;
+  });
+
+  return `<div class="fac-card">
+    <div class="fac-title">🛵 DOMICILIOS WIL</div>
+    <div style="text-align:center;font-size:11px;color:var(--txt2);margin-bottom:6px">Copacabana, Antioquia</div>
+    <div class="fac-sep"></div>
+    <div class="fac-row"><span class="fac-k">🆔 ID</span><span class="fac-v">${id}</span></div>
+    <div class="fac-row"><span class="fac-k">⏰ Hora</span><span class="fac-v">${ahora}</span></div>
+    <div class="fac-sep"></div>
+    <div class="fac-row"><span class="fac-k">👤 Cliente</span><span class="fac-v">${s.nombre}</span></div>
+    <div class="fac-row"><span class="fac-k">📱 Tel.</span><span class="fac-v">${s.telefono}</span></div>
+    <div class="fac-row"><span class="fac-k">📍 Dir.</span><span class="fac-v" style="font-size:11px">${s.direccion}</span></div>
+    <div class="fac-sep"></div>
+    <div class="fac-row"><span class="fac-k">🏪 Negocio</span><span class="fac-v" style="font-size:11px">${s.negocioNombre}</span></div>
+    <div class="fac-sep"></div>
+    ${prods}
+    <div class="fac-sep"></div>
+    ${!esWIL && sub > 0 ? `<div class="fac-row"><span class="fac-k">🧾 Subtotal</span><span class="fac-v">${COP(sub)}</span></div>` : ''}
+    <div class="fac-row"><span class="fac-k">🛵 Domicilio</span><span class="fac-v">${dom > 0 ? COP(dom) : 'Por confirmar'}</span></div>
+    <div class="fac-sep"></div>
+    <div class="fac-row total">
+      <span class="fac-k">💵 TOTAL</span>
+      <span class="fac-v">${tot ? COP(tot) : 'POR CONFIRMAR'}</span>
+    </div>
+    <div class="fac-row" style="margin-top:4px">
+      <span class="fac-k">💳 Pago</span>
+      <span class="fac-v">${s.metodoPago === 'TRANSFERENCIA' ? '🏦 Transferencia' : '💵 Efectivo'}</span>
+    </div>
+    ${!s.tienda ? `<div style="margin-top:6px"><span class="fac-badge">El domi comprará y enviará la factura</span></div>` : ''}
+  </div>`;
+}
+
+// ── Render carrito ────────────────────────────────────────────
+function renderCarrito() {
+  if (!S.carrito.length) return '';
+  const sub = S.carrito.reduce((a,i) => a+(i.subtotal||0), 0);
+  const dom = S.precioDomicilio || 0;
+  let html = '<div style="display:flex;flex-direction:column;gap:5px;margin-top:4px">';
+  S.carrito.forEach((item, idx) => {
+    html += `<div class="cart-item">
+      <div class="cart-item-info">
+        <div class="cart-item-desc">${item.descripcion}</div>
+        <div class="cart-item-sub">${item.cantidad}× ${COP(item.precioUnitario)}</div>
+      </div>
+      <span class="cart-item-total">${COP(item.subtotal)}</span>
+      <button class="cart-remove" onclick="quitarItem(${idx})">✕</button>
+    </div>`;
+  });
+  html += `</div>
+  <div class="fac-sep" style="margin-top:8px"></div>
+  <div class="fac-row" style="margin-top:4px;font-size:13px">
+    <span style="color:var(--txt2)">🧾 Subtotal productos</span>
+    <strong>${COP(sub)}</strong>
+  </div>
+  <div class="fac-row" style="font-size:13px">
+    <span style="color:var(--txt2)">🛵 Domicilio</span>
+    <strong>${dom > 0 ? COP(dom) : 'Por confirmar'}</strong>
+  </div>`;
+  if (sub > 0) {
+    const tot = sub + dom;
+    html += `<div class="fac-row" style="margin-top:4px">
+      <strong style="font-size:14px">💵 Total estimado</strong>
+      <strong style="color:var(--green);font-size:15px">${COP(tot)}</strong>
+    </div>`;
+  }
+  return html;
+}
+
+function quitarItem(idx) {
+  S.carrito.splice(idx, 1);
+  if (S.carrito.length === 0) {
+    botReply('🗑️ Carrito vacío. Busca un producto:');
+    S.paso = 'buscar';
+    mostrarBuscador();
+  } else {
+    toast('Producto eliminado');
+    // Actualizar el bubble de carrito existente
+    mostrarCarritoActual();
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// FLUJO PRINCIPAL
+// ══════════════════════════════════════════════════════════════
+async function iniciarConversacion() {
+  await delay(300);
+  await botReply(
+    `<strong>¡Hola! 👋 Bienvenido a Domicilios WIL</strong><br>
+     📍 Copacabana, Antioquia<br><br>
+     ¿Qué necesitas hoy?`,
+    400
+  );
+  mostrarMenuInicio();
+}
+
+function mostrarMenuInicio() {
+  const id = uid();
+  addMsg(
+    `<p>Elige una opción:</p>
+    <div class="chips">
+      <div class="chip" onclick="elegirNegocio('wil')">
+        <span class="chip-ico">🏪</span>
+        <div class="chip-txt">
+          <div class="chip-title">Domicilios WIL (general)</div>
+          <div class="chip-sub">Tiendas, mercado, lo que necesites</div>
+        </div>
+      </div>
+      <div class="chip" onclick="elegirNegocio('expertos')">
+        <span class="chip-ico">💊</span>
+        <div class="chip-txt">
+          <div class="chip-title">Droguería FarmaExpertos</div>
+          <div class="chip-sub">Cra 47 #51-69, Copacabana</div>
+        </div>
+      </div>
+      <div class="chip" onclick="elegirNegocio('central')">
+        <span class="chip-ico">🏥</span>
+        <div class="chip-txt">
+          <div class="chip-title">Droguería Central</div>
+          <div class="chip-sub">Calle 52 #48-09, Copacabana</div>
+        </div>
+      </div>
+      <div class="chip" onclick="irTarifas()">
+        <span class="chip-ico">💲</span>
+        <div class="chip-txt">
+          <div class="chip-title">Ver tarifas de domicilio</div>
+          <div class="chip-sub">Consulta el costo antes de pedir</div>
+        </div>
+      </div>
+    </div>`,
+    'in', id
+  );
+}
+
+function irTarifas() {
+  addMsg('💲 Ver tarifas', 'out');
+  S.paso = 'tarifa';
+  botReply('📍 Escribe el <strong>barrio o dirección</strong> para consultar la tarifa:<br><em>Ej: Barrio Asunción, Bello, Medellín...</em>');
+}
+
+// ── Elegir negocio ────────────────────────────────────────────
+function elegirNegocio(key) {
+  const neg = NEGOCIOS[key];
+  S.negocio = key;
+  S.negocioNombre = neg.nombre;
+  S.tienda = neg.tienda;
+  S.carrito = [];
+  S.paso = 'nombre';
+
+  addMsg(neg.nombre, 'out');
+  botReply(`<strong>${neg.nombre}</strong><br><br>✏️ ¿Cuál es tu <strong>nombre completo</strong>?`);
+}
+
+// ── Manejar texto libre ───────────────────────────────────────
+async function manejarTexto(txt) {
+  switch (S.paso) {
+    case 'inicio':
+    case 'menu':
+      return botReply('Usa los botones de arriba para empezar 👆');
+
+    case 'tarifa':
+      return await consultarTarifa(txt);
+
+    case 'nombre':
+      if (txt.length < 2) return botReply('❌ Nombre muy corto. Escribe tu nombre completo:');
+      S.nombre = txt;
+      S.paso = 'telefono';
+      return botReply(`👤 <strong>${txt}</strong>\n\n📱 ¿Cuál es tu número de teléfono?`);
+
+    case 'telefono': {
+      const tel = txt.replace(/\D/g, '');
+      if (tel.length < 7) return botReply('❌ Número inválido. Escribe solo los dígitos:');
+      S.telefono = tel;
+      S.paso = 'direccion';
+      return botReply(
+        `✅ Tel: <strong>${tel}</strong><br><br>` +
+        `📍 ¿Cuál es tu <strong>dirección de entrega</strong>?<br>` +
+        `<em>Ej: Cra 50 #30-10 Barrio El Centro, Copacabana</em>`
+      );
+    }
+
+    case 'direccion':
+      S.direccion = txt;
+      S.paso = 'referencia';
+      return botReply(
+        `📌 <strong>Punto de referencia</strong><br>` +
+        `<em>Ej: Casa azul, frente al parque, apto 302...<br>` +
+        `(Escribe "no" si no hay)</em>`
+      );
+
+    case 'referencia':
+      S.referencia = txt.toLowerCase() === 'no' ? '' : txt;
+      await calcularTarifa(S.direccion);
+      return;
+
+    case 'presupuesto': {
+      const n = parseInt(txt.replace(/\D/g, ''));
+      S.presupuesto = isNaN(n) ? 'Sin límite' : COP(n);
+      S.paso = 'pedido_libre';
+      return botReply(
+        `💰 Presupuesto: <strong>${S.presupuesto}</strong><br><br>` +
+        `📦 ¿Qué necesitas?<br>` +
+        `<em>Ej: "2 pollos asados, 1 garrafa aguardiente, 2 libras azúcar"</em>`
+      );
+    }
+
+    case 'pedido_libre':
+      await procesarPedidoLibre(txt);
+      return;
+
+    case 'buscar':
+      await buscarProducto(txt);
+      return;
+
+    case 'cantidad': {
+      const n = parseInt(txt);
+      if (isNaN(n) || n <= 0) return botReply('❌ Escribe un número válido:');
+      await agregarAlCarrito(S.prodSel, n);
+      return;
+    }
+
+    default:
+      return botReply('Usa los botones para continuar 👆');
+  }
+}
+
+// ── Calcular tarifa con OSRM ──────────────────────────────────
+const SEDE_LAT = 6.3497, SEDE_LNG = -75.5078;
+const PRECIO_KM = 1800;
+const TARIFA_MIN = 5000;
+const MUNICIPIOS_FIJOS = ['itagüí','itagui','sabaneta','la estrella','caldas',
+  'san antonio de prado','envigado','medellín','medellin','bello',
+  'girardota','barbosa','rionegro','guarne','marinilla','el carmen de viboral',
+  'la ceja','el retiro','bogotá','bogota','cali','manizales'];
+const TARIFA_FIJA_LEJANO = 50000;
+
+async function calcularTarifa(direccion) {
+  showTyping();
+  try {
+    // 1. Intentar buscar en sheet via API
+    const r = await fetch(`${API}/tarifa?q=${encodeURIComponent(direccion)}`).then(r=>r.json()).catch(()=>null);
+    hideTyping();
+
+    if (r?.tarifa) {
+      S.precioDomicilio = r.tarifa;
+      S.barrioDetectado = r.barrio || direccion;
+      S.zona = r.zona || '';
+      S.municipio = r.municipio || '';
+      continuarFlujoTrasDir();
+      return;
+    }
+
+    // 2. Detectar municipio lejano
+    const dirNorm = direccion.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const esFijo = MUNICIPIOS_FIJOS.some(m => dirNorm.includes(m.normalize('NFD').replace(/[\u0300-\u036f]/g, '')));
+    if (esFijo) {
+      S.precioDomicilio = TARIFA_FIJA_LEJANO;
+      S.barrioDetectado = direccion;
+      continuarFlujoTrasDir();
+      return;
+    }
+
+    // 3. Geocodificar con Nominatim + calcular OSRM
+    showTyping();
+    const geo = await geocodificarNominatim(direccion);
+    hideTyping();
+
+    if (geo) {
+      const distKm = await calcularOSRM(SEDE_LAT, SEDE_LNG, geo.lat, geo.lng);
+      if (distKm !== null) {
+        S.precioDomicilio = Math.max(TARIFA_MIN, Math.round(distKm * PRECIO_KM / 100) * 100);
+        S.barrioDetectado = geo.display || direccion;
+        continuarFlujoTrasDir();
+        return;
+      }
+    }
+
+    // 4. Fallback: tarifa desconocida, continuar igual
+    S.precioDomicilio = 0;
+    S.barrioDetectado = direccion;
+    continuarFlujoTrasDir(true);
+
+  } catch (e) {
+    hideTyping();
+    S.precioDomicilio = 0;
+    S.barrioDetectado = direccion;
+    continuarFlujoTrasDir(true);
+  }
+}
+
+async function geocodificarNominatim(direccion) {
+  try {
+    const q = encodeURIComponent(direccion + ', Antioquia, Colombia');
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`, {
+      headers: {'Accept-Language': 'es', 'User-Agent': 'DomiciliosWIL/1.0'}
+    });
+    const data = await res.json();
+    if (data?.length) {
+      return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), display: data[0].display_name };
+    }
+  } catch (e) { console.warn('Nominatim:', e.message); }
+  return null;
+}
+
+async function calcularOSRM(lat1, lng1, lat2, lng2) {
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=false`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data?.routes?.[0]?.distance) {
+      return data.routes[0].distance / 1000; // metros → km
+    }
+  } catch (e) { console.warn('OSRM:', e.message); }
+  return null;
+}
+
+function continuarFlujoTrasDir(sinTarifa = false) {
+  const dom = S.precioDomicilio;
+  const msg = sinTarifa
+    ? `✅ Dirección: <strong>${S.barrioDetectado}</strong><br><em style="color:var(--txt2)">⚠️ Tarifa se confirma al entregar</em>`
+    : `✅ Dirección: <strong>${S.barrioDetectado}</strong><br>🛵 Domicilio: <strong>${COP(dom)}</strong>`;
+
+  botReply(msg);
+
+  setTimeout(() => {
+    if (S.negocio === 'wil') {
+      S.paso = 'presupuesto';
+      botReply(
+        `💰 ¿Cuánto tienes de <strong>presupuesto</strong> para esta compra?<br>` +
+        `<em>(Ej: 30000 o escribe "no sé")</em>`
+      );
+    } else {
+      S.paso = 'buscar';
+      botReply(`🔍 Listo. ¿Qué medicamento necesitas?`);
+      mostrarBuscador();
+    }
+  }, 600);
+}
+
+// ── Consulta de tarifa ────────────────────────────────────────
+async function consultarTarifa(direccion) {
+  addMsg(direccion, 'out');
+  showTyping();
+
+  const dirNorm = direccion.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const esFijo = MUNICIPIOS_FIJOS.some(m => dirNorm.includes(m.normalize('NFD').replace(/[\u0300-\u036f]/g, '')));
+
+  let tarifa = null;
+  if (esFijo) {
+    tarifa = TARIFA_FIJA_LEJANO;
+  } else {
+    // Intentar API sheet
+    const r = await fetch(`${API}/tarifa?q=${encodeURIComponent(direccion)}`).then(r=>r.json()).catch(()=>null);
+    if (r?.tarifa) {
+      tarifa = r.tarifa;
+    } else {
+      // OSRM
+      const geo = await geocodificarNominatim(direccion);
+      if (geo) {
+        const distKm = await calcularOSRM(SEDE_LAT, SEDE_LNG, geo.lat, geo.lng);
+        if (distKm !== null) {
+          tarifa = Math.max(TARIFA_MIN, Math.round(distKm * PRECIO_KM / 100) * 100);
+        }
+      }
+    }
+  }
+
+  hideTyping();
+
+  const msg = tarifa
+    ? `💲 <strong>${direccion}</strong><br>━━━━━━━━━━━━━━━━━━<br>🛵 Domicilio: <strong>${COP(tarifa)}</strong>`
+    : `⚠️ <strong>${direccion}</strong><br><em>No se encontró tarifa exacta. Se confirma al pedir.</em>`;
+
+  const id = uid();
+  addMsg(msg + `
+    <div class="btns" style="margin-top:8px">
+      <button class="btn btn-p" onclick="elegirNegocio('wil')">🛵 Hacer pedido</button>
+      <button class="btn btn-g" onclick="irTarifas()">🔍 Otro barrio</button>
+    </div>`, 'in', id);
+
+  S.paso = 'menu';
+}
+
+// ── Búsqueda de productos ─────────────────────────────────────
+function mostrarBuscador() {
+  const id = uid();
+  addMsg(
+    `<div class="search-wrap">
+      <span class="search-ico">🔍</span>
+      <input class="search-inp" id="search-inp" placeholder="Buscar medicamento..." 
+        oninput="buscarLive(this.value)" onkeydown="if(event.key==='Enter')buscarDesdeInput()">
+    </div>
+    <div id="search-results"></div>`, 'in', id
+  );
+  setTimeout(() => document.getElementById('search-inp')?.focus(), 300);
+}
+
+let _searchTimer = null;
+function buscarLive(val) {
+  clearTimeout(_searchTimer);
+  if (val.length < 2) { document.getElementById('search-results').innerHTML = ''; return; }
+  _searchTimer = setTimeout(() => buscarProducto(val, true), 400);
+}
+function buscarDesdeInput() {
+  const val = document.getElementById('search-inp')?.value || '';
+  if (val.length >= 2) buscarProducto(val, true);
+}
+
+async function buscarProducto(termino, inline = false) {
+  if (!inline) addMsg(termino, 'out');
+
+  const resultsEl = inline ? document.getElementById('search-results') : null;
+  if (resultsEl) resultsEl.innerHTML = `<div style="color:var(--txt2);font-size:13px;padding:6px 0"><span class="spin"></span>Buscando...</div>`;
+  else showTyping();
+
+  try {
+    const res = await fetch(`${API}/buscar-productos?tienda=${S.tienda}&q=${encodeURIComponent(termino)}`);
+    const data = await res.json();
+
+    if (!inline) hideTyping();
+
+    if (!data.resultados?.length) {
+      const noMsg = `😕 No encontré <strong>"${termino}"</strong>. Intenta con otro nombre.`;
+      if (resultsEl) {
+        resultsEl.innerHTML = `<p style="color:var(--txt2);font-size:13px;padding:6px 0">${noMsg}</p>`;
+      } else {
+        addMsg(noMsg + `<div class="btns" style="margin-top:8px">
+          ${S.carrito.length ? `<button class="btn btn-p" onclick="irAPagar()">✅ Finalizar pedido</button>` : ''}
+        </div>`, 'in');
+      }
+      return;
+    }
+
+    const lista = data.resultados.map((p, i) =>
+      `<div class="prod-item" onclick="seleccionarProducto(${i}, ${JSON.stringify(termino).replace(/'/g,"&#39;")})">
+        <div>
+          <div class="prod-nombre">${p.descripcion.substring(0,40)}</div>
+          <div class="prod-lab">${p.laboratorio || ''} ${p.unidad ? '· '+p.unidad : ''}</div>
+        </div>
+        <div class="prod-precio">${COP(p.precioUnitario)}</div>
+      </div>`
+    ).join('');
+
+    // Guardar resultados globalmente para acceso por índice
+    window._lastResults = data.resultados;
+
+    const contenido = `<p style="font-size:13px;color:var(--txt2);margin-bottom:6px">
+      Resultados para <strong>"${termino}"</strong>:</p>
+      <div class="prod-list">${lista}</div>
+      ${S.carrito.length ? `<div class="btns" style="margin-top:8px">
+        <button class="btn btn-p" onclick="irAPagar()">✅ Finalizar (${S.carrito.length} en carrito)</button>
+      </div>` : ''}`;
+
+    if (resultsEl) {
+      resultsEl.innerHTML = contenido;
+    } else {
+      addMsg(contenido, 'in');
+    }
+
+  } catch (e) {
+    if (!inline) hideTyping();
+    if (resultsEl) resultsEl.innerHTML = `<p style="color:var(--danger);font-size:13px">Error al buscar</p>`;
+    else addMsg('❌ Error de conexión. Intenta de nuevo.', 'in');
+  }
+}
+
+// Guardar resultados de búsqueda globalmente
+window._lastResults = [];
+
+function seleccionarProducto(idx, _termino) {
+  const p = window._lastResults[idx];
+  if (!p) return;
+  S.prodSel = p;
+
+  addMsg(`${p.descripcion} — ${COP(p.precioUnitario)}`, 'out');
+
+  const id = uid();
+  addMsg(
+    `<strong>💊 ${p.descripcion}</strong><br>
+    ${p.laboratorio ? `🏭 ${p.laboratorio}<br>` : ''}
+    ${p.unidad ? `📦 ${p.unidad}<br>` : ''}
+    ${p.tienePrecioVarios
+      ? `💰 1 und: <strong>${COP(p.precioUnidad)}</strong> | Varios: <strong>${COP(p.precioVarios)}</strong><br>`
+      : `💰 <strong>${COP(p.precioUnitario)}</strong> c/u<br>`
+    }
+    <br>¿Cuántas unidades?
+    <div class="cant-sel">
+      <button class="cant-btn" onclick="cambiarCant(-1)">−</button>
+      <span class="cant-val" id="cant-val">1</span>
+      <button class="cant-btn" onclick="cambiarCant(1)">+</button>
+    </div>
+    <div class="btns" style="margin-top:10px">
+      <button class="btn btn-p" onclick="confirmarCantidad()">✅ Agregar al carrito</button>
+      <button class="btn btn-g" onclick="cancelarProducto()">✕ Cancelar</button>
+    </div>`, 'in', id
+  );
+
+  S._cantActual = 1;
+  S.paso = '_seleccionando_cant';
+}
+
+function cambiarCant(delta) {
+  S._cantActual = Math.max(1, (S._cantActual || 1) + delta);
+  const el = document.getElementById('cant-val');
+  if (el) el.textContent = S._cantActual;
+}
+
+function confirmarCantidad() {
+  agregarAlCarrito(S.prodSel, S._cantActual || 1);
+}
+
+function cancelarProducto() {
+  S.paso = 'buscar';
+  mostrarBuscador();
+}
+
+async function agregarAlCarrito(prod, cantidad) {
+  const pu = prod.precioUnitario || 0;
+  S.carrito.push({
+    descripcion: prod.descripcionCompleta || prod.descripcion,
+    laboratorio: prod.laboratorio || '',
+    unidad: prod.unidad || '',
+    cantidad,
+    precioUnitario: pu,
+    subtotal: pu * cantidad,
+  });
+  S.paso = 'buscar';
+  S.prodSel = null;
+
+  addMsg(`✅ ${prod.descripcion} × ${cantidad}`, 'out');
+  mostrarCarritoActual();
+}
+
+function mostrarCarritoActual() {
+  const id = uid();
+  addMsg(
+    `<strong>🛒 Carrito actualizado</strong>
+    ${renderCarrito()}
+    <div class="btns" style="margin-top:10px">
+      <button class="btn btn-p" onclick="irAPagar()">✅ Finalizar pedido</button>
+      <button class="btn btn-s" onclick="seguirComprando()">➕ Agregar otro</button>
+    </div>`, 'in', id
+  );
+}
+
+function seguirComprando() {
+  S.paso = 'buscar';
+  mostrarBuscador();
+}
+
+// ── Pedido libre (WIL) ────────────────────────────────────────
+async function procesarPedidoLibre(txt) {
+  addMsg(txt, 'out');
+  showTyping();
+
+  try {
+    const res = await fetch(`${API}/extraer-productos`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({texto: txt})
+    });
+    const data = await res.json();
+    hideTyping();
+
+    let items = data.productos || [];
+
+    // Parser local de respaldo
+    if (!items.length) {
+      items = txt.split(/,|\sy\s|\s\+\s/)
+        .map(s => s.trim()).filter(Boolean)
+        .map(parte => {
+          const m = parte.match(/^(\d+)\s+(.+)$/i);
+          return m ? {descripcion: m[2].trim(), cantidad: parseInt(m[1]), precioUnitario: 0, subtotal: 0}
+                   : {descripcion: parte, cantidad: 1, precioUnitario: 0, subtotal: 0};
+        });
+    }
+
+    if (!items.length) {
+      return botReply(`😕 No entendí el pedido. Intenta:<br><em>"2 aceites, 1 arroz, 1 pollo"</em>`);
+    }
+
+    S.carrito = items.map(i => ({...i, subtotal: (i.precioUnitario||0) * (i.cantidad||1)}));
+    S.paso = 'confirmar_libre';
+
+    let lista = items.map((i,n) => `${n+1}. ${i.descripcion} × ${i.cantidad}`).join('<br>');
+    const id = uid();
+    addMsg(
+      `<strong>📋 Entendí este pedido:</strong><br><br>${lista}<br><br>
+       💰 Presupuesto: <strong>${S.presupuesto || 'Sin límite'}</strong><br>
+       🛵 Domicilio: <strong>${S.precioDomicilio ? COP(S.precioDomicilio) : 'Por confirmar'}</strong>
+       <div class="btns" style="margin-top:10px">
+         <button class="btn btn-p" onclick="irAPagar()">✅ Confirmar</button>
+         <button class="btn btn-g" onclick="reescribirPedido()">✏️ Modificar</button>
+         <button class="btn btn-d" onclick="cancelarPedido()">❌ Cancelar</button>
+       </div>`, 'in', id
+    );
+
+  } catch(e) {
+    hideTyping();
+    // Parser local como fallback total
+    const items = txt.split(/,|\sy\s|\s\+\s/)
+      .map(s => s.trim()).filter(Boolean)
+      .map(parte => {
+        const m = parte.match(/^(\d+)\s+(.+)$/i);
+        return m ? {descripcion:m[2].trim(),cantidad:parseInt(m[1]),precioUnitario:0,subtotal:0}
+                 : {descripcion:parte,cantidad:1,precioUnitario:0,subtotal:0};
+      });
+    S.carrito = items;
+    S.paso = 'confirmar_libre';
+    let lista = items.map((i,n) => `${n+1}. ${i.descripcion} × ${i.cantidad}`).join('<br>');
+    const id = uid();
+    addMsg(
+      `<strong>📋 Tu pedido:</strong><br><br>${lista}
+       <div class="btns" style="margin-top:10px">
+         <button class="btn btn-p" onclick="irAPagar()">✅ Confirmar</button>
+         <button class="btn btn-g" onclick="reescribirPedido()">✏️ Modificar</button>
+       </div>`, 'in', id
+    );
+  }
+}
+
+function reescribirPedido() {
+  S.carrito = [];
+  S.paso = 'pedido_libre';
+  botReply('✏️ Escribe de nuevo tu pedido:');
+}
+
+function cancelarPedido() {
+  Object.assign(S, { paso:'inicio', negocio:null, tienda:null, carrito:[], nombre:'', telefono:'', direccion:'' });
+  botReply('❌ Pedido cancelado. ¿Deseas hacer otro?');
+  setTimeout(mostrarMenuInicio, 500);
+}
+
+// ── Ir a pagar ────────────────────────────────────────────────
+function irAPagar() {
+  if (!S.carrito.length) { toast('❌ El carrito está vacío'); return; }
+  S.paso = 'pago';
+
+  // Crear bubble de pago con ID para editarlo después
+  const pagoId = uid();
+  S.pagoMsgId = pagoId;
+
+  addMsg(
+    `<strong>💳 ¿Cómo vas a pagar?</strong><br><br>` +
+    renderOpcionesPago(null),
+    'in', pagoId
+  );
+}
+
+function renderOpcionesPago(seleccionado) {
+  return `<div class="pago-opts">
+    <div class="pago-btn ${seleccionado==='EFECTIVO'?'sel':''}" onclick="elegirPago('EFECTIVO')">
+      <span class="pago-ico">💵</span>
+      <div class="pago-label">Efectivo</div>
+    </div>
+    <div class="pago-btn ${seleccionado==='TRANSFERENCIA'?'sel':''}" onclick="elegirPago('TRANSFERENCIA')">
+      <span class="pago-ico">🏦</span>
+      <div class="pago-label">Transferencia<br>Bancolombia</div>
+    </div>
+  </div>`;
+}
+
+// ELEGIR PAGO: edita el bubble existente, no crea uno nuevo
+function elegirPago(metodo) {
+  S.metodoPago = metodo;
+
+  // Editar el bubble de pago para mostrar selección confirmada
+  editMsg(S.pagoMsgId,
+    `<strong>💳 Método de pago</strong><br>` +
+    renderOpcionesPago(metodo) +
+    `<div class="btns" style="margin-top:10px">
+      <button class="btn btn-p" onclick="confirmarPedido()">✅ Confirmar pedido</button>
+      <button class="btn btn-d" onclick="cancelarPedido()">❌ Cancelar</button>
+    </div>`
+  );
+}
+
+// ── Confirmar y enviar pedido ─────────────────────────────────
+async function confirmarPedido() {
+  if (!S.metodoPago) { toast('Elige un método de pago'); return; }
+
+  // Deshabilitar botones para evitar doble envío
+  document.querySelectorAll('.btn').forEach(b => b.disabled = true);
+
+  // Actualizar bubble de pago: mostrar resumen final
+  editMsg(S.pagoMsgId,
+    `<strong>💳 ${S.metodoPago === 'TRANSFERENCIA' ? '🏦 Transferencia Bancolombia' : '💵 Efectivo'}</strong><br>
+     <em style="color:var(--txt2)"><span class="spin"></span>Enviando pedido...</em>`
+  );
+
+  try {
+    const body = {
+      nombre: S.nombre,
+      telefono: S.telefono,
+      direccion: S.direccion,
+      referencia: S.referencia,
+      barrioDetectado: S.barrioDetectado,
+      zona: S.zona,
+      municipio: S.municipio,
+      negocioNombre: S.negocioNombre,
+      tienda: S.tienda,
+      carrito: S.carrito,
+      precioDomicilio: S.precioDomicilio,
+      metodoPago: S.metodoPago,
+      presupuesto: S.presupuesto,
+    };
+
+    const res = await fetch(`${API}/pedido-web`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+
+    if (!data.ok) throw new Error(data.error || 'Error del servidor');
+
+    const id = data.id;
+
+    // Actualizar bubble de pago: confirmado
+    editMsg(S.pagoMsgId,
+      `<strong>💳 ${S.metodoPago === 'TRANSFERENCIA' ? '🏦 Transferencia Bancolombia' : '💵 Efectivo'}</strong><br>
+       <span style="color:var(--green)">✅ Pedido confirmado</span>`
+    );
+
+    // Mostrar factura
+    await delay(300);
+    addMsg(
+      `<p style="font-size:14px;font-weight:600;color:var(--green);margin-bottom:8px">✅ ¡PEDIDO CONFIRMADO!</p>` +
+      renderFactura(S, id) +
+      `<p style="margin-top:8px;font-size:12px;color:var(--txt2)">
+        🆔 Guarda este ID: <strong>${id}</strong><br>
+        🛵 En breve un domiciliario tomará tu pedido.
+      </p>
+      ${S.metodoPago === 'TRANSFERENCIA'
+        ? `<div style="margin-top:8px;padding:8px;background:rgba(240,180,41,.1);border:1px solid rgba(240,180,41,.3);border-radius:8px;font-size:12.5px;color:var(--warn)">
+            ⚠️ El domiciliario te enviará la factura al llegar. Tendrás que hacer la transferencia a Bancolombia.
+           </div>`
+        : ''
+      }`,
+      'in'
+    );
+
+    // Reset estado
+    Object.assign(S, {
+      paso: 'fin', negocio:null, tienda:null, carrito:[], nombre:'', telefono:'',
+      direccion:'', referencia:'', precioDomicilio:0, metodoPago:null, pagoMsgId:null,
+    });
+
+    // Opción de nuevo pedido
+    setTimeout(() => {
+      addMsg(
+        `¿Deseas hacer otro pedido?
+         <div class="btns" style="margin-top:8px">
+           <button class="btn btn-s" onclick="nuevoPedido()">🛵 Nuevo pedido</button>
+         </div>`, 'in'
+      );
+    }, 1200);
+
+  } catch(e) {
+    console.error('confirmarPedido:', e);
+    // Re-habilitar botones
+    document.querySelectorAll('.btn').forEach(b => b.disabled = false);
+    editMsg(S.pagoMsgId,
+      `<strong>💳 Método de pago</strong><br>` +
+      renderOpcionesPago(S.metodoPago) +
+      `<div class="btns" style="margin-top:10px">
+        <button class="btn btn-p" onclick="confirmarPedido()">✅ Confirmar pedido</button>
+        <button class="btn btn-d" onclick="cancelarPedido()">❌ Cancelar</button>
+      </div>`
+    );
+    addMsg(`❌ Error al enviar el pedido: <em>${e.message}</em><br>Intenta de nuevo.`, 'in');
+  }
+}
+
+function nuevoPedido() {
+  Object.assign(S, {
+    paso:'inicio', negocio:null, tienda:null, carrito:[],
+    nombre:'', telefono:'', direccion:'', referencia:'',
+    precioDomicilio:0, metodoPago:null, pagoMsgId:null,
+  });
+  mostrarMenuInicio();
+}
+
+// ── Barra de texto ────────────────────────────────────────────
+const inp = document.getElementById('inp');
+const sendBtn = document.getElementById('send');
+
+inp.addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+});
+
+inp.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    enviar();
+  }
+});
+
+sendBtn.addEventListener('click', enviar);
+
+function enviar() {
+  const txt = inp.value.trim();
+  if (!txt) return;
+  inp.value = '';
+  inp.style.height = 'auto';
+  addMsg(txt, 'out');
+  manejarTexto(txt);
+}
+
+// ── Arranque ──────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  const hoy = new Date().toLocaleDateString('es-CO',{weekday:'long',day:'numeric',month:'long'});
+  chat.appendChild(Object.assign(document.createElement('div'), {
+    className: 'date-chip',
+    textContent: hoy.charAt(0).toUpperCase() + hoy.slice(1)
+  }));
+  iniciarConversacion();
+});
+</script>
+</body>
+</html>

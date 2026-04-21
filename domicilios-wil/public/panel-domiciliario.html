@@ -1,0 +1,3044 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<meta name="theme-color" content="#006970"/>
+<title>Panel Domiciliario — Domicilios WIL</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="domi-notif.js"></script>
+
+<script>
+tailwind.config={darkMode:"class",theme:{extend:{colors:{primary:"#006970","primary-light":"#00bcc9",secondary:"#4c56af",surface:"#f8f9fa","surf-low":"#f3f4f5","surf-high":"#e7e8e9","surf-white":"#fff","on-surface":"#191c1d","on-var":"#3c494b",outline:"#6c7a7b","out-var":"#bbc9cb",green:"#2a9d5c",amber:"#f59e0b",red:"#ba1a1a"},fontFamily:{head:["Plus Jakarta Sans"],body:["Inter"]}}}}
+</script>
+<style>
+*{box-sizing:border-box}
+.material-symbols-outlined{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;font-size:24px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;direction:ltr;-webkit-font-smoothing:antialiased}
+body{min-height:100dvh;font-family:'Inter',sans-serif;background:#f8f9fa;color:#191c1d;padding-bottom:84px}
+.glass{background:rgba(255,255,255,.88);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.grad-wil{background:linear-gradient(135deg,#006970 0%,#00a3b4 60%,#00bcc9 100%)}
+.tab-content{display:none}.tab-content.active{display:block}
+.ping-dot::before{content:'';position:absolute;width:100%;height:100%;border-radius:50%;background:inherit;animation:ping 1.5s cubic-bezier(0,0,.2,1) infinite;opacity:.75}
+@keyframes ping{75%,100%{transform:scale(2.2);opacity:0}}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;text-align:center;gap:12px}
+.polling-wrap{height:3px;background:#e7e8e9;border-radius:2px;overflow:hidden;margin-bottom:12px}
+.polling-fill{height:100%;background:linear-gradient(90deg,#006970,#00bcc9);border-radius:2px;width:0%}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:rot .7s linear infinite;vertical-align:middle}
+@keyframes rot{to{transform:rotate(360deg)}}
+.card-in{animation:cardIn .3s ease both}
+@keyframes cardIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.admin-badge{background:linear-gradient(135deg,#f59e0b,#f97316);color:#fff;border-radius:9999px;padding:2px 10px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+.admin-dt-card{background:linear-gradient(135deg,#f59e0b,#f97316);color:#fff;border-radius:9999px;padding:2px 10px;font-size:9px;font-weight:800;letter-spacing:.04em;white-space:nowrap}
+
+/* ══ MOTO PALPITANTE ══ */
+@keyframes motoPulse{0%{box-shadow:0 0 0 0 rgba(0,188,200,.7),0 4px 18px rgba(0,105,112,.5);transform:scale(1)}50%{box-shadow:0 0 0 14px rgba(0,188,200,0),0 4px 18px rgba(0,105,112,.5);transform:scale(1.06)}100%{box-shadow:0 0 0 0 rgba(0,188,200,.7),0 4px 18px rgba(0,105,112,.5);transform:scale(1)}}
+.moto-marker-pulse{animation:motoPulse 1.8s ease-in-out infinite}
+@keyframes motoPulseAncla{0%,100%{opacity:.55;transform:scale(.96)}50%{opacity:.85;transform:scale(1.03)}}
+.moto-ancla-pulse{animation:motoPulseAncla 2.4s ease-in-out infinite}
+@keyframes dashFlow{to{stroke-dashoffset:-24}}
+.ruta-dash-anim path{stroke-dasharray:12 12;animation:dashFlow .7s linear infinite}
+
+/* ══ MAPA FULLSCREEN ══ */
+#mapFullscreen{position:fixed;top:0;left:0;right:0;bottom:84px;z-index:10;background:#1a2a2a;display:none}
+#leafletMap{position:absolute;top:0;left:0;right:0;bottom:0;width:100%;height:100%;z-index:1}
+.leaflet-control-zoom{border:none!important;box-shadow:0 4px 20px rgba(0,0,0,.25)!important}
+.leaflet-control-zoom a{background:rgba(255,255,255,.95)!important;color:#006970!important;font-weight:800!important;border:none!important;border-radius:10px!important;margin-bottom:3px!important}
+.leaflet-control-attribution{background:rgba(0,0,0,.45)!important;color:rgba(255,255,255,.6)!important;font-size:9px!important;border-radius:6px!important}
+
+/* ══ GPS STRIP ══ */
+#gpsStrip{position:absolute;top:14px;left:14px;z-index:50;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);border-radius:30px;padding:8px 14px 8px 11px;display:flex;align-items:center;gap:8px;box-shadow:0 3px 14px rgba(0,0,0,.18);cursor:pointer}
+
+/* ══ ETA BADGE MAPA ══ */
+#mapEtaBadge{position:absolute;bottom:14px;left:14px;z-index:50;background:rgba(0,0,0,.72);backdrop-filter:blur(10px);color:#fff;border-radius:16px;padding:8px 13px;display:none;flex-direction:column;gap:2px;box-shadow:0 4px 16px rgba(0,0,0,.3)}
+
+/* ══ ETA BANNER TOP ══ */
+#etaTopCard{position:fixed;top:0;left:0;right:0;z-index:190;display:none;pointer-events:none;padding-top:env(safe-area-inset-top)}
+#etaTopCard.show{display:block}
+#etaTopInner{background:linear-gradient(135deg,rgba(0,40,50,.94),rgba(0,100,115,.94));backdrop-filter:blur(18px);border-radius:0 0 24px 24px;padding:14px 16px;color:#fff;box-shadow:0 8px 32px rgba(0,0,0,.3)}
+
+/* ══ TRACKER FLOAT BTN ══ */
+#trkFloatBtn{position:fixed;bottom:100px;left:16px;z-index:490;width:52px;height:52px;background:linear-gradient(135deg,#006970,#00bcc9);border-radius:50%;display:none;align-items:center;justify-content:center;box-shadow:0 5px 20px rgba(0,105,112,.38);cursor:pointer;transition:transform .18s;border:none}
+#trkFloatBtn:active{transform:scale(.92)}
+#trkFloatBtn.live{animation:cloudPulse 2s ease-in-out infinite}
+@keyframes cloudPulse{0%,100%{box-shadow:0 5px 20px rgba(0,105,112,.38)}50%{box-shadow:0 5px 30px rgba(0,185,200,.7),0 0 0 7px rgba(0,185,200,.13)}}
+#trkFloatDot{position:absolute;top:-2px;right:-2px;width:12px;height:12px;border-radius:50%;border:2px solid #fff;background:#bbc9cb;transition:background .3s}
+#trkFloatDot.live{background:#2a9d5c}
+
+/* ══ PLACEHOLDER MAPA ══ */
+#mapPlaceholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:linear-gradient(160deg,#0f2027 0%,#203a43 50%,#2c5364 100%);z-index:2;pointer-events:none}
+#mapLoadingBar{position:absolute;top:0;left:0;right:0;height:3px;background:rgba(255,255,255,.1);overflow:hidden;z-index:20}
+#mapLoadingFill{height:100%;background:linear-gradient(90deg,#33ccff,#00bcc9);width:0%;transition:width .4s ease}
+
+/* ══ POPUP PEDIDO ══ */
+#pedidoPopupOverlay{position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center}
+#pedidoPopupOverlay.open{display:flex}
+#pedidoPopup{width:100%;max-width:520px;background:#f8f9fa;border-radius:28px 28px 0 0;max-height:88dvh;overflow-y:auto;box-shadow:0 -8px 48px rgba(0,0,0,.35);animation:slideUp .35s cubic-bezier(.22,1,.36,1)}
+@keyframes slideUp{from{transform:translateY(70px);opacity:0}to{transform:translateY(0);opacity:1}}
+.pp-handle{width:40px;height:4px;background:#d0d6d8;border-radius:4px;margin:0 auto 0}
+#ppHeader{background:linear-gradient(135deg,#005a60,#007f8c,#00a3b4);padding:18px 16px 16px;position:relative}
+.pp-close-btn{position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.18);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff}
+
+/* ══ STEPPER ══ */
+.step-track{display:flex;align-items:flex-start;width:100%;padding:16px 20px 4px}
+.step-line{flex:1;height:3px;margin-top:17px;border-radius:3px;background:#e7e8e9;min-width:10px;transition:background .4s}
+
+#wazeFloatBtn:active{transform:scale(.9)}
+@keyframes wazeGlow{
+  0%,100%{box-shadow:0 5px 24px rgba(0,110,255,.45)}
+  50%{box-shadow:0 5px 36px rgba(0,180,255,.8),0 0 0 10px rgba(0,150,255,.12)}
+}
+#wazeFloatBtn.live{animation:wazeGlow 2.2s ease-in-out infinite}
+
+/* ══ FLOAT STEP BTN ══ */
+#stepActionBtn{
+  position:fixed;bottom:104px;right:16px;z-index:491;
+  width:58px;height:58px;border-radius:50%;border:none;
+  cursor:pointer;display:none;align-items:center;justify-content:center;
+  color:#fff;background:linear-gradient(135deg,#7c3aed,#8b5cf6);
+  box-shadow:0 5px 22px rgba(124,58,237,.45);
+  transition:transform .18s,background .3s,box-shadow .3s;padding:0;margin:0;
+}
+#stepActionBtn:active{transform:scale(.9)}
+@keyframes stepBtnPulse{
+  0%,100%{box-shadow:0 5px 22px rgba(124,58,237,.45)}
+  50%{box-shadow:0 5px 32px rgba(139,92,246,.8),0 0 0 9px rgba(139,92,246,.13)}
+}
+@keyframes stepBtnPulseV{
+  0%,100%{box-shadow:0 5px 22px rgba(42,157,92,.45)}
+  50%{box-shadow:0 5px 32px rgba(42,157,92,.8),0 0 0 9px rgba(42,157,92,.13)}
+}
+#stepActionBtn.pulse{animation:stepBtnPulse 2s ease-in-out infinite}
+#stepActionBtn.verde{background:linear-gradient(135deg,#1a7a3a,#2a9d5c);
+  box-shadow:0 5px 22px rgba(42,157,92,.45)}
+#stepActionBtn.verde.pulse{animation:stepBtnPulseV 2s ease-in-out infinite}
+
+/* ══ PRODUCTOS ══ */
+.prod-list{display:flex;flex-direction:column;gap:0}
+.prod-row{display:flex;align-items:flex-start;padding:8px 0;border-bottom:1px solid #eef1f3;gap:8px}
+.prod-row:last-child{border-bottom:none;padding-bottom:0}
+.prod-num{width:22px;height:22px;min-width:22px;border-radius:50%;background:#e8f5e9;color:#2a9d5c;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;font-family:'Plus Jakarta Sans',sans-serif}
+.prod-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.prod-nombre{font-size:12.5px;font-weight:700;color:#191c1d;line-height:1.4;word-break:break-word;white-space:normal}
+.prod-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.prod-antes{font-size:10px;color:#bbc9cb;text-decoration:line-through}
+.prod-qty{font-size:10px;font-weight:800;background:#e8f5e9;color:#2a9d5c;padding:1px 7px;border-radius:20px;white-space:nowrap;font-family:'Plus Jakarta Sans',sans-serif}
+.prod-precio{font-size:12px;font-weight:800;color:#006970;white-space:nowrap;margin-top:1px;font-family:'Plus Jakarta Sans',sans-serif}
+.estado-chip{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:10px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif}
+.nav-badge-num{position:absolute;top:-2px;right:-4px;min-width:18px;height:18px;border-radius:99px;border:2px solid #fff;color:#fff;font-size:9px;font-weight:800;display:none;align-items:center;justify-content:center;padding:0 4px;font-family:'Plus Jakarta Sans',sans-serif}
+
+/* ══ DRAWER TRACKER ══ */
+#trkDrawerOverlay{position:fixed;inset:0;z-index:800;background:rgba(0,0,0,.45);display:none;align-items:flex-end;justify-content:center}
+#trkDrawerOverlay.open{display:flex}
+#trkDrawer{width:100%;max-width:520px;background:#fff;border-radius:28px 28px 0 0;padding:20px 20px calc(24px + env(safe-area-inset-bottom));box-shadow:0 -8px 40px rgba(0,0,0,.2);animation:slideUp .3s cubic-bezier(.22,1,.36,1);max-height:80dvh;overflow-y:auto}
+.drw-handle{width:36px;height:4px;background:#e0e4e6;border-radius:4px;margin:0 auto 16px}
+.trk-toggle-track{width:46px;height:26px;border-radius:999px;position:relative;transition:.25s;flex-shrink:0}
+.trk-toggle-track.off{background:#bbc9cb}.trk-toggle-track.on{background:#2a9d5c}
+.trk-toggle-thumb{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.22);transition:.25s}
+.trk-toggle-track.on .trk-toggle-thumb{left:23px}
+.trk-log-scroll{max-height:150px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#bbc9cb transparent}
+@keyframes gpsPulse{0%,100%{box-shadow:0 0 0 0 rgba(42,157,92,.5)}50%{box-shadow:0 0 0 8px rgba(42,157,92,0)}}
+.trk-gps-live{animation:gpsPulse 1.6s ease-in-out infinite}
+.ver-mas-btn{width:100%;margin-top:8px;padding:8px;border:1.5px dashed #bbc9cb;border-radius:12px;background:transparent;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:11px;color:#6c7a7b;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:5px}
+.ver-mas-btn:hover{border-color:#006970;color:#006970;background:rgba(0,105,112,.04)}
+
+/* ══ SHARE LOC ══ */
+#shareLocOverlay{position:fixed;inset:0;z-index:850;background:rgba(0,0,0,.45);display:none;align-items:flex-end;justify-content:center}
+
+/* ══ CHAT ══ */
+#chatOverlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:900;display:none;align-items:flex-end;justify-content:center;padding:0 12px 80px}
+#chatOverlay.open{display:flex}
+#chatPopup{width:100%;max-width:520px;height:78dvh;background:#eef1f3;border-radius:24px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 48px rgba(0,0,0,.28);animation:slideUp .3s cubic-bezier(.22,1,.36,1)}
+#chatPopupHeader{background:linear-gradient(135deg,#005a60,#007f8c,#00a3b4);padding:12px 14px;display:flex;align-items:center;gap:11px;flex-shrink:0}
+#chatPopupAvatarWrap{width:44px;height:44px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,.35);flex-shrink:0;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;position:relative}
+.chat-status-dot{width:11px;height:11px;border-radius:50%;border:2px solid #005a60;position:absolute;bottom:0;right:0}
+.chat-status-dot.online{background:#4ade80}.chat-status-dot.offline{background:#9ca3af}
+#chatPopupMsgs{flex:1;overflow-y:auto;padding:14px 14px 6px;display:flex;flex-direction:column;gap:6px;background:#eef1f3}
+.chat-msg-wrap{display:flex;align-items:flex-end;gap:7px;max-width:100%}
+.chat-msg-wrap.out{flex-direction:row-reverse}
+.chat-mini-domi{width:28px;height:28px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg,#4c56af,#7c83d6);display:flex;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:.65rem;color:#fff;align-self:flex-end}
+.chat-mini-avatar{width:28px;height:28px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg,#006970,#00bcc9);display:flex;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:.65rem;color:#fff;align-self:flex-end}
+.chat-bubble-col{display:flex;flex-direction:column;max-width:calc(100% - 80px)}
+.msg-bubble-out{background:linear-gradient(135deg,#006970,#009eae);color:#fff;border-radius:16px 16px 4px 16px;padding:9px 13px 7px;font-size:13px;line-height:1.45;overflow-wrap:break-word;box-shadow:0 1px 4px rgba(0,105,112,.18)}
+.msg-bubble-in{background:#fff;color:#191c1d;border-radius:16px 16px 16px 4px;padding:9px 13px 7px;font-size:13px;line-height:1.45;overflow-wrap:break-word;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+.msg-meta{font-size:10px;margin-top:3px;display:flex;align-items:center;gap:3px;white-space:nowrap}
+.msg-meta.out{justify-content:flex-end;color:rgba(0,0,0,.38)}.msg-meta.in{color:#9eaaac}
+.tick-unread{color:#9ab8ba;font-size:13px!important}.tick-read{color:#00bcc9;font-size:13px!important}
+.chat-date-sep{text-align:center;margin:4px 0 8px}
+.chat-date-sep span{background:#d6dde0;color:#6c7a7b;font-size:10px;font-weight:700;padding:3px 14px;border-radius:20px}
+#chatTypingIndicator{padding:4px 14px 8px;display:none;align-items:center;gap:8px}
+.typing-dot{width:6px;height:6px;border-radius:50%;background:#bbc9cb;animation:typingBounce 1.2s ease-in-out infinite}
+.typing-dot:nth-child(2){animation-delay:.2s}.typing-dot:nth-child(3){animation-delay:.4s}
+@keyframes typingBounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+#chatPedidoInfo{background:rgba(0,0,0,.15);margin:0 14px 8px;border-radius:10px;padding:7px 11px;display:none}
+#chatPopupInputRow{padding:8px 10px;background:#fff;border-top:1px solid #e4e8ea;display:flex;gap:6px;align-items:flex-end;flex-shrink:0}
+#chatPopupInput{flex:1;border:1.5px solid #e4e8ea;border-radius:20px;padding:9px 14px;font-size:13px;outline:none;font-family:'Inter',sans-serif;background:#f5f7f8;resize:none;max-height:90px;overflow-y:auto;line-height:1.4}
+#chatPopupInput:focus{border-color:#006970;background:#fff}
+.chat-media-btn{width:38px;height:38px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#f0f2f5}
+#chatPopupSendBtn{width:40px;height:40px;background:linear-gradient(135deg,#006970,#00bcc9);border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .15s}
+#chatPopupSendBtn:disabled{opacity:.4}
+#chatImgInput{display:none}
+#perfilFotoWrap{width:100px;height:100px;border-radius:20px;overflow:hidden;border:3px solid rgba(255,255,255,.4);flex-shrink:0;background:rgba(255,255,255,.2);position:relative}
+
+/* ══ PANEL RUTA (pestaña) ══ */
+#rutaTabPanel{padding:12px 0 0}
+#rutaCard{background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 2px 20px rgba(0,105,112,.12);border:1px solid rgba(0,105,112,.08)}
+#rutaCardHeader{background:linear-gradient(135deg,#005a60,#007f8c,#00a3b4);padding:16px}
+#rutaCardMap{height:260px;position:relative;background:#1a2a2a}
+#rutaCardActions{padding:12px 14px 16px}
+
+/* ══ FACTURA TICKET ══ */
+.ticket-wrap{background:#fff;border-radius:16px;border:1px solid rgba(42,157,92,.18);overflow:hidden;margin-bottom:10px}
+.ticket-header{background:linear-gradient(135deg,#005a60,#007f8c);padding:10px 13px;display:flex;align-items:center;justify-content:space-between}
+.ticket-header-lbl{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.7)}
+.ticket-header-val{font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:11px;color:#fff}
+.ticket-col-head{display:grid;grid-template-columns:1fr 52px 70px;gap:4px;padding:7px 12px 5px;background:#f0fdf4;border-bottom:1px dashed rgba(0,105,112,.15)}
+.ticket-col-head span{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#6c7a7b}
+.ticket-col-head span:nth-child(2){text-align:center}
+.ticket-col-head span:nth-child(3){text-align:right}
+.ticket-row{display:grid;grid-template-columns:1fr 52px 70px;gap:4px;padding:7px 12px;border-bottom:1px solid #f0f4f5;align-items:start}
+.ticket-row:last-of-type{border-bottom:none}
+.ticket-row-nombre{font-size:12px;font-weight:700;color:#191c1d;line-height:1.35;word-break:break-word}
+.ticket-row-marca{font-size:10px;color:#9eaaac;font-weight:600;margin-top:1px}
+.ticket-row-qty{font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:11px;color:#fff;background:#2a9d5c;border-radius:20px;padding:2px 7px;text-align:center;white-space:nowrap;align-self:start;justify-self:center;margin-top:2px}
+.ticket-row-precio{font-family:'Plus Jakarta Sans',sans-serif;font-weight:900;font-size:12px;color:#006970;text-align:right;white-space:nowrap;align-self:start;margin-top:2px}
+.ticket-row-vu{font-size:9px;color:#bbc9cb;text-align:right;line-height:1.2;margin-top:1px}
+.ticket-divider{border:none;border-top:2px dashed rgba(0,105,112,.15);margin:0 12px}
+.ticket-subtotal-row{display:flex;justify-content:space-between;align-items:center;padding:5px 12px}
+.ticket-subtotal-lbl{font-size:11px;color:#6c7a7b;font-weight:600}
+.ticket-subtotal-val{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;color:#191c1d}
+.ticket-total-row{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:linear-gradient(135deg,rgba(0,105,112,.08),rgba(0,188,200,.06))}
+.ticket-total-lbl{font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:900;color:#005a60}
+.ticket-total-val{font-family:'Plus Jakarta Sans',sans-serif;font-size:18px;font-weight:900;color:#006970}
+
+
+
+/* ══ NAV PANEL ══ */
+#navPanel{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);width:calc(100% - 28px);max-width:500px;background:rgba(0,30,35,.92);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-radius:22px;padding:14px 16px;z-index:480;box-shadow:0 8px 36px rgba(0,0,0,.42);display:none;flex-direction:column;gap:8px;border:1px solid rgba(255,255,255,.07)}
+
+/* Mapa embebido en pestaña */
+#mapInTab{position:absolute;inset:0;width:100%;height:100%;z-index:1}
+.leaflet-container{background:#1a2a2a!important}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="fixed top-0 w-full z-50 glass border-b border-out-var/20 shadow-sm" id="mainHeader">
+  <div class="max-w-2xl mx-auto flex items-center justify-between px-5 py-3" style="padding-top:calc(0.75rem + env(safe-area-inset-top))">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-full overflow-hidden border-2 border-primary/30 flex-shrink-0 bg-primary/10 flex items-center justify-center">
+        <img src="icons/icon-192.png" id="headerFotoImg" alt="WIL" class="w-full h-full object-cover" style="object-position:center 20%" onerror="this.style.display='none'"/>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <p class="font-head font-extrabold text-primary text-base leading-tight" id="headerNombre">Domicilios WIL</p>
+          <span id="adminBadge" class="admin-badge hidden">Admin</span>
+        </div>
+        <div id="headerSubtitle" class="mt-0.5"></div>
+      </div>
+    </div>
+    <div id="statusBadge" class="flex items-center gap-2 px-3 py-1.5 bg-green/10 rounded-full border border-green/20 cursor-pointer" onclick="toggleStatus()">
+      <div class="relative w-2 h-2">
+        <span id="pingDot" class="absolute inset-0 rounded-full bg-green ping-dot"></span>
+        <span class="relative rounded-full w-2 h-2 bg-green block"></span>
+      </div>
+      <span id="statusText" class="text-xs font-bold text-green">En línea</span>
+    </div>
+  </div>
+</header>
+
+<main class="pt-20 max-w-2xl mx-auto px-4" id="mainContent">
+
+<!-- TAB PEDIDOS -->
+<div id="tab-pedidos" class="tab-content active">
+  <div class="mt-4 mb-2">
+    <div class="polling-wrap"><div class="polling-fill" id="pollingFill"></div></div>
+    <div class="flex items-center justify-between mb-3 px-1">
+      <h3 class="font-head text-lg font-extrabold text-primary">Pedidos Nuevos</h3>
+      <span class="text-[10px] font-extrabold text-outline uppercase tracking-widest bg-surf-high px-2.5 py-1 rounded-full" id="contadorPedidos">0 pedidos</span>
+    </div>
+  </div>
+  <div id="listaPedidos" class="space-y-4"></div>
+  <div id="sinPedidos" class="empty-state">
+    <div class="w-20 h-20 rounded-3xl grad-wil flex items-center justify-center shadow-lg">
+      <span class="material-symbols-outlined text-white" style="font-size:36px">delivery_dining</span>
+    </div>
+    <p class="font-head font-bold text-on-surface text-base">Sin pedidos por ahora</p>
+    <p class="text-sm text-on-var max-w-xs">Estás en línea. Los nuevos pedidos aparecen cada 10 segundos.</p>
+  </div>
+</div>
+
+<!-- TAB EN RUTA — Mapa + card del pedido en la pestaña misma -->
+<div id="tab-ruta" class="tab-content" style="padding:0;margin:0">
+  <div id="rutaTabPanel" class="px-3">
+
+    <!-- Sin pedido activo -->
+    <div id="sinPedidoEnRuta" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 24px;text-align:center;gap:14px">
+      <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#006970,#00bcc9);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 32px rgba(0,105,112,.3)">
+        <span style="font-size:38px">🛵</span>
+      </div>
+      <p class="font-head font-bold text-on-surface text-lg">Sin pedido activo</p>
+      <p class="text-sm text-on-var max-w-xs">Acepta un pedido en la pestaña Pedidos y la ruta aparecerá aquí automáticamente.</p>
+    </div>
+
+    <!-- Pedido activo -->
+    <div id="pedidoActivoPanel" style="display:none">
+
+      <!-- MAPA EMBEBIDO -->
+      <div style="border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,105,112,.18);margin-bottom:12px;position:relative;height:270px;background:#1a2a2a">
+        <div id="mapInTab" style="position:absolute;inset:0;width:100%;height:100%;z-index:1"></div>
+        <!-- GPS badge -->
+        <div id="gpsStripTab" style="position:absolute;top:12px;left:12px;z-index:50;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);border-radius:30px;padding:6px 12px 6px 9px;display:flex;align-items:center;gap:7px;box-shadow:0 3px 14px rgba(0,0,0,.18);cursor:pointer" onclick="abrirTrkDrawer()">
+          <div id="gpsDotTab" style="width:9px;height:9px;border-radius:50%;background:#bbc9cb;flex-shrink:0;transition:background .3s"></div>
+          <span style="font-size:11px;font-weight:800;color:#191c1d" id="gpsNombreDomiTab">GPS</span>
+          <span style="font-size:10px;color:#6c7a7b" id="gpsLabelTab">· sin GPS</span>
+        </div>
+        <!-- ETA badge -->
+        <div id="mapEtaBadgeTab" style="position:absolute;bottom:12px;left:12px;z-index:50;background:rgba(0,0,0,.72);backdrop-filter:blur(10px);color:#fff;border-radius:14px;padding:7px 12px;display:none;flex-direction:column;gap:1px;box-shadow:0 4px 16px rgba(0,0,0,.3)">
+          <span style="font-size:9px;font-weight:800;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.05em">ETA</span>
+          <span style="font-size:14px;font-weight:900;color:#fff;font-family:'Plus Jakarta Sans',sans-serif" id="mapEtaValTab">—</span>
+        </div>
+        <!-- Botón centrar -->
+        <button onclick="centrarMapaEnDomi()" style="position:absolute;top:12px;right:12px;z-index:50;width:38px;height:38px;background:rgba(255,255,255,.96);border:none;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.15)">
+          <span class="material-symbols-outlined" style="font-size:18px;color:#006970;font-variation-settings:'FILL' 1">my_location</span>
+        </button>
+      </div>
+
+      <!-- CARD INFO PEDIDO -->
+      <div style="background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 2px 16px rgba(0,105,112,.1);border:1px solid rgba(0,105,112,.08);margin-bottom:12px">
+
+        <!-- Header cliente -->
+        <div style="background:linear-gradient(135deg,#005a60,#007f8c,#00a3b4);padding:14px 16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span id="tabEstadoChip" class="estado-chip" style="background:rgba(255,255,255,.15);color:#fff">
+              <span class="material-symbols-outlined" style="font-size:12px;font-variation-settings:'FILL' 1">notifications_active</span>
+              Confirmado
+            </span>
+            <span style="color:rgba(255,255,255,.7);font-size:11px;font-weight:700" id="tabHoraAceptado">—</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div id="tabAvatar" style="width:44px;height:44px;border-radius:14px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:20px;color:#fff;flex-shrink:0">?</div>
+            <div style="flex:1;min-width:0">
+              <p style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:16px;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="tabCliente">—</p>
+              <p style="font-size:12px;color:rgba(255,255,255,.75);display:flex;align-items:center;gap:4px;margin-top:2px">
+                <span class="material-symbols-outlined" style="font-size:12px">phone</span>
+                <span id="tabTel">—</span>
+              </p>
+            </div>
+            <div style="display:flex;gap:7px;flex-shrink:0">
+              <a id="tabBtnWA" href="#" target="_blank" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;text-decoration:none">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.096.537 4.066 1.479 5.779L0 24l6.432-1.687A11.93 11.93 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.006-1.368l-.36-.214-3.716.975.992-3.625-.235-.373A9.818 9.818 0 1112 21.818z"/></svg>
+              </a>
+              <button onclick="abrirChatCliente()" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative">
+                <span class="material-symbols-outlined text-white" style="font-size:16px;font-variation-settings:'FILL' 1">forum</span>
+                <span id="tabChatBadge" style="position:absolute;top:-3px;right:-3px;min-width:16px;height:16px;background:#f97316;border-radius:99px;border:2px solid rgba(0,90,96,.9);color:#fff;font-size:9px;font-weight:800;display:none;align-items:center;justify-content:center;padding:0 3px">0</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ruta origen → destino -->
+        <div style="padding:12px 14px 0">
+          <div style="background:#f0fff4;border-radius:14px;padding:11px 13px;border:1px solid rgba(42,157,92,.15)">
+            <div style="display:flex;align-items:flex-start;gap:8px">
+              <div style="display:flex;align-items:flex-start;gap:6px;flex:1;min-width:0">
+                <span class="material-symbols-outlined" style="font-size:15px;color:#006970;flex-shrink:0;margin-top:2px;font-variation-settings:'FILL' 1">storefront</span>
+                <div style="min-width:0">
+                  <p style="font-size:9px;font-weight:800;text-transform:uppercase;color:#9eaaac;letter-spacing:.04em">Recoge en</p>
+                  <p style="font-size:12px;font-weight:700;color:#191c1d;word-break:break-word;line-height:1.3" id="tabOrigen">—</p>
+                </div>
+              </div>
+              <span class="material-symbols-outlined" style="font-size:18px;color:#bbc9cb;flex-shrink:0;margin-top:8px">arrow_forward</span>
+              <div style="display:flex;align-items:flex-start;gap:6px;flex:1;min-width:0">
+                <span class="material-symbols-outlined" style="font-size:15px;color:#4c56af;flex-shrink:0;margin-top:2px;font-variation-settings:'FILL' 1">location_on</span>
+                <div style="min-width:0">
+                  <p style="font-size:9px;font-weight:800;text-transform:uppercase;color:#9eaaac;letter-spacing:.04em">Entrega en</p>
+                  <p style="font-size:12px;font-weight:700;color:#191c1d;word-break:break-word;line-height:1.3" id="tabDestino">—</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Totales -->
+        <div style="display:flex;gap:8px;padding:10px 14px 0">
+          <div style="flex:1;background:#f3f4f5;border-radius:12px;padding:9px;text-align:center">
+            <p style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase">Total</p>
+            <p style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:900;font-size:15px;color:#006970" id="tabTotal">—</p>
+          </div>
+          <div style="flex:1;background:#f3f4f5;border-radius:12px;padding:9px;text-align:center">
+            <p style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase">Pago</p>
+            <p style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:11px;color:#191c1d" id="tabPago">—</p>
+          </div>
+          <div style="flex:1;background:#f3f4f5;border-radius:12px;padding:9px;text-align:center">
+            <p style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase">ETA</p>
+            <p style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:11px;color:#006970" id="tabEta">—</p>
+          </div>
+        </div>
+
+        <!-- Productos -->
+<div style="padding:10px 14px 0" id="tabProductosWrap">
+  <div style="background:#f0fff4;border-radius:14px;padding:10px 13px;border:1px solid rgba(42,157,92,.15)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#9eaaac">💊 Productos del pedido</p>
+      <span style="font-size:9px;font-weight:800;background:#e8f5e9;color:#2a9d5c;padding:2px 8px;border-radius:20px" id="tabProdCount"></span>
+    </div>
+    <div id="tabProductosList" class="prod-list"></div>
+
+    <!-- Subtotal + domicilio + total -->
+    <div id="tabResumenTotal" style="display:none;margin-top:10px;border-top:1px solid rgba(42,157,92,.2);padding-top:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-size:11px;color:#6c7a7b;font-weight:600">Subtotal productos</span>
+        <span style="font-size:11px;font-weight:800;color:#191c1d" id="tabSubtotal">—</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:11px;color:#6c7a7b;font-weight:600">🛵 Domicilio</span>
+        <span style="font-size:11px;font-weight:800;color:#191c1d" id="tabCostoDomi">—</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,105,112,.08);border-radius:10px;padding:8px 10px">
+        <span style="font-size:13px;font-weight:800;color:#006970;font-family:'Plus Jakarta Sans',sans-serif">TOTAL</span>
+        <span style="font-size:16px;font-weight:900;color:#006970;font-family:'Plus Jakarta Sans',sans-serif" id="tabTotalProd">—</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+        <!-- STEPPER -->
+        <div class="step-track" id="tabStepper">
+          <div style="display:flex;flex-direction:column;align-items:center">
+            <div id="tab_step1Icon" style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #2a9d5c;background:#2a9d5c;position:relative;z-index:2">
+              <span class="material-symbols-outlined" style="font-size:15px;color:#fff;font-variation-settings:'FILL' 1">check_circle</span>
+            </div>
+            <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#2a9d5c;margin-top:4px;text-align:center">Aceptado</div>
+            <div style="font-size:8px;color:#9eaaac;text-align:center;margin-top:1px" id="tab_step1Time">—</div>
+          </div>
+          <div id="tab_line1" class="step-line" style="background:linear-gradient(90deg,#006970,#2a9d5c)"></div>
+          <div style="display:flex;flex-direction:column;align-items:center">
+            <div id="tab_step2Icon" style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #e7e8e9;background:#f3f4f5;position:relative;z-index:2;transition:all .35s">
+              <span class="material-symbols-outlined" style="font-size:15px;color:#c4cdd0;font-variation-settings:'FILL' 1">two_wheeler</span>
+            </div>
+            <div id="tab_step2Label" style="font-size:9px;font-weight:800;text-transform:uppercase;color:#c4cdd0;margin-top:4px;text-align:center">En camino</div>
+            <div style="font-size:8px;color:#9eaaac;text-align:center;margin-top:1px" id="tab_step2Time">Pendiente</div>
+          </div>
+          <div id="tab_line2" class="step-line"></div>
+          <div style="display:flex;flex-direction:column;align-items:center">
+            <div id="tab_step3Icon" style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #e7e8e9;background:#f3f4f5;position:relative;z-index:2;transition:all .35s">
+              <span class="material-symbols-outlined" style="font-size:15px;color:#c4cdd0;font-variation-settings:'FILL' 1">home</span>
+            </div>
+            <div id="tab_step3Label" style="font-size:9px;font-weight:800;text-transform:uppercase;color:#c4cdd0;margin-top:4px;text-align:center">Entregado</div>
+            <div style="font-size:8px;color:#9eaaac;text-align:center;margin-top:1px" id="tab_step3Time"></div>
+          </div>
+        </div>
+
+        
+
+        <!-- PASO A PASO INLINE -->
+<div id="inlineStepBtns" style="padding:10px 14px 16px;display:flex;flex-direction:column;gap:8px">
+
+  <!-- Paso 1: Ponerte en camino -->
+  <button id="btnEnCamino" onclick="marcarEncamino()"
+    style="width:100%;padding:13px;background:linear-gradient(135deg,#7c3aed,#8b5cf6);
+    color:#fff;border:none;border-radius:16px;font-family:'Plus Jakarta Sans',sans-serif;
+    font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;
+    justify-content:center;gap:8px;box-shadow:0 4px 18px rgba(124,58,237,.35)">
+    <span class="material-symbols-outlined text-white"
+      style="font-size:17px;font-variation-settings:'FILL' 1">two_wheeler</span>
+    Ponerte en camino
+  </button>
+
+  <!-- Paso 2: Confirmar entrega -->
+  <button id="btnEntregado" onclick="marcarEntregado()"
+    style="width:100%;padding:13px;background:linear-gradient(135deg,#1a7a3a,#2a9d5c);
+    color:#fff;border:none;border-radius:16px;font-family:'Plus Jakarta Sans',sans-serif;
+    font-weight:800;font-size:13px;cursor:pointer;display:none;align-items:center;
+    justify-content:center;gap:8px;box-shadow:0 4px 18px rgba(42,157,92,.35)">
+    <span class="material-symbols-outlined text-white"
+      style="font-size:17px;font-variation-settings:'FILL' 1">check_circle</span>
+    Confirmar entrega
+  </button>
+
+  <!-- Cancelar siempre visible -->
+  <button id="btnCancelarPed" onclick="cancelarPedidoActivo()"
+    style="width:100%;padding:10px;background:rgba(186,26,26,.07);color:#ba1a1a;
+    border:1.5px solid rgba(186,26,26,.2);border-radius:14px;
+    font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:12px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:7px">
+    <span class="material-symbols-outlined" style="font-size:15px;font-variation-settings:'FILL' 1">cancel</span>
+    Cancelar pedido
+  </button>
+</div>
+        </div>
+
+        
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB HISTORIAL -->
+<div id="tab-historial" class="tab-content">
+<div class="mt-4">
+  <h3 class="font-head text-lg font-extrabold text-primary mb-4">Mis Entregas</h3>
+  <div class="flex gap-2 mb-4 overflow-x-auto pb-1">
+  <button onclick="setFiltroHist(this,'todos')"      class="filtro-btn flex-shrink-0 px-4 py-2 bg-primary text-white text-xs font-bold rounded-full">Todos</button>
+  <button onclick="setFiltroHist(this,'hoy')"        class="filtro-btn flex-shrink-0 px-4 py-2 bg-surf-high text-on-var text-xs font-bold rounded-full">Hoy</button>
+  <button onclick="setFiltroHist(this,'semana')"     class="filtro-btn flex-shrink-0 px-4 py-2 bg-surf-high text-on-var text-xs font-bold rounded-full">Esta semana</button>
+  <button onclick="setFiltroHist(this,'entregados')" class="filtro-btn flex-shrink-0 px-4 py-2 bg-surf-high text-on-var text-xs font-bold rounded-full">✅ Entregados</button>
+  <button onclick="setFiltroHist(this,'cancelados')" class="filtro-btn flex-shrink-0 px-4 py-2 bg-surf-high text-on-var text-xs font-bold rounded-full">❌ Cancelados</button>
+</div>
+  <div class="flex gap-3 mb-5">
+    <div class="flex-1 bg-surf-white rounded-2xl p-3 shadow-sm border border-out-var/10 text-center">
+      <p class="font-head font-extrabold text-xl text-primary" id="histTotalEntregas">0</p>
+      <p class="text-[9px] text-on-var font-bold uppercase tracking-wide">Entregas</p>
+    </div>
+    <div class="flex-1 bg-surf-white rounded-2xl p-3 shadow-sm border border-out-var/10 text-center">
+      <p class="font-head font-extrabold text-xl text-primary" id="histEntHoy">0</p>
+      <p class="text-[9px] text-on-var font-bold uppercase tracking-wide">Hoy</p>
+    </div>
+    <div class="flex-1 bg-surf-white rounded-2xl p-3 shadow-sm border border-out-var/10 text-center">
+      <p class="font-head font-extrabold text-xl text-primary" id="histCalHoy">—</p>
+      <p class="text-[9px] text-on-var font-bold uppercase tracking-wide">★ Prom.</p>
+    </div>
+  </div>
+  <div id="listaHistorial" class="space-y-3"></div>
+  <div id="sinHistorial" class="empty-state">
+    <div class="w-16 h-16 rounded-2xl bg-surf-high flex items-center justify-center">
+      <span class="material-symbols-outlined text-outline" style="font-size:32px">history</span>
+    </div>
+    <p class="font-head font-bold text-base">Sin entregas aún</p>
+    <p class="text-sm text-on-var">Las entregas completadas aparecerán aquí.</p>
+  </div>
+</div>
+</div>
+
+<!-- TAB PERFIL -->
+<div id="tab-perfil" class="tab-content">
+<div class="mt-4">
+  <div class="grad-wil rounded-3xl p-6 text-white shadow-xl mb-5 relative overflow-hidden">
+    <div class="flex items-center gap-4 relative z-10">
+      <div id="perfilFotoWrap"><span id="perfilFotoInitial" class="font-head font-extrabold text-3xl text-white w-full h-full flex items-center justify-center">🛵</span></div>
+      <div>
+        <div class="flex items-center gap-2 mb-1">
+          <h2 class="font-head font-extrabold text-xl leading-tight" id="perfilNombre">—</h2>
+          <span id="perfilAdminBadge" class="admin-badge hidden">Admin</span>
+        </div>
+        <p class="text-sm opacity-85 mb-2" id="perfilRol">Domiciliario WIL</p>
+        <div class="flex items-center gap-1 bg-white/15 rounded-full px-3 py-1 w-fit">
+          <span class="material-symbols-outlined text-amber-300" style="font-size:14px;font-variation-settings:'FILL' 1">star</span>
+          <span class="text-sm font-extrabold" id="perfilCalif">—</span>
+          <span class="text-xs opacity-75" id="perfilEntregas">· 0 entregas</span>
+        </div>
+      </div>
+    </div>
+    <div class="absolute -right-8 -bottom-8 w-36 h-36 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+  </div>
+  <div class="bg-surf-white rounded-2xl shadow-sm border border-out-var/10 divide-y divide-out-var/10 mb-4 overflow-hidden">
+    <div class="flex items-center gap-3 p-4">
+      <span class="material-symbols-outlined text-primary" style="font-size:20px;font-variation-settings:'FILL' 1">phone</span>
+      <div><p class="text-[10px] text-on-var font-semibold uppercase tracking-wider">Teléfono</p><p class="text-sm font-bold" id="perfilTel">—</p></div>
+    </div>
+    <div class="flex items-center gap-3 p-4">
+      <span class="material-symbols-outlined text-primary" style="font-size:20px;font-variation-settings:'FILL' 1">badge</span>
+      <div><p class="text-[10px] text-on-var font-semibold uppercase tracking-wider">ID</p><p class="text-sm font-bold" id="perfilId">—</p></div>
+    </div>
+  </div>
+  <div class="grid grid-cols-2 gap-3 mb-5">
+    <div class="bg-surf-white rounded-2xl p-4 shadow-sm border border-out-var/10 text-center">
+      <p class="font-head font-extrabold text-2xl text-primary" id="statEntregas">0</p>
+      <p class="text-[10px] text-on-var font-semibold uppercase tracking-wide mt-1">Entregas totales</p>
+    </div>
+    <div class="bg-surf-white rounded-2xl p-4 shadow-sm border border-out-var/10 text-center">
+      <p class="font-head font-extrabold text-2xl text-primary" id="statCalif">—</p>
+      <p class="text-[10px] text-on-var font-semibold uppercase tracking-wide mt-1">Calificación ★</p>
+    </div>
+    <div class="bg-surf-white rounded-2xl p-4 shadow-sm border border-out-var/10 text-center">
+      <p class="font-head font-extrabold text-2xl text-primary" id="statHoy">0</p>
+      <p class="text-[10px] text-on-var font-semibold uppercase tracking-wide mt-1">Entregas hoy</p>
+    </div>
+    <div class="bg-surf-white rounded-2xl p-4 shadow-sm border border-out-var/10 text-center">
+      <p class="font-head font-extrabold text-2xl text-primary" id="statAceptacion">—</p>
+      <p class="text-[10px] text-on-var font-semibold uppercase tracking-wide mt-1">% Aceptación</p>
+    </div>
+  </div>
+  <button onclick="cerrarSesion()" class="w-full py-4 bg-red/10 text-red font-head font-bold text-sm rounded-2xl border border-red/20 active:scale-95 transition-transform flex items-center justify-center gap-2 mb-2">
+    <span class="material-symbols-outlined" style="font-size:18px">logout</span>Cerrar sesión
+  </button>
+</div>
+</div>
+
+</main>
+
+<!-- BOTTOM NAV -->
+<nav class="fixed bottom-0 left-0 w-full z-50 glass border-t border-out-var/20 rounded-t-3xl" style="padding-bottom:env(safe-area-inset-bottom)">
+  <div class="max-w-2xl mx-auto flex justify-around items-center px-4 py-3">
+    <button onclick="switchTab('pedidos')" id="nav-pedidos" class="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl bg-primary/10 text-primary transition-all relative">
+      <span class="material-symbols-outlined" style="font-size:22px;font-variation-settings:'FILL' 1">pending_actions</span>
+      <span class="text-[10px] font-extrabold uppercase tracking-wider">Pedidos</span>
+      <span id="navBadge" class="nav-badge-num" style="background:#ba1a1a">0</span>
+    </button>
+    <button onclick="switchTab('ruta')" id="nav-ruta" class="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl text-outline transition-all relative">
+      <span class="material-symbols-outlined" style="font-size:22px">two_wheeler</span>
+      <span class="text-[10px] font-extrabold uppercase tracking-wider">En Ruta</span>
+      <span id="navRutaBadge" class="nav-badge-num" style="background:#f59e0b">0</span>
+    </button>
+    <button onclick="switchTab('historial')" id="nav-historial" class="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl text-outline transition-all relative">
+      <span class="material-symbols-outlined" style="font-size:22px">history</span>
+      <span class="text-[10px] font-extrabold uppercase tracking-wider">Historial</span>
+      <span id="navHistBadge" class="nav-badge-num" style="background:#006970">0</span>
+    </button>
+    <button onclick="switchTab('perfil')" id="nav-perfil" class="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl text-outline transition-all">
+      <span class="material-symbols-outlined" style="font-size:22px">person</span>
+      <span class="text-[10px] font-extrabold uppercase tracking-wider">Perfil</span>
+    </button>
+   
+  </div>
+</nav>
+
+<!-- TRACKER FLOAT BTN (solo en tab ruta) -->
+<div id="trkFloatBtn" onclick="abrirTrkDrawer()">
+  <span class="material-symbols-outlined text-white" style="font-size:20px;font-variation-settings:'FILL' 1">cloud_upload</span>
+  <div id="trkFloatDot"></div>
+</div>
+
+<!-- DRAWER TRACKER -->
+<div id="trkDrawerOverlay" onclick="if(event.target===this)cerrarTrkDrawer()">
+  <div id="trkDrawer">
+    <div class="drw-handle"></div>
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined text-primary" style="font-size:20px;font-variation-settings:'FILL' 1">cloud_upload</span>
+        <p class="font-head font-extrabold text-primary text-base">Tracker GPS</p>
+      </div>
+      <button onclick="cerrarTrkDrawer()" class="w-8 h-8 rounded-full bg-surf-high flex items-center justify-center">
+        <span class="material-symbols-outlined text-outline" style="font-size:16px">close</span>
+      </button>
+    </div>
+    <div class="bg-surf-low rounded-2xl p-4 mb-3 flex items-center justify-between gap-4">
+      <div>
+        <p class="font-head font-bold text-on-surface text-sm" id="trkDrawerLbl">Compartir ubicación</p>
+        <p class="text-xs text-on-var" id="trkDrawerSub">Activa para ser visible en el mapa</p>
+      </div>
+      <div id="trkToggleTrack2" class="trk-toggle-track off flex-shrink-0" style="cursor:pointer" onclick="trkToggle()">
+        <div class="trk-toggle-thumb"></div>
+      </div>
+    </div>
+    <div class="bg-surf-white rounded-2xl p-4 shadow-sm border border-out-var/10 mb-3">
+      <div class="flex items-center gap-3 mb-3">
+        <div id="trkGpsDot2" class="w-3 h-3 rounded-full bg-out-var" style="flex-shrink:0"></div>
+        <p class="text-xs font-bold text-on-surface truncate flex-1" id="trkGpsTxt2">Esperando GPS…</p>
+        <span class="text-[10px] font-extrabold text-outline bg-surf-high px-2 py-0.5 rounded-full hidden" id="trkAccTag2"></span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined text-outline" style="font-size:14px">sync</span>
+        <div><p class="text-[9px] font-extrabold text-outline uppercase tracking-wider">Última sync</p>
+          <p class="text-sm font-extrabold text-on-surface font-head" id="trkUltSync2">—</p></div>
+      </div>
+    </div>
+    <div class="bg-surf-white rounded-2xl p-4 shadow-sm border border-out-var/10">
+      <p class="text-[9px] font-extrabold text-outline uppercase tracking-widest mb-2">Actividad reciente</p>
+      <div class="trk-log-scroll space-y-1" id="trkLogList">
+        <div class="flex gap-2 items-start">
+          <span class="text-[10px] text-outline flex-shrink-0 mt-0.5 font-mono">—</span>
+          <span class="text-[11px] text-on-var">Esperando activación…</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SHARE LOC POPUP -->
+<div id="shareLocOverlay" onclick="if(event.target===this)cerrarShareLoc()">
+  <div style="width:100%;max-width:520px;background:#fff;border-radius:28px 28px 0 0;padding:20px 20px calc(24px + env(safe-area-inset-bottom));box-shadow:0 -8px 40px rgba(0,0,0,.2);animation:slideUp .3s cubic-bezier(.22,1,.36,1)">
+    <div style="width:36px;height:4px;background:#e0e4e6;border-radius:4px;margin:0 auto 16px"></div>
+    <div class="flex items-center gap-2 mb-5">
+      <span class="material-symbols-outlined text-primary" style="font-size:22px;font-variation-settings:'FILL' 1">location_on</span>
+      <p class="font-head font-extrabold text-primary text-base">Compartir ubicación</p>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:#f3f4f5;border-radius:18px;padding:14px 16px;margin-bottom:14px">
+      <div>
+        <p class="font-head font-bold text-on-surface text-sm" id="shareToggleLbl">Ubicación desactivada</p>
+        <p class="text-xs text-on-var" id="shareToggleSub">Activa para ser visible</p>
+      </div>
+      <div id="shareToggleTrack" onclick="trkToggle()" style="width:52px;height:29px;border-radius:999px;position:relative;cursor:pointer;transition:.25s;flex-shrink:0;background:#bbc9cb">
+        <div id="shareToggleThumb" style="position:absolute;top:3px;left:3px;width:23px;height:23px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.22);transition:.25s"></div>
+      </div>
+    </div>
+    <div style="background:#f8f9fa;border-radius:16px;padding:13px 15px;border:1px solid #e7e8e9;margin-bottom:12px">
+      <div class="flex items-center gap-2 mb-2">
+        <div style="width:10px;height:10px;border-radius:50%;background:#bbc9cb;flex-shrink:0" id="shareGpsDot"></div>
+        <span class="text-xs font-bold text-on-surface flex-1" id="shareGpsTxt">Sin señal GPS</span>
+      </div>
+      <p class="text-[10px] text-on-var leading-relaxed">Tu ubicación se mantiene activa aunque recargues.</p>
+    </div>
+  </div>
+</div>
+
+<!-- CHAT POPUP -->
+<div id="chatOverlay" onclick="if(event.target===this)minimizarChat()">
+  <div id="chatPopup">
+    <div id="chatPopupHeader">
+      <div id="chatPopupAvatarWrap">
+        <span id="chatPopupAvatarInitial">?</span>
+        <div class="chat-status-dot offline" id="chatStatusDot"></div>
+      </div>
+      <div class="flex-1" style="min-width:0">
+        <p style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:15px;color:#fff;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="chatPopupNombre">Cliente</p>
+        <p style="font-size:11px;color:rgba(255,255,255,.75);display:flex;align-items:center;gap:5px">
+          <span id="chatPopupTel">—</span>
+          <span id="chatOnlineLabel" style="display:none;background:rgba(74,222,128,.25);color:#a7f3d0;font-size:9px;font-weight:800;padding:1px 7px;border-radius:20px">EN LÍNEA</span>
+        </p>
+      </div>
+      <a id="chatCallBtn" href="#" style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;margin-right:5px;flex-shrink:0;text-decoration:none">
+        <span class="material-symbols-outlined text-white" style="font-size:17px;font-variation-settings:'FILL' 1">phone</span>
+      </a>
+      <button onclick="minimizarChat()" style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.15);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <span class="material-symbols-outlined text-white" style="font-size:18px">keyboard_arrow_down</span>
+      </button>
+    </div>
+    <div id="chatPedidoInfo">
+      <p style="font-size:10px;font-weight:800;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.05em;margin-bottom:1px">Pedido activo</p>
+      <p style="font-size:12px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="chatPedidoResumen">—</p>
+    </div>
+    <div id="chatPopupMsgs"><div class="chat-date-sep"><span>Hoy</span></div></div>
+    <div id="chatTypingIndicator">
+      <div class="chat-mini-avatar" id="chatTypingAvatar">?</div>
+      <div style="background:#fff;border-radius:16px;padding:9px 13px;display:flex;gap:4px;box-shadow:0 1px 4px rgba(0,0,0,.07)">
+        <div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>
+      </div>
+    </div>
+    <div id="chatPopupInputRow">
+      <div class="chat-mini-domi" id="chatDomiMiniAvatar"></div>
+      <button class="chat-media-btn" onclick="document.getElementById('chatImgInput').click()">
+        <span class="material-symbols-outlined" style="font-size:20px;color:#6c7a7b;font-variation-settings:'FILL' 1">image</span>
+      </button>
+      <input id="chatImgInput" type="file" accept="image/*">
+      <textarea id="chatPopupInput" rows="1" placeholder="Escribe un mensaje…"
+        oninput="autoResizeTA(this);toggleSendBtn()"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviarMensajePopup()}"></textarea>
+      <button id="chatPopupSendBtn" onclick="enviarMensajePopup()" disabled>
+        <span class="material-symbols-outlined text-white" style="font-size:19px;font-variation-settings:'FILL' 1">send</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- FLOAT WAZE BTN -->
+<button id="wazeFloatBtn" onclick="abrirNavegacion()"
+  style="position:fixed;bottom:104px;right:16px;z-index:492;width:60px;height:60px;
+  border-radius:50%;background:linear-gradient(135deg,#00aaff,#006fff);border:none;
+  cursor:pointer;display:none;align-items:center;justify-content:center;
+  box-shadow:0 5px 24px rgba(0,110,255,.45);transition:transform .18s">
+  <svg width="30" height="30" viewBox="0 0 64 64" fill="white">
+    <path d="M32 4C17.6 4 6 15.6 6 30c0 8.4 3.9 15.9 10 20.7V58l8-6.4c2.6.6 5.2.9 8 .9
+      14.4 0 26-11.6 26-26S46.4 4 32 4z"/>
+    <circle cx="24" cy="30" r="3" fill="#00aaff"/>
+    <circle cx="40" cy="30" r="3" fill="#00aaff"/>
+    <path d="M22 38s4 6 10 6 10-6 10-6" stroke="#00aaff"
+      stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  </svg>
+</button>
+
+
+<!-- PANEL NAVEGACIÓN FLOTANTE -->
+<div id="navPanel">
+  <div style="display:flex;align-items:center;gap:11px">
+    <div id="navIcono" style="font-size:32px;line-height:1;flex-shrink:0">⬆️</div>
+    <div style="flex:1;min-width:0">
+      <div id="navInstruccion" style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:15px;color:#fff;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Calculando ruta…</div>
+      <div id="navCalle" style="font-size:11px;color:rgba(255,255,255,.6);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:1px;flex-shrink:0">
+      <div id="navDistSig" style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:900;font-size:18px;color:#00e5f0">—</div>
+      <div style="font-size:9px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.05em">próx.</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px">
+    <div style="flex:1;background:rgba(255,255,255,.08);border-radius:12px;padding:7px 10px;text-align:center">
+      <div id="navEtaMin" style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:900;font-size:15px;color:#fff">—</div>
+      <div style="font-size:9px;color:rgba(255,255,255,.5);text-transform:uppercase">ETA</div>
+    </div>
+    <div style="flex:1;background:rgba(255,255,255,.08);border-radius:12px;padding:7px 10px;text-align:center">
+      <div id="navDistTotal" style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:900;font-size:15px;color:#fff">—</div>
+      <div style="font-size:9px;color:rgba(255,255,255,.5);text-transform:uppercase">Distancia</div>
+    </div>
+    <button onclick="detenerNavegacion()" style="padding:7px 14px;background:rgba(186,26,26,.7);border:none;border-radius:12px;color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:11px;cursor:pointer">✕ Parar</button>
+  </div>
+  <div id="navProximoPaso" style="background:rgba(255,255,255,.06);border-radius:12px;padding:7px 11px;font-size:11px;color:rgba(255,255,255,.55);display:none">
+    <span id="navProxIcono"></span> <span id="navProxTexto"></span>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════ CONFIG ═══════════════════ */
+var API_BASE      = '/api';
+var POLL_INTERVAL = 10000;
+var ADMIN_IDS     = ['WIL-009','WIL-010'];
+var ANCLA_LAT     = 6.3460765;
+var ANCLA_LNG     = -75.5083194;
+var TZ            = 'America/Bogota';
+var OSRM_BASE     = 'https://router.project-osrm.org/route/v1/driving/';
+var _tabRouteLayer  = null;
+var _tabRouteGlow   = null;
+
+const SHEET_ID_DOMI   = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+const SCRIPT_URL_DOMI = 'https://script.google.com/macros/s/AKfycbzPriKpQz0jI9AaYtylsDR_b5oRwMym0rM-dwQKAnjeqhEyxg4HhQ6MBGN_95U4PYJ6tA/exec';
+var _idsAsignadosNotificados = new Set(); // solo RAM, se resetea al reabrir ✓
+function _guardarIdsNotif() { /* sin localStorage */ }
+
+function horaAhora(){
+  return new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:TZ});
+}
+function escHtml(t){return(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');}
+
+/* Fila de ticket profesional */
+function renderFilaProducto(pr, i) {
+  var marcaHtml = pr.marca ? '<div class="ticket-row-marca">' + escHtml(pr.marca) + '</div>' : '';
+  var vuHtml = (pr.vu > 0 && parseInt(pr.qty || 1) > 1)
+    ? '<div class="ticket-row-vu">c/u ' + fmtCOP(pr.vu) + '</div>'
+    : '';
+  return '<div class="ticket-row">'
+    + '<div><div class="ticket-row-nombre">' + escHtml(pr.nombre) + '</div>' + marcaHtml + '</div>'
+    + '<div class="ticket-row-qty">' + escHtml(pr.qty || '1') + '</div>'
+    + '<div><div class="ticket-row-precio">' + (pr.precio || '—') + '</div>' + vuHtml + '</div>'
+    + '</div>';
+}
+
+
+function parseCOP(v){
+  if(!v && v!==0) return 0;
+  var s = String(v).trim().replace(/[^0-9.,]/g,'');
+  if(!s) return 0;
+  var puntos = (s.match(/\./g)||[]).length;
+  var comas  = (s.match(/,/g)||[]).length;
+  var n;
+  if(puntos > 1)                   n = parseFloat(s.replace(/\./g,''));
+  else if(comas > 1)               n = parseFloat(s.replace(/,/g,''));
+  else if(puntos===1 && comas===1) n = parseFloat(s.replace('.','').replace(',','.'));
+  else if(puntos===1 && comas===0){
+    var pa = s.split('.');
+    n = (pa[1] && pa[1].length===3) ? parseFloat(s.replace('.','')) : parseFloat(s);
+  }
+  else if(comas===1 && puntos===0){
+    var pb = s.split(',');
+    n = (pb[1] && pb[1].length===3) ? parseFloat(s.replace(',','')) : parseFloat(s.replace(',','.'));
+  }
+  else n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
+function fmtCOP(n){
+  var num = Math.round(parseCOP(String(n)));
+  if(!num) return '';
+  return '$' + num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+
+
+/* ═══════════════════ SESIÓN ═══════════════════ */
+// DESPUÉS
+var domi=(function(){
+  // Buscar en localStorage primero (persiste entre sesiones)
+  var s = localStorage.getItem('wil_domi');
+  // Migrar desde sessionStorage si existe
+  if(!s){
+    s = sessionStorage.getItem('wil_domi');
+    if(s){
+      // Migrar a localStorage para que persista
+      localStorage.setItem('wil_domi', s);
+      sessionStorage.removeItem('wil_domi');
+    }
+  }
+  if(!s){ window.location.replace('domi-login.html'); return null; }
+  try{
+    return JSON.parse(s);
+  }catch(e){
+    localStorage.removeItem('wil_domi');
+    window.location.replace('domi-login.html');
+    return null;
+  }
+})();
+
+if(!domi)throw new Error('Sin sesión');
+var esAdmin=ADMIN_IDS.includes((domi.id||'').toUpperCase());
+
+/* HEADER */
+if(domi.foto&&domi.foto.trim()!==''){
+  var _fs=domi.foto.trim().startsWith('http')?domi.foto.trim():'icons/'+domi.foto.trim();
+  var _ie=document.getElementById('headerFotoImg');
+  _ie.src=_fs;_ie.onerror=function(){this.src='icons/icon-192.png';};
+}
+if(esAdmin){
+  document.getElementById('headerNombre').textContent='¡Hola,'+(domi.nombre||'Admin').split(' ')[0]+'!';
+  document.getElementById('adminBadge').classList.remove('hidden');
+  document.getElementById('headerSubtitle').innerHTML='<span class="admin-dt-card" id="adminDtCard">cargando…</span>';
+  function adt(){var e=document.getElementById('adminDtCard');if(e)e.textContent=new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:TZ});}
+  adt();setInterval(adt,1000);
+}else{
+  document.getElementById('headerNombre').textContent=domi.nombre||'WIL';
+  document.getElementById('headerSubtitle').innerHTML='<p class="text-[10px] font-semibold text-on-var leading-none">Panel Domiciliario</p>';
+}
+
+/* ═══════════════════ ESTADO GLOBAL ═══════════════════ */
+var state={online:true,pedidos:[],pedidoActivo:null,estadoPedido:null,historial:[]};
+var idsProcesados=new Set();
+var pollingTimer=null,pollingBarTimer=null;
+var filtroHist='todos';
+var destLatGlobal=null,destLngGlobal=null;
+var currentTab='pedidos';
+var stepState=0;
+
+/* ═══════════════════ MAPA LEAFLET (solo ubicación domi) ═══════════════════ */
+var _tabMap=null, _tabMapInit=false;
+var _tabDomiMarker=null, _tabDestMarker=null;
+var _tabMapInterval=null;
+
+function iconDomi(nombre, live){
+  var nm = nombre ? nombre.split(' ')[0] : 'WIL';
+  var pulseClass = live ? 'moto-marker-pulse' : 'moto-ancla-pulse';
+  var ring = live ? 'border:3px solid rgba(0,188,200,.9);' : 'border:3px solid rgba(180,200,200,.5);';
+  var bg = live ? 'background:linear-gradient(135deg,#005a60,#00a3b4);' : 'background:linear-gradient(135deg,#2c5e5e,#4a8a8a);';
+  var label = live ? 'background:#006970;color:#fff;border:1px solid rgba(255,255,255,.4);' : 'background:#4a8a8a;color:#e0f7f7;border:1px solid rgba(255,255,255,.2);';
+  return L.divIcon({
+    className:'',
+    html:'<div style="position:relative;display:flex;flex-direction:column;align-items:center">'
+      +'<div class="'+pulseClass+'" style="width:44px;height:44px;border-radius:50%;'+bg+ring
+      +'box-shadow:0 4px 18px rgba(0,105,112,.55);display:flex;align-items:center;justify-content:center;font-size:22px">🛵</div>'
+      +'<div style="margin-top:3px;'+label+'font-family:\'Plus Jakarta Sans\',sans-serif;font-size:9px;font-weight:800;padding:1px 7px;border-radius:10px;white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis">'
+      +escHtml(nm)+(live?'':' 📍')+'</div></div>',
+    iconSize:[50,65], iconAnchor:[25,65]
+  });
+}
+
+function iconDest(cn){
+  var ini = (cn && cn!=='—') ? cn.charAt(0).toUpperCase() : 'C';
+  return L.divIcon({
+    className:'',
+    html:'<div style="display:flex;flex-direction:column;align-items:center">'
+      +'<div style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#4c56af,#7c83d6);border:3px solid #fff;'
+      +'box-shadow:0 4px 18px rgba(76,86,175,.5);display:flex;align-items:center;justify-content:center;'
+      +'font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:17px;color:#fff;">'
+      +escHtml(ini)+'</div>'
+      +'<div style="width:3px;height:12px;background:linear-gradient(#4c56af,transparent);margin-top:-2px;border-radius:2px"></div>'
+      +'</div>',
+    iconSize:[42,56], iconAnchor:[21,56]
+  });
+}
+
+function iniciarTabMap(){
+  if(_tabMapInit) return;
+  var mapDiv = document.getElementById('mapInTab');
+  if(!mapDiv) return;
+
+  _tabMap = L.map('mapInTab', {
+    zoomControl: false,
+    attributionControl: true,
+    maxZoom: 19, minZoom: 10
+  }).setView([ANCLA_LAT, ANCLA_LNG], 15);
+
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© <a href="https://www.openstreetmap.org/copyright">OSM</a>',
+    maxZoom: 19
+  }).addTo(_tabMap);
+
+  L.control.zoom({position:'bottomright'}).addTo(_tabMap);
+
+  _tabDomiMarker = L.marker([ANCLA_LAT, ANCLA_LNG],{
+    icon: iconDomi(domi ? domi.nombre : 'WIL', false),
+    zIndexOffset: 1000
+  }).addTo(_tabMap);
+
+  _tabMapInit = true;
+
+  if(TRK.activo && TRK.lat){
+    _tabDomiMarker.setLatLng([TRK.lat, TRK.lng]);
+    _tabDomiMarker.setIcon(iconDomi(domi ? domi.nombre : 'WIL', true));
+    _tabMap.setView([TRK.lat, TRK.lng], 16);
+  }
+}
+
+async function dibujarRutaOSRM(oriLat, oriLng, destLat, destLng) {
+  if (!_tabMap) return;
+  /* Limpiar capa anterior */
+  if (_tabRouteLayer) { _tabMap.removeLayer(_tabRouteLayer); _tabRouteLayer = null; }
+  if (_tabRouteGlow)  { _tabMap.removeLayer(_tabRouteGlow);  _tabRouteGlow  = null; }
+
+  try {
+    var url = OSRM_BASE + oriLng + ',' + oriLat + ';'
+            + destLng  + ',' + destLat
+            + '?overview=full&geometries=geojson&steps=true';
+    var r    = await fetch(url, { signal: AbortSignal.timeout(9000) });
+    var data = await r.json();
+    if (!data.routes || !data.routes[0]) throw new Error('sin_ruta');
+
+    var route  = data.routes[0];
+    var coords = route.geometry.coordinates.map(function(c){ return [c[1], c[0]]; });
+
+    /* Capa glow (halo verde claro) */
+    _tabRouteGlow = L.polyline(coords, {
+      color:'#00bcc9', weight:10, opacity:.22,
+      lineJoin:'round', lineCap:'round'
+    }).addTo(_tabMap);
+
+    /* Capa principal */
+    _tabRouteLayer = L.polyline(coords, {
+      color:'#006970', weight:5, opacity:.92,
+      lineJoin:'round', lineCap:'round'
+    }).addTo(_tabMap);
+
+    var etaMin = Math.max(1, Math.round(route.duration / 60));
+    var distKm = (route.distance / 1000).toFixed(1);
+
+    var etaEl    = document.getElementById('mapEtaValTab');
+    var etaBadge = document.getElementById('mapEtaBadgeTab');
+    if (etaEl)    etaEl.textContent = '~' + etaMin + ' min · ' + distKm + ' km';
+    if (etaBadge) etaBadge.style.display = 'flex';
+    var tabEtaEl = document.getElementById('tabEta');
+    if (tabEtaEl) tabEtaEl.textContent = '~' + etaMin + ' min';
+
+    /* Guardar pasos OSRM para navegación turn-by-turn */
+    if (route.legs && route.legs[0] && route.legs[0].steps) {
+      _navPasos = route.legs[0].steps;
+      _navPasoIdx = 0;
+    }
+
+    _tabMap.fitBounds(_tabRouteLayer.getBounds(), { padding:[52,52] });
+
+  } catch(e) {
+    /* Fallback línea punteada */
+    _tabRouteLayer = L.polyline([[oriLat,oriLng],[destLat,destLng]], {
+      color:'#6c7a7b', weight:3, opacity:.5, dashArray:'9 9'
+    }).addTo(_tabMap);
+    var dM = distHaversine(oriLat, oriLng, destLat, destLng);
+    var em = Math.max(2, Math.round(dM/250));
+    var etaEl = document.getElementById('mapEtaValTab');
+    if (etaEl) etaEl.textContent = '~' + em + ' min · ' + (dM/1000).toFixed(1) + ' km aprox*';
+    document.getElementById('tabEta').textContent = '~' + em + ' min';
+  }
+}
+
+async function cancelarPedidoActivo(){
+  if(!state.pedidoActivo) return;
+  if(!confirm('¿Cancelar este pedido?')) return;
+  var btn = document.getElementById('btnCancelarPed');
+  if(btn){btn.disabled=true; btn.textContent='Cancelando…';}
+  try{
+    var r = await fetch(API_BASE+'/wil?action=cambiar-estado',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({idPedido:state.pedidoActivo.id,
+        estado:'Cancelado', idDomi:domi.id})
+    });
+    var d = await r.json();
+    if(d.ok!==false){
+      var horaCancel = horaAhora();
+      state.historial.unshift({
+        id:state.pedidoActivo.id, cliente:state.pedidoActivo.cliente,
+        telefono:state.pedidoActivo.telefono, direccion:state.pedidoActivo.direccion,
+        total:state.pedidoActivo.total, metodoPago:state.pedidoActivo.metodoPago,
+        hora:horaCancel, fecha:new Date().toLocaleDateString('es-CO',{timeZone:TZ}),
+        estado:'Cancelado', periodo:'hoy'
+      });
+      if(_tabRouteLayer){_tabMap&&_tabMap.removeLayer(_tabRouteLayer);_tabRouteLayer=null;}
+      if(_tabRouteGlow) {_tabMap&&_tabMap.removeLayer(_tabRouteGlow); _tabRouteGlow=null;}
+      clearInterval(_tabMapInterval);
+      detenerNavegacion(); detenerChatPoll();
+      document.getElementById('wazeFloatBtn').style.display='none';
+      state.pedidoActivo=null; state.estadoPedido=null;
+      destLatGlobal=null; destLngGlobal=null;
+      document.getElementById('pedidoActivoPanel').style.display='none';
+      document.getElementById('sinPedidoEnRuta').style.display='flex';
+      actualizarBadgesNav();
+      setTimeout(function(){switchTab('historial');renderHistorial();},500);
+    }else{
+      if(btn){btn.disabled=false;btn.innerHTML='<span class="material-symbols-outlined" style="font-size:15px;font-variation-settings:\'FILL\' 1">cancel</span> Cancelar pedido';}
+      alert('No se pudo cancelar: '+(d.error||'error'));
+    }
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='Cancelar pedido';}
+    alert('Error: '+e.message);
+  }
+}
+
+
+
+
+
+function cargarMapaTab(destLat, destLng, clienteNombre){
+  if(!_tabMapInit) iniciarTabMap();
+  setTimeout(function(){
+    if(_tabMap) _tabMap.invalidateSize({animate:false});
+
+    var oriLat = TRK.lat || ANCLA_LAT;
+    var oriLng = TRK.lng || ANCLA_LNG;
+
+    // Marcador destino
+    if(_tabDestMarker){ _tabMap.removeLayer(_tabDestMarker); _tabDestMarker=null; }
+    if(destLat && destLng){
+      _tabDestMarker = L.marker([destLat, destLng],{
+        icon: iconDest(clienteNombre||'C'),
+        zIndexOffset: 900
+      }).addTo(_tabMap);
+      _tabDestMarker.bindPopup('<b>📍 '+escHtml(clienteNombre||'Cliente')+'</b>');
+    }
+
+    // Posicionar moto
+    if(_tabDomiMarker){
+      _tabDomiMarker.setLatLng([oriLat, oriLng]);
+      _tabDomiMarker.setIcon(iconDomi(domi ? domi.nombre : 'WIL', TRK.activo && TRK.lat!==null));
+    }
+
+    // Ajustar vista
+    if(destLat && destLng){
+      var bounds = L.latLngBounds([[oriLat,oriLng],[destLat,destLng]]);
+      _tabMap.fitBounds(bounds, {padding:[48,48]});
+    } else {
+      _tabMap.setView([oriLat, oriLng], 16);
+    }
+
+    /* Posicionar moto */
+    if(_tabDomiMarker){
+      _tabDomiMarker.setLatLng([oriLat, oriLng]);
+      _tabDomiMarker.setIcon(iconDomi(domi ? domi.nombre : 'WIL', TRK.activo && TRK.lat!==null));
+    }
+
+    /* Marcar destino */
+    if(destLat && destLng){
+      dibujarRutaOSRM(oriLat, oriLng, destLat, destLng);
+    } else {
+      _tabMap.setView([oriLat, oriLng], 16);
+    }
+
+    iniciarUpdateMapaTab();
+
+  }, 120);
+}
+
+function iniciarUpdateMapaTab(){
+  clearInterval(_tabMapInterval);
+  var _rutaLastRecalc = 0;
+  _tabMapInterval = setInterval(function(){
+    if(!_tabDomiMarker || !_tabMap) return;
+    if(!TRK.activo || TRK.lat===null) return;
+
+    _tabDomiMarker.setLatLng([TRK.lat, TRK.lng]);
+    _tabDomiMarker.setIcon(iconDomi(domi ? domi.nombre : 'WIL', true));
+
+    if(destLatGlobal){
+      /* Recalcular ruta OSRM cada 30 s */
+      var ahora = Date.now();
+      if(ahora - _rutaLastRecalc > 30000){
+        _rutaLastRecalc = ahora;
+        dibujarRutaOSRM(TRK.lat, TRK.lng, destLatGlobal, destLngGlobal);
+      }
+    }
+  }, 6000);
+}
+
+function centrarMapaEnDomi(){
+  if(!_tabMap) return;
+  var lat = TRK.lat || ANCLA_LAT;
+  var lng = TRK.lng || ANCLA_LNG;
+  _tabMap.setView([lat, lng], 17, {animate:true});
+}
+
+function centrarMapaEnDomi(){
+  if(!_tabMap)return;
+  var lat=TRK.lat||ANCLA_LAT;
+  var lng=TRK.lng||ANCLA_LNG;
+  _tabMap.setView([lat,lng],17,{animate:true});
+}
+
+/* ═══════════════════ TABS ═══════════════════ */
+function switchTab(tab){
+  currentTab=tab;
+  document.querySelectorAll('.tab-content').forEach(function(e){e.classList.remove('active');});
+  document.getElementById('tab-'+tab).classList.add('active');
+  document.querySelectorAll('nav button[id^="nav-"]').forEach(function(b){
+    b.className='flex flex-col items-center gap-1 px-4 py-2 rounded-2xl text-outline transition-all relative';
+  });
+  var a=document.getElementById('nav-'+tab);
+  if(a)a.className='flex flex-col items-center gap-1 px-4 py-2 rounded-2xl bg-primary/10 text-primary transition-all relative';
+
+  /* Float tracker */
+  var fb = document.getElementById('trkFloatBtn');
+  fb.style.display = (tab==='ruta' && TRK.activo) ? 'flex' : 'none';
+
+  /* Float Waze: visible en tab ruta solo si hay pedido activo */
+  var waze = document.getElementById('wazeFloatBtn');
+  if(waze) waze.style.display = (tab==='ruta' && state.pedidoActivo) ? 'flex' : 'none';
+
+  if(tab==='ruta'&&state.pedidoActivo){
+    /* Inicializar mapa si no está listo */
+    if(!_tabMapInit){
+      setTimeout(function(){
+        iniciarTabMap();
+        if(destLatGlobal){
+          cargarMapaTab(destLatGlobal,destLngGlobal,state.pedidoActivo?state.pedidoActivo.cliente:'Cliente');
+        }
+      },150);
+    }else if(_tabMap){
+      /* Invalidar tamaño y redibujar */
+      setTimeout(function(){
+        _tabMap.invalidateSize({animate:false});
+      },100);
+    }
+  }
+
+  window.scrollTo(0,0);
+  if(tab==='historial')renderHistorial();
+  if(tab==='perfil')renderPerfil();
+}
+
+/* ═══════════════════ BADGES NAV ═══════════════════ */
+function actualizarBadgesNav(){
+  var cnt=state.pedidos.length;
+  var nb=document.getElementById('navBadge');
+  if(cnt>0){nb.textContent=cnt>9?'9+':cnt;nb.style.display='flex';}else nb.style.display='none';
+  var rb=document.getElementById('navRutaBadge');
+  if(state.pedidoActivo){rb.textContent='1';rb.style.display='flex';}else rb.style.display='none';
+  var hb=document.getElementById('navHistBadge');
+  var hoy=state.historial.filter(function(h){return h.periodo==='hoy';});
+  if(hoy.length>0){hb.textContent=hoy.length>9?'9+':hoy.length;hb.style.display='flex';}else hb.style.display='none';
+}
+
+/* Actualizar App Badge (ícono de la PWA instalada) */
+if ('setAppBadge' in navigator) {
+  var totalBadge = state.pedidos.length;
+  if (totalBadge > 0) {
+    navigator.setAppBadge(totalBadge).catch(function(){});
+  } else {
+    navigator.clearAppBadge().catch(function(){});
+  }
+}
+/* Enviar al SW para notificaciones background */
+if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+  navigator.serviceWorker.controller.postMessage({
+    type: 'GUARDAR_DOMI',
+    domi: domi,
+    notifIds: []
+  });
+}
+
+
+/* ═══════════════════ TRACKER GPS ═══════════════════ */
+var TRK={activo:false,lat:null,lng:null,acc:null,watchId:null,envTimer:null};
+var TRK_INTERVAL_MS = 10000; 
+var TRK_KEY='wil_trk_v3';
+
+function trkToggle(){if(!TRK.activo)trkActivar();else trkDesactivar();}
+
+function trkSyncUI(on){
+  /* GPS strip en tab */
+  var dot=document.getElementById('gpsDotTab');
+  var gnTab=document.getElementById('gpsNombreDomiTab');
+  var glTab=document.getElementById('gpsLabelTab');
+  if(gnTab)gnTab.textContent=(domi&&domi.nombre)?domi.nombre.split(' ')[0]:'—';
+  if(glTab)glTab.textContent=on?'· GPS activo':'· sin GPS';
+  if(dot){dot.style.background=on?'#2a9d5c':'#bbc9cb';if(on)dot.classList.add('trk-gps-live');else dot.classList.remove('trk-gps-live');}
+
+  /* Share toggle */
+  var st=document.getElementById('shareToggleTrack');if(st)st.style.background=on?'#2a9d5c':'#bbc9cb';
+  var th=document.getElementById('shareToggleThumb');if(th)th.style.left=on?'26px':'3px';
+  var stl=document.getElementById('shareToggleLbl');if(stl)stl.textContent=on?'¡Ubicación activa!':'Ubicación desactivada';
+  var sts=document.getElementById('shareToggleSub');if(sts)sts.textContent=on?'Eres visible para clientes y admin':'Activa para ser visible';
+  var sgd=document.getElementById('shareGpsDot');if(sgd)sgd.style.background=on?'#2a9d5c':'#bbc9cb';
+
+  /* Float btn */
+  var fb=document.getElementById('trkFloatBtn');
+  if(on){fb.classList.add('live');if(currentTab==='ruta')fb.style.display='flex';}
+  else{fb.classList.remove('live');fb.style.display='none';}
+  var fd=document.getElementById('trkFloatDot');if(fd)fd.classList[on?'add':'remove']('live');
+
+  /* Drawer */
+  var d2=document.getElementById('trkGpsDot2');if(d2){d2.style.background=on?'#2a9d5c':'#bbc9cb';if(on)d2.classList.add('trk-gps-live');else d2.classList.remove('trk-gps-live');}
+  var tt2=document.getElementById('trkToggleTrack2');if(tt2){tt2.className='trk-toggle-track '+(on?'on':'off')+' flex-shrink-0';tt2.style.cursor='pointer';}
+  var dl=document.getElementById('trkDrawerLbl');if(dl)dl.textContent=on?'¡Tracker activo!':'Compartir ubicación';
+  var ds2=document.getElementById('trkDrawerSub');if(ds2)ds2.textContent=on?'Eres visible en el mapa':'Activa para ser visible en el mapa';
+}
+
+function trkActivar(){
+  if(!navigator.geolocation){trkLog('err','GPS no disponible');return;}
+  TRK.activo=true;
+  localStorage.setItem(TRK_KEY,JSON.stringify({domiId:domi.id,nombre:domi.nombre}));
+  trkLog('ok','Tracker activado — buscando GPS…');
+  if(currentTab==='ruta')document.getElementById('trkFloatBtn').style.display='flex';
+  setTimeout(function(){trkSyncUI(true);},300);
+
+  TRK.watchId=navigator.geolocation.watchPosition(
+    function(pos){
+      TRK.lat=pos.coords.latitude;
+      TRK.lng=pos.coords.longitude;
+      TRK.acc=Math.round(pos.coords.accuracy);
+      var coord=TRK.lat.toFixed(5)+', '+TRK.lng.toFixed(5);
+      var el2=document.getElementById('trkGpsTxt2');if(el2)el2.textContent=coord;
+      var t2=document.getElementById('trkAccTag2');if(t2){t2.textContent='±'+TRK.acc+'m';t2.classList.remove('hidden');}
+      var sgt=document.getElementById('shareGpsTxt');if(sgt)sgt.textContent=coord+' ±'+TRK.acc+'m';
+      var h=horaAhora();
+      var tus=document.getElementById('trkUltSync2');if(tus)tus.textContent=h;
+
+      /* Actualizar marcador en mapa de pestaña */
+      if(_tabDomiMarker&&_tabMap){
+        _tabDomiMarker.setLatLng([TRK.lat,TRK.lng]);
+        _tabDomiMarker.setIcon(iconDomi(domi?domi.nombre:'WIL',true));
+        if(!state.pedidoActivo&&currentTab==='ruta'){
+          _tabMap.setView([TRK.lat,TRK.lng],16,{animate:true});
+        }
+      }
+
+      /* Actualizar labels GPS tab */
+      var glTab=document.getElementById('gpsLabelTab');
+      if(glTab)glTab.textContent='· GPS activo';
+      var dotTab=document.getElementById('gpsDotTab');
+      if(dotTab){dotTab.style.background='#2a9d5c';dotTab.classList.add('trk-gps-live');}
+    },
+    function(e){trkLog('err','GPS bloqueado: '+e.message);},
+    {enableHighAccuracy:true,maximumAge:10000,timeout:20000}
+  );
+  trkEnviarUbicacion();
+  TRK.envTimer=setInterval(trkEnviarUbicacion,TRK_INTERVAL_MS);
+}
+
+function trkDesactivar(){
+  TRK.activo=false;localStorage.removeItem(TRK_KEY);
+  if(TRK.watchId!==null){navigator.geolocation.clearWatch(TRK.watchId);TRK.watchId=null;}
+  clearInterval(TRK.envTimer);TRK.envTimer=null;
+  trkSyncUI(false);
+  var el2=document.getElementById('trkGpsTxt2');if(el2)el2.textContent='GPS desactivado';
+  var sgt=document.getElementById('shareGpsTxt');if(sgt)sgt.textContent='Sin señal GPS';
+  var t2=document.getElementById('trkAccTag2');if(t2)t2.classList.add('hidden');
+  if(_tabDomiMarker&&_tabMap){
+    if(!state.pedidoActivo)_tabDomiMarker.setLatLng([ANCLA_LAT,ANCLA_LNG]);
+    _tabDomiMarker.setIcon(iconDomi(domi?domi.nombre:'WIL',false));
+  }
+}
+
+function trkEnviarUbicacion() {
+  if (!TRK.activo || TRK.lat === null) {
+    trkLog('warn', 'Sin GPS — esperando señal…');
+    return;
+  }
+  var ts = new Date().toLocaleTimeString('es-CO', {
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false, timeZone: 'America/Bogota'
+  });
+  // Formato columna G: "lat,lng|HH:mm:ss"
+  var payload = JSON.stringify({
+    accion:   'ubicacion',
+    id:       domi.id,
+    lat:      TRK.lat,
+    lng:      TRK.lng,
+    acc:      TRK.acc || 0,
+    ts:       ts,
+    nombre:   domi.nombre || ''
+  });
+
+fetch('https://script.google.com/macros/s/AKfycbzPriKpQz0jI9AaYtylsDR_b5oRwMym0rM-dwQKAnjeqhEyxg4HhQ6MBGN_95U4PYJ6tA/exec', {
+    method:  'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body:    payload
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.ok) {
+      var tus = document.getElementById('trkUltSync2');
+      if (tus) tus.textContent = ts;
+      trkLog('ok', 'GPS enviado · ' + TRK.lat.toFixed(4) + ', ' + TRK.lng.toFixed(4));
+    } else {
+      trkLog('warn', 'Sheet respondió: ' + (d.error || 'sin ok'));
+    }
+  })
+  .catch(function(e) {
+    trkLog('err', 'Sin conexión: ' + e.message.slice(0, 35));
+  });
+}
+
+function trkLog(tipo,msg){
+  var list=document.getElementById('trkLogList');var ts=horaAhora();
+  var c={ok:'#2a9d5c',err:'#ba1a1a',info:'#006970',warn:'#f59e0b'}[tipo]||'#6c7a7b';
+  var item=document.createElement('div');item.className='flex gap-2 items-start';
+  item.innerHTML='<span style="font-size:10px;color:#6c7a7b;flex-shrink:0;margin-top:1px;font-family:monospace">'+ts+'</span><span style="font-size:11px;font-weight:600;color:'+c+';line-height:1.4">'+msg+'</span>';
+  list.prepend(item);while(list.children.length>12)list.removeChild(list.lastChild);
+}
+
+function abrirTrkDrawer(){document.getElementById('trkDrawerOverlay').classList.add('open');}
+function cerrarTrkDrawer(){document.getElementById('trkDrawerOverlay').classList.remove('open');}
+function abrirShareLoc(){document.getElementById('shareLocOverlay').style.display='flex';}
+function cerrarShareLoc(){document.getElementById('shareLocOverlay').style.display='none';}
+
+/* ═══════════════════ PARSER PRODUCTOS ═══════════════════ */
+function parsearProductos(p){
+  // Caso 1: el servidor ya agrupó los productos en _prods (array de objetos)
+  if(p._prods && Array.isArray(p._prods) && p._prods.length){
+    return p._prods.map(function(x){
+      var precioNum = x.vu > 0 ? x.vu : (x.vtotal > 0 && x.qty > 0 ? x.vtotal / x.qty : 0);
+      return {
+        nombre: x.nom || x.nombre || '',
+        qty:    (x.qty || 1).toString(),
+        precio: precioNum > 0 ? fmtCOP(precioNum * (parseInt(x.qty)||1)) : '',
+        vu:     precioNum,
+        vtotal: x.vtotal || (precioNum * (parseInt(x.qty)||1)),
+        antes:  ''
+      };
+    });
+  }
+
+  // Caso 2: strings separados por | o \n (compatibilidad legacy)
+  var raw = (p.productos || '').trim();
+  if(!raw || raw === 'Pedido libre' || raw === 'Domicilio (default)') return [];
+
+  raw = raw.replace(/\\n/g, '\n').replace(/\\r/g, '');
+
+  var segmentos;
+  if(raw.indexOf('|') !== -1)       segmentos = raw.split(/\s*\|\s*/);
+  else if(raw.indexOf('\n') !== -1) segmentos = raw.split(/\r?\n/);
+  else                              segmentos = [raw];
+
+  segmentos = segmentos.map(function(s){ return s.trim(); }).filter(function(s){
+    return s && s !== 'Pedido libre' && !/^domicilio/i.test(s) && s.length > 1;
+  });
+
+  var cantRaw = (p.cantidad || '').replace(/\\n/g, '\n');
+  var cantidades = cantRaw.indexOf('|') !== -1
+    ? cantRaw.split(/\s*\|\s*/)
+    : cantRaw.split(/\r?\n/);
+
+  var preciosRaw = (p.precios || p.precio || '').replace(/\\n/g, '\n');
+  var precios = [];
+  if(preciosRaw){
+    precios = preciosRaw.indexOf('|') !== -1
+      ? preciosRaw.split(/\s*\|\s*/)
+      : preciosRaw.split(/\r?\n/);
+  }
+
+  return segmentos.map(function(seg, idx){
+    var nombre = seg, qty = '', precio = '', antes = '', vu = 0, vtotal = 0;
+
+    var mAntes = nombre.match(/\(antes\s*\$([0-9.,]+)\)/i);
+    if(mAntes){ antes = '$' + mAntes[1]; nombre = nombre.replace(mAntes[0], '').trim(); }
+
+    var mPrecio = nombre.match(/\s*=\s*\$?\s*([0-9.,]+)/);
+    if(mPrecio){
+      vu = parseCOP(mPrecio[1]);
+      nombre = nombre.replace(mPrecio[0], '').trim();
+    }
+
+    if(!vu && precios[idx] && precios[idx].trim() && precios[idx].trim() !== '-'){
+      vu = parseCOP(precios[idx].trim());
+    }
+
+    var mQty = nombre.match(/\s+[xX](\d+)\s*$/);
+    if(mQty){ qty = mQty[1]; nombre = nombre.replace(mQty[0], '').trim(); }
+    else if(cantidades[idx] && cantidades[idx].trim() !== '-' && cantidades[idx].trim() !== ''){
+      qty = cantidades[idx].trim();
+    }
+
+    var qtyNum = parseInt(qty) || 1;
+    vtotal = vu * qtyNum;
+
+    precio = vtotal > 0 ? fmtCOP(vtotal) : (vu > 0 ? fmtCOP(vu) : '');
+
+    return {
+      nombre: nombre.replace(/\s+/g,' ').trim(),
+      qty:    qty,
+      precio: precio,
+      vu:     vu,
+      vtotal: vtotal,
+      antes:  antes
+    };
+  });
+}
+
+/* ═══════════════════ STATUS ONLINE ═══════════════════ */
+function toggleStatus(){
+  state.online=!state.online;
+  var badge=document.getElementById('statusBadge'),text=document.getElementById('statusText'),ping=document.getElementById('pingDot');
+  if(state.online){
+    badge.className='flex items-center gap-2 px-3 py-1.5 bg-green/10 rounded-full border border-green/20 cursor-pointer';
+    text.className='text-xs font-bold text-green';text.textContent='En línea';
+    ping.className='absolute inset-0 rounded-full bg-green ping-dot';
+    clearInterval(pollingTimer);pollingTimer=setInterval(fetchPedidos,POLL_INTERVAL);fetchPedidos();
+  }else{
+    badge.className='flex items-center gap-2 px-3 py-1.5 bg-outline/10 rounded-full border border-outline/20 cursor-pointer';
+    text.className='text-xs font-bold text-outline';text.textContent='Fuera de línea';
+    ping.className='absolute inset-0 rounded-full bg-outline';
+    clearInterval(pollingTimer);
+  }
+}
+
+/* ═══════════════════ POLLING ═══════════════════ */
+async function fetchPedidos() {
+  try {
+    var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID_DOMI
+            + '/gviz/tq?tqx=out:csv&sheet=Pedidos&cachebust=' + Date.now();
+    var r = await fetch(url, {cache:'no-store', signal:AbortSignal.timeout(14000)});
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    var text = await r.text();
+    if(!text || text.length < 20) throw new Error('vacío');
+
+    var todasFilas = _parsearCSV(text);
+    var pedMap = {}, pedOrder = [], lastId = null;
+
+    todasFilas.forEach(function(cols){
+      var id = (cols[0]||'').trim();
+      if(id){
+        if(!pedMap[id]){
+          pedMap[id] = {
+            id, cliente:(cols[1]||'').trim(), telefono:(cols[2]||'').trim(),
+            metodoPago:(cols[3]||'').trim(), estadoRaw:(cols[4]||'').trim(),
+            imagen:(cols[5]||'').trim(), direccion:(cols[11]||'').trim(),
+            hora:(cols[12]||'').trim(), fecha:(cols[13]||'').trim(),
+            total:(cols[14]||'').trim(), domiAsign:(cols[15]||'').trim(),
+            horaProceso:(cols[16]||'').trim(), horaCamino:(cols[17]||'').trim(),
+            horaEntrega:(cols[18]||'').trim(), domicilio:(cols[19]||'').trim(),
+            tipoEntrega:(cols[20]||'').trim(), _prods:[]
+          };
+          pedOrder.push(id);
+        }
+        lastId = id;
+      }
+      var aId = id || lastId;
+      if(!aId || !pedMap[aId]) return;
+      var nom = (cols[6]||'').replace(/\|cat$/,'').trim();
+      if(nom && !/^domicilio\s*\(/i.test(nom)){
+        var vu=parseCOP(cols[9]||''), vtotal=parseCOP(cols[10]||'');
+        var qty=parseInt(cols[8])||1;
+        pedMap[aId]._prods.push({nom, marca:(cols[7]||'').trim(), qty, vu,
+          vtotal: vtotal||(vu*qty)});
+      }
+    });
+
+    var _norm = function(s){
+      return (s||'').toLowerCase().normalize('NFD')
+        .replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,' ').trim();
+    };
+    var nombreBase = _norm(domi.nombre||'').split(' ')[0];
+    var idDomi     = (domi.id||'').toUpperCase().trim();
+
+    var misPendientes = [];
+    var enRuta        = null;
+
+    pedOrder.forEach(function(id){
+      var p    = pedMap[id];
+      p.estado = _normEst(p.estadoRaw);
+
+      var asgNorm  = _norm(p.domiAsign);
+      var asgUpper = (p.domiAsign||'').toUpperCase();
+      var esMio    = p.domiAsign && (
+        asgNorm.includes(nombreBase) || asgUpper.includes(idDomi)
+      );
+
+      if(!esMio) return; /* Solo me interesan MIS pedidos */
+
+      /* Pedido en ruta */
+      if(p.estado==='proceso' || p.estado==='camino'){
+        enRuta = _cvtPed(p); return;
+      }
+
+      /* Pendiente asignado a mí */
+      if(p.estado==='pendiente' && !idsProcesados.has(id)){
+        /* ¿Es nuevo? → disparar notificación fuerte */
+        if(!_idsAsignadosNotificados.has(id)){
+          _idsAsignadosNotificados.add(id);
+          _notifAsignado(_cvtPed(p));
+        }
+        misPendientes.push(_cvtPed(p));
+      }
+    });
+
+    state.pedidos = misPendientes;
+
+    /* Activar pedido en ruta si es nuevo */
+    if(enRuta && (!state.pedidoActivo || state.pedidoActivo.id !== enRuta.id)){
+      state.pedidoActivo = enRuta;
+      state.estadoPedido = enRuta.estadoRaw;
+      activarPedidoEnRuta(enRuta);
+    }
+
+    renderPedidos();
+    actualizarBadgesNav();
+
+    if('setAppBadge' in navigator){
+      var n = state.pedidos.length;
+      if(n>0) navigator.setAppBadge(n).catch(function(){});
+      else navigator.clearAppBadge().catch(function(){});
+    }
+
+  } catch(e){
+    console.warn('[fetchPedidos]:', e.message);
+  }
+}
+
+async function fetchHistorialSheet() {
+  try {
+    var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID_DOMI
+            + '/gviz/tq?tqx=out:csv&sheet=Pedidos&cachebust=' + Date.now();
+    var r = await fetch(url, { cache:'no-store', signal:AbortSignal.timeout(14000) });
+    if (!r.ok) return;
+    var text = await r.text();
+    if (!text || text.length < 20) return;
+
+    var filas = _parsearCSV(text), pedMap = {}, lastId = null;
+    filas.forEach(function(cols) {
+      var id = (cols[0]||'').trim();
+      if (id) {
+        if (!pedMap[id]) pedMap[id] = {
+          id, cliente:(cols[1]||'').trim(), telefono:(cols[2]||'').trim(),
+          metodoPago:(cols[3]||'').trim(), estadoRaw:(cols[4]||'').trim(),
+          direccion:(cols[11]||'').trim(), hora:(cols[12]||'').trim(),
+          fecha:(cols[13]||'').trim(), total:(cols[14]||'').trim(),
+          domiAsign:(cols[15]||'').trim(), horaEntrega:(cols[18]||'').trim(),
+          domicilio:(cols[19]||'').trim(), _prods:[]
+        };
+        lastId = id;
+      }
+      var aId = id || lastId; if (!aId || !pedMap[aId]) return;
+      var nom = (cols[6]||'').replace(/\|cat$/,'').trim();
+      if (nom && !/^domicilio\s*\(/i.test(nom)) {
+        pedMap[aId]._prods.push({ nom, qty:parseInt(cols[8])||1,
+          vu:parseCOP(cols[9]||''), vtotal:parseCOP(cols[10]||'') });
+      }
+    });
+
+    var _norm = function(s){ return (s||'').toLowerCase().normalize('NFD')
+      .replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,' ').trim(); };
+    var nombreBase = _norm(domi.nombre||'').split(' ')[0];
+    var idDomi     = (domi.id||'').toUpperCase().trim();
+    var hoyStr     = new Date().toLocaleDateString('es-CO',{timeZone:TZ});
+
+    var items = [];
+    Object.values(pedMap).forEach(function(p) {
+      var est = (p.estadoRaw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      var esEntregado = est.includes('entregad');
+      var esCancelado = est.includes('cancelad') || est.includes('cancel');
+      if (!esEntregado && !esCancelado) return;
+
+      var asgNorm  = _norm(p.domiAsign);
+      var asgUpper = (p.domiAsign||'').toUpperCase();
+      var esMio    = p.domiAsign && (asgNorm.includes(nombreBase)||asgUpper.includes(idDomi));
+      if (!esMio) return;
+
+      items.push({
+        id:         p.id,
+        cliente:    p.cliente,
+        telefono:   p.telefono,
+        direccion:  p.direccion,
+        total:      p.total,
+        metodoPago: p.metodoPago,
+        hora:       p.horaEntrega || p.hora,
+        fecha:      p.fecha,
+        estado:     esEntregado ? 'Entregado' : 'Cancelado',
+        periodo:    p.fecha === hoyStr ? 'hoy' : 'anterior',
+        prods:      p._prods.length,
+        domicilio:  p.domicilio
+      });
+    });
+
+    /* Más reciente primero */
+    items.sort(function(a,b){ return (b.hora||'').localeCompare(a.hora||''); });
+    state.historial = items;
+    if (currentTab === 'historial') renderHistorial();
+    actualizarBadgesNav();
+  } catch(e) { console.warn('[fetchHistorialSheet]:', e.message); }
+}
+
+function iniciarPolling(){
+  fetchPedidos().then(function() {
+    /* Notificar al entrar si hay pedidos */
+    setTimeout(function() {
+      var n = state.pedidos.length;
+      if (n > 0 && Notification.permission === 'granted') {
+        var titulo = '🛵 ' + n + ' pedido' + (n > 1 ? 's' : '') + ' te esperan';
+        var opts = {
+          body: 'Bienvenido. Hay ' + n + ' pedido' + (n > 1 ? 's pendientes' : ' pendiente') + ' ahora.',
+          icon: 'icons/icon-192.png', badge: 'icons/badge-72.png',
+          tag: 'wil-bienvenida', requireInteraction: false,
+          vibrate: [200, 80, 200], silent: false
+        };
+        navigator.serviceWorker.ready.then(function(reg) {
+          reg.showNotification(titulo, opts);
+        });
+      }
+    }, 2500); /* esperar que el fetch termine */
+  });
+  pollingTimer = setInterval(fetchPedidos, POLL_INTERVAL);
+  var fill = document.getElementById('pollingFill'), t0 = Date.now();
+  pollingBarTimer = setInterval(function(){
+    fill.style.width = ((Date.now() - t0) % POLL_INTERVAL) / POLL_INTERVAL * 100 + '%';
+  }, 150);
+  /* Historial: carga inicial + polling */
+fetchHistorialSheet();
+setInterval(fetchHistorialSheet, 10000);
+}
+
+/* ═══════════════════ RENDER PEDIDOS ═══════════════════ */
+var CARD_MAX_VIS=50;
+
+
+function buildProdBlockCard(p, pid) {
+  var productos = parsearProductos(p);
+
+  if (!productos.length) {
+    return '<div style="background:#f8faff;border-radius:12px;padding:8px 11px;margin-bottom:10px">'
+      + '<p style="font-size:9px;font-weight:800;color:#9eaaac;text-transform:uppercase;margin-bottom:3px">💰 Total</p>'
+      + '<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:16px;font-weight:900;color:#006970">'
+      + (p.total || 'Por confirmar') + '</p></div>';
+  }
+
+  /* Calcular subtotal y domicilio */
+  var subtotalCalc = 0;
+  productos.forEach(function(pr) { subtotalCalc += pr.vtotal || 0; });
+  var costoDomi = 0;
+  if (p.domicilio && parseCOP(p.domicilio) > 0) {
+    costoDomi = parseCOP(p.domicilio);
+  } else {
+    var totalSheet = parseCOP(p.total);
+    if (totalSheet > 0 && subtotalCalc > 0 && totalSheet > subtotalCalc) {
+      costoDomi = Math.round(totalSheet - subtotalCalc);
+    }
+  }
+  var totalFinal = parseCOP(p.total) || (subtotalCalc + costoDomi);
+
+  var todasFilas = productos.map(function(pr, i) { return renderFilaProducto(pr, i); });
+  var CARD_VISIBLE = 5;
+  var visiblesHtml = todasFilas.slice(0, CARD_VISIBLE).join('');
+  var restante = todasFilas.length - CARD_VISIBLE;
+  var rowsB64 = btoa(unescape(encodeURIComponent(JSON.stringify(todasFilas))));
+
+  return '<div class="ticket-wrap" id="twrap_' + pid + '">'
+    /* Cabecera ticket */
+    + '<div class="ticket-header">'
+    + '<div><div class="ticket-header-lbl">Pedido</div><div class="ticket-header-val">' + escHtml(p.id || '—') + '</div></div>'
+    + '<div style="text-align:center"><div class="ticket-header-lbl">Productos</div><div class="ticket-header-val">' + todasFilas.length + '</div></div>'
+    + '<div style="text-align:right"><div class="ticket-header-lbl">Hora</div><div class="ticket-header-val">' + escHtml(p.hora || '—') + '</div></div>'
+    + '</div>'
+    /* Columnas */
+    + '<div class="ticket-col-head"><span>Descripción</span><span>Cant.</span><span>Precio</span></div>'
+    /* Filas visibles */
+    + '<div id="pl_' + pid + '" data-rows="' + rowsB64 + '" data-max="' + CARD_VISIBLE + '" data-expanded="false">'
+    + visiblesHtml + '</div>'
+    /* Ver más */
+    + (restante > 0
+      ? '<div style="padding:6px 12px 8px">'
+        + '<button class="ver-mas-btn" id="vmb_' + pid + '" onclick="expandirPedidoCard(\'' + pid + '\')">'
+        + '<span class="material-symbols-outlined" style="font-size:13px">expand_more</span>'
+        + '<span id="vmbt_' + pid + '">Ver ' + restante + ' producto' + (restante > 1 ? 's' : '') + ' más</span>'
+        + '</button></div>'
+      : '')
+    /* Subtotales */
+    + '<hr class="ticket-divider">'
+    + (subtotalCalc > 0
+      ? '<div class="ticket-subtotal-row"><span class="ticket-subtotal-lbl">Subtotal</span><span class="ticket-subtotal-val">' + fmtCOP(subtotalCalc) + '</span></div>'
+      : '')
+    + '<div class="ticket-subtotal-row"><span class="ticket-subtotal-lbl">🛵 Domicilio</span><span class="ticket-subtotal-val">'
+    + (costoDomi > 0 ? fmtCOP(costoDomi) : '<span style="color:#2a9d5c;font-weight:800">Gratis 🎉</span>') + '</span></div>'
+    + '<div class="ticket-total-row">'
+    + '<span class="ticket-total-lbl">TOTAL</span>'
+    + '<span class="ticket-total-val">' + (totalFinal > 0 ? fmtCOP(totalFinal) : (p.total || '—')) + '</span>'
+    + '</div></div>';
+}
+
+function expandirPedidoCard(pid){
+  var pList=document.getElementById('pl_'+pid),vmBtn=document.getElementById('vmb_'+pid),vmTxt=document.getElementById('vmbt_'+pid);
+  if(!pList)return;
+  var allRows;
+  try{allRows=JSON.parse(decodeURIComponent(escape(atob(pList.dataset.rows||'W10='))));}catch(e){return;}
+  var maxVis=parseInt(pList.dataset.max)||CARD_MAX_VIS;
+  var expanded=pList.dataset.expanded==='true';
+  if(!expanded){
+    pList.innerHTML='';allRows.forEach(function(h){pList.insertAdjacentHTML('beforeend',h);});pList.dataset.expanded='true';
+    var ic=vmBtn&&vmBtn.querySelector('.material-symbols-outlined');if(ic)ic.textContent='expand_less';if(vmTxt)vmTxt.textContent='Ver menos';
+  }else{
+    pList.innerHTML='';var mostrar=Math.min(allRows.length,maxVis);
+    for(var i=0;i<mostrar;i++)pList.insertAdjacentHTML('beforeend',allRows[i]);
+    pList.dataset.expanded='false';
+    var ic2=vmBtn&&vmBtn.querySelector('.material-symbols-outlined');if(ic2)ic2.textContent='expand_more';if(vmTxt)vmTxt.textContent='Ver '+(allRows.length-maxVis)+' más';
+  }
+}
+
+function renderPedidos(){
+  var lista=document.getElementById('listaPedidos');
+  var vacio=document.getElementById('sinPedidos');
+  var cnt=document.getElementById('contadorPedidos');
+  lista.innerHTML='';
+  if(!state.pedidos.length){vacio.style.display='flex';cnt.textContent='0 pedidos';actualizarBadgesNav();return;}
+  vacio.style.display='none';
+  cnt.textContent=state.pedidos.length+(state.pedidos.length===1?' pedido':' pedidos');
+  actualizarBadgesNav();
+
+  state.pedidos.forEach(function(p){
+    var esFarm=p.tipo==='farmacia';
+    var alianza=esFarm?((p.productos||'').toLowerCase().includes('expertos')?'Farma Expertos':'Droguería Central'):'WIL General';
+    var dirRaw=p.direccion||'';
+    var refM=dirRaw.match(/\(Ref:\s*([^)]+)\)/);
+    var ref=refM?refM[1]:'';
+    var dir=dirRaw.replace(/\s*\(Ref:[^)]+\)/,'').replace(/\s*—\s*\S+/,'').replace(/\s*\[\d+\.\d+,\s*-?\d+\.\d+\]/,'').trim();
+    var pago=(p.metodoPago||'').includes('TRANSFER')?'🏦 Transf.':'💵 Efectivo';
+    var cliente=(p.cliente&&p.cliente!=='—')?p.cliente:'Sin nombre';
+    var ini=cliente.charAt(0).toUpperCase();
+    var pid='p'+p.id.replace(/[^a-z0-9]/gi,'');
+    var prodBlock=buildProdBlockCard(p,pid);
+
+    lista.insertAdjacentHTML('beforeend',
+      '<div class="bg-surf-white rounded-2xl p-4 shadow-sm border border-out-var/10 relative overflow-hidden card-in" id="pedido-'+p.id+'">'
+      +'<div class="flex items-center gap-3 mb-3">'
+      +'<div style="width:40px;height:40px;border-radius:14px;background:rgba(0,105,112,.1);display:flex;align-items:center;justify-content:center;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:18px;color:#006970;flex-shrink:0">'+ini+'</div>'
+      +'<div style="flex:1;min-width:0">'
+      +'<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:14px;color:#191c1d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(cliente)+'</p>'
+      +'<p style="font-size:11px;color:#6c7a7b;display:flex;align-items:center;gap:4px"><span class="material-symbols-outlined" style="font-size:12px">phone</span>'+escHtml(p.telefono||'—')+'</p>'
+      +'</div>'
+      +'<div style="text-align:right;flex-shrink:0">'
+      +'<span style="font-size:10px;font-weight:800;background:#e7e8e9;padding:3px 8px;border-radius:20px;color:#6c7a7b">'+(p.hora||'—')+'</span><br>'
+      +'<span style="font-size:9px;font-weight:700;color:#9eaaac;margin-top:2px;display:inline-block">'+alianza+'</span>'
+      +'</div>'
+      +'</div>'
+
+      +'<div style="display:flex;align-items:flex-start;gap:7px;background:#f3f4f5;border-radius:12px;padding:8px 10px;margin-bottom:10px">'
+      +'<span class="material-symbols-outlined" style="font-size:15px;color:#4c56af;flex-shrink:0;margin-top:2px;font-variation-settings:\'FILL\' 1">location_on</span>'
+      +'<div style="min-width:0;flex:1">'
+      +'<p style="font-size:12px;font-weight:700;color:#191c1d;word-break:break-word;white-space:normal;line-height:1.35">'+escHtml(dir)+'</p>'
+      +(ref?'<p style="font-size:10px;color:#6c7a7b">Ref: '+escHtml(ref)+'</p>':'')
+      +'</div>'
+      +'<span style="font-size:10px;font-weight:800;color:#006970;flex-shrink:0;white-space:nowrap;margin-top:2px">'+(p.total||'—')+'</span>'
+      +'</div>'
+
+      +prodBlock
+
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+      +'<span style="font-size:11px;font-weight:700;color:#6c7a7b">'+pago+'</span>'
+      +'<span style="font-size:10px;color:#9eaaac">'+(p.fecha||'')+'</span>'
+      +'</div>'
+
+      +( (() => {
+    const nombreBase = (domi.nombre||'').toLowerCase().split(' ')[0];
+    const esMio = p.domiAsign &&
+      ((p.domiAsign||'').toLowerCase().includes(nombreBase) ||
+       (p.domiAsign||'').toUpperCase().includes((domi.id||'').toUpperCase()));
+    if (esMio) {
+      return '<div style="background:linear-gradient(135deg,rgba(124,58,237,.12),rgba(124,58,237,.06));border:1.5px solid rgba(124,58,237,.3);border-radius:12px;padding:8px 12px;margin-bottom:10px;display:flex;align-items:center;gap:8px;">'
+        +'<span style="font-size:18px;">🎯</span>'
+        +'<div style="flex:1"><div style="font-size:11px;font-weight:800;color:#7c3aed;">¡Pedido asignado a ti!</div>'
+        +'<div style="font-size:10px;color:#6c7a7b;">El admin te asignó este pedido directamente.</div></div></div>'
+        +'<button id="btn-'+p.id+'" onclick="aceptarPedidoAsignado(\''+p.id+'\')" '
+        +'style="width:100%;padding:13px;background:linear-gradient(135deg,#7c3aed,#8b5cf6);'
+        +'color:#fff;border:none;border-radius:16px;font-family:\'Plus Jakarta Sans\',sans-serif;'
+        +'font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;'
+        +'justify-content:center;gap:7px;box-shadow:0 4px 18px rgba(124,58,237,.35);">'
+        +'<span class="material-symbols-outlined text-white" style="font-size:16px;font-variation-settings:\'FILL\' 1">check_circle</span>'
+        +'Aceptar y ponerme en ruta</button>';
+    }
+    return '<button id="btn-'+p.id+'" onclick="aceptarPedido(\''+p.id+'\')" '
+      +'style="width:100%;padding:13px;background:linear-gradient(135deg,#006970,#00bcc9);color:#fff;border:none;border-radius:16px;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;box-shadow:0 4px 18px rgba(0,105,112,.28)">'
+      +'<span class="material-symbols-outlined text-white" style="font-size:16px;font-variation-settings:\'FILL\' 1">check_circle</span>Aceptar pedido</button>';
+  })() )
+    );
+  });
+}
+
+/* ═══════════════════ ACEPTAR PEDIDO ═══════════════════ */
+async function aceptarPedido(id){
+  var btn=document.getElementById('btn-'+id);
+  if(!btn)return;
+  btn.disabled=true;btn.innerHTML='<span class="spin"></span> Tomando pedido…';
+  try{
+    var r=await fetch(API_BASE+'/wil?action=tomar-pedido',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idPedido:id,idDomi:domi.id,nombreDomi:domi.nombre})});
+    var d=await r.json();
+    if(!d.ok){
+      btn.innerHTML='⚠️ '+(d.error||'Ya fue tomado');btn.style.background='#f59e0b';idsProcesados.add(id);
+      setTimeout(function(){state.pedidos=state.pedidos.filter(function(p){return p.id!==id;});renderPedidos();},2000);
+      return;
+    }
+    btn.innerHTML='<span class="material-symbols-outlined text-white" style="font-size:15px;font-variation-settings:\'FILL\' 1">check_circle</span> ¡Pedido tomado!';
+    btn.style.background='#2a9d5c';idsProcesados.add(id);
+    var pedido=state.pedidos.find(function(p){return p.id===id;});
+    state.pedidos=state.pedidos.filter(function(p){return p.id!==id;});
+    state.pedidoActivo=pedido;state.estadoPedido='Confirmado';
+    actualizarBadgesNav();
+    activarPedidoEnRuta(pedido);
+    /* Ir automáticamente a la pestaña En Ruta */
+    setTimeout(function(){switchTab('ruta');},600);
+  }catch(e){
+    btn.disabled=false;btn.innerHTML='<span class="material-symbols-outlined text-white" style="font-size:15px">check_circle</span> Aceptar pedido';
+    alert('Error: '+e.message);
+  }
+}
+
+/* ═══ EXTRAER DESTINO DEL PEDIDO ═══ */
+function extraerCoordenadasPedido(p){
+  // Intento 1: coords embebidas [lat,lng] en la dirección
+  var dirRaw = p.direccion || '';
+  var m = dirRaw.match(/\[(-?\d+\.\d+),\s*(-?\d+\.\d+)\]/);
+  if(m){
+    var lat = parseFloat(m[1]), lng = parseFloat(m[2]);
+    // Validar que estén en Colombia
+    if(lat > 1 && lat < 13 && lng > -82 && lng < -66) return {lat:lat, lng:lng, fuente:'coords'};
+  }
+  // Intento 2: formato "lat,lng" suelto en algún campo
+  var campos = [p.coordenadas, p.ubicacion, p.geoCliente];
+  for(var i=0;i<campos.length;i++){
+    if(!campos[i]) continue;
+    var mm = (campos[i]+'').match(/(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
+    if(mm){
+      var la=parseFloat(mm[1]),lo=parseFloat(mm[2]);
+      if(la>1&&la<13&&lo>-82&&lo<-66) return {lat:la,lng:lo,fuente:'campo'};
+    }
+  }
+  return null; // no hay coords → usar dirección de texto
+}
+
+
+
+
+
+/* ═══════════════════ ACTIVAR PEDIDO EN RUTA ═══════════════════ */
+function activarPedidoEnRuta(p){
+  if(!p)return;
+  // DEBUG TEMPORAL — ver qué campos llegan del pedido
+console.log('=== PEDIDO DEBUG ===');
+console.log('productos:', JSON.stringify(p.productos));
+console.log('cantidad:', JSON.stringify(p.cantidad));
+console.log('precios:', JSON.stringify(p.precios));
+console.log('total:', JSON.stringify(p.total));
+console.log('domicilio:', JSON.stringify(p.domicilio));
+console.log('=== FIN DEBUG ===');
+  var ESTADO_A_PASO={'Confirmado':0,'En proceso':0,'En camino':1,'Entregado':2};
+  var paso=ESTADO_A_PASO[p.estado]||0;
+  var h=horaAhora();
+  var clienteReal=(p.cliente&&p.cliente!=='—')?p.cliente:'Sin nombre';
+  var ini=clienteReal.charAt(0).toUpperCase();
+
+  /* Mostrar panel activo, ocultar empty */
+  document.getElementById('sinPedidoEnRuta').style.display='none';
+  document.getElementById('pedidoActivoPanel').style.display='block';
+
+  /* Poblar UI */
+  document.getElementById('tabAvatar').textContent=ini;
+  document.getElementById('tabCliente').textContent=clienteReal;
+  document.getElementById('tabTel').textContent=p.telefono||'—';
+  document.getElementById('tabHoraAceptado').textContent=p.horaAceptado||h;
+  document.getElementById('tabTotal').textContent=p.total||'—';
+  document.getElementById('tabPago').textContent=(p.metodoPago||'').includes('TRANSFER')?'🏦 Transferencia':'💵 Efectivo';
+
+  /* Origen */
+  var esFarm=p.tipo==='farmacia';
+  var alianza=esFarm?((p.productos||'').toLowerCase().includes('expertos')?'Farma Expertos':'Droguería Central'):'WIL General';
+  document.getElementById('tabOrigen').textContent=alianza;
+
+  /* Destino — limpiar dirección */
+  var dirRaw=p.direccion||'';
+  var dir=dirRaw.replace(/\s*\(Ref:[^)]+\)/g,'').replace(/\s*—\s*\S+/g,'').replace(/\s*\[\d+\.\d+,\s*-?\d+\.\d+\]/g,'').trim();
+  document.getElementById('tabDestino').textContent=dir||'—';
+
+  /* WhatsApp */
+  var prods=parsearProductos(p);
+  var prodTxt=prods.length?prods.map(function(pr){return '  • '+pr.nombre+(pr.qty?' x'+pr.qty:'')+(pr.precio?' ('+pr.precio+')':'');}).join('\n'):'—';
+  var msgWA='¡Hola '+clienteReal+'! 👋\nSoy tu domiciliario WIL 🛵\n📦 Productos:\n'+prodTxt.substring(0,300)+'\n💰 Total: '+(p.total||'—')+'\n📍 Entrego en: '+dir.substring(0,100);
+  document.getElementById('tabBtnWA').href='https://wa.me/57'+(p.telefono||'').replace(/\D/g,'')+'?text='+encodeURIComponent(msgWA);
+
+  
+  /* Productos en tab */
+  var tabProdWrap  = document.getElementById('tabProductosWrap');
+  var prods        = parsearProductos(p);
+
+  if(prods.length){
+    tabProdWrap.style.display = 'block';
+
+    var pList       = document.getElementById('tabProductosList');
+    var countEl     = document.getElementById('tabProdCount');
+    var resumenEl   = document.getElementById('tabResumenTotal');
+    var subtotalEl  = document.getElementById('tabSubtotal');
+    var costoEl     = document.getElementById('tabCostoDomi');
+    var totalProdEl = document.getElementById('tabTotalProd');
+
+    if(countEl) countEl.textContent = prods.length + ' prod.';
+    pList.innerHTML = '';
+    prods.forEach(function(pr, i){
+      pList.insertAdjacentHTML('beforeend', renderFilaProducto(pr, i));
+    });
+
+    /* ── Subtotal: suma de vtotal de cada producto ── */
+    var subtotalCalc = 0;
+    prods.forEach(function(pr){
+      subtotalCalc += pr.vtotal || (parseCOP(pr.precio));
+    });
+
+    /* ── Costo domicilio ── */
+    var costoDomi = 0;
+    if(p.domicilio && parseCOP(p.domicilio) > 0){
+      costoDomi = parseCOP(p.domicilio);
+    } else if(p.costoDomicilio && parseCOP(p.costoDomicilio) > 0){
+      costoDomi = parseCOP(p.costoDomicilio);
+    } else {
+      var totalSheet = parseCOP(p.total);
+      if(totalSheet > 0 && subtotalCalc > 0 && totalSheet > subtotalCalc){
+        costoDomi = Math.round(totalSheet - subtotalCalc);
+      }
+    }
+
+    /* ── Render resumen ── */
+    if(resumenEl){
+      resumenEl.style.display = 'block';
+
+      if(subtotalEl){
+        subtotalEl.style.display = '';
+        subtotalEl.textContent = subtotalCalc > 0 ? fmtCOP(subtotalCalc) : '—';
+      }
+      if(costoEl){
+        costoEl.style.display = '';
+        if(costoDomi > 0){
+          costoEl.textContent = fmtCOP(costoDomi);
+          costoEl.style.color = '';
+        } else {
+          costoEl.textContent = 'Gratis 🎉';
+          costoEl.style.color = '#2a9d5c';
+        }
+      }
+
+      /* Total final: leer columna O del sheet (p.total) como fuente de verdad */
+      var totalFinal = parseCOP(p.total);
+      if(!totalFinal) totalFinal = subtotalCalc + costoDomi;
+      if(totalProdEl){
+        totalProdEl.textContent = totalFinal > 0 ? fmtCOP(totalFinal) : '—';
+      }
+    }
+
+  } else {
+    tabProdWrap.style.display = 'none';
+  }
+  /* Stepper */
+  var s1=document.getElementById('tab_step1Time');if(s1)s1.textContent=p.horaAceptado||h;
+  var s2=document.getElementById('tab_step2Time');if(s2)s2.textContent=paso>=1?(p.horaEnCamino||h):'Pendiente';
+  var s3=document.getElementById('tab_step3Time');if(s3)s3.textContent=paso>=2?(p.horaEntrego||h):'';
+  renderStepper(paso);
+
+  /* Chat */
+  actualizarChatClienteHeader(p);buildDomiMiniAvatar();
+  mensajesChat=[];chatLastMsgId=0;unreadCount=0;
+  document.getElementById('chatPopupMsgs').innerHTML='<div class="chat-date-sep"><span>Hoy</span></div>';
+  cargarChatPersistido(p.id);iniciarChatPoll(p.id);
+
+  /* ═══ RESOLVER DESTINO Y TRAZAR RUTA ═══ */
+  var _resolverDestino=function(callback){
+    /* Intento 1: coords embebidas [lat,lng] */
+    var coordsM=dirRaw.match(/\[(-?\d+\.\d+),\s*(-?\d+\.\d+)\]/);
+    if(coordsM){
+      var lat=parseFloat(coordsM[1]);
+      var lng=parseFloat(coordsM[2]);
+      if(lat>3&&lat<12&&lng>-80&&lng<-70){
+        destLatGlobal=lat;destLngGlobal=lng;
+        callback(lat,lng);return;
+      }
+    }
+    /* Intento 2: geocodificar */
+    var dirLimpia=dirRaw.replace(/\s*\(Ref:[^)]+\)/g,'').replace(/\s*\[.+?\]/g,'').replace(/\s*—\s*\S+/g,'').trim();
+    if(!dirLimpia){callback(null,null);return;}
+
+    geocodificarDireccion(dirLimpia+' Copacabana Antioquia Colombia',function(lat,lng){
+      if(lat&&lng){destLatGlobal=lat;destLngGlobal=lng;callback(lat,lng);}
+      else{
+        geocodificarDireccion(dirLimpia+' Antioquia Colombia',function(lat2,lng2){
+          if(lat2&&lng2){destLatGlobal=lat2;destLngGlobal=lng2;callback(lat2,lng2);}
+          else callback(null,null);
+        });
+      }
+    });
+  };
+
+  _resolverDestino(function(lat,lng){
+    var navBtn=document.getElementById('tabNavBtnWrap');
+    if(lat&&lng){
+      /* Inicializar mapa si necesario y trazar ruta */
+      if(!_tabMapInit)iniciarTabMap();
+      /* Pequeño delay para que el tab esté visible antes de invalidar */
+      setTimeout(function(){
+        cargarMapaTab(lat,lng,clienteReal);
+      },200);
+      if(navBtn){navBtn.style.display='block';}
+    }else{
+      if(navBtn){navBtn.style.display='block';navBtn.querySelector('button').style.opacity='0.7';}
+    }
+  });
+}
+
+function geocodificarDireccion(query,cb){
+  fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(query)+'&format=json&limit=1',{headers:{'User-Agent':'DomiciliosWIL/1.0'}})
+    .then(function(r){return r.json();})
+    .then(function(d){if(d&&d[0])cb(parseFloat(d[0].lat),parseFloat(d[0].lon));else cb(null,null);})
+    .catch(function(){cb(null,null);});
+}
+
+/* ═══════════════════ NAVEGACIÓN TURN-BY-TURN ═══════════════════ */
+var _navActiva=false,_navPasos=[],_navPasoIdx=0,_navUpdateTimer=null;
+var MANIOBRA_ICON={'turn-right':'➡️','turn-sharp-right':'↪️','turn-slight-right':'↗️','turn-left':'⬅️','turn-sharp-left':'↩️','turn-slight-left':'↖️','straight':'⬆️','roundabout':'🔄','rotary':'🔄','merge':'↗️','depart':'📍','arrive':'🏁','uturn':'🔃','continue':'⬆️'};
+function maniobra2icon(tipo,modi){var key=tipo||'';if(modi)key=key+'-'+modi;return MANIOBRA_ICON[key]||MANIOBRA_ICON[tipo]||'⬆️';}
+
+function distHaversine(lat1,lng1,lat2,lng2){
+  var R=6371000;
+  var dLat=(lat2-lat1)*Math.PI/180;var dLng=(lng2-lng1)*Math.PI/180;
+  var a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+/* ═══ NAVEGAR CON WAZE (sin splash, sin perder sesión) ═══ */
+function abrirNavegacion() {
+  if (!state.pedidoActivo) { alert('Sin pedido activo.'); return; }
+  var p = state.pedidoActivo;
+  try { localStorage.setItem('wil_domi', JSON.stringify(domi)); } catch(e) {}
+
+  /* Usar coords ya resueltas o extraer del pedido */
+  var lat = destLatGlobal, lng = destLngGlobal;
+  if (!lat) {
+    var coords = extraerCoordenadasPedido(p);
+    if (coords) { lat = coords.lat; lng = coords.lng; }
+  }
+
+  if (lat && lng) {
+    _wazeDir(lat, lng, null);
+  } else {
+    var dir = (p.direccion || '')
+      .replace(/\s*\(Ref:[^)]+\)/g,'').replace(/\s*\[.+?\]/g,'')
+      .replace(/\s*—\s*\S+/g,'').trim();
+    if (!dir) { alert('Sin dirección de entrega.'); return; }
+    /* Geocodificar antes de abrir Waze para pasarle coords directas */
+    geocodificarDireccion(dir + ' Copacabana Antioquia Colombia', function(la, lo) {
+      if (la && lo) { destLatGlobal = la; destLngGlobal = lo; _wazeDir(la, lo, null); }
+      else _wazeDir(null, null, dir + ' Copacabana Antioquia Colombia');
+    });
+  }
+}
+
+function _wazeDir(lat, lng, query) {
+  var isIOS     = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  var isAndroid = /Android/.test(navigator.userAgent);
+  /* navigate=yes salta la pantalla de vista previa de ruta en Waze */
+  var params = lat && lng
+    ? 'll=' + lat.toFixed(6) + ',' + lng.toFixed(6) + '&navigate=yes&zoom=17'
+    : 'q=' + encodeURIComponent(query) + '&navigate=yes';
+
+  var wazeApp = 'waze://?' + params;
+  var wazeWeb = 'https://waze.com/ul?' + params;
+
+  if (isAndroid) {
+    /* intent:// es más confiable; navega directo sin pantalla de bienvenida */
+    window.location.href = 'intent://?' + params
+      + '#Intent;scheme=waze;package=com.waze;end';
+    setTimeout(function () { window.open(wazeWeb, '_blank'); }, 2400);
+  } else if (isIOS) {
+    window.location.href = wazeApp;
+    setTimeout(function () { window.open(wazeWeb, '_blank'); }, 2400);
+  } else {
+    window.open(wazeWeb, '_blank');
+  }
+}
+
+
+
+function actualizarPanelNav(paso,distSig,distTotal,etaMin){
+  if(!paso)return;
+  var ic=document.getElementById('navIcono');var ins=document.getElementById('navInstruccion');
+  var cal=document.getElementById('navCalle');var dsg=document.getElementById('navDistSig');
+  var eta=document.getElementById('navEtaMin');var dtot=document.getElementById('navDistTotal');
+  if(ic)ic.textContent=maniobra2icon(paso.maneuver&&paso.maneuver.type,paso.maneuver&&paso.maneuver.modifier);
+  if(ins)ins.textContent=paso.maneuver&&paso.maneuver.instruction?paso.maneuver.instruction:(paso.name||'Continúa');
+  if(cal)cal.textContent=paso.name||'';
+  if(dsg)dsg.textContent=distSig<1000?Math.round(distSig)+' m':(distSig/1000).toFixed(1)+' km';
+  if(eta)eta.textContent='~'+etaMin+' min';
+  if(dtot)dtot.textContent=distTotal<1000?Math.round(distTotal)+' m':(distTotal/1000).toFixed(1)+' km';
+  var prxWrap=document.getElementById('navProximoPaso');
+  var prxIc=document.getElementById('navProxIcono'),prxTx=document.getElementById('navProxTexto');
+  if(prxWrap&&_navPasos[_navPasoIdx+1]){
+    var sig=_navPasos[_navPasoIdx+1];
+    if(prxIc)prxIc.textContent=maniobra2icon(sig.maneuver&&sig.maneuver.type,sig.maneuver&&sig.maneuver.modifier);
+    if(prxTx)prxTx.textContent='Luego: '+(sig.maneuver&&sig.maneuver.instruction?sig.maneuver.instruction:sig.name||'');
+    prxWrap.style.display='block';
+  }else if(prxWrap)prxWrap.style.display='none';
+}
+
+function iniciarNavTracking(durInicial,distInicial,dLat,dLng){
+  clearInterval(_navUpdateTimer);
+  var etaR=durInicial,distR=distInicial;
+  _navUpdateTimer=setInterval(async function(){
+    if(!_navActiva){clearInterval(_navUpdateTimer);return;}
+    var lat=TRK.lat,lng=TRK.lng;if(!lat||!lng)return;
+    if(_tabDomiMarker)_tabDomiMarker.setLatLng([lat,lng]);
+    var minDist=Infinity,idx=_navPasoIdx;
+    for(var i=_navPasoIdx;i<_navPasos.length;i++){
+      var pp=_navPasos[i];if(!pp.maneuver||!pp.maneuver.location)continue;
+      var dd=distHaversine(lat,lng,pp.maneuver.location[1],pp.maneuver.location[0]);
+      if(dd<minDist){minDist=dd;idx=i;}
+    }
+    if(idx>_navPasoIdx)_navPasoIdx=idx;
+    var pasoActual=_navPasos[_navPasoIdx];if(!pasoActual)return;
+    var distSig=pasoActual.maneuver&&pasoActual.maneuver.location?distHaversine(lat,lng,pasoActual.maneuver.location[1],pasoActual.maneuver.location[0]):pasoActual.distance||0;
+    if(distSig<20&&_navPasoIdx<_navPasos.length-1){_navPasoIdx++;pasoActual=_navPasos[_navPasoIdx];}
+    try{
+      var rr=await fetch(OSRM_BASE+lng+','+lat+';'+dLng+','+dLat+'?overview=false');
+      var dr=await rr.json();
+      if(dr.routes&&dr.routes[0]){etaR=Math.round(dr.routes[0].duration/60);distR=dr.routes[0].distance;}
+    }catch(e){}
+    var distAlDest=distHaversine(lat,lng,dLat,dLng);
+    if(distAlDest<30){llegamosAlDestino();return;}
+    actualizarPanelNav(pasoActual,distSig,distR,etaR);
+    document.getElementById('tabEta').textContent='~'+etaR+' min';
+  },5000);
+}
+
+function llegamosAlDestino(){clearInterval(_navUpdateTimer);_navActiva=false;var ins=document.getElementById('navInstruccion');var ic=document.getElementById('navIcono');if(ins)ins.textContent='¡Has llegado!';if(ic)ic.textContent='🏁';setTimeout(detenerNavegacion,4000);}
+function detenerNavegacion(){clearInterval(_navUpdateTimer);_navActiva=false;_navPasos=[];_navPasoIdx=0;document.getElementById('navPanel').style.display='none';}
+
+/* ═══════════════════ STEPPER ═══════════════════ */
+function renderStepper(paso){
+  stepState = paso;
+  var chip       = document.getElementById('tabEstadoChip');
+  var btnCamino  = document.getElementById('btnEnCamino');
+  var btnEntrego = document.getElementById('btnEntregado');
+  var waze       = document.getElementById('wazeFloatBtn');
+
+  function setLine(id,bg){var el=document.getElementById(id);if(el)el.style.background=bg;}
+
+  if(paso===0){
+    setStepStyle('tab_step2Icon','active'); setStepLabelColor('tab_step2Label','#006970');
+    setStepStyle('tab_step3Icon','pending'); setStepLabelColor('tab_step3Label','#c4cdd0');
+    setLine('tab_line2','#e7e8e9');
+    if(btnCamino){ btnCamino.style.display='flex'; btnCamino.disabled=false; btnCamino.innerHTML='<span class="material-symbols-outlined text-white" style="font-size:17px;font-variation-settings:\'FILL\' 1">two_wheeler</span> Ponerte en camino'; }
+    if(btnEntrego) btnEntrego.style.display='none';
+    if(waze){ waze.style.display='flex'; waze.classList.remove('live'); }
+    if(chip){chip.innerHTML='<span class="material-symbols-outlined" style="font-size:12px;font-variation-settings:\'FILL\' 1">notifications_active</span> Confirmado';chip.style.cssText='display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:10px;font-weight:800;font-family:\'Plus Jakarta Sans\',sans-serif;background:rgba(255,255,255,.15);color:#fff';}
+  } else if(paso===1){
+    setStepStyle('tab_step2Icon','done'); setStepLabelColor('tab_step2Label','#2a9d5c');
+    setStepStyle('tab_step3Icon','active'); setStepLabelColor('tab_step3Label','#006970');
+    setLine('tab_line2','linear-gradient(90deg,#2a9d5c,#e7e8e9)');
+    if(btnCamino) btnCamino.style.display='none';
+    if(btnEntrego){ btnEntrego.style.display='flex'; btnEntrego.disabled=false; btnEntrego.innerHTML='<span class="material-symbols-outlined text-white" style="font-size:17px;font-variation-settings:\'FILL\' 1">check_circle</span> Confirmar entrega'; }
+    if(waze){ waze.style.display='flex'; waze.classList.add('live'); }
+    if(chip){chip.innerHTML='<span class="material-symbols-outlined" style="font-size:12px;font-variation-settings:\'FILL\' 1">two_wheeler</span> En camino';chip.style.cssText='display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:10px;font-weight:800;font-family:\'Plus Jakarta Sans\',sans-serif;background:rgba(51,204,255,.25);color:#e0f7ff';}
+  } else if(paso===2){
+    setStepStyle('tab_step2Icon','done'); setStepLabelColor('tab_step2Label','#2a9d5c');
+    setStepStyle('tab_step3Icon','done'); setStepLabelColor('tab_step3Label','#2a9d5c');
+    setLine('tab_line2','linear-gradient(90deg,#006970,#2a9d5c)');
+    if(btnCamino)  btnCamino.style.display='none';
+    if(btnEntrego) btnEntrego.style.display='none';
+    if(waze)       waze.style.display='none';
+    if(chip){chip.innerHTML='<span class="material-symbols-outlined" style="font-size:12px;font-variation-settings:\'FILL\' 1">check_circle</span> ¡Entregado!';chip.style.cssText='display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:10px;font-weight:800;font-family:\'Plus Jakarta Sans\',sans-serif;background:rgba(42,157,92,.3);color:#b8f5d6';}
+  }
+}
+
+function setStepStyle(id,estado){
+  var el=document.getElementById(id);if(!el)return;
+  var icon=el.querySelector('.material-symbols-outlined');
+  if(estado==='done'){el.style.cssText='width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #2a9d5c;background:#2a9d5c;position:relative;z-index:2;transition:all .35s';if(icon)icon.style.color='#fff';}
+  else if(estado==='active'){el.style.cssText='width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #006970;background:linear-gradient(135deg,#006970,#00bcc9);box-shadow:0 0 0 5px rgba(0,105,112,.12);position:relative;z-index:2;transition:all .35s';if(icon)icon.style.color='#fff';}
+  else{el.style.cssText='width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #e7e8e9;background:#f3f4f5;position:relative;z-index:2;transition:all .35s';if(icon)icon.style.color='#c4cdd0';}
+}
+function setStepLabelColor(id,color){var el=document.getElementById(id);if(el)el.style.color=color;}
+
+function showStepBtn(bg, shadow, icon, lbl, pulse) {
+  var btn = document.getElementById('stepActionBtn');
+  if (!btn) return;
+  btn.style.background  = bg;
+  btn.style.boxShadow   = shadow;
+  btn.style.display     = 'flex';
+  btn.disabled          = false;
+  btn.style.opacity     = '1';
+  btn.classList.remove('pulse','verde');
+  if (icon === 'check_circle') btn.classList.add('verde');
+  if (pulse !== false) btn.classList.add('pulse');
+  var iconEl = document.getElementById('stepActionIcon');
+  if (iconEl) iconEl.textContent = icon === 'two_wheeler' ? 'near_me' : 'check_circle';
+}
+
+function setStepLoading(on, msg){
+  var btnCamino  = document.getElementById('btnEnCamino');
+  var btnEntrego = document.getElementById('btnEntregado');
+  [btnCamino, btnEntrego].forEach(function(btn){
+    if(!btn || btn.style.display==='none') return;
+    btn.disabled      = on;
+    btn.style.opacity = on ? '0.65' : '1';
+    if(on) btn.innerHTML = '<span class="spin"></span> ' + (msg||'Guardando…');
+  });
+}
+function stepActionClick(){if(stepState===0)marcarEncamino();else if(stepState===1)marcarEntregado();}
+
+
+
+/* ═══════════════════ ESTADOS PEDIDO ═══════════════════ */
+async function cambiarEstadoPedido(nuevoEstado){
+  if(!state.pedidoActivo)return false;
+  try{
+    var r=await fetch(API_BASE+'/wil?action=cambiar-estado',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idPedido:state.pedidoActivo.id,estado:nuevoEstado,idDomi:domi.id})});
+    var d=await r.json();return d.ok;
+  }catch(e){return false;}
+}
+
+function marcarEncamino(){
+  setStepLoading(true,'Guardando…');
+  cambiarEstadoPedido('En camino').then(function(ok){
+    if(!ok){setStepLoading(false,'Ponerte en camino');showStepBtn('linear-gradient(135deg,#7c3aed,#8b5cf6)','0 4px 20px rgba(139,92,246,.35)','two_wheeler','Reintentar');alert('No se pudo cambiar el estado.');return;}
+    state.estadoPedido='En camino';
+    var s2=document.getElementById('tab_step2Time');if(s2)s2.textContent=horaAhora();
+    renderStepper(1);
+    /* Redibujar ruta con posición actual */
+    if(TRK.lat&&destLatGlobal){
+      dibujarRutaTab(TRK.lat,TRK.lng,destLatGlobal,destLngGlobal);
+      calcularEtaTab(TRK.lat,TRK.lng,destLatGlobal,destLngGlobal);
+    }
+  }).catch(function(e){setStepLoading(false,'Ponerte en camino');alert('Error de red: '+e.message);});
+}
+
+function marcarEntregado(){
+  var horaReal = horaAhora(); // ← capturar AHORA antes de todo
+  setStepLoading(true,'Confirmando…');
+  cambiarEstadoPedido('Entregado').then(function(ok){
+    if(!ok){
+      setStepLoading(false,'Confirmar entrega');
+      showStepBtn('linear-gradient(135deg,#1a7a3a,#2a9d5c)','0 4px 20px rgba(42,157,92,.35)','check_circle','Confirmar entrega');
+      alert('No se pudo confirmar la entrega.'); return;
+    }
+    state.estadoPedido='Entregado';
+    var s3=document.getElementById('tab_step3Time');
+    if(s3) s3.textContent = horaReal; // ← usar hora capturada
+    renderStepper(2);
+    state.historial.unshift({
+      id:state.pedidoActivo.id, cliente:state.pedidoActivo.cliente,
+      direccion:state.pedidoActivo.direccion, total:state.pedidoActivo.total,
+      metodoPago:state.pedidoActivo.metodoPago,
+      hora: horaReal, // ← hora real
+      fecha:new Date().toLocaleDateString('es-CO',{timeZone:TZ}),
+      estado:'Entregado', periodo:'hoy'
+    });
+    actualizarBadgesNav();
+    setTimeout(function(){
+      if(_tabRouteLayer){ _tabMap&&_tabMap.removeLayer(_tabRouteLayer);_tabRouteLayer=null; }
+      if(_tabRouteGlow) { _tabMap&&_tabMap.removeLayer(_tabRouteGlow); _tabRouteGlow=null;  }
+      if(_tabDestMarker&&_tabMap){_tabMap.removeLayer(_tabDestMarker);_tabDestMarker=null;}
+      if(_tabDomiMarker&&_tabMap){
+        _tabDomiMarker.setLatLng([TRK.lat||ANCLA_LAT,TRK.lng||ANCLA_LNG]);
+        _tabDomiMarker.setIcon(iconDomi(domi?domi.nombre:'WIL',TRK.activo));
+      }
+      clearInterval(_tabMapInterval); detenerNavegacion();
+      document.getElementById('mapEtaBadgeTab').style.display='none';
+      state.pedidoActivo=null; state.estadoPedido=null;
+      destLatGlobal=null; destLngGlobal=null;
+      actualizarBadgesNav(); detenerChatPoll();
+      document.getElementById('pedidoActivoPanel').style.display='none';
+      /* Mostrar botón Waze flotante */
+  var waze = document.getElementById('wazeFloatBtn');
+  if(waze) waze.style.display = 'flex';
+      document.getElementById('sinPedidoEnRuta').style.display='flex';
+      /* Ocultar botón Waze flotante */
+      document.getElementById('wazeFloatBtn').style.display='none';
+      setTimeout(function(){switchTab('historial');renderHistorial();},600);
+    },2500);
+  }).catch(function(e){setStepLoading(false,'Confirmar entrega');alert('Error: '+e.message);});
+}
+
+/* ═══════════════════ HISTORIAL ═══════════════════ */
+function renderHistorial(){
+  var lista  = document.getElementById('listaHistorial');
+  var vacio  = document.getElementById('sinHistorial');
+  lista.innerHTML = '';
+
+  var hoy     = state.historial.filter(function(h){ return h.periodo==='hoy'; });
+  var entregados = state.historial.filter(function(h){ return h.estado==='Entregado'; });
+  var cancelados = state.historial.filter(function(h){ return h.estado==='Cancelado'; });
+  var hoyEnt  = hoy.filter(function(h){ return h.estado==='Entregado'; });
+
+  document.getElementById('histEntHoy').textContent    = hoyEnt.length;
+  document.getElementById('histTotalEntregas').textContent = entregados.length;
+  document.getElementById('histCalHoy').textContent    = cancelados.length > 0
+    ? cancelados.length + '✗' : '—';
+  document.getElementById('statHoy').textContent       = hoyEnt.length;
+  document.getElementById('statEntregas').textContent  = entregados.length;
+
+  var items = state.historial.filter(function(h){
+    if (filtroHist === 'hoy')    return h.periodo === 'hoy';
+    if (filtroHist === 'semana') return h.periodo === 'hoy' || h.periodo === 'semana';
+    if (filtroHist === 'entregados') return h.estado === 'Entregado';
+    if (filtroHist === 'cancelados') return h.estado === 'Cancelado';
+    return true;
+  });
+
+  if (!items.length) { vacio.style.display = 'flex'; return; }
+  vacio.style.display = 'none';
+
+  /* Agrupar por fecha */
+  var grupos = {}, orden = [];
+  items.forEach(function(h){
+    var f = h.fecha || (h.periodo==='hoy' ? new Date().toLocaleDateString('es-CO',{timeZone:TZ}) : '—');
+    if (!grupos[f]) { grupos[f] = []; orden.push(f); }
+    grupos[f].push(h);
+  });
+
+  var cfgEst = {
+    Entregado:{ color:'#2a9d5c', bg:'rgba(42,157,92,.1)', icon:'check_circle', emoji:'✅' },
+    Cancelado:{ color:'#ba1a1a', bg:'rgba(186,26,26,.08)', icon:'cancel',       emoji:'❌' },
+    'En camino':{ color:'#8b5cf6', bg:'rgba(139,92,246,.1)', icon:'two_wheeler', emoji:'🛵' }
+  };
+
+  orden.forEach(function(fecha){
+    /* Separador de fecha */
+    lista.insertAdjacentHTML('beforeend',
+      '<div style="text-align:center;margin:14px 0 8px">'
+      +'<span style="background:#e7e8e9;color:#6c7a7b;font-size:10px;font-weight:800;'
+      +'padding:3px 14px;border-radius:20px;font-family:\'Plus Jakarta Sans\',sans-serif">'
+      +escHtml(fecha)+'</span></div>');
+
+    grupos[fecha].forEach(function(h){
+      var cfg = cfgEst[h.estado] || cfgEst['En camino'];
+      var dir = (h.direccion||'—').replace(/\s*\[.+\]/,'').replace(/\s*\(Ref:[^)]+\)/,'')
+                .trim().substring(0,46);
+      var esTrans = (h.metodoPago||'').toLowerCase().includes('transfer');
+      var totalNum = parseCOP(h.total);
+      var domiNum  = parseCOP(h.domicilio || '0');
+      var ganancia = domiNum > 0 ? domiNum : 0;
+
+      lista.insertAdjacentHTML('beforeend',
+        '<div class="card-in" style="background:#fff;border-radius:20px;overflow:hidden;'
+        +'box-shadow:0 2px 14px rgba(0,0,0,.07);border:1px solid rgba(0,0,0,.06);margin-bottom:10px">'
+
+        /* Header color */
+        +'<div style="background:' + cfg.bg + ';border-bottom:1px solid ' + cfg.color + '22;'
+        +'padding:10px 14px;display:flex;align-items:center;justify-content:space-between">'
+        +'<div style="display:flex;align-items:center;gap:8px">'
+        +'<div style="width:32px;height:32px;border-radius:50%;background:' + cfg.color + ';'
+        +'display:flex;align-items:center;justify-content:center">'
+        +'<span class="material-symbols-outlined" style="font-size:15px;color:#fff;font-variation-settings:\'FILL\' 1">'
+        +cfg.icon+'</span></div>'
+        +'<div>'
+        +'<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:13px;'
+        +'color:#191c1d;line-height:1.2">'+escHtml(h.cliente||'—')+'</p>'
+        +'<p style="font-size:10px;color:#6c7a7b;margin-top:1px">'+escHtml(h.telefono||'—')+'</p>'
+        +'</div></div>'
+        +'<div style="text-align:right">'
+        +'<span style="font-size:10px;font-weight:800;color:'+cfg.color+';background:'+cfg.bg+';'
+        +'padding:3px 10px;border-radius:20px;font-family:\'Plus Jakarta Sans\',sans-serif">'
+        +cfg.emoji+' '+h.estado+'</span>'
+        +'<p style="font-size:10px;color:#9eaaac;margin-top:3px">'+(h.hora||'—')+'</p>'
+        +'</div></div>'
+
+        /* Cuerpo */
+        +'<div style="padding:11px 14px 12px">'
+        +'<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:9px">'
+        +'<span class="material-symbols-outlined" style="font-size:14px;color:#4c56af;margin-top:1px;'
+        +'flex-shrink:0;font-variation-settings:\'FILL\' 1">location_on</span>'
+        +'<p style="font-size:12px;color:#3c494b;font-weight:600;line-height:1.4">'+escHtml(dir)+'</p>'
+        +'</div>'
+        +'<div style="display:flex;gap:8px">'
+        +(totalNum > 0
+          ? '<div style="flex:1;background:#f3f4f5;border-radius:11px;padding:7px;text-align:center">'
+            +'<p style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase">Total</p>'
+            +'<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:14px;font-weight:900;'
+            +'color:#006970">'+fmtCOP(totalNum)+'</p></div>' : '')
+        +(ganancia > 0
+          ? '<div style="flex:1;background:#f0fdf4;border-radius:11px;padding:7px;text-align:center">'
+            +'<p style="font-size:9px;font-weight:700;color:#2a9d5c;text-transform:uppercase">Domicilio</p>'
+            +'<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:14px;font-weight:900;'
+            +'color:#2a9d5c">'+fmtCOP(ganancia)+'</p></div>' : '')
+        +'<div style="flex:1;background:#f3f4f5;border-radius:11px;padding:7px;text-align:center">'
+        +'<p style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase">Pago</p>'
+        +'<p style="font-size:11px;font-weight:800;color:#191c1d">'+(esTrans?'🏦 Transf.':'💵 Efectivo')+'</p>'
+        +'</div></div></div></div>'
+      );
+    });
+  });
+}
+function setFiltroHist(btn,f){
+  filtroHist=f;
+  document.querySelectorAll('.filtro-btn').forEach(function(b){b.className='filtro-btn flex-shrink-0 px-4 py-2 bg-surf-high text-on-var text-xs font-bold rounded-full';});
+  btn.className='filtro-btn flex-shrink-0 px-4 py-2 bg-primary text-white text-xs font-bold rounded-full';
+  renderHistorial();
+}
+
+/* ═══════════════════ PERFIL ═══════════════════ */
+function renderPerfil(){
+  document.getElementById('perfilNombre').textContent=domi.nombre||'—';
+  document.getElementById('perfilTel').textContent=domi.telefono||'—';
+  document.getElementById('perfilId').textContent=domi.id||'—';
+  document.getElementById('perfilCalif').textContent='—';
+  document.getElementById('perfilEntregas').textContent='· '+state.historial.length+' entregas';
+  document.getElementById('perfilRol').textContent=esAdmin?'Administrador':'Domiciliario WIL';
+  if(esAdmin)document.getElementById('perfilAdminBadge').classList.remove('hidden');
+  var fw=document.getElementById('perfilFotoWrap');
+  if(domi.foto&&domi.foto.trim()!==''){
+    var src=domi.foto.trim().startsWith('http')?domi.foto.trim():'icons/'+domi.foto.trim();
+    fw.innerHTML='<img src="'+src+'" alt="foto" style="width:100%;height:100%;object-fit:cover;border-radius:17px" onerror="this.parentElement.innerHTML=\'<span style=\\\"font-family:Plus Jakarta Sans;font-weight:800;font-size:2rem;color:#fff;display:flex;align-items:center;justify-content:center;width:100%;height:100%\\\">'+(domi.nombre?domi.nombre.charAt(0).toUpperCase():'🛵')+'</span>\'">';
+  }else{
+    fw.innerHTML='<span style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:2rem;color:#fff;display:flex;align-items:center;justify-content:center;width:100%;height:100%">'+(domi.nombre?domi.nombre.charAt(0).toUpperCase():'🛵')+'</span>';
+  }
+  var hoy=state.historial.filter(function(h){return h.periodo==='hoy';});
+  document.getElementById('statHoy').textContent=hoy.length;
+  document.getElementById('statEntregas').textContent=state.historial.length;
+}
+
+/* ═══════════════════ CHAT ═══════════════════ */
+var chatPopupAbierto=false,mensajesChat=[],unreadCount=0,clienteOnline=false;
+var chatPollTimer=null,chatLastMsgId=0;
+
+function persistirChat(idPedido){
+  var key='wil_chat_'+(idPedido||(state.pedidoActivo?state.pedidoActivo.id:'none'));
+  try{localStorage.setItem(key,JSON.stringify({msgs:mensajesChat,lastId:chatLastMsgId}));}catch(e){}
+}
+function cargarChatPersistido(idPedido){
+  try{
+    var raw=localStorage.getItem('wil_chat_'+idPedido);if(!raw)return;
+    var d=JSON.parse(raw);mensajesChat=d.msgs||[];chatLastMsgId=d.lastId||0;
+    var msgs=document.getElementById('chatPopupMsgs');
+    msgs.innerHTML='<div class="chat-date-sep"><span>Conversación guardada</span></div>';
+    mensajesChat.forEach(function(m){
+      if(m.tipo==='out')msgs.insertAdjacentHTML('beforeend','<div class="chat-msg-wrap out">'+domiAvHtml()+'<div class="chat-bubble-col"><div class="msg-bubble-out">'+escHtml(m.texto||'')+'</div><div class="msg-meta out"><span>'+(m.hora||'')+'</span><span class="material-symbols-outlined tick-read" style="font-size:12px;line-height:1">done_all</span></div></div></div>');
+      else msgs.insertAdjacentHTML('beforeend','<div class="chat-msg-wrap in"><div class="chat-mini-avatar">'+getClienteIni()+'</div><div class="chat-bubble-col"><div class="msg-bubble-in">'+escHtml(m.texto||'')+'</div><div class="msg-meta in"><span>'+(m.hora||'')+'</span></div></div></div>');
+    });
+    msgs.insertAdjacentHTML('beforeend','<div class="chat-date-sep"><span>Nuevos mensajes</span></div>');
+  }catch(e){}
+}
+function iniciarChatPoll(idPedido){
+  clearInterval(chatPollTimer);
+  chatPollTimer=setInterval(function(){
+    fetch(API_BASE+'/wil?action=chat-poll&idPedido='+encodeURIComponent(idPedido)+'&lastId='+chatLastMsgId)
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(!d.ok||!d.mensajes||!d.mensajes.length)return;
+        if(typeof d.clienteOnline!=='undefined')setClienteOnline(d.clienteOnline);
+        d.mensajes.forEach(function(m){if(m.tipo==='in'){chatLastMsgId=Math.max(chatLastMsgId,m.id||0);recibirMensajeCliente(m.texto,m.hora);}});
+        persistirChat(idPedido);
+      }).catch(function(){});
+  },4000);
+}
+function detenerChatPoll(){clearInterval(chatPollTimer);}
+function toggleChatPopup(){chatPopupAbierto=!chatPopupAbierto;var ov=document.getElementById('chatOverlay');if(chatPopupAbierto){ov.classList.add('open');marcarLeidos();setTimeout(scrollChatAbajo,80);document.getElementById('chatPopupInput').focus();}else ov.classList.remove('open');}
+function minimizarChat(){chatPopupAbierto=false;document.getElementById('chatOverlay').classList.remove('open');}
+function marcarLeidos(){unreadCount=0;actualizarBadgeUnread();}
+function actualizarBadgeUnread(){
+  var b=document.getElementById('tabChatBadge');
+  if(b){if(unreadCount>0){b.textContent=unreadCount>9?'9+':unreadCount;b.style.display='flex';}else b.style.display='none';}
+}
+function scrollChatAbajo(){var m=document.getElementById('chatPopupMsgs');m.scrollTop=m.scrollHeight;}
+function autoResizeTA(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,90)+'px';}
+function toggleSendBtn(){var i=document.getElementById('chatPopupInput'),b=document.getElementById('chatPopupSendBtn');b.disabled=(i.value||'').trim()==='';b.style.opacity=b.disabled?'0.4':'1';}
+function setClienteOnline(online){clienteOnline=online;var dot=document.getElementById('chatStatusDot'),onl=document.getElementById('chatOnlineLabel');if(!dot)return;dot.className='chat-status-dot '+(online?'online':'offline');if(onl)onl.style.display=online?'inline':'none';}
+function buildDomiMiniAvatar(){var el=document.getElementById('chatDomiMiniAvatar');if(!el)return;el.textContent=domi.nombre?domi.nombre.charAt(0).toUpperCase():'D';}
+function actualizarChatClienteHeader(p){if(!p)return;var ini=p.cliente?p.cliente.charAt(0).toUpperCase():'?';document.getElementById('chatPopupNombre').textContent=p.cliente||'Cliente';document.getElementById('chatPopupTel').textContent=p.telefono||'—';document.getElementById('chatCallBtn').href='tel:'+(p.telefono||'');document.getElementById('chatPopupAvatarInitial').textContent=ini;document.getElementById('chatTypingAvatar').textContent=ini;var ib=document.getElementById('chatPedidoInfo');if(p.total||p.direccion){var dir=(p.direccion||'').replace(/\s*\[.+\]/,'').replace(/\s*\(Ref:[^)]+\)/,'').trim().substring(0,42);document.getElementById('chatPedidoResumen').textContent=(p.total||'—')+' · '+dir;ib.style.display='block';}setClienteOnline(false);}
+function abrirChatCliente(){if(!chatPopupAbierto)toggleChatPopup();else scrollChatAbajo();}
+function domiAvHtml(){return '<div class="chat-mini-domi">'+(domi.nombre?domi.nombre.charAt(0).toUpperCase():'D')+'</div>';}
+function getClienteIni(){return state.pedidoActivo&&state.pedidoActivo.cliente?state.pedidoActivo.cliente.charAt(0).toUpperCase():'?';}
+function enviarMensajePopup(){
+  var inp=document.getElementById('chatPopupInput');var txt=(inp.value||'').trim();if(!txt)return;
+  inp.value='';inp.style.height='auto';toggleSendBtn();
+  var now=horaAhora(),msgId='msg-'+Date.now();
+  mensajesChat.push({tipo:'out',texto:txt,hora:now,leido:false});
+  var msgs=document.getElementById('chatPopupMsgs');
+  msgs.insertAdjacentHTML('beforeend','<div class="chat-msg-wrap out" id="'+msgId+'">'+domiAvHtml()+'<div class="chat-bubble-col"><div class="msg-bubble-out">'+escHtml(txt)+'</div><div class="msg-meta out"><span>'+now+'</span><span class="material-symbols-outlined tick-unread" style="font-size:12px;line-height:1">done</span></div></div></div>');
+  scrollChatAbajo();persistirChat(state.pedidoActivo?state.pedidoActivo.id:null);
+  if(state.pedidoActivo){
+    fetch(API_BASE+'/wil?action=chat-mensaje',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idPedido:state.pedidoActivo.id,idDomi:domi.id,mensaje:txt,hora:now})})
+      .then(function(r){return r.json();})
+      .then(function(d){if(d&&d.ok){var t=document.querySelector('#'+msgId+' .tick-unread');if(t){t.classList.remove('tick-unread');t.classList.add('tick-read');t.textContent='done_all';}}}).catch(function(){});
+  }
+}
+function recibirMensajeCliente(texto,hora){
+  var h=hora||horaAhora();mensajesChat.push({tipo:'in',texto:texto,hora:h});
+  var msgs=document.getElementById('chatPopupMsgs');
+  msgs.insertAdjacentHTML('beforeend','<div class="chat-msg-wrap in"><div class="chat-mini-avatar">'+getClienteIni()+'</div><div class="chat-bubble-col"><div class="msg-bubble-in">'+escHtml(texto)+'</div><div class="msg-meta in"><span>'+h+'</span></div></div></div>');
+  if(!chatPopupAbierto){unreadCount++;actualizarBadgeUnread();}else scrollChatAbajo();
+  persistirChat(state.pedidoActivo?state.pedidoActivo.id:null);
+}
+
+/* ═══════════════════ CERRAR SESIÓN ═══════════════════ */
+function cerrarSesion(){
+  if(TRK.watchId!==null){navigator.geolocation.clearWatch(TRK.watchId);TRK.watchId=null;}
+  clearInterval(TRK.envTimer);clearInterval(pollingTimer);clearInterval(pollingBarTimer);
+  detenerChatPoll();
+  if (typeof WIL_NOTIF !== 'undefined') WIL_NOTIF.destroy();
+
+  localStorage.removeItem('wil_domi');
+  sessionStorage.removeItem('wil_domi');
+  window.location.replace('domi-login.html');
+}
+
+/* Normaliza estado */
+function _normEst(s) {
+  const v = (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if (v.includes('entregad'))               return 'entregado';
+  if (v.includes('camino'))                 return 'camino';
+  if (v.includes('proceso')||v.includes('ruta')) return 'proceso';
+  return 'pendiente';
+}
+
+/* Convierte fila agrupada al formato de la app */
+function _cvtPed(p) {
+  return {
+    ...p,
+    estado:    p.estado,
+    tipo:      'farmacia',
+    productos: (p._prods||[]).map(x=>x.nom).join(';'),
+    cantidad:  (p._prods||[]).map(x=>x.qty).join(';'),
+  };
+}
+
+/* Parser CSV robusto */
+function _parsearCSV(text) {
+  return text.trim().split('\n').filter(Boolean).slice(1).map(line => {
+    const cols = []; let cur = '', inQ = false;
+    for (const ch of line) {
+      if (ch==='"') inQ=!inQ;
+      else if (ch===','&&!inQ) { cols.push(cur.replace(/^"|"$/g,'').trim()); cur=''; }
+      else cur+=ch;
+    }
+    cols.push(cur.replace(/^"|"$/g,'').trim());
+    return cols;
+  }).filter(c => c[0]||c[6]);
+}
+ 
+/* Notificación cuando te asignan un pedido */
+function _notifAsignado(p) {
+  /* 1. Vibración radar intensa */
+  if (navigator.vibrate) navigator.vibrate([400, 100, 400, 100, 600, 200, 400, 100, 400]);
+
+  /* 2. Sonido radar fuerte — 4 pitidos ascendentes */
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var freqs = [440, 587, 784, 1047]; /* La-Re-Sol-Do */
+    freqs.forEach(function(freq, i) {
+      var osc  = ctx.createOscillator();
+      var gain = ctx.createGain();
+      /* Distorsión leve para sonar más fuerte */
+      var wshaper = ctx.createWaveShaper();
+      var curve = new Float32Array(256);
+      for (var k = 0; k < 256; k++) {
+        var x = (k * 2) / 256 - 1;
+        curve[k] = (Math.PI + 200) * x / (Math.PI + 200 * Math.abs(x));
+      }
+      wshaper.curve = curve;
+      osc.connect(wshaper);
+      wshaper.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'square'; /* cuadrada → más agresiva */
+      osc.frequency.value = freq;
+      var t = ctx.currentTime + i * 0.22;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.55, t + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.20);
+      osc.start(t);
+      osc.stop(t + 0.21);
+    });
+    /* 5º beep más largo como "confirmación" */
+    var oscF  = ctx.createOscillator();
+    var gainF = ctx.createGain();
+    oscF.connect(gainF); gainF.connect(ctx.destination);
+    oscF.type = 'sine'; oscF.frequency.value = 1047;
+    var tf = ctx.currentTime + freqs.length * 0.22;
+    gainF.gain.setValueAtTime(0, tf);
+    gainF.gain.linearRampToValueAtTime(0.45, tf + 0.04);
+    gainF.gain.exponentialRampToValueAtTime(0.001, tf + 0.55);
+    oscF.start(tf); oscF.stop(tf + 0.56);
+  } catch(e) {}
+
+  /* 3. Banner interno */
+  _mostrarBannerAsignado(p);
+
+  /* 4. Notificación de sistema via SW → va a la PWA instalada */
+  if (Notification.permission !== 'granted') {
+    Notification.requestPermission();
+    return;
+  }
+  var dirLimpia = (p.direccion || '')
+    .replace(/\s*\(Ref:[^)]+\)/g, '').replace(/\s*\[.+?\]/g, '').trim().substring(0, 70);
+  var esTrans = (p.metodoPago || '').toLowerCase().includes('transfer');
+
+  var titulo = '🎯 ¡Pedido asignado a ti!';
+  var opts = {
+    body: (p.cliente || 'Cliente') + ' · ' + dirLimpia
+      + '\n' + (p.total || '') + ' · ' + (esTrans ? 'Transferencia' : 'Efectivo'),
+    icon:  'icons/icon-192.png',
+    badge: 'icons/badge-72.png',
+    tag:   'wil-asignado-' + p.id,
+    requireInteraction: true,
+    vibrate: [400, 100, 400, 100, 600, 200, 400, 100, 400],
+    silent:  false,
+    data: { tipo: 'asignado', pedidoId: p.id }
+  };
+
+  if (window._wilSwReg && window._wilSwReg.showNotification) {
+    window._wilSwReg.showNotification(titulo, opts);
+  } else {
+    navigator.serviceWorker.ready.then(function(reg) {
+      window._wilSwReg = reg;
+      reg.showNotification(titulo, opts);
+    });
+  }
+}
+ 
+/* Función auxiliar — banner interno (separado de la notif del sistema) */
+function _mostrarBannerAsignado(p) {
+  if (!document.getElementById('_asign-style')) {
+    var st = document.createElement('style');
+    st.id = '_asign-style';
+    st.textContent =
+      '@keyframes _slideDown{from{transform:translateY(-110%);opacity:0}to{transform:translateY(0);opacity:1}}' +
+      '@keyframes _slideUp2{from{transform:translateY(0);opacity:1}to{transform:translateY(-110%);opacity:0}}' +
+      '._asign-banner{animation:_slideDown .4s cubic-bezier(.22,1,.36,1)}' +
+      '._asign-banner.out{animation:_slideUp2 .35s ease forwards}';
+    document.head.appendChild(st);
+  }
+ 
+  var dirLimpia = (p.direccion || '')
+    .replace(/\s*\(Ref:[^)]+\)/g, '').replace(/\s*\[.+?\]/g, '').trim().substring(0, 55);
+  var esTrans = (p.metodoPago || '').toLowerCase().includes('transfer');
+  var bid = '_ab_' + p.id;
+ 
+  /* Evitar duplicar el banner */
+  if (document.getElementById(bid)) return;
+ 
+  var div = document.createElement('div');
+  div.id        = bid;
+  div.className = '_asign-banner';
+  div.style.cssText =
+    'position:fixed;top:0;left:0;right:0;z-index:9999;' +
+    'background:linear-gradient(135deg,#005a60,#007f8c,#00a3b4);' +
+    'color:#fff;padding:14px 16px;' +
+    'padding-top:calc(14px + env(safe-area-inset-top));' +
+    'box-shadow:0 8px 32px rgba(0,0,0,.45);' +
+    "font-family:'Plus Jakarta Sans',sans-serif;";
+ 
+  div.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">' +
+      '<div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">' +
+        '<div style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">🛵</div>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:14px;font-weight:900;line-height:1.2;margin-bottom:2px">¡Te asignaron un pedido!</div>' +
+          '<div style="font-size:11px;color:rgba(255,255,255,.85);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+            escHtml(p.cliente || '—') + ' · ' + escHtml(dirLimpia) +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<button onclick="_cerrarBanner(\'' + bid + '\')" style="width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.18);border:none;cursor:pointer;color:#fff;font-size:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center">✕</button>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px">' +
+      '<div style="flex:1;background:rgba(255,255,255,.13);border-radius:10px;padding:7px 10px;text-align:center">' +
+        '<div style="font-size:9px;font-weight:800;text-transform:uppercase;color:rgba(255,255,255,.6)">Total</div>' +
+        '<div style="font-size:14px;font-weight:900">' + escHtml(p.total || '—') + '</div>' +
+      '</div>' +
+      '<div style="flex:1;background:rgba(255,255,255,.13);border-radius:10px;padding:7px 10px;text-align:center">' +
+        '<div style="font-size:9px;font-weight:800;text-transform:uppercase;color:rgba(255,255,255,.6)">Pago</div>' +
+        '<div style="font-size:12px;font-weight:800">' + (esTrans ? '🏦 Transf.' : '💵 Efectivo') + '</div>' +
+      '</div>' +
+      '<button onclick="_verPedidoAsignado(\'' + p.id + '\');_cerrarBanner(\'' + bid + '\')" ' +
+        'style="flex:2;background:#fff;color:#005a60;border:none;border-radius:10px;' +
+        "font-family:'Plus Jakarta Sans',sans-serif;" +
+        'font-weight:900;font-size:12px;cursor:pointer;padding:7px 12px;display:flex;align-items:center;justify-content:center;gap:5px">' +
+        '<span style="font-size:16px">📋</span> Ver pedido' +
+      '</button>' +
+    '</div>';
+ 
+  document.body.appendChild(div);
+  setTimeout(function() { _cerrarBanner(bid); }, 18000);
+}
+
+function _cerrarBanner(bid) {
+  const b = document.getElementById(bid);
+  if (!b) return;
+  b.classList.add('out');
+  setTimeout(() => b && b.remove(), 360);
+}
+ 
+function _verPedidoAsignado(id) {
+  switchTab('pedidos');
+  setTimeout(() => {
+    const el = document.getElementById('pedido-' + id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.style.transition = 'box-shadow .3s,transform .3s';
+    el.style.boxShadow  = '0 0 0 3px #00bcc9, 0 8px 32px rgba(0,188,200,.35)';
+    el.style.transform  = 'scale(1.02)';
+    setTimeout(() => { el.style.boxShadow=''; el.style.transform=''; }, 2000);
+  }, 350);
+}
+ 
+/* Acepta un pedido que ya fue asignado por el admin (solo cambia estado) */
+async function aceptarPedidoAsignado(id) {
+  const btn = document.getElementById('btn-' + id);
+  if (!btn) return;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Confirmando…';
+  try {
+    const res  = await fetch(SCRIPT_URL_DOMI, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        accion:    'asignar-domi',
+        pedidoId:  id,
+        domi:      domi.nombre,
+        horaAsign: new Date().toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit' })
+      })
+    });
+    const json = await res.json();
+    if (json.ok !== false) {
+      btn.innerHTML = '<span style="font-size:16px">✅</span> ¡Listo, en ruta!';
+      btn.style.background = '#2a9d5c';
+      idsProcesados.add(id);
+      _idsAsignadosNotificados.add(id);
+      _guardarIdsNotif();
+      const pedido = state.pedidos.find(p => p.id === id);
+      state.pedidos = state.pedidos.filter(p => p.id !== id);
+      state.pedidoActivo = pedido;
+      state.estadoPedido = 'proceso';
+      if (pedido) { pedido.estado = 'proceso'; activarPedidoEnRuta(pedido); }
+      actualizarBadgesNav();
+      setTimeout(() => switchTab('ruta'), 700);
+    } else {
+      btn.disabled = false;
+      btn.innerHTML = '⚠️ Error — reintentar';
+      btn.style.background = '#f59e0b';
+    }
+  } catch(e) {
+    btn.disabled = false;
+    btn.innerHTML = '⚠️ Sin conexión';
+    alert('Error: ' + e.message);
+  }
+}
+ 
+(function iniciarBroadcastListener() {
+  try {
+    var ch = new BroadcastChannel('wil_asignacion');
+    ch.addEventListener('message', function(e) {
+      var msg = e.data || {};
+      if (msg.tipo !== 'pedido-asignado') return;
+ 
+      /* Verificar que el mensaje es para ESTE domi */
+      var nombreBase = (domi.nombre || '').toLowerCase().split(' ')[0];
+      var idDomi     = (domi.id     || '').toUpperCase();
+      var dest       = (msg.domi    || '').toLowerCase();
+ 
+      if (!dest.includes(nombreBase) && !dest.toUpperCase().includes(idDomi)) return;
+ 
+      /* Evitar doble notificación */
+      if (_idsAsignadosNotificados.has(msg.pedidoId)) return;
+      _idsAsignadosNotificados.add(msg.pedidoId);
+ 
+      /* Construir objeto pedido para la notificación */
+      var pedFake = {
+        id:        msg.pedidoId  || '',
+        cliente:   msg.cliente   || 'Cliente',
+        direccion: msg.direccion || '',
+        total:     msg.total     || '',
+        metodoPago:msg.metodo    || '',
+        domiAsign: msg.domi      || ''
+      };
+ 
+      /* Disparar alerta completa: sonido + banner + notif sistema */
+      _notifAsignado(pedFake);
+ 
+      /* Fetch inmediato para mostrar el pedido en la lista */
+      setTimeout(function() { fetchPedidos(); }, 1200);
+      
+    });
+  } catch(e) {
+    console.warn('[BroadcastChannel no soportado]:', e.message);
+  }
+})();
+ 
+ 
+/* ══ 2. RECORDATORIO PENDIENTES CADA 3 MIN ══ */
+(function iniciarRecordatorio3Min() {
+  var CADA_MS      = 3 * 60 * 1000;
+  var _ultimaNotif = 0;
+ 
+  setInterval(function() {
+    /* Solo si han pasado 3 min */
+    if (Date.now() - _ultimaNotif < CADA_MS) return;
+ 
+    var n = state.pedidos.length;
+    if (n === 0) return;
+ 
+    _ultimaNotif = Date.now();
+ 
+    /* Sonido suave */
+    try {
+      var ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [523, 659].forEach(function(freq, i) {
+        var osc = ctx.createOscillator(), g = ctx.createGain();
+        osc.connect(g); g.connect(ctx.destination);
+        osc.type = 'sine'; osc.frequency.value = freq;
+        var t = ctx.currentTime + i * 0.28;
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.3, t + 0.04);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.30);
+        osc.start(t); osc.stop(t + 0.31);
+      });
+    } catch(e) {}
+ 
+    /* Vibración */
+    if (navigator.vibrate) navigator.vibrate([150, 60, 150]);
+ 
+    /* Flash badge */
+    var nb = document.getElementById('navBadge');
+    if (nb) {
+      nb.style.transform = 'scale(1.6)';
+      setTimeout(function() { nb.style.transform = 'scale(1)'; }, 350);
+    }
+ 
+    /* Notificación sistema via SW → llega a PWA instalada */
+    if (Notification.permission === 'granted') {
+      var titulo = '🛵 ' + n + ' pedido' + (n > 1 ? 's' : '') + ' esperando';
+      var opts = {
+        body: 'Hay ' + n + ' pedido' + (n > 1 ? 's pendientes' : ' pendiente') + ' sin tomar en WIL Domicilios',
+        icon:  'icons/icon-192.png',
+        badge: 'icons/badge-72.png',
+        /* Tag único con timestamp → no reemplaza, apila */
+        tag:   'wil-pend-' + Math.floor(Date.now() / 60000),
+        requireInteraction: false,
+        silent: false,
+        vibrate: [200, 80, 200]
+      };
+ 
+      if (window._wilSwReg) {
+        window._wilSwReg.showNotification(titulo, opts);
+      } else {
+        navigator.serviceWorker.ready.then(function(reg) {
+          window._wilSwReg = reg;
+          reg.showNotification(titulo, opts);
+        }).catch(function(){});
+      }
+    }
+ 
+    /* Badge ícono PWA */
+    if ('setAppBadge' in navigator) navigator.setAppBadge(n).catch(function(){});
+ 
+  }, 30 * 1000); /* revisar cada 30s, disparar solo si pasaron 3 min */
+})();
+
+
+/* ═══════════════════ INIT ═══════════════════ */
+renderPedidos();
+renderPerfil();
+iniciarPolling();
+buildDomiMiniAvatar();
+actualizarBadgesNav();
+fetchHistorialSheets();
+
+/* ── Notificaciones push + polling background ── */
+setTimeout(function () {
+  if (typeof WIL_NOTIF !== 'undefined' && domi) {
+    WIL_NOTIF.init(domi);
+  }
+}, 800); /* pequeño delay para que el SW se registre */
+
+(function iniciarRecordatorioPendientes() {
+  var CADA_MS = 5 * 60 * 1000; /* 5 minutos */
+  var _ultimaNotifPend = 0;    /* timestamp última notif pendientes */
+ 
+  setInterval(function () {
+    /* Solo notificar si han pasado 5 min desde la última */
+    if (Date.now() - _ultimaNotifPend < CADA_MS) return;
+ 
+    var totalPend = state.pedidos.length;
+    if (totalPend === 0) return; /* sin pedidos → no molestar */
+ 
+    _ultimaNotifPend = Date.now();
+ 
+    /* Sonido suave tipo ping */
+    /* Sonido radar para pendientes (más suave que asignado) */
+try {
+  var ctx = new (window.AudioContext || window.webkitAudioContext)();
+  var freqs2 = [523, 659]; /* Do-Mi */
+  freqs2.forEach(function(freq, i) {
+    var osc  = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sine'; osc.frequency.value = freq;
+    var t = ctx.currentTime + i * 0.28;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.35, t + 0.04);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
+    osc.start(t); osc.stop(t + 0.33);
+  });
+} catch(e) {}
+ 
+    /* Vibración suave */
+    if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
+ 
+    /* Flash del badge en la nav */
+    var nb = document.getElementById('navBadge');
+    if (nb) {
+      nb.style.transition = 'transform .15s';
+      nb.style.transform = 'scale(1.5)';
+      setTimeout(function () { nb.style.transform = 'scale(1)'; }, 300);
+    }
+ 
+    /* Notificación del sistema (si la app está en background) */
+     if (Notification.permission === 'granted') {
+      var titulo = '🛵 ' + totalPend + ' pedido' + (totalPend > 1 ? 's' : '') + ' esperando';
+      var opts = {
+        body: 'Hay ' + totalPend + ' pedido' + (totalPend > 1 ? 's' : '') +
+              ' pendiente' + (totalPend > 1 ? 's' : '') + ' en WIL',
+        icon:  'icons/icon-192.png',
+        badge: 'icons/badge-72.png',
+        tag:   'wil-pendientes',
+        requireInteraction: false,
+        silent: false,
+        vibrate: [150, 75, 150]
+      };
+ 
+      /* Siempre via SW → va a la PWA instalada */
+      if (window._wilSwReg && window._wilSwReg.showNotification) {
+        window._wilSwReg.showNotification(titulo, opts);
+      } else {
+        navigator.serviceWorker.ready.then(function(reg) {
+          window._wilSwReg = reg;
+          reg.showNotification(titulo, opts);
+        });
+      }
+    }
+ 
+    /* Badge del ícono */
+    if ('setAppBadge' in navigator) {
+      navigator.setAppBadge(totalPend).catch(function(){});
+    }
+  }, 60 * 1000); /* revisa cada 1 min, pero solo dispara cada 5 */
+})();
+
+setTimeout(function () {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+      .then(function (reg) {
+        window._wilSwReg = reg; /* referencia global para notif pendientes */
+        /* Enviar datos del domi al SW para polling en background */
+        navigator.serviceWorker.ready.then(function () {
+          if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({
+              type: 'GUARDAR_DOMI',
+              domi: domi,
+              notifIds: []  /* sin localStorage → siempre vacío */
+            });
+          }
+        });
+      })
+      .catch(function (e) { console.warn('[SW]', e); });
+ 
+    /* Escuchar mensajes del SW (ej: clic en notif fuera de la app) */
+    navigator.serviceWorker.addEventListener('message', function (e) {
+      var msg = e.data || {};
+      if (msg.type === 'OPEN_PEDIDOS') switchTab('pedidos');
+      if (msg.type === 'BG_POLL_RESULT' && msg.asignadosCount > 0) fetchPedidos();
+    });
+  }
+ 
+  /* Pedir permiso de notificación si no lo tiene */
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}, 800);
+
+
+window.WIL={
+  nuevoPedido:function(p){state.pedidos.push(p);renderPedidos();},
+  agregarHistorial:function(items){state.historial=state.historial.concat(items);renderHistorial();actualizarBadgesNav();},
+  mensajeCliente:function(texto,hora){recibirMensajeCliente(texto,hora);},
+  setClienteOnline:function(online){setClienteOnline(online);}
+};
+
+</script>
+</body>
+</html>

@@ -1,0 +1,2793 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<title>Farmacias WIL</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --blue:#003f87;--blue-d:#002d6a;--blue-l:#e8f0fe;--blue-m:#c5d8ff;
+  --green:#15803d;--green-l:#dcfce7;--green-m:#16a34a;
+  --red:#dc2626;--red-l:#fee2e2;
+  --orange:#ea580c;--orange-l:#ffedd5;
+  --purple:#7c3aed;--purple-l:#ede9fe;
+  --gray:#6b7280;--gray-l:#f3f4f6;--gray-m:#e5e7eb;
+  --text:#111827;--text2:#6b7280;--text3:#9ca3af;
+  --bg:#f8faff;--card:#fff;
+  --r:16px;--r2:20px;--shadow:0 2px 12px rgba(0,63,135,.08);
+}
+html,body{height:100%;overflow-x:hidden}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);padding-bottom:90px;-webkit-font-smoothing:antialiased}
+.M{font-family:'Manrope',sans-serif}
+.sym{font-family:'Material Symbols Outlined';font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24;font-style:normal;line-height:1;display:inline-block;vertical-align:middle}
+.symf{font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes scrollL{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+@keyframes scrollR{0%{transform:translateX(-50%)}100%{transform:translateX(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes gradF{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+@keyframes dotPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.4);opacity:.6}}
+@keyframes floatA{0%,100%{transform:translateY(0) rotate(-8deg)}50%{transform:translateY(-9px) rotate(-8deg)}}
+@keyframes floatB{0%,100%{transform:translateY(0) rotate(12deg)}50%{transform:translateY(-12px) rotate(12deg)}}
+@keyframes floatC{0%,100%{transform:translateY(0) rotate(-20deg)}50%{transform:translateY(-7px) rotate(-20deg)}}
+@keyframes floatD{0%,100%{transform:translateY(0) rotate(5deg)}50%{transform:translateY(-11px) rotate(5deg)}}
+@keyframes floatE{0%,100%{transform:translateY(0) rotate(-14deg)}50%{transform:translateY(-8px) rotate(-14deg)}}
+@keyframes pillFade{0%,100%{opacity:.65}50%{opacity:1}}
+
+@keyframes stepIn{from{transform:scale(0.4);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes pulseRing{0%{box-shadow:0 0 0 0 rgba(21,128,61,.5)}70%{box-shadow:0 0 0 8px rgba(21,128,61,0)}100%{box-shadow:0 0 0 0 rgba(21,128,61,0)}}
+@keyframes labelFade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+@keyframes bannerSlide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeScaleIn{from{opacity:0;transform:scale(.88)}to{opacity:1;transform:scale(1)}}
+
+
+
+.pill-float{animation:floatA 3.5s ease-in-out infinite,pillFade 4s ease-in-out infinite;animation-fill-mode:both}
+.pill-float:nth-child(2){animation:floatB 4.2s ease-in-out infinite .4s,pillFade 5s ease-in-out infinite .8s}
+.pill-float:nth-child(3){animation:floatC 3.8s ease-in-out infinite .8s,pillFade 4.5s ease-in-out infinite 1.5s}
+.pill-float:nth-child(4){animation:floatD 4.6s ease-in-out infinite 1.2s,pillFade 5.5s ease-in-out infinite .3s}
+.pill-float:nth-child(5){animation:floatE 3.2s ease-in-out infinite .2s,pillFade 4.2s ease-in-out infinite 1s}
+.pill-float:nth-child(6){animation:floatA 5s ease-in-out infinite 1.6s,pillFade 6s ease-in-out infinite .5s}
+.pill-float:nth-child(7){animation:floatB 3.6s ease-in-out infinite .6s,pillFade 4.8s ease-in-out infinite 1.8s}
+.pill-float:nth-child(8){animation:floatC 4.8s ease-in-out infinite 1s,pillFade 5.2s ease-in-out infinite .2s}
+
+#v-home{display:block}
+#v-search,#v-cats{display:none}
+
+/* ── HEADER ── */
+.hdr{position:sticky;top:0;z-index:200;background:rgba(255,255,255,.97);backdrop-filter:blur(16px);border-bottom:1px solid var(--gray-m);padding:12px 16px calc(12px + env(safe-area-inset-top,0px)/2)}
+.sbar{display:flex;align-items:center;gap:10px;background:var(--gray-l);border-radius:14px;padding:0 14px;height:46px;cursor:pointer;border:2px solid transparent;transition:.15s}
+.sbar input{flex:1;border:none;background:transparent;font-family:'Inter',sans-serif;font-size:14px;font-weight:500;color:var(--text);outline:none}
+.sbar input::placeholder{color:var(--text3)}
+
+/* ── SECTIONS ── */
+.sec-hdr{display:flex;align-items:center;justify-content:space-between;padding:0 16px;margin-bottom:12px}
+.sec-title{font-family:'Manrope',sans-serif;font-size:17px;font-weight:800;color:var(--text)}
+.sec-link{font-size:12px;font-weight:700;color:var(--blue)}
+
+/* ── CATEGORÍAS ── */
+.cat-row{display:flex;gap:8px;padding:0 16px;overflow-x:auto;scrollbar-width:none}
+.cat-row::-webkit-scrollbar{display:none}
+.cat-btn{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;transition:.15s}
+.cat-btn:active{transform:scale(.9)}
+.cat-ico{width:60px;height:60px;border-radius:16px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.cat-lbl{font-size:10.5px;font-weight:700;color:var(--text);text-align:center;line-height:1.2;max-width:60px}
+
+/* ── PROMOS ── */
+.promo-wrap{overflow:hidden}
+.promo-track{display:flex;gap:12px;padding:0 16px;animation:scrollL 28s linear infinite;width:max-content}
+.promo-track:hover{animation-play-state:paused}
+.promo-card{flex-shrink:0;width:82vw;max-width:310px;border-radius:20px;padding:20px;position:relative;overflow:hidden;min-height:130px;display:flex;flex-direction:column;justify-content:space-between;background-size:200% 200%;animation:gradF 4s ease infinite}
+.promo-deco{position:absolute;border-radius:50%;pointer-events:none;background:rgba(255,255,255,.1)}
+.promo-tag{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;padding:3px 10px;border-radius:99px;width:fit-content;margin-bottom:6px}
+.promo-title{font-family:'Manrope',sans-serif;font-size:19px;font-weight:900;color:#fff;line-height:1.15;letter-spacing:-.02em}
+.promo-sub{font-size:10.5px;color:rgba(255,255,255,.78);font-weight:600;margin-top:3px}
+.promo-btn{width:fit-content;background:#fff;border:none;cursor:pointer;padding:7px 16px;border-radius:10px;font-family:'Manrope',sans-serif;font-size:11.5px;font-weight:800;transition:.12s;margin-top:10px}
+.promo-btn:active{transform:scale(.93)}
+
+/* ── PRODUCT CARDS SCROLL ── */
+.prod-scroll-wrap{position:relative}
+.prod-scroll{overflow-x:auto;display:flex;gap:14px;padding:4px 0 6px 16px;scrollbar-width:none;scroll-snap-type:x mandatory;scroll-behavior:smooth}
+
+.prod-scroll::-webkit-scrollbar{display:none}
+/* SCROLL ARROWS */
+.scroll-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:10;width:32px;height:32px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,.18);transition:.13s;background:#fff}
+.scroll-arrow:active{transform:translateY(-50%) scale(.9)}
+.scroll-arrow.left{left:4px}
+.scroll-arrow.right{right:4px}
+
+.pcard{flex-shrink:0;width:calc(100vw - 96px);max-width:280px;background:#fff;border-radius:18px;border:1.5px solid #e5e7eb;box-shadow:0 2px 12px rgba(0,0,0,.08);overflow:hidden;display:flex;flex-direction:column;scroll-snap-align:start;cursor:pointer;transition:.13s;animation:fadeUp .3s ease both}
+.pcard:active{transform:scale(.97)}
+.pcard-top{width:100%;height:175px;display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0;background:#fff!important;border-bottom:1px solid #f3f4f6}
+.pcard-disc{position:absolute;top:8px;right:8px;background:var(--red);color:#fff;font-size:9px;font-weight:900;padding:2px 7px;border-radius:99px}
+.pcard-stk{position:absolute;top:8px;left:8px;font-size:8px;font-weight:800;padding:2px 7px;border-radius:99px}
+.pcard-body{padding:10px 10px 11px;display:flex;flex-direction:column;gap:4px;flex:1}
+.pcard-lab{font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:99px;width:fit-content;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pcard-name{font-size:11.5px;font-weight:700;color:var(--text);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.3em}
+.pcard-prices{display:flex;align-items:center;justify-content:space-between;margin-top:auto;padding-top:4px;gap:4px}
+.pcard-old{font-size:9.5px;color:var(--text3);text-decoration:line-through;font-weight:600}
+.pcard-price{font-size:14px;font-weight:900;color:var(--blue);letter-spacing:-.02em}
+.pcard-add{width:30px;height:30px;border-radius:9px;border:none;cursor:pointer;background:var(--blue);display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;box-shadow:0 3px 10px rgba(0,63,135,.35);transition:.13s}
+.pcard-add:active{transform:scale(.85)}
+.pcard-add.on{background:var(--green)}
+
+/* ── CATALOGO AUTO ── */
+.cat-auto-track{display:flex;gap:10px;width:max-content;padding:0 16px}
+.cat-auto-track.dir-L{animation:scrollL 22s linear infinite}
+.cat-auto-track.dir-R{animation:scrollR 26s linear infinite}
+.cat-auto-track:hover{animation-play-state:paused}
+
+/* ─────────────────────────────────────────────────────────────
+   PILLS FLOTANTES — FIX: altura aumentada a 260px (antes 155px)
+   para que los ítems del fondo no queden clippeados por overflow:hidden
+───────────────────────────────────────────────────────────── */
+.pill-scene{position:relative;width:100%;height:260px;overflow:hidden}
+.pill-item{position:absolute;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;animation-fill-mode:both}
+.pill-item:active{transform:scale(.9)!important}
+.pill-svg{width:44px;height:44px;border-radius:22px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.1)}
+.pill-lbl{font-size:9.5px;font-weight:800;color:var(--text);white-space:nowrap;text-align:center;background:var(--card);border-radius:99px;padding:2px 8px;border:1px solid var(--gray-m);box-shadow:0 1px 4px rgba(0,0,0,.06)}
+
+mark{background:#dbeafe;color:#1e40af;border-radius:3px;padding:0 2px}
+.spinner{width:28px;height:28px;border:3px solid var(--blue-l);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+
+/* ── CART ── */
+#cart-panel{position:fixed;bottom:0;left:0;right:0;z-index:900;background:#fff;border-radius:24px 24px 0 0;box-shadow:0 -8px 40px rgba(0,0,0,.18);transform:translateY(100%);transition:transform .35s cubic-bezier(.22,1,.36,1);max-height:82dvh;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom,0px)}
+#cart-panel.open{transform:translateY(0)}
+#cart-ov{position:fixed;inset:0;z-index:890;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .3s;backdrop-filter:blur(4px)}
+#cart-ov.show{opacity:1;pointer-events:all}
+.ci{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--gray-l)}
+.ci:last-child{border:none}
+
+/* ── OCARD: card universal igual que Ofertas ── */
+.ocard{flex-shrink:0;width:calc(100vw - 96px);max-width:280px;background:#fff;border-radius:18px;border:1.5px solid #e5e7eb;box-shadow:0 2px 12px rgba(0,0,0,.08);overflow:hidden;display:flex;flex-direction:column;scroll-snap-align:start;}
+.ocard-img{width:100%;height:145px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;flex-shrink:0;border-bottom:1px solid #f3f4f6;}
+.ocard-img img{width:100%;height:145px;object-fit:contain;padding:6px;}
+.ocard-body{padding:8px 11px 11px;display:flex;flex-direction:column;gap:3px;}
+.ocard-name{font-family:'Manrope',sans-serif;font-size:12px;font-weight:800;color:#111827;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.1em;}
+.ocard-desc{font-size:10px;color:#6b7280;line-height:1.35;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;}
+.ocard-footer{display:flex;align-items:flex-end;justify-content:space-between;margin-top:5px;gap:6px;}
+.ocard-price{font-family:'Manrope',sans-serif;font-size:15px;font-weight:900;letter-spacing:-.02em;line-height:1.1;}
+.ocard-old{font-size:9px;color:#9ca3af;text-decoration:line-through;font-weight:600;line-height:1.1;}
+.ocard-add{border:none;cursor:pointer;padding:6px 11px;border-radius:9px;font-family:'Manrope',sans-serif;font-size:10.5px;font-weight:800;display:flex;align-items:center;gap:3px;white-space:nowrap;flex-shrink:0;color:#fff;}
+
+/* ── NAV ── */
+.nav{position:fixed;bottom:0;left:0;right:0;z-index:500;background:rgba(255,255,255,.96);backdrop-filter:blur(16px);border-top:1px solid var(--gray-m);display:flex;justify-content:space-around;align-items:center;padding:8px 0 calc(8px + env(safe-area-inset-bottom,0px))}
+.nav-item{display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;padding:4px 16px;transition:.12s;border-radius:12px}
+.nav-item:active{background:var(--gray-l)}
+.nav-item.on .sym{color:var(--blue)}
+.nav-item.on span:last-child{color:var(--blue);font-weight:700}
+.nav-item span:last-child{font-size:10px;font-weight:500;color:var(--text3)}
+
+/* ── TRACKER ── */
+.trk-wrap{background:#fff;border-radius:16px;border:1.5px solid #e5e7eb;box-shadow:0 2px 12px rgba(0,0,0,.06);overflow:hidden}
+.trk-banner{padding:9px 14px;display:flex;align-items:center;gap:7px;transition:background .6s ease}
+.trk-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;transition:background .4s}
+.trk-banner-txt{font-size:10px;font-weight:800;color:#fff;letter-spacing:.04em;transition:all .4s}
+.trk-banner-sub{font-size:9px;color:rgba(255,255,255,.6);font-weight:600;margin-left:auto;white-space:nowrap}
+.trk-body{padding:12px 14px 8px}
+.trk-steps{display:flex;align-items:flex-start}
+.trk-step{display:flex;flex-direction:column;align-items:center;flex:1;position:relative}
+.trk-step::after{content:'';position:absolute;top:14px;left:50%;width:100%;height:2px;background:var(--gray-m);z-index:0;transition:background .5s ease}
+.trk-step:last-child::after{display:none}
+.trk-step .line-fill{position:absolute;top:14px;left:50%;height:2px;width:0;background:#15803d;z-index:1;transition:width .7s cubic-bezier(.4,0,.2,1)}
+.trk-node{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:2;flex-shrink:0;position:relative;transition:background .5s ease,border .5s ease,box-shadow .5s ease;border:2px solid transparent;background:var(--gray-l)}
+.trk-node.done{background:#15803d;border-color:#15803d}
+.trk-node.active{background:#15803d;border-color:#15803d;animation:pulseRing 1.6s ease infinite}
+.trk-node.pending{background:#f3f4f6;border-color:#e5e7eb}
+.trk-node-icon{font-size:13px;color:#9ca3af;transition:color .4s}
+.trk-node.done .trk-node-icon,.trk-node.active .trk-node-icon{color:#fff}
+.trk-lbl-wrap{margin-top:6px;text-align:center}
+.trk-lbl{font-size:9.5px;font-weight:700;color:var(--text3);transition:color .4s}
+.trk-lbl.done,.trk-lbl.active{color:#15803d}
+.trk-sublbl{font-size:8.5px;font-weight:700;color:#15803d;margin-top:1px;min-height:12px;transition:opacity .3s}
+.trk-pills{padding:6px 14px 10px;display:flex;gap:5px;flex-wrap:wrap}
+.trk-pill{display:flex;align-items:center;gap:3px;border-radius:99px;padding:3px 8px;font-size:9.5px;font-weight:700}
+
+/* ── SHEET PRODUCT SECTION ── */
+.sheet-section{margin-top:22px}
+.sheet-scroll-wrap{position:relative}
+.sheet-scroll{overflow-x:auto;display:flex;gap:14px;padding:4px 16px 6px 16px;scrollbar-width:none;scroll-snap-type:x mandatory;scroll-behavior:smooth}
+.sheet-scroll::-webkit-scrollbar{display:none}
+.scard{flex-shrink:0;width:152px;background:var(--card);border-radius:18px;border:1.5px solid var(--gray-m);box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;scroll-snap-align:start;cursor:pointer;transition:.13s;animation:fadeUp .3s ease both}
+.scard:active{transform:scale(.97)}
+.scard-top{width:100%;height:100px;display:flex;align-items:center;justify-content:center;background:#f0f4ff;position:relative}
+.scard-body{padding:9px 10px 10px;display:flex;flex-direction:column;gap:4px;flex:1}
+.scard-lab{font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:2px 6px;border-radius:99px;width:fit-content;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:var(--blue-l);color:var(--blue)}
+.scard-name{font-size:11px;font-weight:700;color:var(--text);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.2em}
+.scard-prices{display:flex;align-items:center;justify-content:space-between;margin-top:auto;padding-top:4px;gap:4px}
+.scard-price{font-size:13px;font-weight:900;color:var(--blue)}
+.scard-add{width:28px;height:28px;border-radius:8px;border:none;cursor:pointer;background:var(--blue);display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;box-shadow:0 3px 8px rgba(0,63,135,.3);transition:.13s}
+.scard-add:active{transform:scale(.85)}
+.scard-add.on{background:var(--green)}
+
+/* skeleton loader */
+.skel{background:linear-gradient(90deg,#f0f0f0 25%,#e0e8ff 50%,#f0f0f0 75%);background-size:200% 100%;animation:skelShimmer 1.2s infinite}
+@keyframes skelShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+</style>
+</head>
+<body>
+
+<!-- HEADER — sin logo, con botón volver -->
+<div class="hdr">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <!-- BOTÓN VOLVER en lugar del logo -->
+      <button onclick="window.location.href='pedido-wil.html'" style="width:40px;height:40px;border-radius:50%;border:none;background:var(--blue-l);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:.13s;box-shadow:0 2px 8px rgba(0,63,135,.15)">
+        <span class="sym" style="font-size:22px;color:var(--blue)">arrow_back</span>
+      </button>
+      <div>
+        <div id="hdr-name" class="M" style="font-size:18px;font-weight:900;color:var(--blue);line-height:1.1;letter-spacing:-.02em">Farma Expertos</div>
+        <div style="display:flex;align-items:center;gap:3px;margin-top:3px">
+          <span class="sym" style="font-size:11px;color:var(--text3)">location_on</span>
+          <div id="hdr-sub" style="font-size:10px;font-weight:600;color:var(--text3)">Cra 47 #51-69 · Copacabana</div>
+          <span style="font-size:9px;font-weight:700;color:#16a34a;background:#dcfce7;padding:1px 6px;border-radius:99px;margin-left:3px">Abierta</span>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:4px;background:var(--gray-l);padding:6px 10px;border-radius:99px;flex-shrink:0">
+      <span class="sym symf" style="font-size:13px;color:var(--blue)">location_on</span>
+      <span style="font-size:11px;font-weight:600">Copacabana</span>
+    </div>
+  </div>
+  <div id="hdr-search" class="sbar" onclick="openSearch()" style="cursor:pointer">
+    <span class="sym" style="font-size:20px;color:var(--text3)">search</span>
+    <input id="s-inp" placeholder="Buscar medicamentos, marcas..." autocomplete="off" spellcheck="false" style="cursor:pointer;pointer-events:none"/>
+    <button id="s-clr" onclick="event.stopPropagation();clearSearch()" style="border:none;background:none;cursor:pointer;display:none;padding:0">
+      <span class="sym" style="font-size:18px;color:var(--text3)">close</span>
+    </button>
+  </div>
+</div>
+
+<!-- ════ VISTA HOME ════ -->
+<div id="v-home">
+<div id="v-home-content">
+  <div style="padding:12px 16px 0;display:flex;gap:8px">
+    <button id="btn-domi" onclick="setModo('domi')" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 12px;border-radius:12px;border:2px solid var(--blue);background:var(--blue-l);color:var(--blue);font-family:'Manrope',sans-serif;font-size:13px;font-weight:800;cursor:pointer">
+      <span class="sym symf" style="font-size:18px">delivery_dining</span> Domicilio
+    </button>
+    <button id="btn-reco" onclick="setModo('reco')" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 12px;border-radius:12px;border:2px solid var(--gray-m);background:var(--card);color:var(--text3);font-family:'Manrope',sans-serif;font-size:13px;font-weight:700;cursor:pointer">
+      <span class="sym" style="font-size:18px">store</span> Recogida
+    </button>
+  </div>
+
+  <!-- Categorías -->
+  <div style="margin-top:18px">
+    <div class="sec-hdr">
+      <span class="sec-title">Categorías</span>
+      <span class="sec-link" onclick="openCats()" style="cursor:pointer">Ver todas →</span>
+    </div>
+    <div class="cat-row">
+      <div class="cat-btn" onclick="openSearch('acetaminofen')"><div class="cat-ico" style="background:#f3f4f6"><span class="sym" style="font-size:30px;color:var(--blue)">medication</span></div><span class="cat-lbl">Genéricos</span></div>
+      <div class="cat-btn" onclick="openSearch('pediatrico')"><div class="cat-ico" style="background:#f3f4f6"><span class="sym" style="font-size:30px;color:var(--blue)">child_care</span></div><span class="cat-lbl">Bebés</span></div>
+      <div class="cat-btn" onclick="openSearch('crema')"><div class="cat-ico" style="background:#f3f4f6"><span class="sym" style="font-size:30px;color:var(--blue)">face_6</span></div><span class="cat-lbl">Belleza</span></div>
+      <div class="cat-btn" onclick="openSearch('vitamina')"><div class="cat-ico" style="background:#f3f4f6"><span class="sym" style="font-size:30px;color:var(--blue)">health_and_safety</span></div><span class="cat-lbl">Vitaminas</span></div>
+      <div class="cat-btn" onclick="openSearch('ibuprofeno')"><div class="cat-ico" style="background:#f3f4f6"><span class="sym" style="font-size:30px;color:var(--blue)">healing</span></div><span class="cat-lbl">Dolor</span></div>
+      <div class="cat-btn" onclick="openSearch('insulina')"><div class="cat-ico" style="background:#f3f4f6"><span class="sym" style="font-size:30px;color:var(--blue)">vaccines</span></div><span class="cat-lbl">Crónico</span></div>
+      <div class="cat-btn" onclick="openSearch('protector solar')"><div class="cat-ico" style="background:#f3f4f6"><span class="sym" style="font-size:30px;color:var(--blue)">wb_sunny</span></div><span class="cat-lbl">Solar</span></div>
+    </div>
+  </div>
+
+  <!-- Promos -->
+  <!-- Promos — cargadas dinámicamente desde el sheet de Ofertas -->
+<div style="margin-top:20px" id="promos-section">
+  <div class="sec-hdr" style="margin-bottom:10px">
+    <span class="sec-title">Ofertas Especiales 🏷️</span>
+    <span id="promos-count" style="font-size:10px;color:var(--text3);font-weight:600;"></span>
+  </div>
+  <div class="promo-wrap" id="promos-wrap">
+    <!-- Se llena dinámicamente -->
+    <div id="promos-loading" style="display:flex;align-items:center;gap:10px;padding:0 16px;">
+      <div class="spinner" style="width:18px;height:18px;border-width:2px;"></div>
+      <span style="font-size:12px;color:var(--text3);font-weight:600;">Cargando ofertas...</span>
+    </div>
+    <!-- Fallback estático (visible si el sheet falla) -->
+    <div id="promos-fallback" style="display:none;">
+      <div class="promo-track">
+        <div class="promo-card" style="background:linear-gradient(135deg,#003f87,#1a56db,#3b82f6)" onclick="openSearch('vitamina')">
+          <div><div class="promo-tag" style="background:rgba(255,255,255,.2);color:#fff">Oferta Flash</div>
+          <div class="promo-title">20% OFF<br/>en Vitaminas</div>
+          <div class="promo-sub">Healthy America · Genfar · MK</div></div>
+          <button class="promo-btn" style="color:var(--blue)">Ver ofertas →</button>
+        </div>
+        <div class="promo-card" style="background:linear-gradient(135deg,#7c1d00,#dc2626,#f97316)" onclick="openSearch('acetaminofen')">
+          <div><div class="promo-tag" style="background:rgba(255,255,255,.2);color:#fff">Más Vendido</div>
+          <div class="promo-title">Analgésicos<br/>desde $3.200</div>
+          <div class="promo-sub">Acetaminofén · Ibuprofeno · Naproxeno</div></div>
+          <button class="promo-btn" style="color:var(--red)">Buscar →</button>
+        </div>
+        <div class="promo-card" style="background:linear-gradient(135deg,#064e3b,#059669,#34d399)" onclick="openSearch('crema')">
+          <div><div class="promo-tag" style="background:rgba(255,255,255,.2);color:#fff">Dermocosméticos</div>
+          <div class="promo-title">Piel Radiante<br/>Paga 2 Lleva 3</div>
+          <div class="promo-sub">La Roche-Posay · Cerave · Eucerin</div></div>
+          <button class="promo-btn" style="color:var(--green)">Explorar →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <!-- ══ PRODUCTOS DEL SHEET (50 productos reales) ══ -->
+  <div class="sheet-section">
+    <div class="sec-hdr">
+      <div>
+        <div class="sec-title">Catálogo Activo 📦</div>
+        <div id="tienda-lbl" style="font-size:10.5px;color:var(--text3);font-weight:500;margin-top:1px">Cargando productos...</div>
+      </div>
+      <span class="sec-link" onclick="openSearch('')" style="cursor:pointer">Ver todo →</span>
+    </div>
+    <div class="sheet-scroll-wrap">
+      <!-- Skeleton loaders mientras carga -->
+      <div id="sheet-skeleton" class="sheet-scroll" style="padding:2px 16px 4px">
+        <div style="flex-shrink:0;width:160px;height:210px;border-radius:18px;overflow:hidden" class="skel"></div>
+        <div style="flex-shrink:0;width:160px;height:210px;border-radius:18px;overflow:hidden" class="skel"></div>
+        <div style="flex-shrink:0;width:160px;height:210px;border-radius:18px;overflow:hidden" class="skel"></div>
+        <div style="flex-shrink:0;width:160px;height:210px;border-radius:18px;overflow:hidden" class="skel"></div>
+      </div>
+      <div id="sheet-scroll" class="sheet-scroll" style="display:none"></div>
+      <!-- Flechas de scroll -->
+      <button id="sheet-arrow-l" class="scroll-arrow left" onclick="scrollSection('sheet-scroll',-1)" style="display:none">
+        <span class="sym" style="font-size:18px;color:var(--blue)">chevron_left</span>
+      </button>
+      <button id="sheet-arrow-r" class="scroll-arrow right" onclick="scrollSection('sheet-scroll',1)" style="display:none">
+        <span class="sym" style="font-size:18px;color:var(--blue)">chevron_right</span>
+      </button>
+    </div>
+  </div>
+
+ 
+ 
+<!-- ══ MÁS POPULARES ══ -->
+<div id="sec-populares" style="margin-top:22px">
+  <div class="sec-hdr">
+    <div><div class="sec-title">Más Populares 🔥</div><div style="font-size:10.5px;color:var(--text3);font-weight:500;margin-top:1px">Productos destacados</div></div>
+    <span class="sec-link" onclick="openSearch('')" style="cursor:pointer">Ver todo</span>
+  </div>
+  <div style="overflow:visible;padding-left:16px">
+    <div id="pop-scroll" style="display:flex;gap:10px;padding-right:16px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;"></div>
+  </div>
+</div>
+
+
+
+<!-- ══ DERMOCOSMÉTICOS ══ -->
+<div id="sec-dermo" style="margin-top:22px">
+  <div class="sec-hdr">
+    <div><div class="sec-title">Dermocosméticos</div><div style="font-size:10.5px;color:var(--text3);font-weight:500;margin-top:1px">Cuidado de piel premium</div></div>
+    <span class="sec-link" onclick="openSearch('crema')" style="cursor:pointer">Ver más →</span>
+  </div>
+  <div style="overflow:visible;padding-left:16px">
+    <div id="dermo-scroll" style="display:flex;gap:10px;padding-right:16px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;"></div>
+  </div>
+</div>
+
+ 
+ <!-- ══ VITAMINAS ══ -->
+<div style="margin-top:22px">
+  <div class="sec-hdr">
+    <div><div class="sec-title">Vitaminas &amp; Suplementos</div><div style="font-size:10.5px;color:var(--text3);font-weight:500;margin-top:1px">Bienestar y nutrición</div></div>
+    <span class="sec-link" onclick="openSearch('vitamina')" style="cursor:pointer">Ver más →</span>
+  </div>
+  <div style="overflow:visible;padding-left:16px">
+    <div id="vit-scroll" style="display:flex;gap:10px;padding-right:16px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;"></div>
+  </div>
+</div>
+
+ <!-- ══ PEDIÁTRICO ══ -->
+<div style="margin-top:22px">
+  <div class="sec-hdr">
+    <div><div class="sec-title">Pediátrico</div><div style="font-size:10.5px;color:var(--text3);font-weight:500;margin-top:1px">Para los más pequeños</div></div>
+    <span class="sec-link" onclick="openSearch('pediatrico')" style="cursor:pointer">Ver más →</span>
+  </div>
+  <div style="overflow:visible;padding-left:16px">
+    <div id="ped-scroll" style="display:flex;gap:10px;padding-right:16px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;"></div>
+  </div>
+</div>
+<!-- ══ HIGIENE PERSONAL ══ -->
+<div style="margin-top:22px">
+  <div class="sec-hdr">
+    <div><div class="sec-title">Leches</div><div style="font-size:10.5px;color:var(--text3);font-weight:500;margin-top:1px">Cuidado e higiene diaria</div></div>
+    <span class="sec-link" onclick="openSearch('higiene')" style="cursor:pointer">Ver más →</span>
+  </div>
+  <div style="overflow:visible;padding-left:16px">
+    <div id="hig-scroll" style="display:flex;gap:10px;padding-right:16px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;"></div>
+  </div>
+</div>
+
+<!-- ══ CUIDADO BUCAL ══ -->
+<div style="margin-top:22px">
+  <div class="sec-hdr">
+    <div><div class="sec-title">Dermatólogicos</div><div style="font-size:10.5px;color:var(--text3);font-weight:500;margin-top:1px">Salud dental y bucal</div></div>
+    <span class="sec-link" onclick="openSearch('bucal')" style="cursor:pointer">Ver más →</span>
+  </div>
+  <div style="overflow:visible;padding-left:16px">
+    <div id="buc-scroll" style="display:flex;gap:10px;padding-right:16px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;"></div>
+  </div>
+</div>
+
+<!-- ══ CUIDADO ÍNTIMO ══ -->
+<div style="margin-top:22px">
+  <div class="sec-hdr">
+    <div><div class="sec-title">Anticonceptivos</div><div style="font-size:10.5px;color:var(--text3);font-weight:500;margin-top:1px">Higiene y salud íntima</div></div>
+    <span class="sec-link" onclick="openSearch('intimo')" style="cursor:pointer">Ver más →</span>
+  </div>
+  <div style="overflow:visible;padding-left:16px">
+    <div id="int-scroll" style="display:flex;gap:10px;padding-right:16px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;"></div>
+  </div>
+</div>
+
+<!-- ══ BELLEZA Y CUIDADO PERSONAL ══ -->
+<div style="margin-top:22px">
+  <div class="sec-hdr">
+    <div><div class="sec-title">Aseo Personal</div><div style="font-size:10.5px;color:var(--text3);font-weight:500;margin-top:1px">Productos de belleza</div></div>
+    <span class="sec-link" onclick="openSearch('belleza')" style="cursor:pointer">Ver más →</span>
+  </div>
+  <div style="overflow:visible;padding-left:16px">
+    <div id="bel-scroll" style="display:flex;gap:10px;padding-right:16px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;"></div>
+  </div>
+</div>
+
+<!-- ══ VARIEDADES ══ -->
+<div style="margin-top:22px">
+  <div class="sec-hdr">
+    <div><div class="sec-title">Variedades</div><div style="font-size:10.5px;color:var(--text3);font-weight:500;margin-top:1px">Productos variados</div></div>
+    <span class="sec-link" onclick="openSearch('variedades')" style="cursor:pointer">Ver más →</span>
+  </div>
+  <div style="overflow:visible;padding-left:16px">
+    <div id="var-scroll" style="display:flex;gap:10px;padding-right:16px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;"></div>
+  </div>
+</div>
+
+<!-- ══ INSUMOS MÉDICOS ══ -->
+<div style="margin-top:22px">
+  <div class="sec-hdr">
+    <div><div class="sec-title">Insumos Médicos</div><div style="font-size:10.5px;color:var(--text3);font-weight:500;margin-top:1px">Equipos y materiales médicos</div></div>
+    <span class="sec-link" onclick="openSearch('insumos')" style="cursor:pointer">Ver más →</span>
+  </div>
+  <div style="overflow:visible;padding-left:16px">
+    <div id="ins-scroll" style="display:flex;gap:10px;padding-right:16px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;"></div>
+  </div>
+</div>
+</div>
+
+<!-- ══ OTC ══ -->
+<div style="margin-top:22px">
+  <div class="sec-hdr">
+    <div><div class="sec-title">OTC</div><div style="font-size:10.5px;color:var(--text3);font-weight:500;margin-top:1px">Equipos y materiales médicos</div></div>
+    <span class="sec-link" onclick="openSearch('OTC')" style="cursor:pointer">Ver más →</span>
+  </div>
+  <div style="overflow:visible;padding-left:16px">
+    <div id="ins-scroll" style="display:flex;gap:10px;padding-right:16px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;"></div>
+  </div>
+</div>
+</div>
+
+
+<!-- ════ VISTA CATEGORÍAS ════ -->
+<div id="v-cats" style="display:none">
+
+  <!-- Sub-header fijo -->
+  <div style="position:sticky;top:73px;z-index:100;background:var(--bg);border-bottom:1px solid var(--gray-m);padding:11px 16px 10px;display:flex;align-items:center;gap:10px">
+    <button onclick="goHome()" style="width:36px;height:36px;border-radius:50%;border:none;background:var(--card);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">
+      <span class="sym" style="font-size:20px;color:var(--blue)">arrow_back</span>
+    </button>
+    <div>
+      <div class="M" style="font-size:16px;font-weight:800;color:var(--text)">Catálogo</div>
+      <div id="cats-tienda-lbl" style="font-size:10px;color:var(--text3);font-weight:500">Todas las categorías</div>
+    </div>
+  </div>
+
+  <!-- Grid de categorías -->
+  <div style="padding:16px 16px 24px">
+    <div id="cats-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px"></div>
+  </div>
+
+  <!-- Vista de resultados por categoría -->
+  <div id="cats-results-wrap" style="display:none;padding:0 16px 24px">
+    <!-- header de la categoría seleccionada -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-top:4px">
+      <button onclick="closeCatResults()" style="width:34px;height:34px;border-radius:50%;border:none;background:var(--gray-l);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">
+        <span class="sym" style="font-size:18px;color:var(--blue)">arrow_back</span>
+      </button>
+      <div id="cats-res-header" style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
+        <div id="cats-res-ico" style="width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0"></div>
+        <div>
+          <div id="cats-res-title" class="M" style="font-size:15px;font-weight:800;color:var(--text)"></div>
+          <div id="cats-res-count" style="font-size:10px;color:var(--text3);font-weight:500"></div>
+        </div>
+      </div>
+      <div id="cats-res-search" style="display:flex;align-items:center;gap:7px;background:var(--gray-l);border-radius:10px;padding:6px 11px;flex-shrink:0">
+        <span class="sym" style="font-size:14px;color:var(--text3)">search</span>
+        <input id="cats-res-inp" type="text" placeholder="Filtrar…" style="width:90px;border:none;background:transparent;font-family:'Inter',sans-serif;font-size:12px;font-weight:500;color:var(--text);outline:none" oninput="filtrarCatResults(this.value)"/>
+      </div>
+    </div>
+    <!-- Estado cargando -->
+    <div id="cats-res-loading" style="display:flex;flex-direction:column;align-items:center;padding:40px 0;gap:10px">
+      <div class="spinner"></div>
+      <span style="font-size:13px;color:var(--text3);font-weight:600">Buscando en inventario…</span>
+    </div>
+    <!-- Sin resultados -->
+    <div id="cats-res-empty" style="display:none;flex-direction:column;align-items:center;padding:40px 0;text-align:center">
+      <div style="width:56px;height:56px;background:var(--gray-l);border-radius:16px;display:flex;align-items:center;justify-content:center;margin-bottom:12px">
+        <span class="sym" style="font-size:26px;color:var(--text3)">search_off</span>
+      </div>
+      <div class="M" style="font-size:15px;font-weight:800;margin-bottom:4px">Sin resultados</div>
+      <div style="font-size:12px;color:var(--text3)">No hay productos en esta categoría</div>
+    </div>
+    <!-- Grid resultados -->
+    <div id="cats-res-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px"></div>
+  </div>
+
+</div>
+
+<!-- ════ VISTA BÚSQUEDA ════ -->
+<div id="v-search" style="display:none">
+  <div style="padding:8px 16px 0;display:flex;align-items:center;gap:8px">
+    <button onclick="goHome()" style="width:36px;height:36px;border-radius:50%;border:none;background:var(--gray-l);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:.13s"><span class="sym" style="font-size:20px;color:var(--blue)">arrow_back</span></button>
+    <span style="font-size:13px;color:var(--text3);font-weight:500">Resultados de búsqueda</span>
+  </div>
+
+  <!-- Estado vacío -->
+  <div id="st-empty" style="padding-bottom:16px">
+    <div style="text-align:center;padding:14px 16px 10px">
+      <div class="M" style="font-size:22px;font-weight:900;color:var(--text);line-height:1.2;margin-bottom:4px">¿Qué necesitas hoy?</div>
+      <div style="font-size:13px;color:var(--text3);font-weight:500">Toca un medicamento para buscarlo al instante</div>
+    </div>
+
+    <!-- ─────────────────────────────────────────────────────────
+         PILLS FLOTANTES — FIX: top de la fila baja ajustados para
+         que quepan dentro de los 260px de altura del contenedor.
+         Antes: top:62% y top:72% → cortados a 155px.
+         Ahora: top:53% y top:63% → caben completos a 260px.
+    ──────────────────────────────────────────────────────────── -->
+   <div class="pill-scene" style="height:280px">
+
+  <!-- Fila 1 -->
+  <div class="pill-item pill-float" style="left:4%;top:6%" onclick="qs('acetaminofen')">
+    <div class="pill-svg" style="background:#eef2ff;border:1.5px solid #c7d2fe;box-shadow:0 6px 18px rgba(59,91,219,.2)">
+      <span class="sym symf" style="font-size:26px;color:#3b5bdb">medication</span>
+    </div>
+    <div class="pill-lbl">Acetaminofén</div>
+  </div>
+
+  <div class="pill-item pill-float" style="left:36%;top:2%" onclick="qs('ibuprofeno')">
+    <div class="pill-svg" style="background:#fff0ee;border:1.5px solid #fca5a5;box-shadow:0 6px 18px rgba(220,38,38,.2)">
+      <span class="sym symf" style="font-size:26px;color:#dc2626">healing</span>
+    </div>
+    <div class="pill-lbl">Ibuprofeno</div>
+  </div>
+
+  <div class="pill-item pill-float" style="left:66%;top:6%" onclick="qs('vitamina c')">
+    <div class="pill-svg" style="background:#fef9ec;border:1.5px solid #fde68a;box-shadow:0 6px 18px rgba(180,83,9,.2)">
+      <span class="sym symf" style="font-size:26px;color:#b45309">health_and_safety</span>
+    </div>
+    <div class="pill-lbl">Vitamina C</div>
+  </div>
+
+  <!-- Fila 2 -->
+  <div class="pill-item pill-float" style="left:0%;top:34%" onclick="qs('amoxicilina')">
+    <div class="pill-svg" style="background:#f0fdf4;border:1.5px solid #86efac;box-shadow:0 6px 18px rgba(21,128,61,.2)">
+      <span class="sym symf" style="font-size:26px;color:#15803d">vaccines</span>
+    </div>
+    <div class="pill-lbl">Amoxicilina</div>
+  </div>
+
+  <div class="pill-item pill-float" style="left:32%;top:31%" onclick="qs('omeprazol')">
+    <div class="pill-svg" style="background:#faf5ff;border:1.5px solid #c4b5fd;box-shadow:0 6px 18px rgba(124,58,237,.2)">
+      <span class="sym symf" style="font-size:26px;color:#7c3aed">pill</span>
+    </div>
+    <div class="pill-lbl">Omeprazol</div>
+  </div>
+
+  <div class="pill-item pill-float" style="left:62%;top:33%" onclick="qs('loratadina')">
+    <div class="pill-svg" style="background:#ecfeff;border:1.5px solid #a5f3fc;box-shadow:0 6px 18px rgba(14,116,144,.2)">
+      <span class="sym symf" style="font-size:26px;color:#0e7490">ecg</span>
+    </div>
+    <div class="pill-lbl">Loratadina</div>
+  </div>
+
+  <!-- Fila 3 -->
+  <div class="pill-item pill-float" style="left:6%;top:62%" onclick="qs('metformina')">
+    <div class="pill-svg" style="background:#f0fdf4;border:1.5px solid #bbf7d0;box-shadow:0 6px 18px rgba(21,128,61,.15)">
+      <span class="sym symf" style="font-size:26px;color:#15803d">monitor_heart</span>
+    </div>
+    <div class="pill-lbl">Metformina</div>
+  </div>
+
+  <div class="pill-item pill-float" style="left:36%;top:65%" onclick="qs('crema')">
+    <div class="pill-svg" style="background:#fdf2f8;border:1.5px solid #f5d0fe;box-shadow:0 6px 18px rgba(134,25,143,.2)">
+      <span class="sym symf" style="font-size:26px;color:#86198f">face_6</span>
+    </div>
+    <div class="pill-lbl">Dermocosm.</div>
+  </div>
+
+  <div class="pill-item pill-float" style="left:66%;top:62%" onclick="qs('pediatrico')">
+    <div class="pill-svg" style="background:#f5f3ff;border:1.5px solid #ddd6fe;box-shadow:0 6px 18px rgba(124,58,237,.15)">
+      <span class="sym symf" style="font-size:26px;color:#7c3aed">child_care</span>
+    </div>
+    <div class="pill-lbl">Pediátrico</div>
+  </div>
+
+</div>
+
+  </div><!-- /v-home-content -->
+
+  <!-- Cargando -->
+  <div id="st-loading" style="display:none;flex-direction:column;align-items:center;justify-content:center;padding-top:60px;gap:10px">
+    <div class="spinner"></div>
+    <div style="font-size:13px;color:var(--text3);font-weight:600">Buscando medicamentos…</div>
+  </div>
+  <!-- Sin resultados -->
+  <div id="st-nores" style="display:none;flex-direction:column;align-items:center;padding-top:60px;text-align:center;padding-left:32px;padding-right:32px">
+    <div style="width:60px;height:60px;background:var(--red-l);border-radius:18px;display:flex;align-items:center;justify-content:center;margin-bottom:14px"><span class="sym" style="font-size:28px;color:var(--red)">search_off</span></div>
+    <div class="M" style="font-size:17px;font-weight:800;margin-bottom:5px">Sin resultados</div>
+    <div id="nores-txt" style="font-size:13px;color:var(--text3)">Intenta con otro nombre</div>
+  </div>
+  <!-- Resultados -->
+  <div id="st-results" style="display:none;padding:14px 16px">
+    <div id="res-count" style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px"></div>
+    <div id="res-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%"></div>
+  </div>
+</div><!-- /v-search -->
+
+<!-- OVERLAY -->
+<div id="cart-ov" onclick="closeCart()"></div>
+
+<!-- POPUP ÚNICO REUTILIZABLE -->
+<div id="popup-oferta" onclick="if(event.target===this)cerrarPopupOferta()" style="display:none;position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;overflow-y:auto">
+  <div id="popup-oferta-inner" style="background:#fff;border-radius:22px;width:100%;max-width:340px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;animation:fadeScaleIn .22s ease;position:relative">
+    <button onclick="cerrarPopupOferta()" style="position:absolute;top:10px;right:10px;z-index:10;width:32px;height:32px;border-radius:50%;border:none;background:rgba(0,0,0,.18);cursor:pointer;display:flex;align-items:center;justify-content:center">
+      <span class="sym" style="font-size:17px;color:#fff">close</span>
+    </button>
+    <div id="popup-oferta-body"></div>
+  </div>
+</div>
+
+<!-- CARRITO PANEL -->
+<div id="cart-panel">
+  <div style="width:40px;height:4px;border-radius:2px;background:var(--gray-m);margin:10px auto 0"></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--gray-l);flex-shrink:0">
+    <div style="display:flex;align-items:center;gap:8px"><span class="sym symf" style="font-size:22px;color:var(--blue)">shopping_cart</span><span class="M" style="font-size:17px;font-weight:800">Mi pedido</span></div>
+    <button onclick="closeCart()" style="width:32px;height:32px;border-radius:50%;border:none;background:var(--gray-l);display:flex;align-items:center;justify-content:center;cursor:pointer"><span class="sym" style="font-size:17px;color:var(--text3)">close</span></button>
+  </div>
+  <div id="cart-items" style="flex:1;overflow-y:auto;padding:4px 18px;scrollbar-width:none;min-height:0"></div>
+  <div id="cart-footer" style="flex-shrink:0;padding:14px 18px;border-top:1px solid var(--gray-l);display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <span style="font-size:13px;color:var(--text3);font-weight:500">Subtotal (<span id="cp-qty">0</span> items)</span>
+      <span style="font-size:13px;font-weight:700" id="cp-sub">$0</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <span class="M" style="font-size:15px;font-weight:800">Total</span>
+      <span class="M" style="font-size:24px;font-weight:900;color:var(--blue)" id="cp-total">$0</span>
+    </div>
+       <button onclick="abrirCheckout()" style="width:100%;background:var(--blue);color:#fff;border:none;cursor:pointer;padding:15px;border-radius:16px;font-family:'Manrope',sans-serif;font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 5px 20px rgba(0,63,135,.4);margin-bottom:10px;transition:.13s"><span class="sym symf" style="font-size:20px">local_shipping</span> Confirmar pedido</button>
+    <button onclick="closeCart()" style="width:100%;background:var(--gray-l);color:var(--text3);border:none;cursor:pointer;padding:12px;border-radius:12px;font-size:13px;font-weight:600">Seguir comprando</button>
+  </div>
+</div>
+
+
+</div>
+
+<!-- FAB carrito -->
+<div id="cart-fab" onclick="openCart()" style="position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 62px);right:16px;z-index:800;cursor:pointer">
+  <div style="width:52px;height:52px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;box-shadow:0 6px 20px rgba(0,63,135,.5);position:relative;transition:.15s">
+    <span class="sym symf" style="font-size:24px;color:#fff">shopping_cart</span>
+    <span id="fab-badge" style="position:absolute;top:-3px;right:-3px;min-width:19px;height:19px;border-radius:99px;background:#ef4444;color:#fff;font-size:10px;font-weight:900;display:none;align-items:center;justify-content:center;padding:0 4px;border:2px solid #fff;box-shadow:0 2px 6px rgba(239,68,68,.4)">0</span>
+  </div>
+</div>
+
+<!-- NAV -->
+<div class="nav">
+  <div class="nav-item on" onclick="goHome()"><span class="sym symf" style="font-size:22px;color:var(--blue)">home_health</span><span>Inicio</span></div>
+  <div class="nav-item" onclick="openSearch()"><span class="sym" style="font-size:22px">search</span><span>Buscar</span></div>
+  <div class="nav-item" onclick="openCats()"><span class="sym" style="font-size:22px">category</span><span>Catálogo</span></div>
+  <div class="nav-item"><span class="sym" style="font-size:22px">person</span><span>Perfil</span></div>
+</div>
+
+<div id="co-ov" onclick="if(event.target===this)closeCheckout()" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.55);backdrop-filter:blur(6px)"></div>
+<div id="co-sheet" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:1001;background:#fff;border-radius:28px 28px 0 0;max-height:93dvh;flex-direction:column;box-shadow:0 -12px 50px rgba(0,0,0,.22);padding-bottom:env(safe-area-inset-bottom,0px)">
+  <div style="width:40px;height:4px;border-radius:2px;background:#e5e7eb;margin:12px auto 0;flex-shrink:0"></div>
+  <!-- Header steps -->
+  <div style="padding:14px 20px 10px;border-bottom:1px solid #f3f4f6;flex-shrink:0">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="M" style="font-size:17px;font-weight:900;color:var(--blue)" id="co-title">Datos del pedido</div>
+      <button onclick="closeCheckout()" style="width:32px;height:32px;border-radius:50%;border:none;background:#f3f4f6;cursor:pointer;display:flex;align-items:center;justify-content:center"><span class="sym" style="font-size:17px;color:#6b7280">close</span></button>
+    </div>
+    <!-- progress bar -->
+    <div style="display:flex;gap:6px">
+      <div id="co-pb1" style="flex:1;height:4px;border-radius:2px;background:var(--blue);transition:.3s"></div>
+      <div id="co-pb2" style="flex:1;height:4px;border-radius:2px;background:#e5e7eb;transition:.3s"></div>
+      <div id="co-pb3" style="flex:1;height:4px;border-radius:2px;background:#e5e7eb;transition:.3s"></div>
+    </div>
+  </div>
+
+  <!-- GPS chip (visible siempre arriba) -->
+  <div id="co-loc-chip" onclick="coCapturarGPS()" style="margin:12px 20px 0;background:var(--blue-l);border:1.5px solid var(--blue-m);border-radius:14px;padding:10px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:.15s;flex-shrink:0">
+    <div id="co-pin-wrap" style="position:relative;width:32px;height:32px;flex-shrink:0;display:flex;align-items:center;justify-content:center">
+      <div id="co-pin-ring" style="position:absolute;inset:-4px;border-radius:50%;background:rgba(0,63,135,.18);animation:wilPulse 1.8s ease-in-out infinite"></div>
+      <span class="sym symf" style="font-size:20px;color:var(--blue);position:relative">location_on</span>
+    </div>
+    <div style="flex:1">
+      <div style="font-size:11.5px;font-weight:800;color:var(--blue)" id="co-loc-title">Ver mi ubicación</div>
+      <div style="font-size:10px;color:#6b7280;font-weight:500;margin-top:1px" id="co-loc-sub">Toca para detectar automáticamente</div>
+    </div>
+    <span id="co-loc-st" style="font-size:11px;font-weight:800;color:var(--blue)">→</span>
+  </div>
+
+  <!-- Contenido scrollable -->
+  <div style="flex:1;overflow-y:auto;padding:14px 20px 20px;scrollbar-width:none" id="co-body">
+
+    <!-- STEP 1: Datos personales -->
+    <div id="co-s1">
+      <div class="M" style="font-size:13px;font-weight:800;color:#374151;margin-bottom:12px;display:flex;align-items:center;gap:6px"><span class="sym symf" style="font-size:16px;color:var(--blue)">person</span>Tus datos</div>
+      <div style="margin-bottom:10px">
+        <label style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px">Nombre completo *</label>
+        <input id="co-nombre" type="text" placeholder="Ej: María González" style="width:100%;border:1.5px solid #e5e7eb;border-radius:12px;padding:12px 14px;font-family:'Inter',sans-serif;font-size:14px;color:#111827;outline:none;transition:.15s;background:#fafafa" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='#e5e7eb'"/>
+      </div>
+      <div style="margin-bottom:10px">
+        <label style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px">Teléfono *</label>
+        <input id="co-telefono" type="tel" placeholder="310 123 4567" style="width:100%;border:1.5px solid #e5e7eb;border-radius:12px;padding:12px 14px;font-family:'Inter',sans-serif;font-size:14px;color:#111827;outline:none;transition:.15s;background:#fafafa" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='#e5e7eb'"/>
+      </div>
+      <div style="margin-bottom:10px">
+        <label style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px">Dirección *</label>
+        <input id="co-direccion" type="text" placeholder="Calle 50 #45-23, Barrio El Centro" style="width:100%;border:1.5px solid #e5e7eb;border-radius:12px;padding:12px 14px;font-family:'Inter',sans-serif;font-size:14px;color:#111827;outline:none;transition:.15s;background:#fafafa" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='#e5e7eb'"/>
+        <div style="font-size:9.5px;color:#9ca3af;margin-top:3px;font-weight:500">💡 Se llena automático con el GPS de arriba</div>
+      </div>
+      <div>
+        <label style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px">Punto de referencia *</label>
+        <input id="co-referencia" type="text" placeholder="Casa azul, frente al parque, piso 2…" style="width:100%;border:1.5px solid #e5e7eb;border-radius:12px;padding:12px 14px;font-family:'Inter',sans-serif;font-size:14px;color:#111827;outline:none;transition:.15s;background:#fafafa" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='#e5e7eb'"/>
+      </div>
+    </div>
+
+    <!-- STEP 2: Pago -->
+    <div id="co-s2" style="display:none">
+      <div class="M" style="font-size:13px;font-weight:800;color:#374151;margin-bottom:12px;display:flex;align-items:center;gap:6px"><span class="sym symf" style="font-size:16px;color:var(--blue)">payments</span>Método de pago</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+        <div id="co-pago-ef" onclick="coSelPago('EFECTIVO')" style="border:2px solid #e5e7eb;border-radius:14px;padding:14px 10px;cursor:pointer;text-align:center;background:#fafafa;transition:.18s">
+          <div style="font-size:28px;margin-bottom:5px">💵</div>
+          <div style="font-size:13px;font-weight:800;color:#111827">Efectivo</div>
+          <div style="font-size:10px;color:#9ca3af;margin-top:2px">Al entregar</div>
+        </div>
+        <div id="co-pago-tr" onclick="coSelPago('TRANSFERENCIA')" style="border:2px solid #e5e7eb;border-radius:14px;padding:14px 10px;cursor:pointer;text-align:center;background:#fafafa;transition:.18s">
+          <div style="font-size:28px;margin-bottom:5px">🏦</div>
+          <div style="font-size:13px;font-weight:800;color:#111827">Transferencia</div>
+          <div style="font-size:10px;color:#9ca3af;margin-top:2px">Bancolombia / Nequi</div>
+        </div>
+      </div>
+      <!-- Resumen de precios -->
+  <!-- Resumen del pedido -->
+<div style="background:#fff;border:1.5px solid #e5e7eb;border-radius:16px;padding:14px 16px;margin-top:4px">
+  <div class="M" style="font-size:11px;font-weight:900;color:#9ca3af;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Resumen del pedido</div>
+  <div id="co-resumen-items"></div>
+  <div style="border-top:1.5px solid #e5e7eb;margin-top:4px;padding-top:10px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <span style="font-size:12px;color:#6b7280;font-weight:500">Subtotal productos</span>
+      <span style="font-size:12px;font-weight:700;color:#111827" id="co-sub-txt">$0</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <span style="font-size:12px;color:#6b7280;font-weight:500">Domicilio <span id="co-zona-lbl" style="font-size:10px;background:#e8f0fe;color:#1d4ed8;padding:1px 7px;border-radius:99px;margin-left:3px"></span></span>
+      <span style="font-size:12px;font-weight:700;color:#111827" id="co-domi-txt">Calculando…</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:2px solid #e5e7eb">
+      <span class="M" style="font-size:14px;font-weight:900;color:#111827">Total a pagar</span>
+      <span class="M" style="font-size:22px;font-weight:900;color:var(--blue)" id="co-total-txt">$0</span>
+    </div>
+  </div>
+</div>
+    </div>
+
+    <!-- STEP 3: Éxito -->
+   <div id="co-s3" style="display:none;text-align:center;padding:20px 0">
+  <div style="width:80px;height:80px;border-radius:50%;background:#dcfce7;border:2px solid #86efac;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;box-shadow:0 0 0 12px rgba(22,163,74,.07)">
+    <span class="sym symf" style="font-size:40px;color:#15803d">check_circle</span>
+  </div>
+  <div class="M" style="font-size:22px;font-weight:900;color:#111827;letter-spacing:-.02em;margin-bottom:8px">¡Pedido enviado! 🎉</div>
+  <div style="font-size:13px;color:#6b7280;font-weight:500;line-height:1.6;margin-bottom:20px" id="co-exito-msg">Tu pedido fue registrado.</div>
+  <div style="background:var(--blue-l);border:1.5px solid var(--blue-m);border-radius:14px;padding:14px;margin-bottom:16px">
+    <div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Código de pedido</div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:10px">
+      <div id="co-codigo" class="M" style="font-size:32px;font-weight:900;letter-spacing:.12em;color:var(--blue)">—</div>
+      <button onclick="copiarCodigoFarmacia()" style="width:36px;height:36px;border-radius:10px;border:none;background:var(--blue);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,63,135,.3)">
+        <span class="sym symf" style="font-size:18px">content_copy</span>
+      </button>
+    </div>
+  </div>
+  <button onclick="verEstadoPedidoFarmacia()" style="width:100%;background:#15803d;color:#fff;border:none;cursor:pointer;padding:14px;border-radius:14px;font-family:'Manrope',sans-serif;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;box-shadow:0 4px 14px rgba(21,128,61,.3)">
+    <span class="sym symf" style="font-size:18px">search</span> Ver estado de mi pedido
+  </button>
+  <button onclick="closeCheckout()" style="width:100%;background:#f3f4f6;color:#374151;border:none;cursor:pointer;padding:12px;border-radius:14px;font-family:'Manrope',sans-serif;font-size:13px;font-weight:700">Volver al catálogo</button>
+</div>
+
+  </div>
+
+  <!-- Footer con botón acción -->
+  <div id="co-footer" style="padding:14px 20px;border-top:1px solid #f3f4f6;flex-shrink:0;background:#fff">
+    <button id="co-btn-next" onclick="coNext()" style="width:100%;background:var(--blue);color:#fff;border:none;cursor:pointer;padding:15px;border-radius:16px;font-family:'Manrope',sans-serif;font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 18px rgba(0,63,135,.35);transition:.13s">
+      <span class="sym symf" style="font-size:18px">arrow_forward</span> Continuar
+    </button>
+  </div>
+</div>
+
+<script>
+/* ══ CONFIG ══ */
+var SHEETS={
+  central:{tab:'STOCK_DROGUERIA_CENTRAL',nombre:'Droguería Central',sub:'Calle 52 #48-09 · Copacabana'},
+  expertos:{tab:'STOCK_DROGUERIA_EXPERTOS',nombre:'Farma Expertos',sub:'Cra 47 #51-69 · Copacabana'}
+};
+
+var tienda='expertos',allData=[],cart={},cache={},stm=null;
+var _searchAllData = [];  // índice unificado: STOCK + Nuevo_Producto + Ofertas
+var _ofertasMap = {};
+var modoEntrega = 'domi'; // 'domi' | 'reco'
+
+/* ══ CATS DATA ══ */
+var CATS=[
+  {n:'Analgésicos',s:'Dolor y fiebre',ic:'medication',q:'acetaminofen',items:[{nm:'Acetaminofén 500mg x10',lab:'Genfar',p:3800,d:4500,k:'cat_ac1'},{nm:'Ibuprofeno 400mg x10',lab:'La Santé',p:4200,k:'cat_ib1'},{nm:'Naproxeno 250mg x10',lab:'MK',p:5800,d:7000,k:'cat_na1'},{nm:'Aspirina 100mg x20',lab:'Bayer',p:6500,k:'cat_as1'}]},
+  {n:'Antibióticos',s:'Infecciones',ic:'vaccines',q:'amoxicilina',items:[{nm:'Amoxicilina 500mg x21',lab:'La Santé',p:22000,k:'cat_am1'},{nm:'Azitromicina 500mg x3',lab:'Genfar',p:18000,d:22000,k:'cat_az1'},{nm:'Ciprofloxacino 500mg x10',lab:'MK',p:28000,k:'cat_ci1'},{nm:'Cefalexina 500mg x20',lab:'La Santé',p:35000,k:'cat_ce1'}]},
+  {n:'Vitaminas',s:'Suplementos',ic:'health_and_safety',q:'vitamina',items:[{nm:'Vitamina C 1000mg x30',lab:'Healthy America',p:45900,d:57000,k:'cat_vc1'},{nm:'Vitamina D3 2000UI x60',lab:'Natrol',p:38000,k:'cat_vd1'},{nm:"Omega 3 1000mg x60",lab:"Nature's Truth",p:45000,d:55000,k:'cat_om3'},{nm:'Zinc 50mg x30',lab:'MK',p:22000,k:'cat_zn1'}]},
+  {n:'Dermocosméticos',s:'Cuidado de piel',ic:'face_6',q:'crema',items:[{nm:'Crema Hidratante 40ml',lab:'La Roche-Posay',p:63900,d:85000,k:'cat_cr1'},{nm:'Protector Solar FPS50',lab:'Eucerin',p:52000,d:78000,k:'cat_sp1'},{nm:'Limpiador Hidratante 237ml',lab:'CeraVe',p:58000,k:'cat_ce2'},{nm:'Sérum Vitamina E 30ml',lab:'Neutrogena',p:42000,k:'cat_se1'}]},
+  {n:'Pediátrico',s:'Para los más pequeños',ic:'child_care',q:'pediatrico',items:[{nm:'Acetaminofén Jarabe 120ml',lab:'Genfar',p:12500,k:'cat_acj'},{nm:'Suero Oral x500ml',lab:'Pedialyte',p:8500,k:'cat_su1'},{nm:'Vitaminas Pediátricas x20',lab:'Triviñón',p:25200,d:28000,k:'cat_vp1'},{nm:'Ibuprofeno Niños Jarabe',lab:'MK',p:15800,k:'cat_ibj'}]},
+  {n:'Cardiovascular',s:'Corazón e HTA',ic:'cardiology',q:'enalapril',items:[{nm:'Enalapril 10mg x30',lab:'Genfar',p:18000,k:'cat_en1'},{nm:'Losartán 50mg x30',lab:'La Santé',p:22000,d:28000,k:'cat_lo1'},{nm:'Amlodipino 5mg x30',lab:'MK',p:16000,k:'cat_am2'},{nm:'Metoprolol 100mg x20',lab:'Genfar',p:24000,k:'cat_me1'}]},
+  {n:'Digestivo',s:'Gastritis · Reflujo',ic:'pill',q:'omeprazol',items:[{nm:'Omeprazol 20mg x30',lab:'Genfar',p:16200,d:18000,k:'cat_op1'},{nm:'Ranitidina 150mg x20',lab:'MK',p:12000,k:'cat_ra1'},{nm:'Metoclopramida 10mg x20',lab:'La Santé',p:9500,k:'cat_mt1'},{nm:'Bicarbonato Sod. x200g',lab:'Genérico',p:4500,k:'cat_bi1'}]},
+  {n:'Primeros Auxilios',s:'Curaciones',ic:'emergency',q:'curación',items:[{nm:'Alcohol Antiséptico 500ml',lab:'Sucroal',p:8000,k:'cat_al1'},{nm:'Gasas Estériles x10',lab:'Genérico',p:5500,k:'cat_ga1'},{nm:'Micropore 1.25cm x9m',lab:'3M',p:7500,k:'cat_mi1'},{nm:'Esparadrapo 2.5cm x4.5m',lab:'3M',p:9000,k:'cat_es1'}]}
+];
+var CAT_BG={medication:'#eef2ff',health_and_safety:'#fef9ec',face_6:'#fdf2f8',child_care:'#f5f3ff',vaccines:'#f0fdf4',cardiology:'#eff6ff',pill:'#faf5ff',emergency:'#fff7ed',healing:'#fff0ee',wb_sunny:'#fef9ec',water_drop:'#eef2ff',science:'#f0fdf4'};
+
+/* ═══════════════════════════════════════════════════════════════
+   FIX BÚSQUEDA: buildStaticData() convierte todos los ítems de
+   CATS al mismo formato de allData. Se llama antes de loadSheet()
+   para que la búsqueda funcione aunque la API falle o tarde.
+═══════════════════════════════════════════════════════════════ */
+function buildStaticData(){
+  var items=[];
+  CATS.forEach(function(cat){
+    cat.items.forEach(function(it){
+      var key='static_'+it.k;
+      items.push({
+        desc:it.nm,
+        lab:it.lab,
+        unidad:'',
+        precio:it.p,
+        pUnit:it.p,
+        key:key
+      });
+      cache[key]={desc:it.nm,lab:it.lab,unidad:'',precio:it.p,pUnit:it.p,key:key};
+    });
+  });
+  return items;
+}
+
+/* ══ TRACKER ANIMADO ══ */
+var trkState=0,trkTimer=null;
+var TRK_STATES=[
+  {bannerBg:'linear-gradient(90deg,#1a2a3a,#003f87)',bannerTxt:'PEDIDO RECIBIDO · PROCESANDO',dot:'#60a5fa',
+   steps:[{node:'active',icon:'inventory_2',lbl:'done',sub:{txt:'Verificando...',show:true}},{node:'pending',icon:'delivery_dining',lbl:'',sub:{txt:'',show:false}},{node:'pending',icon:'home',lbl:'',sub:{txt:'',show:false}}]},
+  {bannerBg:'linear-gradient(90deg,#1a3a1a,#15803d)',bannerTxt:'EN CAMINO · DOMICILIOS WIL',dot:'#4ade80',
+   steps:[{node:'done',icon:'check',lbl:'done',sub:{txt:'Listo ✓',show:true}},{node:'active',icon:'delivery_dining',lbl:'active',sub:{txt:'⏱ ~12 min',show:true}},{node:'pending',icon:'home',lbl:'',sub:{txt:'',show:false}}]},
+  {bannerBg:'linear-gradient(90deg,#064e3b,#059669)',bannerTxt:'¡PEDIDO ENTREGADO! 🎉',dot:'#34d399',
+   steps:[{node:'done',icon:'check',lbl:'done',sub:{txt:'Listo ✓',show:true}},{node:'done',icon:'check',lbl:'done',sub:{txt:'Completado',show:true}},{node:'active',icon:'celebration',lbl:'active',sub:{txt:'¡Disfrútalo!',show:true}}]}
+];
+function applyTrkState(s,animate){
+  var cfg=TRK_STATES[s];
+  var banner=document.getElementById('trk-banner'),dot=document.getElementById('trk-dot'),btxt=document.getElementById('trk-banner-txt');
+  if(!banner)return;
+  banner.style.background=cfg.bannerBg;dot.style.background=cfg.dot;btxt.textContent=cfg.bannerTxt;
+  if(animate){btxt.style.animation='none';void btxt.offsetWidth;btxt.style.animation='bannerSlide .4s ease both';}
+  for(var i=0;i<3;i++){
+    var sc=cfg.steps[i],node=document.getElementById('node'+i),icon=document.getElementById('icon'+i),lbl=document.getElementById('lbl'+i),sub=document.getElementById('sub'+i);
+    if(!node)continue;
+    node.className='trk-node '+sc.node;icon.textContent=sc.icon;lbl.className='trk-lbl '+(sc.lbl?sc.lbl:'');
+    sub.textContent=sc.sub.txt;sub.style.opacity=sc.sub.show?'1':'0';
+    if(sc.sub.show&&animate){sub.style.animation='none';void sub.offsetWidth;sub.style.animation='labelFade .5s ease .2s both';}
+  }
+  var l0=document.getElementById('line0'),l1=document.getElementById('line1');
+  if(l0)l0.style.width=(s>=1)?'100%':'0';
+  if(l1)l1.style.width=(s>=2)?'100%':'0';
+}
+function nextTrkState(){trkState=(trkState+1)%3;applyTrkState(trkState,true);}
+function startTracker(){applyTrkState(0,false);clearInterval(trkTimer);trkTimer=setInterval(nextTrkState,3800);}
+
+/* ══ SCROLL ARROWS ══ */
+function scrollSection(id,dir){
+  var el=document.getElementById(id);
+  if(!el)return;
+  el.scrollBy({left:dir*320,behavior:'smooth'});
+}
+
+/* ══ INIT ══ */
+window.addEventListener('DOMContentLoaded',function(){
+  var p=new URLSearchParams(window.location.search);
+  tienda=p.get('tienda')==='central'?'central':'expertos';
+  var s=SHEETS[tienda];
+  document.getElementById('hdr-name').textContent=s.nombre;
+  document.getElementById('hdr-sub').textContent=s.sub;
+  buildCats();
+
+  /* ─── FIX BÚSQUEDA: poblar allData con productos estáticos
+         antes de la llamada a la API, para que la búsqueda
+         funcione de inmediato incluso si el sheet tarda o falla ─── */
+  allData=buildStaticData();
+
+  loadSheet();
+  startTracker();
+
+  var inp=document.getElementById('s-inp');
+  inp.style.pointerEvents='none';
+  inp.style.cursor='pointer';
+
+  /* ── BÚSQUEDA EN TIEMPO REAL ── */
+  inp.addEventListener('input',function(){
+    var q=inp.value.trim();
+    document.getElementById('s-clr').style.display=q?'block':'none';
+    clearTimeout(stm);
+    if(!q){setSt('empty');return;}
+    stm=setTimeout(function(){doSearch(q);},180);
+  });
+
+  document.getElementById('hdr-search').addEventListener('click',function(){
+    if(document.getElementById('v-search').style.display==='none'){
+      openSearch();
+    }
+  });
+    loadOfertasCarrusel();
+loadNuevoProducto();
+setInterval(function() {
+  loadOfertasCarrusel();
+  loadNuevoProducto();
+}, 60000);
+});
+
+/* ══ VIEWS ══ */
+function showView(id){
+  var hc=document.getElementById('v-home-content');
+  if(hc) hc.style.display=id==='v-home'?'block':'none';
+  document.getElementById('v-search').style.display=id==='v-search'?'block':'none';
+  document.getElementById('v-cats').style.display=id==='v-cats'?'block':'none';
+  document.querySelectorAll('.nav-item').forEach(function(el){el.classList.remove('on');});
+  if(id==='v-home')document.querySelectorAll('.nav-item')[0].classList.add('on');
+  if(id==='v-search')document.querySelectorAll('.nav-item')[1].classList.add('on');
+  if(id==='v-cats')document.querySelectorAll('.nav-item')[2].classList.add('on');
+}
+
+function goHome(){
+  showView('v-home');
+  var inp=document.getElementById('s-inp');
+  inp.value='';inp.blur();inp.style.pointerEvents='none';inp.style.cursor='pointer';
+  document.getElementById('s-clr').style.display='none';
+  document.getElementById('hdr-search').style.cursor='pointer';
+}
+
+function openSearch(q){
+  showView('v-search');
+  setSt('empty');
+  var inp=document.getElementById('s-inp');
+  inp.style.pointerEvents='all';
+  inp.style.cursor='text';
+  document.getElementById('hdr-search').style.cursor='text';
+  setTimeout(function(){
+    inp.focus();
+    if(q){
+      inp.value=q;
+      document.getElementById('s-clr').style.display='block';
+      doSearch(q);
+    }
+  },80);
+}
+
+function openCats(){showView('v-cats');}
+
+function qs(q){
+  openSearch(q);
+}
+
+function clearSearch(){
+  var inp=document.getElementById('s-inp');
+  inp.value='';
+  document.getElementById('s-clr').style.display='none';
+  setSt('empty');
+  inp.focus();
+}
+
+var SHEET_ID_OFERTAS = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+
+// Gradientes para las cards del carrusel (cycling)
+var PROMO_GRADIENTS = [
+  'linear-gradient(135deg,#003f87,#1a56db,#3b82f6)',
+  'linear-gradient(135deg,#064e3b,#059669,#34d399)',
+  'linear-gradient(135deg,#4c1d95,#7c3aed,#a78bfa)',
+  'linear-gradient(135deg,#7c1d00,#dc2626,#f97316)',
+  'linear-gradient(135deg,#1a3a3a,#0d9488,#2dd4bf)',
+  'linear-gradient(135deg,#1e1b4b,#4338ca,#818cf8)',
+];
+
+
+
+var _PROD_GRADS=[
+  ['#003f87','#1a56db'],['#064e3b','#059669'],['#4c1d95','#7c3aed'],
+  ['#7c1d00','#dc2626'],['#1a3a3a','#0d9488'],['#1e1b4b','#4338ca'],
+  ['#86198f','#c026d3'],['#b45309','#d97706'],['#0e7490','#0891b2'],
+  ['#15803d','#16a34a'],['#dc2626','#ef4444'],['#7c3aed','#8b5cf6'],
+];
+var _PROD_ICONS=[
+  'medication','pill','vaccines','healing','health_and_safety','ecg',
+  'monitor_heart','water_drop','science','face_6','child_care','wb_sunny',
+  'spa','thermostat','emergency','biotech','favorite','local_pharmacy',
+];
+
+var _SECCION_MAP={
+
+  // Más Populares
+  'mas':'pop-scroll','mas populares':'pop-scroll','popular':'pop-scroll',
+'populares':'pop-scroll','mas popular':'pop-scroll','mas populares ':'pop-scroll',
+'destacados':'pop-scroll','destacado':'pop-scroll','top':'pop-scroll',
+
+  // Dermocosméticos
+  'dermocosmeticos':'dermo-scroll','dermocosmetico':'dermo-scroll',
+  'dermo':'dermo-scroll','dermocosmetica':'dermo-scroll',
+  'cosmeticos':'dermo-scroll','cosmetica':'dermo-scroll',
+
+  // Vitaminas y Suplementos
+  'vitaminas':'vit-scroll','suplementos':'vit-scroll',
+'vitaminas y suplementos':'vit-scroll','vitaminas suplementos':'vit-scroll',
+'vitamina':'vit-scroll','suplemento':'vit-scroll',
+'vitaminas amp suplementos':'vit-scroll',
+'vitaminas  suplementos':'vit-scroll',
+'vitaminasysuplementos':'vit-scroll',
+
+  // Pediátrico
+  'pediatrico':'ped-scroll','pediatrica':'ped-scroll',
+  'pediatricos':'ped-scroll','pediatricas':'ped-scroll',
+  'bebes':'ped-scroll','ninos':'ped-scroll','infantil':'ped-scroll',
+
+  // Cuidado Facial → dermo-scroll (misma sección visual)
+  'facial':'dermo-scroll','cuidado facial':'dermo-scroll',
+
+  // Higiene Personal → nueva sección
+  'higiene':'hig-scroll','higiene personal':'hig-scroll',
+
+  // Cuidado Bucal → nueva sección
+  'bucal':'buc-scroll','cuidado bucal':'buc-scroll',
+
+  // Cuidado Íntimo → nueva sección
+  'intimo':'int-scroll','cuidado intimo':'int-scroll',
+  'intímo':'int-scroll','cuidado intímo':'int-scroll',
+
+  // Belleza y cuidado Personal → nueva sección
+  'belleza':'bel-scroll','belleza y cuidado personal':'bel-scroll',
+  'belleza y cuidado':'bel-scroll',
+
+  // Variedades
+'variedades':'var-scroll','variedad':'var-scroll',
+'variedades ':'var-scroll','variedad ':'var-scroll',  // ← con espacio trailing
+'varios':'var-scroll','general':'var-scroll','miscelanea':'var-scroll',
+
+  // Insumos Médicos → nueva sección
+  'insumos':'ins-scroll','insumos medicos':'ins-scroll',
+  'insumos médicos':'ins-scroll',
+
+  // Otros → pop-scroll como fallback
+  'otros':'pop-scroll',
+};
+
+function _nrmSec(s){
+  return (s||'')
+    .replace(/\r/g,'')
+    .replace(/\t/g,' ')
+    .toLowerCase()
+    .replace(/&amp;/g,' ')
+    .replace(/&/g,' ')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9\s]/g,'')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+
+function _parseCsvLineNP(line){
+  var cols=[],cur='',inQ=false;
+  for(var i=0;i<line.length;i++){
+    var ch=line[i];
+    if(ch==='"'){inQ=!inQ;}
+    else if(ch===','&&!inQ){cols.push(cur.trim());cur='';}
+    else{cur+=ch;}
+  }
+  cols.push(cur.trim());
+  return cols.map(function(c){
+    return c.replace(/^"|"$/g,'').replace(/\r/g,'').trim(); // ← agrega .replace(/\r/g,'')
+  });
+}
+
+function _parsePrecioNP(v){
+  var s=String(v||'').replace(/[^0-9.,]/g,'');
+  if(!s)return 0;
+  var n=parseFloat(s.replace(/\./g,'').replace(',','.'));
+  return isNaN(n)?0:n;
+}
+function _fpNP(n){
+  if(!n)return 'Consultar';
+  return '$\u2009'+Math.round(n).toLocaleString('es-CO');
+}
+function _escNP(s){
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function _escJSNP(s){
+  return (s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"');
+}
+
+function _renderProdEnScroll(scrollId,productos,colorOffset){
+  var container=document.getElementById(scrollId);
+  if(!container||!productos.length)return;
+  var html='';
+  productos.forEach(function(p,i){
+    var gi=(i+(colorOffset||0))%_PROD_GRADS.length;
+    var c1=_PROD_GRADS[gi][0];
+    var icon=_PROD_ICONS[(i+(colorOffset||0))%_PROD_ICONS.length];
+    var hasImg=p.imagen&&p.imagen.startsWith('http');
+    var precio=_parsePrecioNP(p.precio);
+    var addKey='np_'+(p.id||i).toString().replace(/[^a-z0-9]/gi,'_');
+
+    /* Guardar en cache para que abrirPopupSheet lo encuentre */
+    var cacheKey='np_raw_'+addKey;
+    cache[cacheKey]={desc:p.nombre,lab:p.laboratorio||'',unidad:p.descripcion||'',precio:precio,pUnit:precio,imagen:p.imagen||'',key:cacheKey};
+
+    html+=
+      '<div class="ocard">'+
+        '<div class="ocard-img" style="position:relative;">'+
+          (hasImg
+  ? '<img src="'+_escNP(p.imagen)+'" alt="'+_escNP(p.nombre)+'"'+
+    ' style="width:100%;height:145px;object-fit:contain;object-position:center;padding:6px;display:block;"'+
+    ' onerror="this.style.display=\'none\';document.getElementById(\'icon_fb_'+addKey+'\').style.display=\'flex\'">'
+   +'<span id="icon_fb_'+addKey+'" class="sym symf" style="font-size:80px;color:'+c1+';opacity:.85;display:none;align-items:center;justify-content:center;width:100%;height:100%">'+icon+'</span>'
+  : '<span class="sym symf" style="font-size:80px;color:'+c1+';opacity:.85">'+icon+'</span>'
+)+
+          '<div style="position:absolute;top:7px;right:8px;background:'+c1+';color:#fff;font-size:7.5px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;padding:2px 7px;border-radius:99px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+_escNP(p.laboratorio||'Genérico')+'</div>'+
+          '<button onclick="abrirPopupSheet(\''+_escJSNP(cacheKey)+'\')" style="position:absolute;bottom:7px;right:8px;width:26px;height:26px;border-radius:50%;border:none;cursor:pointer;background:'+c1+';display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.25);">'+
+            '<span class="sym" style="font-size:14px;color:#fff">zoom_in</span>'+
+          '</button>'+
+        '</div>'+
+        '<div class="ocard-body">'+
+          '<div class="ocard-name">'+_escNP(p.nombre)+'</div>'+
+          (p.descripcion?'<div class="ocard-desc">'+_escNP(p.descripcion)+'</div>':'')+
+          '<div class="ocard-footer">'+
+            '<div><div class="ocard-price" style="color:'+c1+'">'+_fpNP(precio)+'</div></div>'+
+            '<button class="ocard-add" style="background:'+c1+';box-shadow:0 2px 8px '+c1+'44;" onclick="sadd(\''+_escJSNP(addKey)+'\',\''+_escJSNP(p.nombre)+'\',\''+_escJSNP(p.laboratorio||'')+'\','+precio+',null)"><span class="sym symf" style="font-size:13px">add</span>Agregar</button>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
+  });
+  html+='<div style="flex-shrink:0;width:4px"></div>';
+  container.innerHTML=html;
+}
+
+async function loadNuevoProducto(){
+  try{
+    var url='https://docs.google.com/spreadsheets/d/'+SHEET_ID_OFERTAS+'/gviz/tq?tqx=out:csv&sheet=Nuevo_Producto&cachebust='+Date.now();
+    var r=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(12000)});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    var text=await r.text();
+    if(!text||text.trim().length<5)throw new Error('Empty');
+
+    var allLines=text.trim().split('\n');
+    // Log encabezados para debug
+    console.log('[NP] Encabezados CSV:', allLines[0]);
+
+    var lines=allLines.slice(1).filter(Boolean);
+    var grupos={
+      'pop-scroll':[],'dermo-scroll':[],'vit-scroll':[],'ped-scroll':[],
+      'hig-scroll':[],'buc-scroll':[],'int-scroll':[],'bel-scroll':[],'var-scroll':[],'ins-scroll':[]
+    };
+
+    lines.forEach(function(line,lineIdx){
+      var cols=_parseCsvLineNP(line);
+      var col=function(idx){return(cols[idx]||'').replace(/^"|"$/g,'').trim();};
+
+      // Log primeras 3 filas para debug
+      if(lineIdx<3) console.log('[NP] fila '+lineIdx+' cols:', cols.slice(0,9));
+
+      var id      = col(0);
+      var nombre  = col(1);
+      var lab     = col(2);
+      var precio  = col(3);
+      var desc    = col(4);
+      var estado  = _nrmSec(col(5));
+      var seccion = col(6);
+      var fecha   = col(7);
+      var imagen  = col(8);
+
+      if(!nombre) return; // fila vacía
+
+      // Filtro estado: si tiene valor debe ser activo
+      if(estado && estado!=='activo' && estado!=='activa' && estado!=='active' &&
+         estado!=='si' && estado!=='yes' && estado!=='1') return;
+
+      var scrollId=_SECCION_MAP[_nrmSec(seccion)];
+      console.log('[NP]', nombre, '| seccion:"'+seccion+'" | nrm:"'+_nrmSec(seccion)+'" | scroll:', scrollId, '| img:', imagen);
+
+      if(!scrollId) return;
+      grupos[scrollId].push({
+        id:id, nombre:nombre, laboratorio:lab,
+        precio:precio, descripcion:desc, imagen:imagen
+      });
+            _searchAllData.push({
+
+        desc: nombre,
+        lab: lab,
+        unidad: desc,
+        precio: _parsePrecioNP(precio),
+        pUnit: _parsePrecioNP(precio),
+        imagen: imagen,
+        key: 'np_raw_np_' + id.replace(/[^a-z0-9]/gi,'_')
+      });
+      
+    });
+    
+
+    var offsets={
+      'pop-scroll':0,'dermo-scroll':3,'vit-scroll':6,'ped-scroll':9,
+      'hig-scroll':2,'buc-scroll':5,'int-scroll':8,'bel-scroll':1,'var-scroll':4,'ins-scroll':7
+    };
+    Object.keys(grupos).forEach(function(sid){
+      if(grupos[sid].length) _renderProdEnScroll(sid,grupos[sid].reverse(),offsets[sid]||0);
+    });
+
+  }catch(e){
+    console.warn('[loadNuevoProducto]',e.message);
+  }
+}
+var PROMO_BTN_COLORS = ['#3b82f6','#10b981','#a78bfa','#f97316','#2dd4bf','#818cf8'];
+
+async function loadOfertasCarrusel() {
+  const wrap = document.getElementById('promos-wrap');
+
+  // Limpiar tracks anteriores antes de redibujar
+  const tracksViejos = wrap.querySelectorAll('.promo-track');
+  tracksViejos.forEach(t => t.remove());
+
+  // Mostrar loading solo si no hay tracks (primera carga)
+  const loading = document.getElementById('promos-loading');
+  if (!tracksViejos.length && loading) loading.style.display = 'flex';
+
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID_OFERTAS}/gviz/tq?tqx=out:csv&sheet=Ofertas&cachebust=${Date.now()}`;
+    const r = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(12000) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const text = await r.text();
+    if (!text || text.trim().length < 5) throw new Error('Empty');
+
+    const lines = text.trim().split('\n').slice(1).filter(Boolean);
+    const ofertas = lines.map(line => {
+      const cols = [];
+      let cur = '', inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') { inQ = !inQ; }
+        else if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+        else { cur += ch; }
+      }
+      cols.push(cur.trim());
+      const col = (i) => (cols[i] || '').replace(/^"|"$/g, '').trim();
+      return {
+        id:     col(0),
+        nombre: col(1),
+        lab:    col(2),
+        precio: col(3),
+        desc:   col(4),
+        estado: col(5) || 'activa',
+        img:    col(7)
+      };
+  
+    }).filter(o => o.id && o.estado === 'activa').reverse();
+
+
+    if (loading) loading.style.display = 'none';
+    renderOfertasCarrusel(ofertas);
+
+  } catch (e) {
+    console.warn('[loadOfertasCarrusel]:', e.message);
+    if (loading) loading.style.display = 'none';
+   
+    const hayTracks = wrap.querySelectorAll('.promo-track').length > 0;
+    if (!hayTracks) {
+      const fallback = document.getElementById('promos-fallback');
+      if (fallback) fallback.style.display = 'block';
+    }
+  }
+}
+
+function abrirPopupOferta(uid){
+  var o = _ofertasMap[uid];
+  if(!o) return;
+  var hasImg = o.img && o.img.startsWith('http');
+  var precioNum = _parseCOP(o.precio);
+  var tachadoNum = precioNum > 0 ? Math.round(precioNum * 1.15) : 0;
+  var precioFmt = precioNum > 0 ? _fpOferta(precioNum) : '';
+  var tachadoFmt = tachadoNum > 0 ? _fpOferta(tachadoNum) : '';
+  var c1 = o._c1 || '#003f87';
+  var desc = _getDescOferta(o, precioNum, tachadoNum);
+  var pct = desc && desc.includes('%') ? desc.replace(' OFF','') : '';
+  var addKey = 'oferta_' + uid;
+
+  document.getElementById('popup-oferta-body').innerHTML =
+    /* ── IMAGEN ── */
+    '<div style="width:100%;height:280px;background:#fff;display:flex;align-items:center;justify-content:center;position:relative;border-bottom:1px solid #f0f0f0;">'+
+  (hasImg
+    ? '<img src="'+escFarmacia(o.img)+'" style="width:100%;height:280px;object-fit:contain;padding:6px;">'
+    : '<span class="sym symf" style="font-size:130px;color:'+c1+';opacity:.08">medication</span>'
+  )+
+      /* Badge lab — sup izq */
+      '<div style="position:absolute;top:10px;left:10px;display:flex;align-items:center;gap:4px;background:#fff;border:1.5px solid '+c1+'33;border-radius:99px;padding:3px 8px 3px 6px;box-shadow:0 1px 5px rgba(0,0,0,.07);">'+
+        '<div style="width:6px;height:6px;border-radius:50%;background:'+c1+';flex-shrink:0;"></div>'+
+        '<span style="font-size:8px;font-weight:800;color:'+c1+';text-transform:uppercase;letter-spacing:.06em;">'+escFarmacia(o.lab||'Oferta')+'</span>'+
+      '</div>'+
+      /* Badge % OFF — inf izq, lejos de la X */
+      (pct
+        ? '<div style="position:absolute;bottom:10px;left:10px;background:'+c1+';color:#fff;border-radius:8px;padding:3px 8px;text-align:center;display:flex;align-items:baseline;gap:2px;">'+
+            '<span class="M" style="font-size:13px;font-weight:900;line-height:1;">'+pct+'</span>'+
+            '<span style="font-size:7px;font-weight:800;opacity:.85;">OFF</span>'+
+          '</div>'
+        : ''
+      )+
+    '</div>'+
+
+    /* ── INFO ── */
+    '<div style="padding:14px 16px 18px;">'+
+
+      /* Nombre */
+      '<div class="M" style="font-size:13px;font-weight:900;color:#111827;line-height:1.3;margin-bottom:10px;">'+
+        escFarmacia(o.nombre)+
+      '</div>'+
+
+      /* Descripción */
+      (o.desc
+        ? '<div style="font-size:10px;color:#6b7280;line-height:1.5;background:#f8f9fa;border-left:2px solid '+c1+'55;border-radius:0 6px 6px 0;padding:6px 10px;margin-bottom:10px;">'+
+            escFarmacia(o.desc)+
+          '</div>'
+        : ''
+      )+
+
+      /* Fila precio compacta */
+      (precioFmt
+        ? '<div style="display:flex;align-items:center;justify-content:space-between;background:#f8faff;border:1px solid '+c1+'20;border-radius:11px;padding:9px 13px;margin-bottom:12px;">'+
+            '<div>'+
+              '<div style="font-size:9px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;">Precio oferta</div>'+
+              '<div class="M" style="font-size:22px;font-weight:900;color:'+c1+';letter-spacing:-.03em;line-height:1;">'+precioFmt+'</div>'+
+              (tachadoFmt ? '<div style="font-size:9px;color:#9ca3af;font-weight:600;text-decoration:line-through;margin-top:1px;">'+tachadoFmt+'</div>' : '')+
+            '</div>'+
+            '<div style="width:38px;height:38px;border-radius:10px;background:'+c1+';display:flex;align-items:center;justify-content:center;">'+
+              '<span class="sym symf" style="font-size:18px;color:#fff">local_offer</span>'+
+            '</div>'+
+          '</div>'
+        : ''
+      )+
+
+      /* Chips */
+      '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:13px;padding-bottom:13px;border-bottom:1px solid #f3f4f6;">'+
+        '<div style="display:flex;align-items:center;gap:3px;background:'+c1+'12;border-radius:99px;padding:3px 8px;">'+
+          '<span class="sym symf" style="font-size:10px;color:'+c1+'">business</span>'+
+          '<span style="font-size:8px;font-weight:800;color:'+c1+';text-transform:uppercase;letter-spacing:.05em;">'+escFarmacia(o.lab||'Genérico')+'</span>'+
+        '</div>'+
+        '<div style="display:flex;align-items:center;gap:3px;background:#f0fdf4;border-radius:99px;padding:3px 8px;">'+
+          '<span class="sym symf" style="font-size:10px;color:#15803d">verified</span>'+
+          '<span style="font-size:8px;font-weight:700;color:#15803d;">Disponible</span>'+
+        '</div>'+
+        '<div style="display:flex;align-items:center;gap:3px;background:#fff7ed;border-radius:99px;padding:3px 8px;">'+
+          '<span class="sym symf" style="font-size:10px;color:#ea580c">local_fire_department</span>'+
+          '<span style="font-size:8px;font-weight:700;color:#ea580c;">Oferta activa</span>'+
+        '</div>'+
+      '</div>'+
+
+      /* CTA */
+      '<button onclick="cerrarPopupOferta();sadd(\''+escJS(addKey)+'\',\''+escJS(o.nombre)+'\',\''+escJS(o.lab||'')+'\','+precioNum+',null)" '+
+        'style="width:100%;background:'+c1+';color:#fff;border:none;cursor:pointer;padding:12px;border-radius:11px;font-family:\'Manrope\',sans-serif;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 4px 14px '+c1+'44;">'+
+        '<span class="sym symf" style="font-size:15px">add_shopping_cart</span>Agregar al pedido'+
+      '</button>'+
+
+    '</div>';
+
+  document.getElementById('popup-oferta').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function cerrarPopupOferta() {
+  document.getElementById('popup-oferta').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+/* ── Helpers internos ── */
+function _parseCOP(v) {
+  var s = String(v || '').replace(/[^0-9.,]/g, '');
+  if (!s) return 0;
+  var n = parseFloat(s.replace(/\./g, '').replace(',', '.'));
+  return isNaN(n) ? 0 : n;
+}
+function _fpOferta(n) {
+  if (!n) return '';
+  return '$\u2009' + Math.round(n).toLocaleString('es-CO');
+}
+function _getDescOferta(o, precioNum, tachado) {
+  var txt = (o.desc || '') + ' ' + (o.nombre || '');
+  var m = txt.match(/(\d{1,2})\s*%/);
+  if (m) { var p = parseInt(m[1]); if (p > 0 && p <= 90) return p + '% OFF'; }
+  if (tachado > 0 && precioNum > 0 && tachado > precioNum)
+    return Math.round((tachado - precioNum) / tachado * 100) + '% OFF';
+  return '';
+}
+function escJS(s) {
+  return (s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+}
+
+renderOfertasCarrusel = function(ofertas) {
+  var loading  = document.getElementById('promos-loading');
+  var fallback = document.getElementById('promos-fallback');
+  var wrap     = document.getElementById('promos-wrap');
+  var countEl  = document.getElementById('promos-count');
+
+  if (loading)  loading.style.display  = 'none';
+  if (fallback) fallback.style.display = 'none';
+
+  if (!ofertas.length) {
+    if (fallback) fallback.style.display = 'block';
+    return;
+  }
+  if (countEl) countEl.textContent = ofertas.length + ' oferta' + (ofertas.length !== 1 ? 's' : '');
+
+  var GRADS = [
+    ['#003f87','#1a56db'],
+    ['#064e3b','#059669'],
+    ['#4c1d95','#7c3aed'],
+    ['#7c1d00','#dc2626'],
+    ['#1a3a3a','#0d9488'],
+    ['#1e1b4b','#4338ca'],
+  ];
+
+  /* Guardar datos en mapa global */
+  _ofertasMap = {};
+  var cards = ofertas.map(function(o, i) {
+    var uid = 'of_' + (o.id || i).toString().replace(/[^a-z0-9]/gi, '_');
+    var gc  = GRADS[i % GRADS.length];
+    o._c1 = gc[0]; o._c2 = gc[1];
+    _ofertasMap[uid] = o;
+    _searchAllData.push({    // ← AÑADIR ESTAS 8 LÍNEAS
+      desc: o.nombre,
+      lab: o.lab || '',
+      unidad: o.desc || '',
+      precio: _parseCOP(o.precio),
+      pUnit: _parseCOP(o.precio),
+      imagen: o.img || '',
+      key: 'oferta_' + uid
+    });
+
+    var hasImg     = o.img && o.img.startsWith('http');
+    var precioNum  = _parseCOP(o.precio);
+    var tachadoNum = precioNum > 0 ? Math.round(precioNum * 1.15) : 0;
+    var precioFmt  = precioNum > 0 ? _fpOferta(precioNum) : '';
+    var tachadoFmt = tachadoNum > 0 ? _fpOferta(tachadoNum) : '';
+    var desc       = _getDescOferta(o, precioNum, tachadoNum);
+    var addKey     = 'oferta_' + uid;
+    var c1 = gc[0], c2 = gc[1];
+
+    return (
+      '<div style="' +
+        'flex-shrink:0;width:calc(100vw - 96px);max-width:280px;' +
+        'background:#fff;border-radius:18px;border:1.5px solid #e5e7eb;' +
+        'box-shadow:0 2px 12px rgba(0,0,0,.08);' +
+        'overflow:hidden;display:flex;flex-direction:column;' +
+        'scroll-snap-align:start;">' +
+
+        /* ── Imagen ── */
+        '<div style="width:100%;height:180px;background:#fff;' +
+  'display:flex;align-items:center;justify-content:center;' +
+  'overflow:hidden;position:relative;flex-shrink:0;border-bottom:1px solid #f3f4f6;">' +
+
+          (hasImg
+            ? '<img src="' + escFarmacia(o.img) + '" alt="' + escFarmacia(o.nombre) + '"' +
+              ' style="width:100%;height:180px;object-fit:contain;padding:8px;"' +
+
+              ' onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'">' +
+              '<span class="sym" style="font-size:44px;color:' + c1 + ';display:none">medication</span>'
+            : '<span class="sym" style="font-size:44px;color:' + c1 + '">medication</span>'
+          ) +
+
+          /* Badge descuento — dentro de la imagen, no desborda */
+          (desc
+            ? '<div style="position:absolute;top:7px;left:8px;' +
+              'background:#ef4444;color:#fff;font-size:9px;font-weight:900;' +
+              'padding:2px 8px;border-radius:99px;' +
+              'box-shadow:0 2px 6px rgba(239,68,68,.4);white-space:nowrap;">' + desc + '</div>'
+            : '') +
+
+          /* Lab badge */
+          '<div style="position:absolute;top:7px;right:8px;' +
+            'background:' + c1 + ';color:#fff;font-size:7.5px;font-weight:900;' +
+            'text-transform:uppercase;letter-spacing:.05em;' +
+            'padding:2px 7px;border-radius:99px;' +
+            'max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+            escFarmacia(o.lab || 'Oferta') + '</div>' +
+
+          /* Lupa */
+          '<button onclick="abrirPopupOferta(\'' + uid + '\')" style="' +
+            'position:absolute;bottom:7px;right:8px;' +
+            'width:26px;height:26px;border-radius:50%;border:none;cursor:pointer;' +
+            'background:' + c1 + ';display:flex;align-items:center;justify-content:center;' +
+            'box-shadow:0 2px 8px rgba(0,0,0,.25);">' +
+            '<span class="sym" style="font-size:14px;color:#fff">zoom_in</span>' +
+          '</button>' +
+        '</div>' +
+
+        /* ── Info compacta ── */
+        '<div style="padding:8px 11px 11px;display:flex;flex-direction:column;gap:3px;">' +
+
+          /* Nombre */
+          '<div class="M" style="font-size:12px;font-weight:800;color:#111827;' +
+            'line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;' +
+            '-webkit-box-orient:vertical;overflow:hidden;min-height:2.1em;">' +
+            escFarmacia(o.nombre) + '</div>' +
+
+          /* Descripción 1 línea */
+          (o.desc
+            ? '<div style="font-size:10px;color:#6b7280;line-height:1.35;' +
+              'display:-webkit-box;-webkit-line-clamp:1;' +
+              '-webkit-box-orient:vertical;overflow:hidden;">' +
+              escFarmacia(o.desc) + '</div>'
+            : '') +
+
+          /* Precio + botón agregar */
+          '<div style="display:flex;align-items:flex-end;justify-content:space-between;' +
+            'margin-top:5px;gap:6px;">' +
+            (precioFmt
+              ? '<div>' +
+                  (tachadoFmt ? '<div style="font-size:9px;color:#9ca3af;text-decoration:line-through;font-weight:600;line-height:1.1">' + tachadoFmt + '</div>' : '') +
+                  '<div class="M" style="font-size:15px;font-weight:900;color:' + c1 + ';letter-spacing:-.02em;line-height:1.1">' + precioFmt + '</div>' +
+                '</div>'
+              : '<div></div>'
+            ) +
+            '<button onclick="sadd(\'' + escJS(addKey) + '\',\'' + escJS(o.nombre) + '\',\'' + escJS(o.lab || '') + '\',' + precioNum + ',null)" style="' +
+              'background:' + c1 + ';color:#fff;border:none;cursor:pointer;' +
+              'padding:6px 11px;border-radius:9px;' +
+              'font-family:\'Manrope\',sans-serif;font-size:10.5px;font-weight:800;' +
+              'display:flex;align-items:center;gap:3px;' +
+              'box-shadow:0 2px 8px ' + c1 + '44;white-space:nowrap;flex-shrink:0;">' +
+              '<span class="sym symf" style="font-size:13px">add</span>Agregar' +
+            '</button>' +
+          '</div>' +
+
+        '</div>' +       '</div>'
+    );
+  }).join('');
+
+  /* Contenedor principal con overflow visible para el peek */
+  wrap.style.overflow = 'visible';
+  wrap.style.paddingLeft = '16px';
+
+  var track = document.createElement('div');
+  track.id = 'promos-track';
+  track.style.cssText =
+    'display:flex;gap:10px;padding-right:16px;width:max-content;' +
+    'transition:transform .85s cubic-bezier(.4,0,.2,1);';
+  track.innerHTML = cards;
+
+  wrap.innerHTML = '';
+  wrap.appendChild(track);
+
+  _iniciarCarrusel(ofertas.length);
+};
+
+/* ════ CARRUSEL ════ */
+var _cIdx = 0, _cTotal = 0, _cTimer = null, _cPaused = false;
+
+function _iniciarCarrusel(total) {
+  clearTimeout(_cTimer);
+  _cIdx = 0; _cTotal = total; _cPaused = false;
+
+  function cardW() {
+    var t = document.getElementById('promos-track');
+    if (!t) return 0;
+    var first = t.firstElementChild;
+    return first ? first.offsetWidth + 10 : 0;
+  }
+  function goTo(idx, anim) {
+    var t = document.getElementById('promos-track');
+    if (!t) return;
+    t.style.transition = anim ? 'transform .85s cubic-bezier(.4,0,.2,1)' : 'none';
+    t.style.transform = 'translateX(-' + (idx * cardW()) + 'px)';
+  }
+  function next() {
+    if (_cPaused) return;
+    var t = document.getElementById('promos-track');
+    if (!t) return;
+    _cIdx++;
+    if (_cIdx >= _cTotal) {
+      _cIdx = 0; goTo(0, false);
+      _cTimer = setTimeout(next, 3400); return;
+    }
+    goTo(_cIdx, true);
+    _cTimer = setTimeout(next, 3400);
+  }
+
+  var track = document.getElementById('promos-track');
+  if (track) {
+    track.addEventListener('mouseenter',  function() { _cPaused = true; clearTimeout(_cTimer); });
+    track.addEventListener('mouseleave',  function() { _cPaused = false; _cTimer = setTimeout(next, 2000); });
+    track.addEventListener('touchstart',  function() { _cPaused = true; clearTimeout(_cTimer); }, { passive: true });
+    track.addEventListener('touchend',    function() { _cPaused = false; _cTimer = setTimeout(next, 2400); }, { passive: true });
+  }
+
+  goTo(0, false);
+  _cTimer = setTimeout(next, 3400);
+}
+
+function abrirFichaTecnica(uid) {
+  var el = document.getElementById(uid);
+  if (!el) return;
+  el.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function cerrarFichaTecnica(uid) {
+  var el = document.getElementById(uid);
+  if (!el) return;
+  el.style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function formatPrecioFarmacia(v) {
+  if (!v) return '';
+  const s = String(v).replace(/[^0-9.,]/g, '');
+  const n = parseFloat(s.replace(/\./g, '').replace(',', '.'));
+  if (isNaN(n) || n === 0) return '';
+  return '$\u2009' + n.toLocaleString('es-CO', { minimumFractionDigits: 0 });
+}
+
+function escFarmacia(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ══ CATS GRID — Vista catálogo ══ */
+var CAT_DEFS = [
+  {n:'Analgésicos',     s:'Dolor y fiebre',       ic:'medication',       q:'acetaminofen',    bg:'#eef2ff', c:'#3b5bdb'},
+  {n:'Antibióticos',    s:'Infecciones',           ic:'vaccines',         q:'amoxicilina',     bg:'#f0fdf4', c:'#15803d'},
+  {n:'Vitaminas',       s:'Suplementos',           ic:'health_and_safety',q:'vitamina',        bg:'#fef9ec', c:'#b45309'},
+  {n:'Dermocosméticos', s:'Cuidado de piel',       ic:'face_6',           q:'crema',           bg:'#fdf2f8', c:'#86198f'},
+  {n:'Pediátrico',      s:'Para los pequeños',     ic:'child_care',       q:'pediatrico',      bg:'#f5f3ff', c:'#7c3aed'},
+  {n:'Cardiovascular',  s:'Corazón e HTA',         ic:'cardiology',       q:'enalapril',       bg:'#eff6ff', c:'#1d4ed8'},
+  {n:'Digestivo',       s:'Gastritis · Reflujo',   ic:'pill',             q:'omeprazol',       bg:'#faf5ff', c:'#7c3aed'},
+  {n:'Respiratorio',    s:'Tos · Gripa · Asma',    ic:'air',              q:'salbutamol',      bg:'#ecfeff', c:'#0e7490'},
+  {n:'Diabetes',        s:'Control glucemia',       ic:'monitor_heart',   q:'metformina',      bg:'#f0fdf4', c:'#15803d'},
+  {n:'Dermatología',    s:'Piel · Hongos',         ic:'healing',          q:'clotrimazol',     bg:'#fff0ee', c:'#dc2626'},
+  {n:'Primeros Auxilios',s:'Curaciones',            ic:'emergency',        q:'alcohol',         bg:'#fff7ed', c:'#ea580c'},
+  {n:'Oftalmología',    s:'Ojos · Gotas',          ic:'visibility',       q:'lagrima',         bg:'#f8faff', c:'#003f87'},
+];
+
+var _catResultsAll = []; // cache para filtro
+
+function buildCats(){
+  /* ── Catálogo: grid visual ── */
+  var grid = document.getElementById('cats-grid');
+  if(!grid) return;
+
+  var lbl = document.getElementById('cats-tienda-lbl');
+  if(lbl) lbl.textContent = (SHEETS[tienda]||{}).nombre || 'Farmacias WIL';
+
+  grid.innerHTML = CAT_DEFS.map(function(cat, i){
+    var delay = (i * 40) + 'ms';
+    return (
+      '<div onclick="abrirCatSheet(\''+cat.q+'\',\''+cat.n+'\',\''+cat.ic+'\',\''+cat.bg+'\',\''+cat.c+'\')" '+
+        'style="background:#fff;border-radius:18px;border:1.5px solid #e5e7eb;'+
+        'box-shadow:0 2px 12px rgba(0,0,0,.07);overflow:hidden;cursor:pointer;'+
+        'transition:transform .13s,box-shadow .13s;animation:fadeUp .3s ease both;animation-delay:'+delay+'" '+
+        'onmousedown="this.style.transform=\'scale(.96)\'" '+
+        'onmouseup="this.style.transform=\'\'" '+
+        'ontouchstart="this.style.transform=\'scale(.96)\'" '+
+        'ontouchend="this.style.transform=\'\'">' +
+
+        /* Cabecera con gradiente e ícono */
+        '<div style="height:88px;background:'+cat.bg+';display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden">' +
+          /* Círculo decorativo */
+          '<div style="position:absolute;width:80px;height:80px;border-radius:50%;background:'+cat.c+'18;right:-20px;top:-20px"></div>'+
+          '<div style="position:absolute;width:50px;height:50px;border-radius:50%;background:'+cat.c+'12;left:-10px;bottom:-14px"></div>'+
+          '<span class="sym symf" style="font-size:40px;color:'+cat.c+';position:relative;z-index:1">'+cat.ic+'</span>'+
+        '</div>'+
+
+        /* Body */
+        '<div style="padding:10px 12px 12px">' +
+          '<div class="M" style="font-size:13px;font-weight:900;color:var(--text);line-height:1.2;margin-bottom:3px">'+cat.n+'</div>'+
+          '<div style="font-size:10px;color:var(--text3);font-weight:500;line-height:1.3;margin-bottom:8px">'+cat.s+'</div>'+
+          '<div style="display:flex;align-items:center;justify-content:space-between">' +
+            '<div style="font-size:9px;font-weight:800;color:'+cat.c+';background:'+cat.bg+';padding:3px 8px;border-radius:99px;border:1px solid '+cat.c+'33">Ver productos</div>'+
+            '<span class="sym" style="font-size:16px;color:'+cat.c+'">chevron_right</span>'+
+          '</div>'+
+        '</div>'+
+      '</div>'
+    );
+  }).join('');
+}
+
+/* Abre la vista de resultados de una categoría */
+function abrirCatSheet(query, nombre, icon, bg, color){
+  var grid   = document.getElementById('cats-grid');
+  var wrap   = document.getElementById('cats-results-wrap');
+  var loading= document.getElementById('cats-res-loading');
+  var empty  = document.getElementById('cats-res-empty');
+  var resGrid= document.getElementById('cats-res-grid');
+  var title  = document.getElementById('cats-res-title');
+  var icoEl  = document.getElementById('cats-res-ico');
+  var countEl= document.getElementById('cats-res-count');
+  var inp    = document.getElementById('cats-res-inp');
+
+  /* Ocultar grid, mostrar wrap */
+  grid.parentElement.style.display = 'none';
+  wrap.style.display = 'block';
+  loading.style.display = 'flex';
+  empty.style.display   = 'none';
+  resGrid.innerHTML     = '';
+  if(inp) inp.value     = '';
+
+  /* Header */
+  title.textContent = nombre;
+  icoEl.style.background = bg;
+  icoEl.innerHTML = '<span class="sym symf" style="font-size:20px;color:'+color+'">'+icon+'</span>';
+  countEl.textContent = 'Buscando en inventario…';
+
+  /* Buscar en allData */
+  setTimeout(function(){
+    var q = query;
+    var resultados = [];
+    allData.forEach(function(it){
+      var s = Math.max(scr2(it.desc, q), scr2(it.lab, q)*0.7);
+      if(s >= 12) resultados.push({it:it, s:s});
+    });
+    resultados.sort(function(a,b){return b.s - a.s;});
+    var items = resultados.slice(0,80).map(function(x){return x.it;});
+
+    loading.style.display = 'none';
+    _catResultsAll = items;
+
+    if(!items.length){
+      empty.style.display = 'flex';
+      countEl.textContent = 'Sin resultados';
+      return;
+    }
+    countEl.textContent = items.length + ' producto' + (items.length!==1?'s':'') + ' encontrados';
+    renderCatResGrid(items, q, color);
+  }, 80);
+}
+
+function filtrarCatResults(q){
+  if(!_catResultsAll.length) return;
+  var filtered = q.trim()
+    ? _catResultsAll.filter(function(it){
+        return nrm(it.desc).includes(nrm(q)) || nrm(it.lab).includes(nrm(q));
+      })
+    : _catResultsAll;
+  var count = document.getElementById('cats-res-count');
+  if(count) count.textContent = filtered.length + ' producto' + (filtered.length!==1?'s':'') + ' encontrados';
+  renderCatResGrid(filtered, q, '');
+}
+
+function renderCatResGrid(items, q, accentColor){
+  var grid = document.getElementById('cats-res-grid');
+  if(!grid) return;
+
+  var GRADS=[
+    ['#003f87','#1a56db'],['#064e3b','#059669'],['#4c1d95','#7c3aed'],
+    ['#7c1d00','#dc2626'],['#1a3a3a','#0d9488'],['#1e1b4b','#4338ca'],
+    ['#86198f','#c026d3'],['#b45309','#d97706'],['#0e7490','#0891b2'],
+    ['#15803d','#16a34a'],['#dc2626','#ef4444'],['#7c3aed','#8b5cf6'],
+  ];
+  var ICONS=['medication','pill','vaccines','healing','health_and_safety','ecg',
+             'monitor_heart','water_drop','science','face_6','child_care','wb_sunny',
+             'spa','thermostat','emergency','biotech','favorite','local_pharmacy'];
+  var BG_POOL=['#f0f4ff','#fef9ec','#f0fdf4','#fdf2f8','#f5f3ff','#ecfeff','#fff7ed','#fff0ee'];
+
+  if(!items.length){
+    grid.innerHTML='';
+    document.getElementById('cats-res-empty').style.display='flex';
+    return;
+  }
+  document.getElementById('cats-res-empty').style.display='none';
+
+  grid.innerHTML = items.map(function(it, i){
+    cache[it.key] = it;
+    var inCart  = !!cart[it.key];
+    var precio  = it.precio > 0 ? it.precio : it.pUnit;
+    var gc      = GRADS[i % GRADS.length];
+    var c1      = accentColor || gc[0];
+    var icon    = ICONS[i % ICONS.length];
+    var bg      = BG_POOL[i % BG_POOL.length];
+    var delay   = Math.min(i * 25, 300) + 'ms';
+    var nombre  = (it.desc||'').length > 0 ? hl(it.desc, q||'') : '—';
+    var lab     = hl(it.lab||'Genérico', q||'');
+
+    return (
+      '<article style="background:#fff;border-radius:16px;border:1.5px solid #e5e7eb;'+
+        'box-shadow:0 2px 10px rgba(0,0,0,.06);display:flex;flex-direction:column;'+
+        'overflow:hidden;animation:fadeUp .25s ease both;animation-delay:'+delay+'">' +
+
+        /* Imagen / ícono */
+        '<div style="height:84px;background:'+bg+';display:flex;align-items:center;'+
+          'justify-content:center;flex-shrink:0;position:relative">' +
+          '<span class="sym symf" style="font-size:40px;color:'+c1+'">'+icon+'</span>'+
+          (inCart
+            ? '<div style="position:absolute;top:6px;right:6px;width:18px;height:18px;'+
+              'border-radius:50%;background:#15803d;display:flex;align-items:center;justify-content:center">'+
+              '<span class="sym symf" style="font-size:11px;color:#fff">check</span></div>'
+            : ''
+          )+
+        '</div>'+
+
+        /* Body */
+        '<div style="padding:8px 10px 10px;display:flex;flex-direction:column;gap:3px;flex:1">' +
+          '<div style="font-size:7.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;'+
+            'padding:2px 6px;border-radius:99px;width:fit-content;max-width:100%;overflow:hidden;'+
+            'text-overflow:ellipsis;white-space:nowrap;background:'+bg+';color:'+c1+'">'+lab+'</div>'+
+          '<div style="font-size:11px;font-weight:700;color:#111827;line-height:1.3;'+
+            'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.2em">'+nombre+'</div>'+
+          (it.unidad ? '<span style="font-size:8px;font-weight:600;color:#9ca3af;background:#f3f4f6;'+
+            'border-radius:5px;padding:1px 5px;width:fit-content">'+it.unidad+'</span>' : '')+
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;padding-top:5px;gap:4px">' +
+            '<div style="font-size:14px;font-weight:900;color:'+c1+';letter-spacing:-.02em">'+fp(precio)+'</div>'+
+            '<button data-key="'+esc(it.key)+'" '+
+              'onclick="addToCart(\''+esc(it.key)+'\',this)" '+
+              'style="background:'+(inCart?'#15803d':c1)+';width:30px;height:30px;border-radius:9px;'+
+              'border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;'+
+              'color:#fff;flex-shrink:0;box-shadow:0 3px 8px '+c1+'44;transition:.12s">'+
+              '<span class="sym symf" style="font-size:16px">'+(inCart?'check':'add')+'</span>'+
+            '</button>'+
+          '</div>'+
+        '</div>'+
+      '</article>'
+    );
+  }).join('');
+}
+
+function closeCatResults(){
+  var grid = document.getElementById('cats-grid');
+  var wrap = document.getElementById('cats-results-wrap');
+  grid.parentElement.style.display = 'block';
+  wrap.style.display = 'none';
+  _catResultsAll = [];
+}
+
+/* ══ LOAD SHEET — directo desde Google Sheets CSV (igual que Ofertas) ══
+   Encabezados: A:NOMBRE  B:LABORATORIO  C:PRESENTACION  D:PRECIO_VENTA  E:PRECIO_UNIDAD
+═══════════════════════════════════════════════════════════════════════════ */
+function loadSheet(){
+  var tab = SHEETS[tienda].tab;
+  var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID_OFERTAS +
+            '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent(tab) + '&cachebust=' + Date.now();
+ 
+  fetch(url, {cache:'no-store', signal:AbortSignal.timeout(15000)})
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
+    .then(function(text){
+      if(!text || text.trim().length < 5) throw new Error('Empty');
+ 
+      var lines = text.trim().split('\n').slice(1).filter(Boolean);
+      var items = [];
+ 
+      lines.forEach(function(line){
+        var cols = _parseCsvLineNP(line);
+        var col  = function(i){
+          return (cols[i]||'')
+            .replace(/^"|"$/g,'')
+            .replace(/\r/g,'')
+            .replace(/[\u200B-\u200D\uFEFF]/g,'') // ← limpia chars invisibles
+            .trim();
+        };
+ 
+        var nombre = col(0); // A NOMBRE/DESCRIPCION
+        var lab    = col(1); // B LABORATORIO
+        var unidad = col(2); // C PRESENTACION
+        var precioV= _parsePrecioNP(col(3)); // D PRECIO_VENTA
+        var precioU= _parsePrecioNP(col(4)); // E PRECIO_UNIDAD
+        var imagen = col(5); // F IMAGEN ← NUEVO: ya no es string vacío
+ 
+        if(!nombre) return;
+ 
+        var key = nombre + '|||' + lab;
+        var it = {
+          desc:   nombre,
+          lab:    lab,
+          unidad: unidad,
+          precio: precioV || precioU,
+          pUnit:  precioU || precioV,
+          imagen: imagen,   // ← guarda la URL real
+          key:    key
+        };
+        items.push(it);
+        cache[key] = it;
+      });
+ 
+      if(!items.length) throw new Error('No products');
+ 
+      allData = items;
+      _rebuildSearchIndex();
+
+ 
+      // Re-ejecutar búsqueda activa si la hay
+      var _aq = document.getElementById('s-inp').value.trim();
+      if(_aq && document.getElementById('v-search').style.display !== 'none') doSearch(_aq);
+ 
+      document.getElementById('tienda-lbl').textContent =
+        SHEETS[tienda].nombre + ' · ' + items.length + ' productos';
+ 
+      renderSheetCards(items.slice(0, 60).reverse());
+ 
+      console.log('[loadSheet] OK →', items.length, 'productos');
+      var conImg = items.filter(function(it){ return it.imagen && it.imagen.startsWith('http'); }).length;
+      console.log('[loadSheet] Con imagen:', conImg, 'de', items.length);
+    })
+    .catch(function(e){
+      console.warn('[loadSheet] CSV falló:', e.message, '— intentando API...');
+      fetch('/api/wil?action=sheet-stock&tab=' + encodeURIComponent(tab))
+        .then(function(r){ if(!r.ok) throw new Error('API HTTP '+r.status); return r.json(); })
+        .then(function(j){
+          if(!j.ok) throw new Error(j.error||'Error API');
+          var sheetItems = j.productos.map(function(p){
+            return {
+              desc:   p.desc,
+              lab:    p.lab||'',
+              unidad: p.unidad||'',
+              precio: p.precio||0,
+              pUnit:  p.pUnit||0,
+              imagen: p.imagen||'',
+              key:    p.desc+'|||'+(p.lab||'')
+            };
+          });
+          allData = sheetItems;
+          var _aq2 = document.getElementById('s-inp').value.trim();
+          if(_aq2 && document.getElementById('v-search').style.display !== 'none') doSearch(_aq2);
+          document.getElementById('tienda-lbl').textContent =
+            SHEETS[tienda].nombre + ' · ' + sheetItems.length + ' productos';
+          renderSheetCards(sheetItems.slice(0,50).reverse());
+        })
+        .catch(function(e2){
+          console.warn('[loadSheet] API también falló:', e2.message);
+          document.getElementById('tienda-lbl').textContent =
+            'Catálogo local · ' + allData.length + ' productos';
+          document.getElementById('sheet-skeleton').style.display = 'none';
+        });
+    });
+}
+var ICON_MAP=['medication','pill','vaccines','healing','health_and_safety','ecg','monitor_heart','water_drop','science','face_6','child_care','wb_sunny','spa','thermostat','emergency'];
+var BG_POOL=['#f0f4ff','#fef9ec','#f0fdf4','#fdf2f8','#f5f3ff','#ecfeff','#fff7ed','#fff0ee','#f0f9ff'];
+
+function renderSheetCards(items){
+  var skel = document.getElementById('sheet-skeleton');
+  var scr  = document.getElementById('sheet-scroll');
+  var arL  = document.getElementById('sheet-arrow-l');
+  var arR  = document.getElementById('sheet-arrow-r');
+ 
+  skel.style.display = 'none';
+  scr.style.display  = 'flex';
+  scr.style.padding  = '4px 0 6px 0';
+  if(arL) arL.style.display = 'none';
+  if(arR) arR.style.display = 'none';
+ 
+  var wrap = scr.parentElement;
+  wrap.style.overflow    = 'visible';
+  wrap.style.paddingLeft = '16px';
+ 
+  var GRADS = [
+    ['#003f87','#1a56db'],['#064e3b','#059669'],['#4c1d95','#7c3aed'],
+    ['#7c1d00','#dc2626'],['#1a3a3a','#0d9488'],['#1e1b4b','#4338ca'],
+    ['#86198f','#c026d3'],['#b45309','#d97706'],['#0e7490','#0891b2'],
+    ['#15803d','#16a34a'],['#dc2626','#ef4444'],['#7c3aed','#8b5cf6'],
+  ];
+  var ICONS = [
+    'medication','pill','vaccines','healing','health_and_safety','ecg',
+    'monitor_heart','water_drop','science','face_6','child_care','wb_sunny',
+    'spa','thermostat','emergency'
+  ];
+ 
+  var html = '';
+ 
+  items.forEach(function(it, i){
+    cache[it.key] = it;
+    var precio  = it.precio > 0 ? it.precio : (it.pUnit > 0 ? it.pUnit : 0);
+    var gc      = GRADS[i % GRADS.length];
+    var c1      = gc[0];
+    var icon    = ICONS[i % ICONS.length];
+    var hasImg  = !!(it.imagen && (it.imagen.startsWith('https://') || it.imagen.startsWith('http://')));
+    var uid     = 'sc_' + i; // id único para el fallback
+ 
+    html +=
+      '<div class="ocard">' +
+ 
+        // ── ZONA IMAGEN ──
+        '<div class="ocard-img" style="position:relative;background:#fff;">' +
+ 
+          // Imagen real (visible solo si URL válida)
+          (hasImg
+            ? '<img src="' + escFarmacia(it.imagen) + '"' +
+              ' alt="' + escFarmacia(it.desc) + '"' +
+              ' style="width:100%;height:145px;object-fit:contain;object-position:center;padding:6px;display:block;"' +
+              ' onerror="this.style.display=\'none\';' +
+                        'var x=document.getElementById(\'' + uid + '\');' +
+                        'if(x){x.style.display=\'flex\';}">'
+            : ''
+          ) +
+ 
+          // Ícono fallback: visible si no hay imagen, oculto si hay imagen OK
+          '<span id="' + uid + '" class="sym"' +
+            ' style="font-size:46px;color:' + c1 + ';' +
+            'display:' + (hasImg ? 'none' : 'flex') + ';' +
+            'align-items:center;justify-content:center;' +
+            'width:100%;height:145px;">' +
+            icon +
+          '</span>' +
+ 
+          // Badge laboratorio
+          '<div style="position:absolute;top:7px;right:8px;background:' + c1 + ';color:#fff;' +
+            'font-size:7.5px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;' +
+            'padding:2px 7px;border-radius:99px;max-width:90px;overflow:hidden;' +
+            'text-overflow:ellipsis;white-space:nowrap;">' +
+            escFarmacia(it.lab || 'Genérico') +
+          '</div>' +
+ 
+          // Botón zoom → popup detalle
+          '<button onclick="abrirPopupSheet(\'' + esc(it.key) + '\')"' +
+            ' style="position:absolute;bottom:7px;right:8px;width:26px;height:26px;' +
+            'border-radius:50%;border:none;cursor:pointer;background:' + c1 + ';' +
+            'display:flex;align-items:center;justify-content:center;' +
+            'box-shadow:0 2px 8px rgba(0,0,0,.25);">' +
+            '<span class="sym" style="font-size:14px;color:#fff">zoom_in</span>' +
+          '</button>' +
+ 
+        '</div>' +
+ 
+        // ── CUERPO CARD ──
+        '<div class="ocard-body">' +
+          '<div class="ocard-name">' + escFarmacia(it.desc) + '</div>' +
+          (it.unidad ? '<div class="ocard-desc">' + escFarmacia(it.unidad) + '</div>' : '') +
+          '<div class="ocard-footer">' +
+            '<div>' +
+              '<div class="ocard-price" style="color:' + c1 + '">' +
+                (precio > 0 ? fp(precio) : 'Consultar') +
+              '</div>' +
+            '</div>' +
+            '<button class="ocard-add"' +
+              ' style="background:' + c1 + ';box-shadow:0 2px 8px ' + c1 + '44;"' +
+              ' onclick="addToCart(\'' + esc(it.key) + '\',null)">' +
+              '<span class="sym symf" style="font-size:13px">add</span>Agregar' +
+            '</button>' +
+          '</div>' +
+        '</div>' +
+ 
+      '</div>';
+  });
+ 
+  html += '<div style="flex-shrink:0;width:4px"></div>';
+  scr.innerHTML = html;
+}
+/* ══ FUZZY SEARCH ══ */
+function nrm(s){
+  return (s||'').toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9\s]/g,'');
+}
+
+function scr2(txt,q){
+  var t=nrm(txt), nq=nrm(q);
+  if(!t||!nq)return 0;
+  if(t.includes(nq))return 100;
+  var ws=nq.split(/\s+/).filter(Boolean);
+  var h=ws.filter(function(w){return t.includes(w);}).length;
+  if(h===ws.length)return 90;
+  if(h>0)return 65*(h/ws.length);
+  var best=0;
+  t.split(/\s+/).forEach(function(tv){
+    ws.forEach(function(w){
+      if(w.length<3)return;
+      var sim=1-lev(tv,w)/Math.max(tv.length,w.length,1);
+      if(sim>best)best=sim;
+    });
+  });
+  return best>0.6?best*50:0;
+}
+
+function lev(a,b){var m=a.length,n=b.length,d=[];for(var i=0;i<=m;i++)d[i]=[i];for(var j=0;j<=n;j++)d[0][j]=j;for(var i=1;i<=m;i++)for(var j=1;j<=n;j++)d[i][j]=a[i-1]===b[j-1]?d[i-1][j-1]:1+Math.min(d[i-1][j],d[i][j-1],d[i-1][j-1]);return d[m][n];}
+
+function _rebuildSearchIndex(){
+  var seen={};
+  var extras=_searchAllData.filter(function(it){
+    return it.key&&(it.key.startsWith('np_raw_')||it.key.startsWith('oferta_'));
+  });
+  _searchAllData=[];
+  function push(it){
+    if(!it.desc||seen[it.key])return;
+    seen[it.key]=true;
+    cache[it.key]=it;
+    _searchAllData.push(it);
+  }
+  allData.forEach(push);   // STOCK principal
+  extras.forEach(push);    // Más Populares, Dermocosméticos, Vitaminas, Pediátrico, Ofertas...
+}
+
+
+function doSearch(q){
+  if(!q){setSt('empty');return;}
+  setSt('loading');
+  setTimeout(function(){
+    if(!allData.length){
+      document.getElementById('nores-txt').textContent='Cargando inventario, intenta en segundos.';
+      setSt('nores');
+      return;
+    }
+    var pool = _searchAllData.length ? _searchAllData : allData;
+var sc=[];
+pool.forEach(function(it){
+      var s=Math.max(scr2(it.desc,q), scr2(it.lab,q)*0.7);
+      if(s>=15) sc.push({it:it,s:s});
+    });
+    sc.sort(function(a,b){return b.s-a.s;});
+    if(!sc.length){
+      document.getElementById('nores-txt').textContent='No encontramos "'+q+'". Intenta con otro nombre.';
+      setSt('nores');
+      return;
+    }
+    renderResults(sc.slice(0,60).map(function(x){return x.it;}),q);
+  },55);
+}
+
+function copiarCodigoFarmacia(){
+  var cod=document.getElementById('co-codigo').textContent;
+  if(!cod||cod==='—')return;
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(cod).then(function(){
+      mostrarToastFarmacia('Código copiado: '+cod);
+    });
+  }
+}
+
+function verEstadoPedidoFarmacia(){
+  var cod=document.getElementById('co-codigo').textContent;
+  closeCheckout();
+  // Redirige a pedido-wil.html con el código para rastrear
+  window.location.href='pedido-wil.html?rastrear='+encodeURIComponent(cod);
+}
+
+function mostrarToastFarmacia(msg){
+  var t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 18px;border-radius:12px;font-size:13px;font-weight:700;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.25)';
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(function(){t.remove();},2500);
+}
+
+function renderResults(items,q){
+  setSt('results');
+  document.getElementById('res-count').textContent=
+    items.length+' resultado'+(items.length!==1?'s':'')+' para "'+q+'"';
+ 
+  var grid=document.getElementById('res-grid');
+  grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%';
+  grid.innerHTML='';
+ 
+  var GRADS=[
+    ['#003f87','#1a56db'],['#064e3b','#059669'],['#4c1d95','#7c3aed'],
+    ['#7c1d00','#dc2626'],['#1a3a3a','#0d9488'],['#1e1b4b','#4338ca'],
+    ['#86198f','#c026d3'],['#b45309','#d97706'],['#0e7490','#0891b2'],
+    ['#15803d','#16a34a'],['#dc2626','#ef4444'],['#7c3aed','#8b5cf6']
+  ];
+  var ICONS=[
+    'medication','pill','vaccines','healing','health_and_safety','ecg',
+    'monitor_heart','water_drop','science','face_6','child_care','wb_sunny',
+    'spa','thermostat','emergency','biotech','favorite','local_pharmacy'
+  ];
+ 
+  items.forEach(function(it,i){
+    cache[it.key]=it;
+    var inCart=!!cart[it.key];
+    var precio=it.precio>0?it.precio:(it.pUnit>0?it.pUnit:0);
+    var gc=GRADS[i%GRADS.length];
+    var c1=gc[0];
+    var icon=ICONS[i%ICONS.length];
+    var uid='rs_'+i;
+ 
+    /* ── URL imagen: acepta https://lh3.googleusercontent.com/d/... y cualquier https ── */
+    var img=(it.imagen||'').replace(/\r|\n|\t/g,'').trim();
+    var hasImg=img.length>8&&img.startsWith('http');
+ 
+    var card=document.createElement('article');
+    card.style.cssText=
+      'background:#fff;border-radius:16px;border:1.5px solid #e5e7eb;'+
+      'box-shadow:0 2px 10px rgba(0,0,0,.06);display:flex;flex-direction:column;'+
+      'overflow:hidden;animation:fadeUp .25s ease both;animation-delay:'+
+      Math.min(i*20,240)+'ms';
+ 
+    card.innerHTML=
+      /* zona imagen — fondo blanco para que la foto se vea limpia */
+      '<div style="height:130px;background:#fff;display:flex;align-items:center;'+
+        'justify-content:center;flex-shrink:0;position:relative;overflow:hidden;'+
+        'border-bottom:1px solid #f3f4f6;">'+
+ 
+        /* imagen real: visible si URL, oculta si falla → muestra ícono */
+        (hasImg
+          ? '<img src="'+escFarmacia(img)+'"'+
+            ' style="width:100%;height:130px;object-fit:contain;object-position:center;'+
+            'padding:6px;display:block;"'+
+            ' onerror="this.style.display=\'none\';'+
+            'var f=document.getElementById(\''+uid+'\');if(f)f.style.display=\'flex\'">'
+          : '')+
+ 
+        /* ícono fallback: visible SOLO si no hay URL */
+        '<span id="'+uid+'" class="sym symf"'+
+          ' style="font-size:50px;color:'+c1+';'+
+          'display:'+(hasImg?'none':'flex')+';'+
+          'align-items:center;justify-content:center;'+
+          'width:100%;height:130px;">'+icon+'</span>'+
+ 
+        /* badge laboratorio */
+        '<div style="position:absolute;top:7px;right:8px;background:'+c1+';color:#fff;'+
+          'font-size:7.5px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;'+
+          'padding:2px 7px;border-radius:99px;max-width:88px;overflow:hidden;'+
+          'text-overflow:ellipsis;white-space:nowrap;">'+
+          escFarmacia(it.lab||'Genérico')+
+        '</div>'+
+ 
+        /* botón zoom → popup detalle */
+        '<button onclick="abrirPopupSheet(\''+esc(it.key)+'\')"'+
+          ' style="position:absolute;bottom:6px;right:8px;width:24px;height:24px;'+
+          'border-radius:50%;border:none;cursor:pointer;background:'+c1+';'+
+          'display:flex;align-items:center;justify-content:center;'+
+          'box-shadow:0 2px 6px rgba(0,0,0,.22);">'+
+          '<span class="sym" style="font-size:13px;color:#fff">zoom_in</span>'+
+        '</button>'+
+      '</div>'+
+ 
+      /* cuerpo */
+      '<div style="padding:8px 10px 10px;display:flex;flex-direction:column;gap:4px;flex:1">'+
+        '<div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;'+
+          'padding:2px 7px;border-radius:99px;width:fit-content;max-width:100%;overflow:hidden;'+
+          'text-overflow:ellipsis;white-space:nowrap;background:'+c1+'18;color:'+c1+'">'+
+          hl(it.lab||'Genérico',q)+
+        '</div>'+
+        '<div style="font-size:11.5px;font-weight:700;color:#111827;line-height:1.3;'+
+          'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;'+
+          'overflow:hidden;min-height:2.2em">'+
+          hl(it.desc,q)+
+        '</div>'+
+        (it.unidad
+          ? '<span style="font-size:8px;font-weight:600;color:#9ca3af;background:#f3f4f6;'+
+            'border-radius:5px;padding:1px 5px;display:inline-block;width:fit-content">'+
+            it.unidad+'</span>'
+          : '')+
+        '<div style="display:flex;align-items:flex-end;justify-content:space-between;'+
+          'margin-top:auto;padding-top:4px">'+
+          '<div style="font-size:15px;font-weight:900;color:'+c1+';letter-spacing:-.02em">'+
+            (precio>0?fp(precio):'Consultar')+
+          '</div>'+
+          '<button data-key="'+esc(it.key)+'" onclick="addToCart(\''+esc(it.key)+'\',this)"'+
+            ' style="background:'+(inCart?'#15803d':c1)+';width:30px;height:30px;'+
+            'border-radius:9px;border:none;cursor:pointer;display:flex;align-items:center;'+
+            'justify-content:center;color:#fff;flex-shrink:0;box-shadow:0 3px 8px '+c1+'44;'+
+            'transition:.12s">'+
+            '<span class="sym symf" style="font-size:16px">'+(inCart?'check':'add')+'</span>'+
+          '</button>'+
+        '</div>'+
+      '</div>';
+ 
+    grid.appendChild(card);
+  });
+}
+
+function hl(t,q){if(!t||!q)return t||'';var ws=nrm(q).split(/\s+/).filter(function(w){return w.length>1;});var r=t;ws.forEach(function(w){r=r.replace(new RegExp('('+w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<mark>$1</mark>');});return r;}
+
+/* ══ ESTADOS UI ══ */
+function setSt(st){
+  ['empty','loading','nores','results'].forEach(function(s){
+    var el=document.getElementById('st-'+s);var on=s===st;
+    el.style.display=on?(s==='loading'?'flex':'block'):'none';
+    if(on&&s!=='loading'){el.style.animation='none';void el.offsetHeight;el.style.animation='fadeUp .25s ease';}
+  });
+  var trk=document.getElementById('trk-fixed');
+  if(trk){trk.style.display=(st==='empty')?'block':'none';}
+}
+
+/* ══ CARRITO ══ */
+function addToCart(key,btn){
+  var it=cache[key];if(!it)return;
+  var esNuevo=!cart[key];
+  if(cart[key])cart[key].qty++;
+  else{cart[key]={it:it,qty:1};if(btn){btn.style.background='var(--green)';btn.innerHTML='<span class="sym symf" style="font-size:17px">check</span>';}}
+  if(btn){btn.style.transform='scale(1.3)';setTimeout(function(){btn.style.transform='';},180);}
+  updFAB();renderCart();
+  _toastCarrito(it.desc, esNuevo);
+}
+
+function sadd(key,desc,lab,precio,btn){
+  var esNuevo=!cart[key];
+  if(cart[key])cart[key].qty++;
+  else{cart[key]={it:{desc:desc,lab:lab,precio:precio,pUnit:0,unidad:'',key:key},qty:1};if(btn){btn.classList.add('on');btn.innerHTML='<span class="sym symf" style="font-size:16px">check</span>';}}
+  if(btn){btn.style.transform='scale(1.3)';setTimeout(function(){btn.style.transform='';},180);}
+  updFAB();renderCart();
+  _toastCarrito(desc,esNuevo);
+}
+
+function _toastCarrito(desc,esNuevo){
+  /* Eliminar toast anterior si existe */
+  var prev=document.getElementById('_toast-cart');
+  if(prev)prev.remove();
+
+  var t=document.createElement('div');
+  t.id='_toast-cart';
+  t.style.cssText=[
+    'position:fixed',
+    'bottom:calc(env(safe-area-inset-bottom,0px) + 124px)',
+    'left:50%',
+    'transform:translateX(-50%) translateY(8px)',
+    'background:#111827',
+    'color:#fff',
+    'padding:10px 16px 10px 12px',
+    'border-radius:14px',
+    'font-family:\'Inter\',sans-serif',
+    'font-size:13px',
+    'font-weight:600',
+    'z-index:9999',
+    'box-shadow:0 6px 24px rgba(0,0,0,.35)',
+    'display:flex',
+    'align-items:center',
+    'gap:8px',
+    'max-width:calc(100vw - 40px)',
+    'opacity:0',
+    'transition:opacity .18s ease,transform .18s ease',
+    'pointer-events:none',
+    'white-space:nowrap',
+    'overflow:hidden',
+    'text-overflow:ellipsis',
+  ].join(';');
+
+  var nombre=desc.length>28?desc.substring(0,28)+'…':desc;
+  t.innerHTML=
+    '<span style="width:22px;height:22px;border-radius:50%;background:#15803d;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+
+      '<span class="sym symf" style="font-size:13px;color:#fff">check</span>'+
+    '</span>'+
+    '<span>'+
+      (esNuevo?'<b style="color:#4ade80">Agregado:</b> ':'<b style="color:#60a5fa">+1:</b> ')+
+      nombre+
+    '</span>'+
+    '<span style="display:flex;align-items:center;gap:3px;background:rgba(255,255,255,.12);border-radius:8px;padding:3px 8px;flex-shrink:0;cursor:pointer" onclick="openCart();var t=document.getElementById(\'_toast-cart\');if(t)t.remove()">'+
+      '<span class="sym symf" style="font-size:13px">shopping_cart</span>'+
+      '<span style="font-size:11px;font-weight:700">Ver</span>'+
+    '</span>';
+
+  document.body.appendChild(t);
+  /* Animación entrada */
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      t.style.opacity='1';
+      t.style.transform='translateX(-50%) translateY(0)';
+    });
+  });
+  /* Auto-dismiss */
+  setTimeout(function(){
+    t.style.opacity='0';
+    t.style.transform='translateX(-50%) translateY(8px)';
+    setTimeout(function(){if(t.parentNode)t.remove();},200);
+  },2800);
+}
+
+function chgQty(key,d){if(!cart[key])return;cart[key].qty+=d;if(cart[key].qty<=0){delItem(key);return;}updFAB();renderCart();}
+function delItem(key){
+  delete cart[key];
+  document.querySelectorAll('[data-key="'+key+'"]').forEach(function(b){b.style.background='var(--blue)';b.innerHTML='<span class="sym symf" style="font-size:17px">add</span>';});
+  document.querySelectorAll('.pcard-add').forEach(function(b){var oc=b.getAttribute('onclick')||'';if(oc.includes("'"+key+"'")){b.classList.remove('on');b.innerHTML='<span class="sym symf" style="font-size:16px">add</span>';}});
+  document.querySelectorAll('.scard-add').forEach(function(b){if((b.getAttribute('data-key')||'')===key){b.classList.remove('on');b.innerHTML='<span class="sym symf" style="font-size:15px">add</span>';}});
+  updFAB();renderCart();
+}
+function updFAB(){
+  var cnt=0;Object.values(cart).forEach(function(c){cnt+=c.qty;});
+  var badge=document.getElementById('fab-badge');
+  if(badge){badge.textContent=cnt>9?'9+':cnt;badge.style.display=cnt>0?'flex':'none';}
+}
+function renderCart(){
+  var keys=Object.keys(cart),el=document.getElementById('cart-items'),foot=document.getElementById('cart-footer');
+  if(!keys.length){el.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;padding:36px 0;gap:8px"><span class="sym symf" style="font-size:44px;color:var(--gray-m)">shopping_cart</span><span style="font-size:13px;color:var(--text3);font-weight:600">Tu carrito está vacío</span></div>';foot.style.display='none';return;}
+  foot.style.display='block';
+  var html='',tot=0,qty=0;
+  keys.forEach(function(key){
+    var c=cart[key],p=c.it.precio>0?c.it.precio:c.it.pUnit,sub=p*c.qty;
+    tot+=sub;qty+=c.qty;
+    html+='<div class="ci"><div style="flex:1;min-width:0"><div style="font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+c.it.desc+'</div>'+(c.it.lab?'<div style="font-size:10px;color:var(--text3);font-weight:500;margin-top:1px">'+c.it.lab+'</div>':'')+
+      '<div style="font-size:13px;font-weight:900;color:var(--blue);margin-top:3px">'+fp(sub)+'</div></div>'+
+      '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">'+
+        '<button onclick="chgQty(\''+esc(key)+'\',-1)" style="width:28px;height:28px;border-radius:8px;border:1.5px solid '+(c.qty===1?'#fca5a5':'var(--gray-m)')+';background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.12s">'+(c.qty===1?'<span class="sym symf" style="font-size:13px;color:var(--red)">delete</span>':'<span style="font-size:15px;font-weight:700">−</span>')+'</button>'+
+        '<span style="font-size:14px;font-weight:800;min-width:20px;text-align:center">'+c.qty+'</span>'+
+        '<button onclick="chgQty(\''+esc(key)+'\',1)" style="width:28px;height:28px;border-radius:8px;border:1.5px solid var(--gray-m);background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center"><span style="font-size:15px;font-weight:700">+</span></button>'+
+      '</div></div>';
+  });
+  el.innerHTML=html;
+  document.getElementById('cp-qty').textContent=qty;
+  document.getElementById('cp-sub').textContent=fp(tot);
+  document.getElementById('cp-total').textContent=fp(tot);
+}
+function openCart(){document.getElementById('cart-panel').classList.add('open');document.getElementById('cart-ov').classList.add('show');}
+function closeCart(){document.getElementById('cart-panel').classList.remove('open');document.getElementById('cart-ov').classList.remove('show');}
+
+/* ══ CHECKOUT ══ */
+var coStep=1,coPago=null,coCoords=null,coBarrio='',coDomicilio=0,coZonaNombre='';
+
+var CO_ZONAS=[
+  {keywords:['asuncion','fatima','mirador','obrero','horizonte','miraflores','misericordia','mojon','pedregal','pedrera','san francisco','shangay','simon bolivar','tobon','monte verde','remanso','yarumito','canoas','piedras','porvenir','recreo','azulita'],precio:5000,nombre:'Zona 1'},
+  {keywords:['calorcol','villas','tablazo','cristo rey','colinas','vegas','edificios','montesion','jardin','reservas','posada','rosa de los vientos','vicenza'],precio:7000,nombre:'Zona 2'},
+  {keywords:['bello','niquía','niquia','madera','fabricato'],precio:15000,nombre:'Bello'},
+  {keywords:['medellin','medellín','envigado','sabaneta','itagui','itagüí','estrella','caldas','laureles','poblado','estadio','robledo'],precio:40000,nombre:'Área Metro'},
+];
+var CO_DEFAULT_PRECIO=8000,CO_DEFAULT_ZONA='Copacabana';
+
+function coPrecioBarrio(barrio){
+  var b=(barrio||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  for(var i=0;i<CO_ZONAS.length;i++){
+    var z=CO_ZONAS[i];
+    for(var j=0;j<z.keywords.length;j++){
+      if(b.includes(z.keywords[j]))return{precio:z.precio,nombre:z.nombre};
+    }
+  }
+  return{precio:CO_DEFAULT_PRECIO,nombre:CO_DEFAULT_ZONA};
+}
+
+function abrirCheckout(){
+  coStep=1;coPago=null;
+  document.getElementById('co-s1').style.display='block';
+  document.getElementById('co-s2').style.display='none';
+  document.getElementById('co-s3').style.display='none';
+  document.getElementById('co-footer').style.display='block';
+  document.getElementById('co-btn-next').innerHTML='<span class="sym symf" style="font-size:18px">arrow_forward</span> Continuar';
+  document.getElementById('co-title').textContent='Datos del pedido';
+  document.getElementById('co-pb1').style.background='var(--blue)';
+  document.getElementById('co-pb2').style.background='#e5e7eb';
+  document.getElementById('co-pb3').style.background='#e5e7eb';
+  coActualizarResumen();
+  var ov=document.getElementById('co-ov'),sh=document.getElementById('co-sheet');
+  ov.style.display='block';sh.style.display='flex';
+  closeCart();
+  setTimeout(function(){sh.style.transform='translateY(0)';ov.style.opacity='1';},10);
+}
+
+function closeCheckout(){
+  var sh=document.getElementById('co-sheet'),ov=document.getElementById('co-ov');
+  sh.style.transform='translateY(100%)';ov.style.opacity='0';
+  setTimeout(function(){sh.style.display='none';ov.style.display='none';},350);
+}
+
+function coCapturarGPS(){
+  var title=document.getElementById('co-loc-title'),sub=document.getElementById('co-loc-sub'),st=document.getElementById('co-loc-st');
+  if(!navigator.geolocation){sub.textContent='GPS no disponible';return;}
+  title.textContent='Captando ubicaci\xf3n\u2026';sub.textContent='Un momento\u2026';st.textContent='\u27f3';
+  navigator.geolocation.getCurrentPosition(function(pos){
+    coCoords={lat:pos.coords.latitude,lng:pos.coords.longitude};
+    fetch('https://nominatim.openstreetmap.org/reverse?lat='+pos.coords.latitude+'&lon='+pos.coords.longitude+'&format=json&accept-language=es',{headers:{'User-Agent':'FarmaWIL/1.0'}})
+      .then(function(r){return r.json();})
+      .then(function(data){
+        var a=data.address||{};
+        coBarrio=a.neighbourhood||a.suburb||a.village||a.city_district||a.city||'Copacabana';
+        var calle=(a.road||a.street||'').trim(),num=(a.house_number||'').trim(),ciudad=(a.city||a.town||a.municipality||'Copacabana').trim();
+        var dirAuto=[calle+(num?' #'+num:''),coBarrio,ciudad].filter(Boolean).join(', ');
+        var dirInput=document.getElementById('co-direccion');
+        if(dirInput&&!dirInput.value.trim())dirInput.value=dirAuto;
+ 
+        // ── Función centralizada para aplicar tarifa ──
+        function aplicarTarifa(precio,nombre){
+          coDomicilio=precio;
+          coZonaNombre=nombre;
+          var zonaEl=document.getElementById('co-zona-lbl');
+          var domiEl=document.getElementById('co-domi-txt');
+          if(zonaEl)zonaEl.textContent=coZonaNombre;
+          if(domiEl)domiEl.textContent=fp(coDomicilio);
+          coActualizarResumen();
+        }
+ 
+        // 1. Intentar API propia (hoja de tarifas)
+        fetch('/api/wil?action=tarifa-barrio&barrio='+encodeURIComponent(coBarrio))
+          .then(function(r){return r.json();})
+          .then(function(td){
+            if(td.ok&&td.tarifa){
+              aplicarTarifa(td.tarifa,td.barrio||coBarrio);
+            } else if(coCoords){
+              // 2. Fallback: OSRM distancia desde sede Copacabana
+              var COPA_LAT=6.34911,COPA_LNG=-75.50619;
+              fetch('https://router.project-osrm.org/route/v1/driving/'+COPA_LNG+','+COPA_LAT+';'+coCoords.lng+','+coCoords.lat+'?overview=false')
+                .then(function(r){return r.json();})
+                .then(function(od){
+                  if(od.routes&&od.routes[0]){
+                    var km=od.routes[0].distance/1000;
+                    // $1800/km redondeado a $500, mínimo $5000
+                    aplicarTarifa(
+                      Math.max(5000,Math.round(km*1800/500)*500),
+                      km>15?'\xc1rea Metro':coBarrio
+                    );
+                  } else {
+                    var z=coPrecioBarrio(coBarrio);aplicarTarifa(z.precio,z.nombre);
+                  }
+                })
+                .catch(function(){
+                  var z=coPrecioBarrio(coBarrio);aplicarTarifa(z.precio,z.nombre);
+                });
+            } else {
+              var z=coPrecioBarrio(coBarrio);aplicarTarifa(z.precio,z.nombre);
+            }
+          })
+          .catch(function(){
+            var z=coPrecioBarrio(coBarrio);aplicarTarifa(z.precio,z.nombre);
+          });
+ 
+        // Actualizar chip de GPS
+        title.textContent='\ud83d\udccd '+coBarrio;
+        sub.textContent=dirAuto||'Ubicaci\xf3n capturada';
+        st.textContent='\u2713';st.style.color='#15803d';
+        document.getElementById('co-loc-chip').style.background='#dcfce7';
+        document.getElementById('co-loc-chip').style.borderColor='#86efac';
+      })
+      .catch(function(){
+        title.textContent='GPS capturado';
+        sub.textContent='Completa la direcci\xf3n manualmente';
+        st.textContent='\u2713';
+      });
+  },function(){
+    title.textContent='No se pudo captar';
+    sub.textContent='Ingresa la direcci\xf3n manualmente';
+    st.textContent='\u2717';st.style.color='#dc2626';
+  },{enableHighAccuracy:true,timeout:12000});
+}
+function coSelPago(m){
+  coPago=m;
+  var ef=document.getElementById('co-pago-ef'),tr=document.getElementById('co-pago-tr');
+  var onStyle='border:2px solid var(--blue);background:var(--blue-l)';
+  var offStyle='border:2px solid #e5e7eb;background:#fafafa';
+  ef.style.cssText=(m==='EFECTIVO'?onStyle:offStyle)+';border-radius:14px;padding:14px 10px;cursor:pointer;text-align:center;transition:.18s';
+  tr.style.cssText=(m==='TRANSFERENCIA'?onStyle:offStyle)+';border-radius:14px;padding:14px 10px;cursor:pointer;text-align:center;transition:.18s';
+}
+
+function coActualizarResumen(){
+  var tot=0,html='';
+  Object.values(cart).forEach(function(c){
+    var p=c.it.precio>0?c.it.precio:c.it.pUnit, sub=p*c.qty;
+    tot+=sub;
+    html+=
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid #f3f4f6">'
+        +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:12.5px;font-weight:700;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+c.it.desc+'</div>'
+          +'<div style="font-size:10px;color:#9ca3af;font-weight:600;margin-top:1px">'+(c.it.lab||'Genérico')+' ×'+c.qty+'</div>'
+        +'</div>'
+        +'<div style="font-size:13px;font-weight:800;color:#111827;flex-shrink:0;margin-left:12px">'+fp(sub)+'</div>'
+      +'</div>';
+  });
+  document.getElementById('co-resumen-items').innerHTML=html;
+
+  var domVal = modoEntrega === 'reco' ? 0 : (coDomicilio || CO_DEFAULT_PRECIO);
+
+  var zonaNm = modoEntrega === 'reco' ? 'Recogida en tienda' : (coZonaNombre || CO_DEFAULT_ZONA);
+
+  document.getElementById('co-sub-txt').textContent=fp(tot);
+  document.getElementById('co-zona-lbl').textContent=zonaNm;
+  document.getElementById('co-domi-txt').textContent=fp(domVal);
+  document.getElementById('co-total-txt').textContent=fp(tot+domVal);
+}
+
+
+function coNext(){
+  if(coStep===1){
+    var nom=document.getElementById('co-nombre').value.trim();
+    var tel=document.getElementById('co-telefono').value.trim();
+    var dir=document.getElementById('co-direccion').value.trim();
+    var ref=document.getElementById('co-referencia').value.trim();
+    if(!nom){alert('Ingresa tu nombre');document.getElementById('co-nombre').focus();return;}
+    if(!tel){alert('Ingresa tu teléfono');document.getElementById('co-telefono').focus();return;}
+    if(!dir){alert('Ingresa la dirección');document.getElementById('co-direccion').focus();return;}
+    if(!ref){alert('Ingresa un punto de referencia');document.getElementById('co-referencia').focus();return;}
+    coActualizarResumen();
+    coStep=2;
+    document.getElementById('co-s1').style.display='none';
+    document.getElementById('co-s2').style.display='block';
+    document.getElementById('co-title').textContent='Pago y resumen';
+    document.getElementById('co-pb2').style.background='var(--blue)';
+    document.getElementById('co-btn-next').innerHTML='<span class="sym symf" style="font-size:18px">check_circle</span> Confirmar pedido';
+    document.getElementById('co-body').scrollTop=0;
+  } else if(coStep===2){
+    if(!coPago){alert('Selecciona método de pago');return;}
+    coEnviarPedido();
+  }
+}
+
+async function coEnviarPedido(){
+  var btn=document.getElementById('co-btn-next');
+  btn.disabled=true;
+  btn.innerHTML='<span style="display:inline-block;width:16px;height:16px;border:2.5px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle"></span> Enviando…';
+
+  var nom=document.getElementById('co-nombre').value.trim();
+  var tel=document.getElementById('co-telefono').value.trim();
+  var dir=document.getElementById('co-direccion').value.trim();
+  var ref=document.getElementById('co-referencia').value.trim();
+  var dirCompleta=dir+(ref?' — Ref: '+ref:'');
+
+  var now=new Date();
+  var hora=now.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true});
+  var fecha=now.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
+  var idPedido=String(Math.floor(100+Math.random()*900));
+
+  var items=Object.values(cart);
+  var subtotal=items.reduce(function(a,c){
+    var p=c.it.precio>0?c.it.precio:c.it.pUnit;
+    return a+p*c.qty;
+  },0);
+  var totalFinal=subtotal+coDomicilio;
+
+  // ── Una fila por producto ──
+  // Fila 1 (i===0): lleva ID, nombre, tel, pago, estado, dir, hora, fecha, total
+  // Filas siguientes: solo G-K (producto, marca, cant, v/u, vtotal), resto vacío
+  var rows=[];
+  items.forEach(function(c,i){
+    var p=c.it.precio>0?c.it.precio:c.it.pUnit;
+    var vtotal=p*c.qty;
+    if(i===0){
+      rows.push([
+        idPedido,    // A ID_PEDIDO
+        nom,         // B NOMBRE_CLI
+        tel,         // C TELEFONO
+        coPago,      // D METODO_PAGO
+        'Pendiente', // E ESTADO
+        '',          // F IMAGEN_TRANSFERENCIA
+        c.it.desc,   // G PRODUCTO
+        c.it.lab||'',// H MARCA
+        c.qty,       // I CANTIDAD
+        p,           // J V/U
+        vtotal,      // K V/TOTAL
+        dirCompleta, // L DIRECCION
+        hora,        // M HORA
+        fecha,       // N FECHA
+        totalFinal,  // O TOTAL
+        '',          // P NOMBRE_DOMI
+        '',          // Q HORA_TOMO_PEDIDO
+        '',          // R HORA_ENTREGO
+        '',         // S CALIFICACION
+        coDomicilio||0, // T DOMICILIO 
+        modoEntrega === 'domi' ? 'DOMICILIO' : 'RECOGIDA_EN_TIENDA',
+      ]);
+    } else {
+      rows.push([
+        '','','','','','',
+        c.it.desc,    // G
+        c.it.lab||'', // H
+        c.qty,        // I
+        p,            // J
+        vtotal,       // K
+        '','','','','','','',''
+      ]);
+    }
+  });
+
+  // Fila domicilio al final
+   if(coDomicilio>0 && modoEntrega === 'domi'){
+    rows.push([
+      '','','','','','',
+      'Domicilio ('+(coZonaNombre||'Copacabana')+')',
+      'WIL Domicilios',
+      1,
+      coDomicilio,
+      coDomicilio,
+      '','','','','','','',''
+    ]);
+  }
+
+  try{
+    var res=await fetch('/api/wil?action=pedido-farmacia',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        rows:rows,
+        id:idPedido,
+        sede:tienda,
+        nombre:nom,
+        telefono:tel,
+        total:totalFinal,
+        domicilio:coDomicilio,
+        zona:coZonaNombre,
+        direccion:dirCompleta,
+        metodoPago:coPago,
+        coords:coCoords
+      })
+    });
+    var data=await res.json();
+    if(!data.ok)throw new Error(data.error||'Error al guardar');
+
+    coStep=3;
+    document.getElementById('co-s2').style.display='none';
+    document.getElementById('co-s3').style.display='block';
+    document.getElementById('co-footer').style.display='none';
+    document.getElementById('co-pb3').style.background='var(--blue)';
+    document.getElementById('co-title').textContent='¡Pedido confirmado!';
+    document.getElementById('co-codigo').textContent=idPedido;
+    document.getElementById('co-exito-msg').textContent=
+      'Tu pedido fue registrado. Un domiciliario WIL te contactará al '+tel+' pronto.';
+    cart={};updFAB();renderCart();
+  }catch(e){
+    btn.disabled=false;
+    btn.innerHTML='<span class="sym symf" style="font-size:18px">check_circle</span> Confirmar pedido';
+    alert('Error al enviar el pedido: '+e.message);
+  }
+}
+
+
+/* ══ UTILS ══ */
+function fp(n){if(!n||isNaN(n))return '$0';return '$'+Math.round(n).toLocaleString('es-CO')+' COP';}
+function esc(s){return(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+function setModo(m){
+  modoEntrega = m;
+  document.getElementById('btn-domi').style.background=m==='domi'?'var(--blue-l)':'var(--card)';
+  document.getElementById('btn-domi').style.borderColor=m==='domi'?'var(--blue)':'var(--gray-m)';
+  document.getElementById('btn-domi').style.color=m==='domi'?'var(--blue)':'var(--text3)';
+  document.getElementById('btn-reco').style.background=m==='reco'?'var(--blue-l)':'var(--card)';
+  document.getElementById('btn-reco').style.borderColor=m==='reco'?'var(--blue)':'var(--gray-m)';
+  document.getElementById('btn-reco').style.color=m==='reco'?'var(--blue)':'var(--text3)';
+}
+
+function abrirPopupSheet(key){
+  var it = cache[key];
+  if(!it) return;
+  var precio = it.precio > 0 ? it.precio : it.pUnit;
+  var addKey = 'sheet_' + key.replace(/[^a-z0-9]/gi,'_');
+  var seed = key.split('').reduce(function(a,c){return a+c.charCodeAt(0);},0);
+  var c1 = _PROD_GRADS[seed % _PROD_GRADS.length][0];
+  var icon = _PROD_ICONS[seed % _PROD_ICONS.length];
+  var hasImg = it.imagen && it.imagen.startsWith('http');
+  var precioTachado = precio > 0 ? Math.round(precio * 1.18) : 0;
+
+  document.getElementById('popup-oferta-body').innerHTML =
+    /* ── Zona imagen ── */
+    '<div style="width:100%;height:340px;background:#fff;display:flex;align-items:center;justify-content:center;position:relative;border-bottom:0.5px solid #e5e7eb;">'+
+      (hasImg
+        ? '<img src="'+escFarmacia(it.imagen)+'" style="width:100%;height:340px;object-fit:contain;padding:28px;">'
+        : '<span class="sym symf" style="font-size:150px;color:'+c1+';opacity:.1">'+icon+'</span>'
+      )+
+      /* Badge laboratorio en imagen */
+      '<div style="position:absolute;top:12px;left:12px;background:'+c1+';color:#fff;font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;padding:3px 10px;border-radius:99px;">'+
+        escFarmacia(it.lab||'Genérico')+
+      '</div>'+
+    '</div>'+
+
+    /* ── Info ── */
+    '<div style="padding:16px 18px 20px;">'+
+
+      /* Nombre */
+      '<div class="M" style="font-size:14px;font-weight:800;color:#111827;line-height:1.35;margin-bottom:12px;">'+
+        escFarmacia(it.desc)+
+      '</div>'+
+
+      /* Bloque precio */
+      (precio > 0
+        ? '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px;">'+
+            '<span class="M" style="font-size:26px;font-weight:900;color:'+c1+';letter-spacing:-.03em;">'+fp(precio)+'</span>'+
+            '<span style="font-size:11px;color:#9ca3af;text-decoration:line-through;font-weight:600;">'+fp(precioTachado)+'</span>'+
+          '</div>'
+        : '<div style="font-size:13px;color:#9ca3af;font-weight:600;margin-bottom:4px;">Precio a consultar</div>'
+      )+
+
+      /* Línea separadora con lab + presentación */
+      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid #f3f4f6;">'+
+        '<span style="font-size:9px;font-weight:700;color:'+c1+';text-transform:uppercase;letter-spacing:.06em;background:'+c1+'15;padding:2px 8px;border-radius:99px;">'+
+          escFarmacia(it.lab||'Genérico')+
+        '</span>'+
+        (it.unidad
+          ? '<span style="font-size:9px;color:#9ca3af;">·</span>'+
+            '<span style="font-size:9px;color:#6b7280;font-weight:600;">'+escFarmacia(it.unidad)+'</span>'
+          : ''
+        )+
+      '</div>'+
+
+      /* Botón agregar */
+      '<button onclick="cerrarPopupOferta();sadd(\''+escJS(addKey)+'\',\''+escJS(it.desc)+'\',\''+escJS(it.lab||'')+'\','+precio+',null)" '+
+        'style="width:100%;background:'+c1+';color:#fff;border:none;cursor:pointer;padding:13px;border-radius:12px;font-family:\'Manrope\',sans-serif;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 4px 16px '+c1+'44;">'+
+        '<span class="sym symf" style="font-size:16px">add_shopping_cart</span>Agregar al pedido'+
+      '</button>'+
+
+    '</div>';
+
+  document.getElementById('popup-oferta').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+</script>
+</body>
+</html>
