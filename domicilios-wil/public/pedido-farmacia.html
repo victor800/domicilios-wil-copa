@@ -460,7 +460,7 @@ mark{background:#dbeafe;color:#1e40af;border-radius:3px;padding:0 2px}
     <span class="sec-link" onclick="openSearch('OTC')" style="cursor:pointer">Ver más →</span>
   </div>
   <div style="overflow:visible;padding-left:16px">
-    <div id="ins-scroll" style="display:flex;gap:10px;padding-right:16px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;"></div>
+    <div id="otc-scroll" style="display:flex;gap:10px;padding-right:16px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;"></div>
   </div>
 </div>
 </div>
@@ -1043,18 +1043,18 @@ var _SECCION_MAP={
   'bebes':'ped-scroll','ninos':'ped-scroll','infantil':'ped-scroll',
 
   // leches → dermo-scroll (misma sección visual)
-  'leches':'leche-scroll','leches':'dermo-scroll',
-  'leche':'leche-scroll','leche':'dermo-scroll',
+  'leches':'leches-scroll','leche':'leches-scroll',
 
   // dermatologicos → nueva sección
-  'dermatologicos':'derma-scroll','dermatologico':'derma-scroll',
+  'dermatologicos':'derm-scroll','dermatologico':'derm-scroll',
 
   // Cuidado Bucal → nueva sección
   'bucal':'buc-scroll','cuidado bucal':'buc-scroll',
 
   // Anticonceptivos → nueva sección
   'intimo':'int-scroll','cuidado intimo':'int-scroll',
-  'intímo':'int-scroll','cuidado intímo':'int-scroll',
+'intímo':'int-scroll','cuidado intímo':'int-scroll',
+
 
   // Aseo Personal → nueva sección
   'belleza':'bel-scroll','belleza y cuidado personal':'bel-scroll',
@@ -1067,14 +1067,15 @@ var _SECCION_MAP={
 
   // Insumos Médicos → nueva sección
   'insumos':'ins-scroll','insumos medicos':'ins-scroll',
-  'insumos médicos':'ins-scroll',
+'insumos médicos':'ins-scroll',
 
   // OTC → nueva sección
   'OTC':'otc-scroll','insumos medicos':'otc-scroll',
   'insumos médicos':'ins-scroll',
 
   // Otros → pop-scroll como fallback
-  'otros':'pop-scroll',
+  'otc':'otc-scroll',
+
 };
 
 function _nrmSec(s){
@@ -1180,9 +1181,10 @@ async function loadNuevoProducto(){
 
     var lines=allLines.slice(1).filter(Boolean);
     var grupos={
-      'pop-scroll':[],'dermo-scroll':[],'vit-scroll':[],'ped-scroll':[],
-      'hig-scroll':[],'buc-scroll':[],'int-scroll':[],'bel-scroll':[],'var-scroll':[],'ins-scroll':[]
-    };
+  'pop-scroll':[],'dermo-scroll':[],'vit-scroll':[],'ped-scroll':[],
+  'hig-scroll':[],'buc-scroll':[],'int-scroll':[],'bel-scroll':[],
+  'var-scroll':[],'ins-scroll':[],'otc-scroll':[],'leches-scroll':[],'derm-scroll':[]
+};
 
     lines.forEach(function(line,lineIdx){
       var cols=_parseCsvLineNP(line);
@@ -1230,9 +1232,10 @@ async function loadNuevoProducto(){
     
 
     var offsets={
-      'pop-scroll':0,'dermo-scroll':3,'vit-scroll':6,'ped-scroll':9,
-      'hig-scroll':2,'buc-scroll':5,'int-scroll':8,'bel-scroll':1,'var-scroll':4,'ins-scroll':7
-    };
+  'pop-scroll':0,'dermo-scroll':3,'vit-scroll':6,'ped-scroll':9,
+  'hig-scroll':2,'buc-scroll':5,'int-scroll':8,'bel-scroll':1,
+  'var-scroll':4,'ins-scroll':7,'otc-scroll':10,'leches-scroll':11,'derm-scroll':2
+};
     Object.keys(grupos).forEach(function(sid){
       if(grupos[sid].length) _renderProdEnScroll(sid,grupos[sid].reverse(),offsets[sid]||0);
     });
