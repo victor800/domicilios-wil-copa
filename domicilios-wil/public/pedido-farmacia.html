@@ -2897,6 +2897,7 @@ function abrirPopupSheet(key){
 
   /* ─── 2. SWIPE TÁCTIL EN EL CARRUSEL DE OFERTAS ─── */
   /* Mantiene el auto-avance; agrega arrastre con el dedo */
+ /* ─── 2. SWIPE TÁCTIL EN EL CARRUSEL DE OFERTAS ─── */
   function attachSwipe(){
     var track=document.getElementById('promos-track');
     if(!track||track._wilSwipe)return;
@@ -2904,41 +2905,50 @@ function abrirPopupSheet(key){
 
     var sx=0,sy=0,st=0,dragging=false,isHoriz=null;
 
-    function getTx(){
-      var m=(track.style.transform||'').match(/translateX\((-?[\d.]+)px\)/);
-      return m?parseFloat(m[1]):0;
-    }
     function cw(){
       var f=track.firstElementChild;
       return f?f.offsetWidth+10:0;
     }
-    function snapTo(idx,anim){
-      var _idx=Math.max(0,Math.min(idx,_cTotal-1));
-      _cIdx=_idx;
-      track.style.transition=anim?'transform .35s cubic-bezier(.4,0,.2,1)':'none';
-      track.style.transform='translateX(-'+(_idx*cw())+'px)';
-    }
+
+    /* ── Reanuda el loop ORIGINAL de _iniciarCarrusel ── */
     function resumeAuto(){
-      clearTimeout(_cTimer);
-      _cPaused=false;
-      _cTimer=setTimeout(function go(){
-        if(_cPaused)return;
-        _cIdx=(_cIdx+1)>=_cTotal?0:_cIdx+1;
-        if(_cIdx===0){
-          track.style.transition='none';
-          track.style.transform='translateX(0)';
-          _cTimer=setTimeout(go,3400);return;
+      clearTimeout(window._cTimer);
+      window._cPaused=false;
+
+      function goTo(idx,anim){
+        var t=document.getElementById('promos-track');
+        if(!t)return;
+        t.style.transition=anim?'transform .85s cubic-bezier(.4,0,.2,1)':'none';
+        t.style.transform='translateX(-'+(idx*cw())+'px)';
+      }
+      function next(){
+        if(window._cPaused)return;
+        if(!document.getElementById('promos-track'))return;
+        window._cIdx++;
+        if(window._cIdx>=window._cTotal){
+          window._cIdx=0;goTo(0,false);
+          window._cTimer=setTimeout(next,3400);return;
         }
-        snapTo(_cIdx,true);
-        _cTimer=setTimeout(go,3400);
-      },3200);
+        goTo(window._cIdx,true);
+        window._cTimer=setTimeout(next,3400);
+      }
+      window._cTimer=setTimeout(next,3200);
+    }
+
+    function snapTo(idx,anim){
+      var i=Math.max(0,Math.min(idx,window._cTotal-1));
+      window._cIdx=i;
+      track.style.transition=anim?'transform .35s cubic-bezier(.4,0,.2,1)':'none';
+      track.style.transform='translateX(-'+(i*cw())+'px)';
     }
 
     track.addEventListener('touchstart',function(e){
       sx=e.touches[0].clientX;sy=e.touches[0].clientY;
-      st=getTx();dragging=true;isHoriz=null;
+      st=parseFloat((track.style.transform||'').replace(/[^-\d.]/g,'')||0);
+      dragging=true;isHoriz=null;
       track.style.transition='none';
-      _cPaused=true;clearTimeout(_cTimer);
+      window._cPaused=true;
+      clearTimeout(window._cTimer);
     },{passive:true});
 
     track.addEventListener('touchmove',function(e){
@@ -2947,22 +2957,22 @@ function abrirPopupSheet(key){
       var dy=e.touches[0].clientY-sy;
       if(isHoriz===null)isHoriz=Math.abs(dx)>Math.abs(dy);
       if(!isHoriz){dragging=false;resumeAuto();return;}
-      /* Resistencia en los extremos */
       var raw=st+dx;
-      var min=-(_cTotal-1)*cw();
+      var min=-(window._cTotal-1)*cw();
       if(raw>0)raw=raw*0.3;
       if(raw<min)raw=min+(raw-min)*0.3;
       track.style.transform='translateX('+raw+'px)';
     },{passive:true});
 
     function onEnd(e){
-      if(!dragging||!isHoriz){dragging=false;resumeAuto();return;}
+      if(!dragging){resumeAuto();return;}
       dragging=false;
+      if(!isHoriz){resumeAuto();return;}
       var dx=(e.changedTouches?e.changedTouches[0]:e).clientX-sx;
       var thr=cw()*0.22;
-      var next=_cIdx;
-      if(dx<-thr)next=Math.min(_cIdx+1,_cTotal-1);
-      else if(dx>thr)next=Math.max(_cIdx-1,0);
+      var next=window._cIdx;
+      if(dx<-thr)next=Math.min(window._cIdx+1,window._cTotal-1);
+      else if(dx>thr)next=Math.max(window._cIdx-1,0);
       snapTo(next,true);
       resumeAuto();
     }
@@ -2971,12 +2981,10 @@ function abrirPopupSheet(key){
     track.addEventListener('touchcancel',function(){dragging=false;resumeAuto();},{passive:true});
   }
 
-  /* Esperar a que el carrusel se renderice */
   var chk=setInterval(function(){
     var track=document.getElementById('promos-track');
     if(track){
       attachSwipe();
-      /* Si se re-renderiza el carrusel, volver a enganchar */
       var wrap=document.getElementById('promos-wrap');
       if(wrap){
         new MutationObserver(function(){
