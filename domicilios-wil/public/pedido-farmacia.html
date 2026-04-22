@@ -1597,8 +1597,10 @@ renderOfertasCarrusel = function(ofertas) {
   wrap.appendChild(track);
 
   /* ── Indicadores de navegación para el carrusel de ofertas ── */
+ /* ── Indicadores de navegación para el carrusel de ofertas ── */
   (function() {
-    if (wrap.querySelector('.wil-ind-r')) return;
+    /* Eliminar botones viejos si existen (recarga del carrusel) */
+    wrap.querySelectorAll('.wil-ind-l, .wil-ind-r').forEach(function(b){ b.remove(); });
     if (getComputedStyle(wrap).position === 'static') wrap.style.position = 'relative';
 
     function mkBtn(side) {
@@ -1623,20 +1625,6 @@ renderOfertasCarrusel = function(ofertas) {
       ].join(';');
       d.innerHTML = '<span class="sym" style="font-size:20px;color:#fff">' +
         (isR ? 'chevron_right' : 'chevron_left') + '</span>';
-
-      d.addEventListener('click', function(e) {
-        e.stopPropagation();
-        if (window._cTimer) { clearTimeout(window._cTimer); window._cTimer = null; }
-        window._cPaused = false;
-        if (isR) {
-          window._cIdx = Math.min((window._cIdx || 0) + 1, (window._cTotal || 1) - 1);
-        } else {
-          window._cIdx = Math.max((window._cIdx || 0) - 1, 0);
-        }
-        if (window._cGoTo) window._cGoTo(window._cIdx, true);
-        if (window._cScheduleNext) window._cScheduleNext();
-      });
-
       wrap.appendChild(d);
       return d;
     }
@@ -1644,10 +1632,9 @@ renderOfertasCarrusel = function(ofertas) {
     var indL = mkBtn('l');
     var indR = mkBtn('r');
 
-    /* Actualizar visibilidad según índice actual */
     function updByIdx() {
       var idx = window._cIdx || 0;
-      var tot = window._cTotal || ofertas.length;  /* ← usa ofertas.length como fallback */
+      var tot = window._cTotal || ofertas.length;
       var showL = idx > 0;
       var showR = idx < tot - 1;
       indL.style.opacity = showL ? '1' : '0';
@@ -1656,15 +1643,31 @@ renderOfertasCarrusel = function(ofertas) {
       indR.style.pointerEvents = showR ? 'auto' : 'none';
     }
 
+    /* Click: navegar y retomar auto */
+    [indL, indR].forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (window._cTimer) { clearTimeout(window._cTimer); window._cTimer = null; }
+        window._cPaused = false;
+        var isR = btn === indR;
+        if (isR) {
+          window._cIdx = Math.min((window._cIdx || 0) + 1, (window._cTotal || ofertas.length) - 1);
+        } else {
+          window._cIdx = Math.max((window._cIdx || 0) - 1, 0);
+        }
+        if (window._cGoTo) window._cGoTo(window._cIdx, true);
+        updByIdx(); /* actualizar inmediatamente al hacer clic */
+        if (window._cScheduleNext) window._cScheduleNext();
+      });
+    });
 
-    /* Observar cambios de transform para actualizar indicadores */
+    /* Observar el WRAP (no el track) para sobrevivir al cloneNode */
     var observer = new MutationObserver(function() { updByIdx(); });
-    observer.observe(track, { attributes: true, attributeFilter: ['style'] });
+    observer.observe(wrap, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] });
 
     updByIdx();
-    /* Reintentar cuando _cTotal ya esté definido por _iniciarCarrusel */
-    setTimeout(updByIdx, 100);
-    setTimeout(updByIdx, 600);
+    setTimeout(updByIdx, 120);
+    setTimeout(updByIdx, 700);
   })();
 
   _iniciarCarrusel(ofertas.length);
