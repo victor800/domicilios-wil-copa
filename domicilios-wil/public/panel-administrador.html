@@ -5476,6 +5476,143 @@ async function sendProductoToSheet(producto, accion, imgOverride) {
   }
 }
 
+/* ════ BÚSQUEDA + FILTRO SECCIÓN PRODUCTOS ════ */
+function filterProductosBusqueda() {
+  const q  = (document.getElementById('prod-search')?.value || '').toLowerCase().trim();
+  const sc = (document.getElementById('prod-seccion-filter')?.value || '').toLowerCase().trim();
+  const estadoTab = prodFilter; // usa el tab activo (todas/activo/inactivo)
+
+  let list = estadoTab === 'activo'   ? productos.filter(p => p.estado === 'activo')
+           : estadoTab === 'inactivo' ? productos.filter(p => p.estado === 'inactivo')
+           : productos;
+
+  if (q)  list = list.filter(p =>
+    (p.nombre  || '').toLowerCase().includes(q) ||
+    (p.lab     || '').toLowerCase().includes(q) ||
+    (p.desc    || '').toLowerCase().includes(q)
+  );
+  if (sc) list = list.filter(p => (p.seccion || '').toLowerCase() === sc);
+
+  document.getElementById('prod-count').textContent =
+    list.length + ' producto' + (list.length !== 1 ? 's' : '');
+
+  const grid = document.getElementById('prod-grid');
+  if (!list.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;min-width:100%;">
+      <div class="ico" style="font-size:40px;opacity:.2;">🔍</div>
+      <p>Sin resultados para tu búsqueda</p></div>`;
+    document.getElementById('prod-dots').style.display = 'none';
+    return;
+  }
+
+  const sColor = s => ({
+    'Medicamentos':'background:#fee2e2;color:#991b1b;','Vitaminas':'background:#dcfce7;color:#166534;',
+    'Bebés':'background:#fce7f3;color:#9d174d;','Higiene':'background:#dbeafe;color:#1e40af;',
+    'Belleza':'background:#fdf4ff;color:#7e22ce;','Hogar':'background:#fef3c7;color:#92400e;',
+    'Otros':'background:#f1f5f9;color:#334155;'
+  })[s] || 'background:#f1f5f9;color:#334155;';
+
+  grid.innerHTML = list.map(p => `
+    <div class="ofert-card prod-card-wrap" style="border-color:#ede9fe;">
+      <div class="prod-img-actions">
+        <button class="pia-edit" onclick="event.stopPropagation();openProdModal('${p.id}')" title="Editar">
+          <span class="material-symbols-rounded" style="font-size:14px;">edit</span></button>
+        <button class="pia-pause" onclick="event.stopPropagation();toggleProducto('${p.id}')" title="${p.estado==='activo'?'Pausar':'Activar'}">
+          <span class="material-symbols-rounded" style="font-size:14px;">${p.estado==='activo'?'pause':'play_arrow'}</span></button>
+        <button class="pia-del" onclick="event.stopPropagation();deleteProducto('${p.id}')" title="Eliminar">
+          <span class="material-symbols-rounded" style="font-size:14px;">delete</span></button>
+      </div>
+      <div class="prod-estado-pill ${p.estado}">${p.estado==='activo'?'✦ Activo':'⏸ Inactivo'}</div>
+      <div class="ofert-img-wrap" style="background:#faf5ff;">
+        ${(()=>{
+          const src=resolveImgSrc(p.img,p.nombre);
+          if(!src) return `<div class="ofert-img-placeholder" style="background:#faf5ff;"><span class="material-symbols-rounded" style="color:#a78bfa;">image</span><span>Sin imagen</span></div>`;
+          const lbSrc=src.replace(/'/g,"\\'");
+          return `<div style="position:relative;width:100%;height:260px;">
+            <img class="ofert-img" src="${src}" alt="${p.nombre}" crossorigin="anonymous"
+              onclick="openLbox('${lbSrc}')" style="cursor:zoom-in;"
+              onerror="this.parentElement.innerHTML='<div class=ofert-img-placeholder style=background:#faf5ff><span class=material-symbols-rounded style=color:#a78bfa>broken_image</span><span>Sin imagen</span></div>'">
+            ${src.startsWith('http')?`<a href="${src}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="position:absolute;bottom:6px;right:6px;background:rgba(30,27,75,.82);color:#e0d9ff;border-radius:8px;padding:4px 9px;font-size:9px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:4px;backdrop-filter:blur(4px);border:1px solid rgba(124,58,237,.3);"><span class="material-symbols-rounded" style="font-size:12px;">link</span>Drive</a>`:''}
+          </div>`;
+        })()}
+      </div>
+      <div class="ofert-body">
+        <div class="ofert-lab" style="color:#7c3aed;display:flex;align-items:center;gap:4px;">
+          <span class="material-symbols-rounded" style="font-size:12px;">science</span>${p.lab}</div>
+        <div class="ofert-name">${p.nombre}</div>
+        <div class="ofert-desc-text">${p.desc||'<span style="color:var(--text3);font-style:italic;">Sin descripción</span>'}</div>
+        <div class="ofert-price-box" style="background:#faf5ff;border-color:#ddd6fe;">
+          <div><div class="ofert-price-lbl">Precio</div>
+            <div class="ofert-price" style="color:#7c3aed;">${fmtPrecio(p.precio)}</div></div>
+          <span style="font-size:9px;font-weight:800;padding:3px 9px;border-radius:99px;${sColor(p.seccion)}">${p.seccion||'General'}</span>
+        </div>
+      </div>
+    </div>`).join('');
+  setTimeout(initProdCarousel, 60);
+}
+
+/* ════ EXPORTAR EXCEL ════ */
+function exportarProductosExcel() {
+  const q  = (document.getElementById('prod-search')?.value  || '').toLowerCase().trim();
+  const sc = (document.getElementById('prod-seccion-filter')?.value || '').toLowerCase().trim();
+  let list = prodFilter==='activo' ? productos.filter(p=>p.estado==='activo')
+           : prodFilter==='inactivo' ? productos.filter(p=>p.estado==='inactivo') : productos;
+  if (q)  list = list.filter(p=>(p.nombre||'').toLowerCase().includes(q)||(p.lab||'').toLowerCase().includes(q));
+  if (sc) list = list.filter(p=>(p.seccion||'').toLowerCase()===sc);
+  if (!list.length) { showToast('w','Sin productos','No hay productos con los filtros actuales'); return; }
+
+  const rows = [['ID','Nombre','Laboratorio','Precio','Sección','Estado','Descripción','Fecha']];
+  list.forEach(p => rows.push([p.id,p.nombre,p.lab,p.precio,p.seccion,p.estado,p.desc||'',p.fecha||'']));
+
+  let csv = rows.map(r => r.map(c => '"' + String(c||'').replace(/"/g,'""') + '"').join(',')).join('\r\n');
+  const bom = '\uFEFF';
+  const blob = new Blob([bom + csv], { type:'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'productos_nuevos_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click(); URL.revokeObjectURL(url);
+  showToast('s','Excel exportado', list.length + ' productos exportados');
+}
+
+/* ════ IMPRIMIR / PDF ════ */
+function imprimirProductos() {
+  const q  = (document.getElementById('prod-search')?.value  || '').toLowerCase().trim();
+  const sc = (document.getElementById('prod-seccion-filter')?.value || '').toLowerCase().trim();
+  let list = prodFilter==='activo' ? productos.filter(p=>p.estado==='activo')
+           : prodFilter==='inactivo' ? productos.filter(p=>p.estado==='inactivo') : productos;
+  if (q)  list = list.filter(p=>(p.nombre||'').toLowerCase().includes(q)||(p.lab||'').toLowerCase().includes(q));
+  if (sc) list = list.filter(p=>(p.seccion||'').toLowerCase()===sc);
+  if (!list.length) { showToast('w','Sin productos','No hay productos con los filtros actuales'); return; }
+
+  const filas = list.map((p,i) => `<tr style="background:${i%2===0?'#f9f9f9':'#fff'}">
+    <td>${i+1}</td><td><b>${p.nombre}</b></td><td>${p.lab}</td>
+    <td style="font-weight:700;color:#7c3aed;">${fmtPrecio(p.precio)}</td>
+    <td>${p.seccion||'—'}</td>
+    <td><span style="padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;
+      background:${p.estado==='activo'?'#dcfce7':'#f1f5f9'};
+      color:${p.estado==='activo'?'#166534':'#64748b'};">${p.estado}</span></td>
+    <td style="font-size:11px;color:#64748b;">${p.desc||'—'}</td>
+  </tr>`).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <title>Productos Nuevos — Domicilios WIL</title>
+    <style>
+      body{font-family:Arial,sans-serif;padding:24px;color:#0c2225;}
+      h2{margin-bottom:4px;color:#7c3aed;}p.sub{font-size:12px;color:#888;margin-bottom:16px;}
+      table{width:100%;border-collapse:collapse;font-size:12px;}
+      th{background:#7c3aed;color:#fff;padding:8px 10px;text-align:left;font-size:11px;}
+      td{padding:7px 10px;border-bottom:1px solid #e5e7eb;vertical-align:top;}
+      @media print{body{padding:10px;}}
+    </style></head><body>
+    <h2>Productos Nuevos — Domicilios WIL</h2>
+    <p class="sub">Generado: ${new Date().toLocaleString('es-CO')} · ${list.length} producto${list.length!==1?'s':''}</p>
+    <table><thead><tr><th>#</th><th>Nombre</th><th>Laboratorio</th><th>Precio</th><th>Sección</th><th>Estado</th><th>Descripción</th></tr></thead>
+    <tbody>${filas}</tbody></table>
+    <script>window.onload=()=>{window.print();}<\/script></body></html>`;
+
+  const w = window.open('','_blank','width=900,height=700');
+  w.document.write(html); w.document.close();
+}
 
 </script>
 </body>
