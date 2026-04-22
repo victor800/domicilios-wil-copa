@@ -1612,35 +1612,34 @@ function _iniciarCarrusel(total) {
     var first = t.firstElementChild;
     return first ? first.offsetWidth + 10 : 0;
   }
+
   function goTo(idx, anim) {
     var t = document.getElementById('promos-track');
     if (!t) return;
-    t.style.transition = anim ? 'transform .85s cubic-bezier(.4,0,.2,1)' : 'none';
+    t.style.transition = anim ? 'transform .7s cubic-bezier(.4,0,.2,1)' : 'none';
     t.style.transform = 'translateX(-' + (idx * cardW()) + 'px)';
   }
+
   function next() {
     if (_cPaused) return;
     var t = document.getElementById('promos-track');
     if (!t) return;
     _cIdx++;
-    if (_cIdx >= _cTotal) {
-      _cIdx = 0; goTo(0, false);
-      _cTimer = setTimeout(next, 3400); return;
-    }
-    goTo(_cIdx, true);
-    _cTimer = setTimeout(next, 3400);
+    if (_cIdx >= _cTotal) { _cIdx = 0; goTo(0, false); }
+    else { goTo(_cIdx, true); }
+    _cTimer = setTimeout(next, 4500); // ← 4.5s entre slides
   }
 
   var track = document.getElementById('promos-track');
   if (track) {
-    track.addEventListener('mouseenter',  function() { _cPaused = true; clearTimeout(_cTimer); });
-    track.addEventListener('mouseleave',  function() { _cPaused = false; _cTimer = setTimeout(next, 2000); });
-    track.addEventListener('touchstart',  function() { _cPaused = true; clearTimeout(_cTimer); }, { passive: true });
-    track.addEventListener('touchend',    function() { _cPaused = false; _cTimer = setTimeout(next, 2400); }, { passive: true });
+    track.addEventListener('mouseenter', function () { _cPaused = true; clearTimeout(_cTimer); });
+    track.addEventListener('mouseleave', function () { _cPaused = false; _cTimer = setTimeout(next, 2500); });
+    track.addEventListener('touchstart', function () { _cPaused = true; clearTimeout(_cTimer); }, { passive: true });
+    track.addEventListener('touchend',   function () { _cPaused = false; _cTimer = setTimeout(next, 3000); }, { passive: true });
   }
 
   goTo(0, false);
-  _cTimer = setTimeout(next, 3400);
+  _cTimer = setTimeout(next, 4500);
 }
 
 function abrirFichaTecnica(uid) {
@@ -2814,186 +2813,189 @@ function abrirPopupSheet(key){
   document.body.style.overflow = 'hidden';
 }
 
-(function(){
-  /* ─── 1. INDICADORES DE SCROLL EN SECCIONES ─── */
-  var BG='rgba(248,250,255,';
-  var SECTIONS=[
+(function () {
+
+  var SECTIONS = [
     'pop-scroll','dermo-scroll','vit-scroll','ped-scroll',
     'leches-scroll','derm-scroll','int-scroll','bel-scroll',
     'var-scroll','ins-scroll','otc-scroll','gen-scroll','sheet-scroll'
   ];
 
-  function addIndicators(el){
-    var wrap=el.parentElement;
-    if(!wrap||wrap.querySelector('.wil-ind-r'))return;
-    if(getComputedStyle(wrap).position==='static')wrap.style.position='relative';
-
-    var mkInd=function(side){
-      var d=document.createElement('div');
-      d.className='wil-ind-'+side;
-      var isR=side==='r';
-      d.style.cssText=[
-        'position:absolute',
-        isR?'right:6px':'left:6px',
-        'top:50%','transform:translateY(-50%)',
-        'width:30px','height:30px',
-        'border-radius:50%',
-        'background:var(--blue)',
-        'box-shadow:0 2px 10px rgba(0,63,135,.35)',
-        'display:flex','align-items:center','justify-content:center',
-        'pointer-events:none',
-        'opacity:0',
-        'transition:opacity .22s',
-        'z-index:6'
-      ].join(';');
-      d.innerHTML='<span class="sym" style="font-size:20px;color:#fff;'+
-        'animation:wilIndPulse 1.6s ease-in-out infinite '+(isR?'':'0.4s')+'">'+
-        (isR?'chevron_right':'chevron_left')+'</span>';
-      wrap.appendChild(d);
-      return d;
-    };
-
-    var indL=mkInd('l'), indR=mkInd('r');
-
-    function upd(){
-      var sl=el.scrollLeft, max=el.scrollWidth-el.clientWidth;
-      indL.style.opacity=sl>12?'1':'0';
-      indR.style.opacity=(max-sl)>12?'1':'0';
-    }
-
-    el.addEventListener('scroll',upd,{passive:true});
-    // Revisar luego de que cargue contenido dinámico
-    [300,900,2200,4000].forEach(function(t){setTimeout(upd,t);});
-  }
-
-  function initAll(){
-    SECTIONS.forEach(function(id){
-      var el=document.getElementById(id);
-      if(el&&el.children.length>0)addIndicators(el);
-    });
-  }
-
   /* Inyectar keyframe si no existe */
-  if(!document.getElementById('wil-patch-style')){
-    var st=document.createElement('style');
-    st.id='wil-patch-style';
-    st.textContent='@keyframes wilIndPulse{0%,100%{transform:translateX(0);opacity:.7}50%{transform:translateX(3px);opacity:1}}';
+  if (!document.getElementById('wil-patch-style')) {
+    var st = document.createElement('style');
+    st.id = 'wil-patch-style';
+    st.textContent =
+      '@keyframes wilIndPulse{0%,100%{opacity:.75;transform:translateY(-50%) scale(1)}' +
+      '50%{opacity:1;transform:translateY(-50%) scale(1.12)}}';
     document.head.appendChild(st);
   }
 
-  /* Observar cambios en el DOM para secciones que se llenan dinámicamente */
-  var mo=new MutationObserver(function(muts){
-    muts.forEach(function(m){
-      if(m.addedNodes.length)initAll();
+  function addIndicators(el) {
+    var wrap = el.parentElement;
+    if (!wrap || wrap.querySelector('.wil-ind-r')) return;
+    if (getComputedStyle(wrap).position === 'static') wrap.style.position = 'relative';
+
+    /* Crear botón lado — también hace scroll al presionar */
+    function mkBtn(side) {
+      var isR = side === 'r';
+      var d = document.createElement('button');
+      d.className = 'wil-ind-' + side;
+      d.style.cssText = [
+        'position:absolute',
+        isR ? 'right:6px' : 'left:6px',
+        'top:50%', 'transform:translateY(-50%)',
+        'width:32px', 'height:32px',
+        'border-radius:50%',
+        'background:#003f87',
+        'border:none',
+        'box-shadow:0 2px 10px rgba(0,63,135,.35)',
+        'display:flex', 'align-items:center', 'justify-content:center',
+        'cursor:pointer',
+        'opacity:0',
+        'transition:opacity .22s',
+        'z-index:6',
+        'pointer-events:none'
+      ].join(';');
+      d.innerHTML = '<span class="sym" style="font-size:20px;color:#fff">' +
+        (isR ? 'chevron_right' : 'chevron_left') + '</span>';
+
+      /* Al hacer clic: avanza/retrocede un card */
+      d.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var cards = el.querySelectorAll('.ocard, .scard, [class^="ocard"]');
+        var cw = cards.length ? cards[0].offsetWidth + 10 : 220;
+        el.scrollBy({ left: isR ? cw : -cw, behavior: 'smooth' });
+      });
+
+      wrap.appendChild(d);
+      return d;
+    }
+
+    var indL = mkBtn('l');
+    var indR = mkBtn('r');
+
+    function upd() {
+      var sl = el.scrollLeft, max = el.scrollWidth - el.clientWidth;
+      var showL = sl > 12;
+      var showR = (max - sl) > 12;
+      indL.style.opacity = showL ? '1' : '0';
+      indL.style.pointerEvents = showL ? 'auto' : 'none';
+      indR.style.opacity = showR ? '1' : '0';
+      indR.style.pointerEvents = showR ? 'auto' : 'none';
+    }
+
+    el.addEventListener('scroll', upd, { passive: true });
+    [300, 900, 2200, 4500].forEach(function (t) { setTimeout(upd, t); });
+  }
+
+  function initAll() {
+    SECTIONS.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) addIndicators(el);
     });
+  }
+
+  var mo = new MutationObserver(function (muts) {
+    muts.forEach(function (m) { if (m.addedNodes.length) initAll(); });
   });
 
-  setTimeout(function(){
-    var home=document.getElementById('v-home-content');
-    if(home)mo.observe(home,{childList:true,subtree:true});
+  setTimeout(function () {
+    var home = document.getElementById('v-home-content');
+    if (home) mo.observe(home, { childList: true, subtree: true });
     initAll();
-  },200);
+  }, 200);
 
+  /* ── SWIPE TÁCTIL EN EL CARRUSEL DE OFERTAS ── */
+  function attachSwipe() {
+    var track = document.getElementById('promos-track');
+    if (!track || track._wilSwipe) return;
+    track._wilSwipe = true;
 
-  /* ─── 2. SWIPE TÁCTIL EN EL CARRUSEL DE OFERTAS ─── */
-  /* Mantiene el auto-avance; agrega arrastre con el dedo */
- /* ─── 2. SWIPE TÁCTIL EN EL CARRUSEL DE OFERTAS ─── */
-  function attachSwipe(){
-    var track=document.getElementById('promos-track');
-    if(!track||track._wilSwipe)return;
-    track._wilSwipe=true;
+    var sx = 0, sy = 0, st = 0, dragging = false, isHoriz = null;
 
-    var sx=0,sy=0,st=0,dragging=false,isHoriz=null;
-
-    function cw(){
-      var f=track.firstElementChild;
-      return f?f.offsetWidth+10:0;
+    function cw() {
+      var f = track.firstElementChild;
+      return f ? f.offsetWidth + 10 : 0;
     }
 
-    /* ── Reanuda el loop ORIGINAL de _iniciarCarrusel ── */
-    function resumeAuto(){
+    function resumeAuto() {
       clearTimeout(window._cTimer);
-      window._cPaused=false;
-
-      function goTo(idx,anim){
-        var t=document.getElementById('promos-track');
-        if(!t)return;
-        t.style.transition=anim?'transform .85s cubic-bezier(.4,0,.2,1)':'none';
-        t.style.transform='translateX(-'+(idx*cw())+'px)';
+      window._cPaused = false;
+      function goTo(idx, anim) {
+        var t = document.getElementById('promos-track');
+        if (!t) return;
+        t.style.transition = anim ? 'transform .7s cubic-bezier(.4,0,.2,1)' : 'none';
+        t.style.transform = 'translateX(-' + (idx * cw()) + 'px)';
       }
-      function next(){
-        if(window._cPaused)return;
-        if(!document.getElementById('promos-track'))return;
+      function next() {
+        if (window._cPaused) return;
+        if (!document.getElementById('promos-track')) return;
         window._cIdx++;
-        if(window._cIdx>=window._cTotal){
-          window._cIdx=0;goTo(0,false);
-          window._cTimer=setTimeout(next,3400);return;
-        }
-        goTo(window._cIdx,true);
-        window._cTimer=setTimeout(next,3400);
+        if (window._cIdx >= window._cTotal) { window._cIdx = 0; goTo(0, false); }
+        else { goTo(window._cIdx, true); }
+        window._cTimer = setTimeout(next, 4500);
       }
-      window._cTimer=setTimeout(next,3200);
+      window._cTimer = setTimeout(next, 3000);
     }
 
-    function snapTo(idx,anim){
-      var i=Math.max(0,Math.min(idx,window._cTotal-1));
-      window._cIdx=i;
-      track.style.transition=anim?'transform .35s cubic-bezier(.4,0,.2,1)':'none';
-      track.style.transform='translateX(-'+(i*cw())+'px)';
+    function snapTo(idx, anim) {
+      var i = Math.max(0, Math.min(idx, window._cTotal - 1));
+      window._cIdx = i;
+      track.style.transition = anim ? 'transform .35s cubic-bezier(.4,0,.2,1)' : 'none';
+      track.style.transform = 'translateX(-' + (i * cw()) + 'px)';
     }
 
-    track.addEventListener('touchstart',function(e){
-      sx=e.touches[0].clientX;sy=e.touches[0].clientY;
-      st=parseFloat((track.style.transform||'').replace(/[^-\d.]/g,'')||0);
-      dragging=true;isHoriz=null;
-      track.style.transition='none';
-      window._cPaused=true;
+    track.addEventListener('touchstart', function (e) {
+      sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+      st = parseFloat((track.style.transform || '').replace(/[^-\d.]/g, '') || 0);
+      dragging = true; isHoriz = null;
+      track.style.transition = 'none';
+      window._cPaused = true;
       clearTimeout(window._cTimer);
-    },{passive:true});
+    }, { passive: true });
 
-    track.addEventListener('touchmove',function(e){
-      if(!dragging)return;
-      var dx=e.touches[0].clientX-sx;
-      var dy=e.touches[0].clientY-sy;
-      if(isHoriz===null)isHoriz=Math.abs(dx)>Math.abs(dy);
-      if(!isHoriz){dragging=false;resumeAuto();return;}
-      var raw=st+dx;
-      var min=-(window._cTotal-1)*cw();
-      if(raw>0)raw=raw*0.3;
-      if(raw<min)raw=min+(raw-min)*0.3;
-      track.style.transform='translateX('+raw+'px)';
-    },{passive:true});
+    track.addEventListener('touchmove', function (e) {
+      if (!dragging) return;
+      var dx = e.touches[0].clientX - sx;
+      var dy = e.touches[0].clientY - sy;
+      if (isHoriz === null) isHoriz = Math.abs(dx) > Math.abs(dy);
+      if (!isHoriz) { dragging = false; resumeAuto(); return; }
+      var raw = st + dx;
+      var min = -(window._cTotal - 1) * cw();
+      if (raw > 0) raw = raw * 0.3;
+      if (raw < min) raw = min + (raw - min) * 0.3;
+      track.style.transform = 'translateX(' + raw + 'px)';
+    }, { passive: true });
 
-    function onEnd(e){
-      if(!dragging){resumeAuto();return;}
-      dragging=false;
-      if(!isHoriz){resumeAuto();return;}
-      var dx=(e.changedTouches?e.changedTouches[0]:e).clientX-sx;
-      var thr=cw()*0.22;
-      var next=window._cIdx;
-      if(dx<-thr)next=Math.min(window._cIdx+1,window._cTotal-1);
-      else if(dx>thr)next=Math.max(window._cIdx-1,0);
-      snapTo(next,true);
+    function onEnd(e) {
+      if (!dragging) { resumeAuto(); return; }
+      dragging = false;
+      if (!isHoriz) { resumeAuto(); return; }
+      var dx = (e.changedTouches ? e.changedTouches[0] : e).clientX - sx;
+      var thr = cw() * 0.22;
+      var next = window._cIdx;
+      if (dx < -thr) next = Math.min(window._cIdx + 1, window._cTotal - 1);
+      else if (dx > thr) next = Math.max(window._cIdx - 1, 0);
+      snapTo(next, true);
       resumeAuto();
     }
 
-    track.addEventListener('touchend',onEnd,{passive:true});
-    track.addEventListener('touchcancel',function(){dragging=false;resumeAuto();},{passive:true});
+    track.addEventListener('touchend', onEnd, { passive: true });
+    track.addEventListener('touchcancel', function () { dragging = false; resumeAuto(); }, { passive: true });
   }
 
-  var chk=setInterval(function(){
-    var track=document.getElementById('promos-track');
-    if(track){
+  var chk = setInterval(function () {
+    var track = document.getElementById('promos-track');
+    if (track) {
       attachSwipe();
-      var wrap=document.getElementById('promos-wrap');
-      if(wrap){
-        new MutationObserver(function(){
-          setTimeout(attachSwipe,120);
-        }).observe(wrap,{childList:true});
+      var wrap = document.getElementById('promos-wrap');
+      if (wrap) {
+        new MutationObserver(function () { setTimeout(attachSwipe, 120); }).observe(wrap, { childList: true });
       }
       clearInterval(chk);
     }
-  },400);
+  }, 400);
 
 })();
 
