@@ -1647,7 +1647,7 @@ renderOfertasCarrusel = function(ofertas) {
     /* Actualizar visibilidad según índice actual */
     function updByIdx() {
       var idx = window._cIdx || 0;
-      var tot = window._cTotal || 1;
+      var tot = window._cTotal || ofertas.length;  /* ← usa ofertas.length como fallback */
       var showL = idx > 0;
       var showR = idx < tot - 1;
       indL.style.opacity = showL ? '1' : '0';
@@ -1656,12 +1656,15 @@ renderOfertasCarrusel = function(ofertas) {
       indR.style.pointerEvents = showR ? 'auto' : 'none';
     }
 
+
     /* Observar cambios de transform para actualizar indicadores */
     var observer = new MutationObserver(function() { updByIdx(); });
     observer.observe(track, { attributes: true, attributeFilter: ['style'] });
 
     updByIdx();
-    setTimeout(updByIdx, 500);
+    /* Reintentar cuando _cTotal ya esté definido por _iniciarCarrusel */
+    setTimeout(updByIdx, 100);
+    setTimeout(updByIdx, 600);
   })();
 
   _iniciarCarrusel(ofertas.length);
