@@ -1099,7 +1099,6 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
         </tr></thead>
         <tbody id="ped-tbody"><tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text3);">Cargando…</td></tr></tbody>
       </table>
-      <div id="ped-pag" style="padding:6px 8px 4px;"></div>
     </div>
   </div>
 </div>
@@ -1142,7 +1141,6 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
     <span style="font-size:11px;color:var(--text3);margin-left:auto;" id="ofert-count">0 ofertas</span>
   </div>
   <div class="ofert-grid" id="ofert-grid">
-    <div id="ofert-pag" style="padding:0 4px;"></div>
     <div class="empty-state" style="grid-column:1/-1;">
       <div class="ico" style="font-size:48px;opacity:.25;">🏷️</div>
       <p style="font-size:13px;margin-bottom:6px;">No hay ofertas creadas</p>
@@ -1225,7 +1223,6 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
   <!-- Grid catálogo -->
   <div class="prod-carousel-wrap">
     <div class="ofert-grid" id="prod-grid"></div>
-    <div id="prod-pag" style="padding:0 4px;margin-top:4px;"></div>
     <div class="prod-indicators" id="prod-dots" style="display:none;"></div>
   </div>
   </div>
@@ -3029,67 +3026,133 @@ function updateBadges() {
 
 
 /* ════ OFERTAS RENDER ════ */
-let _ofertListCached = [];
 function renderOfertas() {
-  const activas   = ofertas.filter(o => o.estado === 'activa');
-  const inactivas = ofertas.filter(o => o.estado === 'inactiva');
+ 
+  const activas   = ofertas.filter(o=>o.estado==='activa');
+  const inactivas = ofertas.filter(o=>o.estado==='inactiva');
   document.getElementById('ost-total').textContent     = ofertas.length;
   document.getElementById('ost-activas').textContent   = activas.length;
   document.getElementById('ost-inactivas').textContent = inactivas.length;
   document.getElementById('nb-ofer').textContent       = activas.length || '0';
 
-  // Carrusel preview (sin paginar — solo activas)
   const cp = document.getElementById('carousel-preview-inner');
   if (!activas.length) {
     cp.innerHTML = '<div class="cp-empty"><span class="material-symbols-rounded">local_offer</span>No hay ofertas activas</div>';
   } else {
     cp.innerHTML = activas.map(o => `
       <div class="cp-item">
-        ${o.img ? `<div class="cp-img-wrap"><img class="cp-img" src="${o.img}" alt="${o.nombre}" onerror="this.style.display='none'" onclick="openLbox('${o.img.replace(/'/g,"\\'")}')"></div>` : `<div class="cp-img-wrap" style="background:#1a1a1a;"><span class="material-symbols-rounded" style="color:#555;font-size:32px;">image</span></div>`}
-        <div class="cp-info"><div class="cp-lab">${o.lab}</div><div class="cp-name">${o.nombre}</div>${o.desc?`<div class="cp-desc">${o.desc}</div>`:''}<div class="cp-price">${fmtPrecio(o.precio)}</div></div>
+        ${o.img
+          ? `<div class="cp-img-wrap"><img class="cp-img" src="${o.img}" alt="${o.nombre}" 
+                            onerror="this.style.display='none'"
+
+            onclick="openLbox('${o.img.replace(/'/g, "\\'")}')"></div>`
+          
+          : `<div class="cp-img-wrap" style="background:#1a1a1a;"><span class="material-symbols-rounded" style="color:#555;font-size:32px;">image</span></div>`}
+        <div class="cp-info">
+          <div class="cp-lab">${o.lab}</div>
+          <div class="cp-name">${o.nombre}</div>
+          ${o.desc ? `<div class="cp-desc">${o.desc}</div>` : ''}
+          <div class="cp-price">${fmtPrecio(o.precio)}</div>
+        </div>
       </div>`).join('');
   }
 
   let list = ofertFilter==='activa' ? activas : ofertFilter==='inactiva' ? inactivas : ofertas;
-  _ofertListCached = list;
-  PAG.ofertas.page = 1;
   document.getElementById('ofert-count').textContent = list.length + ' oferta' + (list.length!==1?'s':'');
-  _renderOfertGrid(list);
-}
-
-function _renderOfertGrid(list) {
   const grid = document.getElementById('ofert-grid');
-  const paginado = pagSlice('ofertas', list);
-
   if (!list.length) {
-    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><div class="ico" style="font-size:48px;opacity:.2;">🏷️</div><p style="font-size:13px;margin-bottom:6px;">No hay ofertas</p></div>`;
-    document.getElementById('ofert-pag').innerHTML = '';
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><div class="ico" style="font-size:48px;opacity:.2;">🏷️</div><p style="font-size:13px;margin-bottom:6px;">${ofertFilter==='todas'?'No hay ofertas creadas':'No hay ofertas '+ofertFilter+'s'}</p></div>`;
     return;
   }
+  grid.innerHTML = list.map(o => {
+    // ✅ Determinar URL clickeable de imagen
+    const imgIsUrl = o.img && o.img.startsWith('http');
+    const imgBadge = imgIsUrl
+      ? `<a class="ofert-img-link" href="${o.img}" target="_blank" rel="noopener" onclick="event.stopPropagation()"><span class="material-symbols-rounded" style="font-size:12px;">link</span>Ver imagen</a>`
+      : (o.img ? '<span class="ofert-img-link" style="cursor:default;opacity:.7;"><span class="material-symbols-rounded" style="font-size:12px;">image</span>Local</span>' : '');
 
-  grid.innerHTML = paginado.map(o => `
-    <div class="ofert-card">
-      <div class="prod-estado-pill ${o.estado === 'activa' ? 'activo' : 'inactivo'}">${o.estado==='activa'?'● Activa':'⏸ Inactiva'}</div>
-      <div class="prod-img-actions">
-        <button class="pia-edit" onclick="event.stopPropagation();openOfertModal('${o.id}')" title="Editar"><span class="material-symbols-rounded" style="font-size:14px;">edit</span></button>
-        <button class="pia-pause" onclick="event.stopPropagation();toggleOferta('${o.id}')" title="${o.estado==='activa'?'Pausar':'Activar'}"><span class="material-symbols-rounded" style="font-size:14px;">${o.estado==='activa'?'pause':'play_arrow'}</span></button>
-        <button class="pia-del" onclick="event.stopPropagation();deleteOferta('${o.id}')" title="Eliminar"><span class="material-symbols-rounded" style="font-size:14px;">delete</span></button>
+    return `<div class="ofert-card">
+      <!-- Estado pill igual que productos -->
+      <div class="prod-estado-pill ${o.estado === 'activa' ? 'activo' : 'inactivo'}">
+        ${o.estado === 'activa' ? '● Activa' : '⏸ Inactiva'}
       </div>
-      <div class="ofert-img-wrap">${(()=>{
-        const src=resolveImgSrc(o.img);
-        if(!src) return `<div class="ofert-img-placeholder"><span class="material-symbols-rounded">image</span><span>Sin imagen</span></div>`;
-        const lbSrc=src.replace(/'/g,"\\'");
-        return `<div style="position:relative;width:100%;height:260px;"><img class="ofert-img" src="${src}" alt="${o.nombre}" crossorigin="anonymous" onclick="openLbox('${lbSrc}')" style="cursor:zoom-in;" onerror="this.parentElement.innerHTML='<div class=ofert-img-placeholder><span class=material-symbols-rounded>broken_image</span><span>Sin imagen</span></div>'">${src.startsWith('http')?`<a class="ofert-img-link" href="${src}" target="_blank" rel="noopener" onclick="event.stopPropagation()"><span class="material-symbols-rounded" style="font-size:12px;">link</span>Drive</a>`:''}</div>`;
-      })()}</div>
+      <!-- Acciones sobre la imagen, siempre visibles -->
+      <div class="prod-img-actions">
+        <button class="pia-edit"
+          onclick="event.stopPropagation();openOfertModal('${o.id}')"
+          title="Editar">
+          <span class="material-symbols-rounded" style="font-size:14px;">edit</span>
+        </button>
+        <button class="pia-pause"
+          onclick="event.stopPropagation();toggleOferta('${o.id}')"
+          title="${o.estado === 'activa' ? 'Pausar' : 'Activar'}">
+          <span class="material-symbols-rounded" style="font-size:14px;">
+            ${o.estado === 'activa' ? 'pause' : 'play_arrow'}
+          </span>
+        </button>
+        <button class="pia-del"
+          onclick="event.stopPropagation();deleteOferta('${o.id}')"
+          title="Eliminar">
+          <span class="material-symbols-rounded" style="font-size:14px;">delete</span>
+        </button>
+      </div>
+      <div class="ofert-img-wrap">
+        ${(() => {
+          const src = resolveImgSrc(o.img, o.nombre);
+          if (!src) return `<div class="ofert-img-placeholder"><span class="material-symbols-rounded">image</span><span>Sin imagen</span></div>`;
+          const fn  = imgFilename(o.img);
+          const lbSrc = src.replace(/'/g, "\\'");
+          return `<div style="position:relative;width:100%;height:260px;">
+            <img class="ofert-img" src="${src}" alt="${o.nombre}"
+            crossorigin="anonymous"
+              onclick="openLbox('${lbSrc}')"
+              style="cursor:zoom-in;"
+              onerror="this.parentElement.innerHTML='<div class=ofert-img-placeholder><span class=material-symbols-rounded>broken_image</span><span>Sin imagen</span></div>'">
+            ${fn ? `<div style="position:absolute;bottom:6px;left:6px;background:rgba(7,30,34,.82);color:#e2f8f9;font-family:'DM Mono',monospace;font-size:9px;font-weight:700;padding:3px 8px;border-radius:6px;display:flex;align-items:center;gap:4px;backdrop-filter:blur(4px);border:1px solid rgba(40,185,193,.25);max-width:calc(100% - 12px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;">
+              <span class="material-symbols-rounded" style="font-size:11px;color:#28B9C1;">image</span>${fn}
+            </div>` : ''}
+            ${src.startsWith('http') ? `<a class="ofert-img-link" href="${src}" target="_blank" rel="noopener" onclick="event.stopPropagation()"><span class="material-symbols-rounded" style="font-size:12px;">link</span>Drive</a>` : ''}
+          </div>`;
+        })()}
+      </div>
       <div class="ofert-body">
         <div class="ofert-lab"><span class="material-symbols-rounded">science</span>${o.lab}</div>
         <div class="ofert-name">${o.nombre}</div>
-        <div class="ofert-desc-text">${o.desc||'<span style="color:var(--text3);font-style:italic;">Sin descripción</span>'}</div>
-        <div class="ofert-price-box"><div><div class="ofert-price-lbl">Precio</div><div class="ofert-price">${fmtPrecio(o.precio)}</div></div><div style="text-align:right;"><div class="ofert-ts">${o.ts||''}</div></div></div>
+        <div class="ofert-desc-text">${o.desc || '<span style="color:var(--text3);font-style:italic;">Sin descripción</span>'}</div>
+        <div class="ofert-price-box">
+          <div><div class="ofert-price-lbl">Precio</div><div class="ofert-price">${fmtPrecio(o.precio)}</div></div>
+          <div style="text-align:right;"><div class="ofert-ts">${o.ts || ''}</div>${o.imgPendiente ? '<div style="font-size:8px;color:var(--orange);margin-top:2px;">⏳ Img subiendo…</div>' : ''}</div>
+        </div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+}
 
-  document.getElementById('ofert-pag').innerHTML = pagRender('ofertas', list.length, 'goPageOfertas');
+/* ════ NAVEGACIÓN ════ */
+const TITLES = {overview:'Dashboard', drivers:'Domiciliarios', deliveries:'Pedidos',
+  ofert:'Ofertas', productos:'Productos Nuevos', stats:'Estadísticas',
+  driverStats:'Ranking Domis', alliances:'Farmacias', settings:'Configuración',
+  actividad:'Actividad en vivo', horario:'Horario Especial'
+};
+
+
+function sp(id, el) {
+  document.querySelectorAll('.pg').forEach(p => {
+    p.classList.remove('on');
+    p.style.display = '';
+  });
+  const pg = document.getElementById('pg-' + id);
+  if (pg) {
+    if (id === 'actividad') {
+      initActividadTab(); // manejo especial con flex
+    } else {
+      pg.classList.add('on');
+    }
+  }
+  document.querySelectorAll('.ni').forEach(n => n.classList.remove('on'));
+  if (el) el.classList.add('on');
+  document.getElementById('tb-title').textContent = TITLES[id] || id;
+  closeSB();
 }
 
 function toggleSB() { document.getElementById('sb').classList.toggle('open'); document.getElementById('sbo').classList.toggle('show'); }
@@ -3909,10 +3972,11 @@ function filterProductos(f,btn) {
 }
 
 
-let _prodListCached = [];
+
 function renderProductos() {
   const activos   = productos.filter(p => p.estado === 'activo');
   const inactivos = productos.filter(p => p.estado === 'inactivo');
+
   document.getElementById('pst-total').textContent     = productos.length;
   document.getElementById('pst-activos').textContent   = activos.length;
   document.getElementById('pst-inactivos').textContent = inactivos.length;
@@ -3922,69 +3986,120 @@ function renderProductos() {
            : prodFilter === 'inactivo' ? inactivos
            : productos;
 
-  // Aplicar búsqueda y filtro de sección si hay valores
-  const q  = (document.getElementById('prod-search')?.value || '').toLowerCase().trim();
-  const sc = (document.getElementById('prod-seccion-filter')?.value || '').toLowerCase().trim();
-  if (q)  list = list.filter(p => (p.nombre||'').toLowerCase().includes(q)||(p.lab||'').toLowerCase().includes(q)||(p.desc||'').toLowerCase().includes(q));
-  if (sc) list = list.filter(p => (p.seccion||'').toLowerCase() === sc);
-
-  _prodListCached = list;
-  PAG.productos.page = 1;
-
   document.getElementById('prod-count').textContent =
     list.length + ' producto' + (list.length !== 1 ? 's' : '');
 
+  // ── Banner desktop ──
   const banner = document.getElementById('prod-pub-banner-top');
   const lbl    = document.getElementById('ppb-count-lbl');
-  if (banner) { banner.style.display = (window.innerWidth > 768 && activos.length > 0) ? 'flex' : 'none'; if (lbl) lbl.textContent = activos.length; }
-  const sticky  = document.getElementById('prod-pub-sticky');
-  const stickyN = document.getElementById('pps-count');
-  if (sticky) { sticky.style.display = (window.innerWidth <= 768 && activos.length > 0) ? 'flex' : 'none'; if (stickyN) stickyN.textContent = activos.length; }
+  if (banner) {
+    const isMobile = window.innerWidth <= 768;
+    banner.style.display = (!isMobile && activos.length > 0) ? 'flex' : 'none';
+    if (lbl) lbl.textContent = activos.length;
+  }
 
-  _renderProdGrid(list);
-}
+  // ── Botón sticky móvil ──
+  const sticky   = document.getElementById('prod-pub-sticky');
+  const stickyN  = document.getElementById('pps-count');
+  if (sticky) {
+    const isMobile = window.innerWidth <= 768;
+    sticky.style.display = (isMobile && activos.length > 0) ? 'flex' : 'none';
+    if (stickyN) stickyN.textContent = activos.length;
+  }
 
-function _renderProdGrid(list) {
   const grid = document.getElementById('prod-grid');
-  const paginado = pagSlice('productos', list);
 
   if (!list.length) {
-    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;min-width:100%;">
-      <div class="ico" style="font-size:48px;opacity:.2;">✦</div>
-      <p>No hay productos</p></div>`;
+    grid.innerHTML = `
+      <div class="empty-state" style="grid-column:1/-1;min-width:100%;">
+        <div class="ico" style="font-size:48px;opacity:.2;">✦</div>
+        <p>No hay productos ${prodFilter === 'todas' ? '' : prodFilter + 's'}</p>
+      </div>`;
     document.getElementById('prod-dots').style.display = 'none';
-    document.getElementById('prod-pag').innerHTML = '';
     return;
   }
 
-  const sColor = s => ({'Medicamentos':'background:#fee2e2;color:#991b1b;','Vitaminas':'background:#dcfce7;color:#166534;','Bebés':'background:#fce7f3;color:#9d174d;','Higiene':'background:#dbeafe;color:#1e40af;','Belleza':'background:#fdf4ff;color:#7e22ce;','Hogar':'background:#fef3c7;color:#92400e;','Otros':'background:#f1f5f9;color:#334155;'})[s] || 'background:#f1f5f9;color:#334155;';
+  const sColor = s => ({
+    'Medicamentos': 'background:#fee2e2;color:#991b1b;',
+    'Vitaminas':    'background:#dcfce7;color:#166534;',
+    'Bebés':        'background:#fce7f3;color:#9d174d;',
+    'Higiene':      'background:#dbeafe;color:#1e40af;',
+    'Belleza':      'background:#fdf4ff;color:#7e22ce;',
+    'Hogar':        'background:#fef3c7;color:#92400e;',
+    'Otros':        'background:#f1f5f9;color:#334155;'
+  })[s] || 'background:#f1f5f9;color:#334155;';
 
-  grid.innerHTML = paginado.map(p => `
+  grid.innerHTML = list.map(p => `
     <div class="ofert-card prod-card-wrap" style="border-color:#ede9fe;">
+      <!-- Acciones sobre la imagen, siempre visibles -->
       <div class="prod-img-actions">
-        <button class="pia-edit" onclick="event.stopPropagation();openProdModal('${p.id}')" title="Editar"><span class="material-symbols-rounded" style="font-size:14px;">edit</span></button>
-        <button class="pia-pause" onclick="event.stopPropagation();toggleProducto('${p.id}')" title="${p.estado==='activo'?'Pausar':'Activar'}"><span class="material-symbols-rounded" style="font-size:14px;">${p.estado==='activo'?'pause':'play_arrow'}</span></button>
-        <button class="pia-del" onclick="event.stopPropagation();deleteProducto('${p.id}')" title="Eliminar"><span class="material-symbols-rounded" style="font-size:14px;">delete</span></button>
+        <button class="pia-edit"
+          onclick="event.stopPropagation();openProdModal('${p.id}')"
+          title="Editar">
+          <span class="material-symbols-rounded" style="font-size:14px;">edit</span>
+        </button>
+        <button class="pia-pause"
+          onclick="event.stopPropagation();toggleProducto('${p.id}')"
+          title="${p.estado === 'activo' ? 'Pausar' : 'Activar'}">
+          <span class="material-symbols-rounded" style="font-size:14px;">
+            ${p.estado === 'activo' ? 'pause' : 'play_arrow'}
+          </span>
+        </button>
+        <button class="pia-del"
+          onclick="event.stopPropagation();deleteProducto('${p.id}')"
+          title="Eliminar">
+          <span class="material-symbols-rounded" style="font-size:14px;">delete</span>
+        </button>
       </div>
-      <div class="prod-estado-pill ${p.estado}">${p.estado==='activo'?'✦ Activo':'⏸ Inactivo'}</div>
-      <div class="ofert-img-wrap" style="background:#faf5ff;">${(()=>{
-        const src=resolveImgSrc(p.img);
-        if(!src) return `<div class="ofert-img-placeholder" style="background:#faf5ff;"><span class="material-symbols-rounded" style="color:#a78bfa;">image</span><span>Sin imagen</span></div>`;
-        const lbSrc=src.replace(/'/g,"\\'");
-        return `<div style="position:relative;width:100%;height:260px;"><img class="ofert-img" src="${src}" alt="${p.nombre}" crossorigin="anonymous" onclick="openLbox('${lbSrc}')" style="cursor:zoom-in;" onerror="this.parentElement.innerHTML='<div class=ofert-img-placeholder style=background:#faf5ff><span class=material-symbols-rounded style=color:#a78bfa>broken_image</span><span>Sin imagen</span></div>'">${src.startsWith('http')?`<a href="${src}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="position:absolute;bottom:6px;right:6px;background:rgba(30,27,75,.82);color:#e0d9ff;border-radius:8px;padding:4px 9px;font-size:9px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:4px;backdrop-filter:blur(4px);border:1px solid rgba(124,58,237,.3);"><span class="material-symbols-rounded" style="font-size:12px;">link</span>Drive</a>`:''}</div>`;
-      })()}</div>
+      <!-- Badge estado -->
+      <div class="prod-estado-pill ${p.estado}">
+        ${p.estado === 'activo' ? '✦ Activo' : '⏸ Inactivo'}
+      </div>
+      <!-- Imagen -->
+      <div class="ofert-img-wrap" style="background:#faf5ff;">
+        ${(() => {
+          const src = resolveImgSrc(p.img, p.nombre);
+          if (!src) return `<div class="ofert-img-placeholder" style="background:#faf5ff;"><span class="material-symbols-rounded" style="color:#a78bfa;">image</span><span>Sin imagen</span></div>`;
+          const fn  = imgFilename(p.img);
+          const lbSrc = src.replace(/'/g, "\\'");
+          return `<div style="position:relative;width:100%;height:260px;">
+            <img class="ofert-img" src="${src}" alt="${p.nombre}"
+              crossorigin="anonymous"
+
+              onclick="openLbox('${lbSrc}')"
+              style="cursor:zoom-in;"
+              onerror="this.parentElement.innerHTML='<div class=ofert-img-placeholder style=background:#faf5ff><span class=material-symbols-rounded style=color:#a78bfa>broken_image</span><span>Sin imagen</span></div>'">
+            ${fn ? `<div style="position:absolute;bottom:6px;left:6px;background:rgba(30,27,75,.85);color:#e0d9ff;font-family:'DM Mono',monospace;font-size:9px;font-weight:700;padding:3px 8px;border-radius:6px;display:flex;align-items:center;gap:4px;backdrop-filter:blur(4px);border:1px solid rgba(124,58,237,.3);max-width:calc(100% - 12px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;">
+              <span class="material-symbols-rounded" style="font-size:11px;color:#a78bfa;">image</span>${fn}
+            </div>` : ''}
+            ${src.startsWith('http') ? `<a href="${src}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="position:absolute;bottom:6px;right:6px;background:rgba(30,27,75,.82);color:#e0d9ff;border-radius:8px;padding:4px 9px;font-size:9px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:4px;backdrop-filter:blur(4px);border:1px solid rgba(124,58,237,.3);transition:background .15s;" onmouseover="this.style.background='rgba(124,58,237,.85)'" onmouseout="this.style.background='rgba(30,27,75,.82)'">
+              <span class="material-symbols-rounded" style="font-size:12px;">link</span>Drive
+            </a>` : ''}
+          </div>`;
+        })()}
+      </div>
+      
+      <!-- Cuerpo -->
       <div class="ofert-body">
-        <div class="ofert-lab" style="color:#7c3aed;display:flex;align-items:center;gap:4px;"><span class="material-symbols-rounded" style="font-size:12px;">science</span>${p.lab}</div>
+        <div class="ofert-lab" style="color:#7c3aed;display:flex;align-items:center;gap:4px;">
+          <span class="material-symbols-rounded" style="font-size:12px;">science</span>${p.lab}
+        </div>
         <div class="ofert-name">${p.nombre}</div>
-        <div class="ofert-desc-text">${p.desc||'<span style="color:var(--text3);font-style:italic;">Sin descripción</span>'}</div>
+        <div class="ofert-desc-text">
+          ${p.desc || '<span style="color:var(--text3);font-style:italic;">Sin descripción</span>'}
+        </div>
         <div class="ofert-price-box" style="background:#faf5ff;border-color:#ddd6fe;">
-          <div><div class="ofert-price-lbl">Precio</div><div class="ofert-price" style="color:#7c3aed;">${fmtPrecio(p.precio)}</div></div>
-          <span style="font-size:9px;font-weight:800;padding:3px 9px;border-radius:99px;${sColor(p.seccion)}">${p.seccion||'General'}</span>
+          <div>
+            <div class="ofert-price-lbl">Precio</div>
+            <div class="ofert-price" style="color:#7c3aed;">${fmtPrecio(p.precio)}</div>
+          </div>
+          <span style="font-size:9px;font-weight:800;padding:3px 9px;border-radius:99px;
+            ${sColor(p.seccion)}">${p.seccion || 'General'}</span>
         </div>
       </div>
     </div>`).join('');
 
-  document.getElementById('prod-pag').innerHTML = pagRender('productos', list.length, 'goPageProductos');
+  // Iniciar carousel después del render
   setTimeout(initProdCarousel, 60);
 }
 
@@ -4497,65 +4612,80 @@ async function ejecutarAsignacion() {
 }
  
 /* ── renderPedidosTable MEJORADO — reemplaza el anterior ── */
-let _pedListCached = [];
 function renderPedidosTable(filter) {
   pedFilter = filter;
   poblarFiltrosDomi();
-
+ 
   const domiSel = (document.getElementById('ped-domi-filter')?.value || '').trim();
   const tipoSel = (document.getElementById('ped-tipo-filter')?.value || '').trim();
-
-  let list = filter==='pendiente' ? allPedidos.filter(p=>p.estado==='pendiente')
-           : filter==='proceso'   ? allPedidos.filter(p=>p.estado==='proceso')
-           : filter==='entregado' ? allPedidos.filter(p=>p.estado==='entregado')
+ 
+  let list = filter === 'pendiente' ? allPedidos.filter(p => p.estado === 'pendiente')
+           : filter === 'proceso'   ? allPedidos.filter(p => p.estado === 'proceso')
+           : filter === 'entregado' ? allPedidos.filter(p => p.estado === 'entregado')
            : allPedidos;
-
-  if (domiSel) list = list.filter(p => (p.domi||'') === domiSel);
-  if (tipoSel==='domicilio') list = list.filter(p => !(p.tipoEntrega||'').toLowerCase().includes('recog'));
-  if (tipoSel==='recogida')  list = list.filter(p =>  (p.tipoEntrega||'').toLowerCase().includes('recog'));
-
-  _pedListCached = list;
-  PAG.pedidos.page = 1;
-  document.getElementById('ped-count').textContent = list.length + ' pedido' + (list.length!==1?'s':'');
-  _renderPedTable(list);
-}
-
-function _renderPedTable(list) {
+ 
+  if (domiSel) list = list.filter(p => (p.domi || '') === domiSel);
+  if (tipoSel === 'domicilio') list = list.filter(p => !(p.tipoEntrega || '').toLowerCase().includes('recog'));
+  if (tipoSel === 'recogida')  list = list.filter(p =>  (p.tipoEntrega || '').toLowerCase().includes('recog'));
+ 
+  document.getElementById('ped-count').textContent = list.length + ' pedido' + (list.length !== 1 ? 's' : '');
+ 
   const tb = document.getElementById('ped-tbody');
-  const paginado = pagSlice('pedidos', list);
-
   if (!list.length) {
-    tb.innerHTML = `<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text3);">${allPedidos.length?'Sin pedidos con ese filtro':'⚠️ El sheet de Pedidos está vacío o sin acceso'}</td></tr>`;
-    document.getElementById('ped-pag').innerHTML = '';
+    tb.innerHTML = `<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text3);">
+      ${allPedidos.length ? 'Sin pedidos con ese filtro' : '⚠️ El sheet de Pedidos está vacío o sin acceso'}
+    </td></tr>`;
     return;
   }
-
-  tb.innerHTML = paginado.map(p => {
-    const subtotal   = calcSubtotal(p);
-    const costoEnvio = parsePrecio(p.costoEnvio);
-    const totalSheet = parsePrecio(p.total);
-    const totalM     = totalSheet > 0 ? totalSheet : (subtotal + costoEnvio) || 0;
-    const envioReal  = costoEnvio > 0 ? costoEnvio : (totalSheet>0&&subtotal>0&&totalSheet>subtotal ? totalSheet-subtotal : 0);
-    const esRec      = (p.tipoEntrega||'').toLowerCase().includes('recog');
-    const rowBg      = p.estado==='pendiente'?'style="background:rgba(217,119,6,.04);"':p.estado==='proceso'?'style="background:rgba(37,99,235,.03);"':'';
+ 
+  tb.innerHTML = list.map(p => {
+    const subtotal    = calcSubtotal(p);
+    const costoEnvio  = parsePrecio(p.costoEnvio);
+    const totalSheet  = parsePrecio(p.total);
+    const totalMostrar= totalSheet > 0 ? totalSheet : (subtotal + costoEnvio) || 0;
+    const costoEnvioReal = costoEnvio > 0 ? costoEnvio
+      : (totalSheet > 0 && subtotal > 0 && totalSheet > subtotal ? totalSheet - subtotal : 0);
+    const esRecogida  = (p.tipoEntrega || '').toLowerCase().includes('recog');
+ 
+    // Color de fila según estado
+    const rowBg = p.estado === 'pendiente' ? 'style="background:rgba(217,119,6,.04);"'
+                : p.estado === 'proceso'   ? 'style="background:rgba(37,99,235,.03);"'
+                : '';
+ 
     return `<tr ${rowBg} onclick="openModalPed('${p.id.replace(/'/g,"\\'")}');abrirAsignacion('${p.id.replace(/'/g,"\\'")}')">
       <td>${p.id}</td>
-      <td><b style="font-size:12px;">${p.cliente||'–'}</b><br><span style="font-size:9px;color:var(--text3);">${p.tel||''}</span></td>
-      <td style="font-size:11px;color:var(--text2);max-width:140px;">${p.direccion||'–'}</td>
-      <td>${p.domi?`<span style="font-size:11px;font-weight:700;">${p.domi}</span>`:`<button onclick="event.stopPropagation();abrirAsignacion('${p.id.replace(/'/g,"\\'")}'" style="background:var(--red-l);color:var(--red);border:1px solid rgba(220,38,38,.2);border-radius:8px;padding:3px 9px;font-size:10px;font-weight:800;cursor:pointer;">+ Asignar</button>`}</td>
-      <td><span class="stag ${p.estado}">${p.estado==='entregado'?'Entregado':p.estado==='proceso'?'En proceso':'Pendiente'}</span></td>
-      <td>${esRec?'<span style="font-size:9px;font-weight:800;background:#ede9fe;color:#7c3aed;padding:2px 8px;border-radius:99px;">🏪 Recogida</span>':'<span style="font-size:9px;font-weight:800;background:var(--teal-m);color:var(--teal-d);padding:2px 8px;border-radius:99px;">🛵 Domicilio</span>'}</td>
-      <td style="font-size:11px;color:var(--text2);">${p.metodo||'–'}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:11px;font-weight:700;color:var(--text2);">${subtotal>0?fmtMoney(subtotal):'–'}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:11px;">${envioReal>0?`<span style="color:var(--orange);font-weight:700;">${fmtMoney(envioReal)}</span>`:'<span style="color:var(--green);font-size:9px;font-weight:800;">Gratis</span>'}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:12px;font-weight:800;color:var(--teal-d);">${totalM>0?fmtMoney(totalM):'–'}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:10px;">${p.hora||'–'}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:10px;">${p.fecha||'–'}</td>
+      <td><b style="font-size:12px;">${p.cliente || '–'}</b><br>
+          <span style="font-size:9px;color:var(--text3);">${p.tel || ''}</span></td>
+      <td style="font-size:11px;color:var(--text2);max-width:140px;">${p.direccion || '–'}</td>
+      <td>
+        ${p.domi
+          ? `<span style="font-size:11px;font-weight:700;">${p.domi}</span>`
+          : `<button onclick="event.stopPropagation();abrirAsignacion('${p.id.replace(/'/g,"\\'")}')"
+              style="background:var(--red-l);color:var(--red);border:1px solid rgba(220,38,38,.2);
+                     border-radius:8px;padding:3px 9px;font-size:10px;font-weight:800;cursor:pointer;">
+              + Asignar
+             </button>`}
+      </td>
+      <td><span class="stag ${p.estado}">${p.estado === 'entregado' ? 'Entregado' : p.estado === 'proceso' ? 'En proceso' : 'Pendiente'}</span></td>
+      <td>
+        ${esRecogida
+          ? '<span style="font-size:9px;font-weight:800;background:#ede9fe;color:#7c3aed;padding:2px 8px;border-radius:99px;">🏪 Recogida</span>'
+          : '<span style="font-size:9px;font-weight:800;background:var(--teal-m);color:var(--teal-d);padding:2px 8px;border-radius:99px;">🛵 Domicilio</span>'}
+      </td>
+      <td style="font-size:11px;color:var(--text2);">${p.metodo || '–'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;font-weight:700;color:var(--text2);">${subtotal > 0 ? fmtMoney(subtotal) : '–'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;">
+        ${costoEnvioReal > 0
+          ? `<span style="color:var(--orange);font-weight:700;">${fmtMoney(costoEnvioReal)}</span>`
+          : `<span style="color:var(--green);font-size:9px;font-weight:800;">Gratis</span>`}
+      </td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px;font-weight:800;color:var(--teal-d);">${totalMostrar > 0 ? fmtMoney(totalMostrar) : '–'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:10px;">${p.hora || '–'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:10px;">${p.fecha || '–'}</td>
     </tr>`;
   }).join('');
-
-  document.getElementById('ped-pag').innerHTML = pagRender('pedidos', list.length, 'goPagePedidos');
 }
+
 
 /* ── Popup ── */
 function _popupDomi(d, lat, lng, ts, acc, ped) {
@@ -5346,215 +5476,7 @@ async function sendProductoToSheet(producto, accion, imgOverride) {
   }
 }
 
-/* ════ BÚSQUEDA + FILTRO SECCIÓN PRODUCTOS ════ */
-function filterProductosBusqueda() {
-  const q  = (document.getElementById('prod-search')?.value || '').toLowerCase().trim();
-  const sc = (document.getElementById('prod-seccion-filter')?.value || '').toLowerCase().trim();
-  const estadoTab = prodFilter; // usa el tab activo (todas/activo/inactivo)
 
-  let list = estadoTab === 'activo'   ? productos.filter(p => p.estado === 'activo')
-           : estadoTab === 'inactivo' ? productos.filter(p => p.estado === 'inactivo')
-           : productos;
-
-  if (q)  list = list.filter(p =>
-    (p.nombre  || '').toLowerCase().includes(q) ||
-    (p.lab     || '').toLowerCase().includes(q) ||
-    (p.desc    || '').toLowerCase().includes(q)
-  );
-  if (sc) list = list.filter(p => (p.seccion || '').toLowerCase() === sc);
-
-  document.getElementById('prod-count').textContent =
-    list.length + ' producto' + (list.length !== 1 ? 's' : '');
-
-  const grid = document.getElementById('prod-grid');
-  if (!list.length) {
-    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;min-width:100%;">
-      <div class="ico" style="font-size:40px;opacity:.2;">🔍</div>
-      <p>Sin resultados para tu búsqueda</p></div>`;
-    document.getElementById('prod-dots').style.display = 'none';
-    return;
-  }
-
-  const sColor = s => ({
-    'Medicamentos':'background:#fee2e2;color:#991b1b;','Vitaminas':'background:#dcfce7;color:#166534;',
-    'Bebés':'background:#fce7f3;color:#9d174d;','Higiene':'background:#dbeafe;color:#1e40af;',
-    'Belleza':'background:#fdf4ff;color:#7e22ce;','Hogar':'background:#fef3c7;color:#92400e;',
-    'Otros':'background:#f1f5f9;color:#334155;'
-  })[s] || 'background:#f1f5f9;color:#334155;';
-
-  grid.innerHTML = list.map(p => `
-    <div class="ofert-card prod-card-wrap" style="border-color:#ede9fe;">
-      <div class="prod-img-actions">
-        <button class="pia-edit" onclick="event.stopPropagation();openProdModal('${p.id}')" title="Editar">
-          <span class="material-symbols-rounded" style="font-size:14px;">edit</span></button>
-        <button class="pia-pause" onclick="event.stopPropagation();toggleProducto('${p.id}')" title="${p.estado==='activo'?'Pausar':'Activar'}">
-          <span class="material-symbols-rounded" style="font-size:14px;">${p.estado==='activo'?'pause':'play_arrow'}</span></button>
-        <button class="pia-del" onclick="event.stopPropagation();deleteProducto('${p.id}')" title="Eliminar">
-          <span class="material-symbols-rounded" style="font-size:14px;">delete</span></button>
-      </div>
-      <div class="prod-estado-pill ${p.estado}">${p.estado==='activo'?'✦ Activo':'⏸ Inactivo'}</div>
-      <div class="ofert-img-wrap" style="background:#faf5ff;">
-        ${(()=>{
-          const src=resolveImgSrc(p.img,p.nombre);
-          if(!src) return `<div class="ofert-img-placeholder" style="background:#faf5ff;"><span class="material-symbols-rounded" style="color:#a78bfa;">image</span><span>Sin imagen</span></div>`;
-          const lbSrc=src.replace(/'/g,"\\'");
-          return `<div style="position:relative;width:100%;height:260px;">
-            <img class="ofert-img" src="${src}" alt="${p.nombre}" crossorigin="anonymous"
-              onclick="openLbox('${lbSrc}')" style="cursor:zoom-in;"
-              onerror="this.parentElement.innerHTML='<div class=ofert-img-placeholder style=background:#faf5ff><span class=material-symbols-rounded style=color:#a78bfa>broken_image</span><span>Sin imagen</span></div>'">
-            ${src.startsWith('http')?`<a href="${src}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="position:absolute;bottom:6px;right:6px;background:rgba(30,27,75,.82);color:#e0d9ff;border-radius:8px;padding:4px 9px;font-size:9px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:4px;backdrop-filter:blur(4px);border:1px solid rgba(124,58,237,.3);"><span class="material-symbols-rounded" style="font-size:12px;">link</span>Drive</a>`:''}
-          </div>`;
-        })()}
-      </div>
-      <div class="ofert-body">
-        <div class="ofert-lab" style="color:#7c3aed;display:flex;align-items:center;gap:4px;">
-          <span class="material-symbols-rounded" style="font-size:12px;">science</span>${p.lab}</div>
-        <div class="ofert-name">${p.nombre}</div>
-        <div class="ofert-desc-text">${p.desc||'<span style="color:var(--text3);font-style:italic;">Sin descripción</span>'}</div>
-        <div class="ofert-price-box" style="background:#faf5ff;border-color:#ddd6fe;">
-          <div><div class="ofert-price-lbl">Precio</div>
-            <div class="ofert-price" style="color:#7c3aed;">${fmtPrecio(p.precio)}</div></div>
-          <span style="font-size:9px;font-weight:800;padding:3px 9px;border-radius:99px;${sColor(p.seccion)}">${p.seccion||'General'}</span>
-        </div>
-      </div>
-    </div>`).join('');
-  setTimeout(initProdCarousel, 60);
-}
-
-/* ════ EXPORTAR EXCEL ════ */
-function exportarProductosExcel() {
-  const q  = (document.getElementById('prod-search')?.value  || '').toLowerCase().trim();
-  const sc = (document.getElementById('prod-seccion-filter')?.value || '').toLowerCase().trim();
-  let list = prodFilter==='activo' ? productos.filter(p=>p.estado==='activo')
-           : prodFilter==='inactivo' ? productos.filter(p=>p.estado==='inactivo') : productos;
-  if (q)  list = list.filter(p=>(p.nombre||'').toLowerCase().includes(q)||(p.lab||'').toLowerCase().includes(q));
-  if (sc) list = list.filter(p=>(p.seccion||'').toLowerCase()===sc);
-  if (!list.length) { showToast('w','Sin productos','No hay productos con los filtros actuales'); return; }
-
-  const rows = [['ID','Nombre','Laboratorio','Precio','Sección','Estado','Descripción','Fecha']];
-  list.forEach(p => rows.push([p.id,p.nombre,p.lab,p.precio,p.seccion,p.estado,p.desc||'',p.fecha||'']));
-
-  let csv = rows.map(r => r.map(c => '"' + String(c||'').replace(/"/g,'""') + '"').join(',')).join('\r\n');
-  const bom = '\uFEFF';
-  const blob = new Blob([bom + csv], { type:'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url; a.download = 'productos_nuevos_' + new Date().toISOString().slice(0,10) + '.csv';
-  a.click(); URL.revokeObjectURL(url);
-  showToast('s','Excel exportado', list.length + ' productos exportados');
-}
-
-/* ════ IMPRIMIR / PDF ════ */
-function imprimirProductos() {
-  const q  = (document.getElementById('prod-search')?.value  || '').toLowerCase().trim();
-  const sc = (document.getElementById('prod-seccion-filter')?.value || '').toLowerCase().trim();
-  let list = prodFilter==='activo' ? productos.filter(p=>p.estado==='activo')
-           : prodFilter==='inactivo' ? productos.filter(p=>p.estado==='inactivo') : productos;
-  if (q)  list = list.filter(p=>(p.nombre||'').toLowerCase().includes(q)||(p.lab||'').toLowerCase().includes(q));
-  if (sc) list = list.filter(p=>(p.seccion||'').toLowerCase()===sc);
-  if (!list.length) { showToast('w','Sin productos','No hay productos con los filtros actuales'); return; }
-
-  const filas = list.map((p,i) => `<tr style="background:${i%2===0?'#f9f9f9':'#fff'}">
-    <td>${i+1}</td><td><b>${p.nombre}</b></td><td>${p.lab}</td>
-    <td style="font-weight:700;color:#7c3aed;">${fmtPrecio(p.precio)}</td>
-    <td>${p.seccion||'—'}</td>
-    <td><span style="padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;
-      background:${p.estado==='activo'?'#dcfce7':'#f1f5f9'};
-      color:${p.estado==='activo'?'#166534':'#64748b'};">${p.estado}</span></td>
-    <td style="font-size:11px;color:#64748b;">${p.desc||'—'}</td>
-  </tr>`).join('');
-
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
-    <title>Productos Nuevos — Domicilios WIL</title>
-    <style>
-      body{font-family:Arial,sans-serif;padding:24px;color:#0c2225;}
-      h2{margin-bottom:4px;color:#7c3aed;}p.sub{font-size:12px;color:#888;margin-bottom:16px;}
-      table{width:100%;border-collapse:collapse;font-size:12px;}
-      th{background:#7c3aed;color:#fff;padding:8px 10px;text-align:left;font-size:11px;}
-      td{padding:7px 10px;border-bottom:1px solid #e5e7eb;vertical-align:top;}
-      @media print{body{padding:10px;}}
-    </style></head><body>
-    <h2>Productos Nuevos — Domicilios WIL</h2>
-    <p class="sub">Generado: ${new Date().toLocaleString('es-CO')} · ${list.length} producto${list.length!==1?'s':''}</p>
-    <table><thead><tr><th>#</th><th>Nombre</th><th>Laboratorio</th><th>Precio</th><th>Sección</th><th>Estado</th><th>Descripción</th></tr></thead>
-    <tbody>${filas}</tbody></table>
-    <script>window.onload=()=>{window.print();}<\/script></body></html>`;
-
-  const w = window.open('','_blank','width=900,height=700');
-  w.document.write(html); w.document.close();
-}
-
-/* ════ PAGINACIÓN GLOBAL ════ */
-const PAG = {
-  productos: { page: 1, size: 12 },
-  ofertas:   { page: 1, size: 12 },
-  pedidos:   { page: 1, size: 20 }
-};
-
-function pagSlice(key, list) {
-  const { page, size } = PAG[key];
-  return list.slice((page - 1) * size, page * size);
-}
-
-function pagRender(key, total, onPage) {
-  const { page, size } = PAG[key];
-  const pages = Math.ceil(total / size) || 1;
-  if (pages <= 1) return '';
-  const btns = [];
-  // Prev
-  btns.push(`<button onclick="${onPage}(${page - 1})" ${page === 1 ? 'disabled' : ''}
-    style="padding:5px 10px;border-radius:8px;border:1.5px solid var(--border);
-    background:${page===1?'var(--bg2)':'var(--white)'};color:${page===1?'var(--text3)':'var(--text2)'};
-    cursor:${page===1?'default':'pointer'};font-family:'Plus Jakarta Sans',sans-serif;
-    font-size:11px;font-weight:700;transition:all .14s;">‹</button>`);
-  // Páginas
-  for (let i = 1; i <= pages; i++) {
-    if (pages > 7 && i > 2 && i < pages - 1 && Math.abs(i - page) > 1) {
-      if (i === 3 || i === pages - 2) btns.push(`<span style="color:var(--text3);font-size:12px;padding:0 2px;">…</span>`);
-      continue;
-    }
-    btns.push(`<button onclick="${onPage}(${i})"
-      style="padding:5px 10px;border-radius:8px;border:1.5px solid ${i===page?'var(--teal)':'var(--border)'};
-      background:${i===page?'var(--teal)':'var(--white)'};color:${i===page?'#fff':'var(--text2)'};
-      cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:${i===page?'800':'600'};
-      transition:all .14s;">${i}</button>`);
-  }
-  // Next
-  btns.push(`<button onclick="${onPage}(${page + 1})" ${page === pages ? 'disabled' : ''}
-    style="padding:5px 10px;border-radius:8px;border:1.5px solid var(--border);
-    background:${page===pages?'var(--bg2)':'var(--white)'};color:${page===pages?'var(--text3)':'var(--text2)'};
-    cursor:${page===pages?'default':'pointer'};font-family:'Plus Jakarta Sans',sans-serif;
-    font-size:11px;font-weight:700;transition:all .14s;">›</button>`);
-
-  return `<div style="display:flex;align-items:center;justify-content:space-between;
-    padding:14px 0 4px;flex-wrap:wrap;gap:8px;">
-    <span style="font-size:11px;color:var(--text3);">
-      Mostrando ${Math.min((page-1)*size+1,total)}–${Math.min(page*size,total)} de <b style="color:var(--text2);">${total}</b>
-    </span>
-    <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">${btns.join('')}</div>
-  </div>`;
-}
-
-function goPageProductos(n) {
-  const pages = Math.ceil(_prodListCached.length / PAG.productos.size) || 1;
-  PAG.productos.page = Math.max(1, Math.min(n, pages));
-  _renderProdGrid(_prodListCached);
-  document.getElementById('prod-grid')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
-function goPageOfertas(n) {
-  const pages = Math.ceil(_ofertListCached.length / PAG.ofertas.size) || 1;
-  PAG.ofertas.page = Math.max(1, Math.min(n, pages));
-  _renderOfertGrid(_ofertListCached);
-  document.getElementById('ofert-grid')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
-function goPagePedidos(n) {
-  const pages = Math.ceil(_pedListCached.length / PAG.pedidos.size) || 1;
-  PAG.pedidos.page = Math.max(1, Math.min(n, pages));
-  _renderPedTable(_pedListCached);
-  document.getElementById('ped-tbody')?.closest('.pn')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
 </script>
 </body>
 </html>
