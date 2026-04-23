@@ -914,6 +914,18 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
   <div class="ibtn" id="voz-btn" onclick="VOZ.toggleVoz()" title="Silenciar/activar voz" style="color:var(--teal);">
   <span class="material-symbols-rounded" style="font-size:16px;">volume_up</span>
 </div>
+<div class="ibtn" onclick="SONIDO.test()" title="Probar sonido de pedido" style="color:var(--orange);">
+  <span class="material-symbols-rounded" style="font-size:16px;">notifications_active</span>
+</div>
+
+<div class="ibtn" id="btn-alerta" onclick="toggleAlerta()" 
+     title="Alertas de pendientes cada 5 min" 
+     style="color:var(--orange);">
+  <span class="material-symbols-rounded" style="font-size:16px;">alarm</span>
+</div>
+
+
+
 </header>
 
 <!-- ACTIVIDAD — MAPA EN VIVO -->
@@ -1858,9 +1870,12 @@ const VOZ = {
   },
 
   nuevoPedido(id, cliente) {
-    const msg = `Nuevo pedido recibido.${cliente ? ' Cliente: ' + cliente + '.' : ''} Número ${id}.`;
-    this.hablar(msg, 1.1, 1.2);
-  },
+  // ── AGREGAR ESTA LÍNEA ──
+  SONIDO.nuevoPedido();
+  // ────────────────────────
+  const msg = `Nuevo pedido recibido.${cliente ? ' Cliente: ' + cliente + '.' : ''} Número ${id}.`;
+  this.hablar(msg, 1.1, 1.2);
+},
 
   toggleVoz() {
     this.habilitada = !this.habilitada;
@@ -1874,6 +1889,177 @@ const VOZ = {
   }
 };
 VOZ.init();
+
+/* ═══════════════════════════════════════════════
+   🔔 SONIDO DE NOTIFICACIÓN — NUEVO PEDIDO
+═══════════════════════════════════════════════ */
+const SONIDO = {
+  ctx: null,
+
+  init() {
+    // Crear contexto al primer click del usuario (requisito del navegador)
+    document.addEventListener('click', () => {
+      if (!this.ctx) {
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    }, { once: false });
+  },
+
+  nuevoPedido() {
+    try {
+      if (!this.ctx) {
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      const ctx = this.ctx;
+
+      // ── Secuencia de 4 tonos tipo "ding dong" fuerte ──
+      const notas = [
+        { freq: 880, t: 0.00, dur: 0.18 },   // La5 — golpe inicial
+        { freq: 660, t: 0.20, dur: 0.18 },   // Mi5
+        { freq: 880, t: 0.40, dur: 0.18 },   // La5
+        { freq: 1100,t: 0.60, dur: 0.28 },   // Do#6 — nota final larga
+      ];
+
+      notas.forEach(({ freq, t, dur }) => {
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + t);
+
+        // Volumen alto con fade suave al final
+        gain.gain.setValueAtTime(0, ctx.currentTime + t);
+        gain.gain.linearRampToValueAtTime(1.0, ctx.currentTime + t + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + dur);
+
+        osc.start(ctx.currentTime + t);
+        osc.stop(ctx.currentTime + t + dur + 0.05);
+      });
+
+      // ── Vibración en móvil ──
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
+
+    } catch(e) {
+      console.warn('[SONIDO]:', e.message);
+    }
+  },
+
+  test() {
+    this.nuevoPedido();
+    showToast('s', '🔔 Sonido probado', 'Así suena cada nuevo pedido');
+  }
+};
+
+SONIDO.init();
+
+/* ═══════════════════════════════════════════════
+   ⏰ ALERTA PERIÓDICA — PEDIDOS PENDIENTES SIN ASIGNAR
+═══════════════════════════════════════════════ */
+const ALERTA_PENDIENTES = {
+  timer: null,
+  INTERVALO: 5 * 60 * 1000, // 5 minutos
+
+  init() {
+    this.timer = setInterval(() => this.revisar(), this.INTERVALO);
+    console.log('[ALERTA] Iniciada — revisará cada 5 min');
+  },
+
+  revisar() {
+    // Solo alertar si la pestaña está visible
+    if (document.hidden) return;
+
+    const sinAsignar = allPedidos.filter(p =>
+      p.estado === 'pendiente' && (!p.domi || p.domi.trim() === '')
+    );
+
+    if (!sinAsignar.length) return;
+
+    const n = sinAsignar.length;
+    const nombres = sinAsignar.slice(0, 3).map(p => p.cliente || p.id).join(', ');
+    const sufijo  = sinAsignar.length > 3 ? ` y ${sinAsignar.length - 3} más` : '';
+
+    // 🔔 Sonido urgente (más agresivo que el de nuevo pedido)
+    this.sonidoUrgente();
+
+    // 📢 Voz
+    VOZ.hablar(
+      `Atención. Hay ${n} pedido${n !== 1 ? 's' : ''} pendiente${n !== 1 ? 's' : ''} sin asignar. Revisa el panel.`,
+      1.0, 1.15
+    );
+
+    // 🍞 Toast
+    showToast('w',
+      `⚠️ ${n} pedido${n !== 1 ? 's' : ''} sin asignar`,
+      nombres + sufijo
+    );
+
+    // 📳 Vibración larga en móvil
+    if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300, 100, 600]);
+  },
+
+  sonidoUrgente() {
+    try {
+      if (!SONIDO.ctx) {
+        SONIDO.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      const ctx = SONIDO.ctx;
+
+      // Secuencia urgente: 6 pulsos rápidos descendentes
+      const notas = [
+        { freq: 1200, t: 0.00, dur: 0.12 },
+        { freq: 1000, t: 0.15, dur: 0.12 },
+        { freq: 1200, t: 0.30, dur: 0.12 },
+        { freq: 1000, t: 0.45, dur: 0.12 },
+        { freq: 1200, t: 0.60, dur: 0.12 },
+        { freq: 800,  t: 0.75, dur: 0.35 }, // nota larga final
+      ];
+
+      notas.forEach(({ freq, t, dur }) => {
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'square'; // más estridente que sine
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + t);
+        gain.gain.setValueAtTime(0, ctx.currentTime + t);
+        gain.gain.linearRampToValueAtTime(0.8, ctx.currentTime + t + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + dur);
+        osc.start(ctx.currentTime + t);
+        osc.stop(ctx.currentTime + t + dur + 0.05);
+      });
+
+    } catch(e) {
+      console.warn('[ALERTA sonido]:', e.message);
+    }
+  },
+
+  test() {
+    this.revisar();
+    if (!allPedidos.filter(p => p.estado === 'pendiente' && !p.domi?.trim()).length) {
+      showToast('i', 'Sin pendientes ahora', 'La alerta solo suena si hay pedidos sin asignar');
+    }
+  },
+
+  detener() {
+    clearInterval(this.timer);
+    this.timer = null;
+    showToast('i', 'Alertas pausadas', 'No avisará sobre pendientes');
+  },
+
+  reanudar() {
+    if (this.timer) return;
+    this.init();
+    showToast('s', 'Alertas activas', 'Avisará cada 5 min si hay pendientes');
+  }
+};
+
+ALERTA_PENDIENTES.init();
+
+
+
 
 const SECCION_COLORS = {
   'Medicamentos':'background:#fee2e2;color:#991b1b;',
@@ -2008,6 +2194,16 @@ function matchDomi(p, d) {
   return p.domi.toLowerCase().includes(d.nombre.trim().split(/\s+/)[0].toLowerCase());
 }
 
+function toggleAlerta() {
+  const btn = document.getElementById('btn-alerta');
+  if (ALERTA_PENDIENTES.timer) {
+    ALERTA_PENDIENTES.detener();
+    if (btn) { btn.style.color = 'var(--text3)'; btn.title = 'Alertas pausadas — clic para reanudar'; }
+  } else {
+    ALERTA_PENDIENTES.reanudar();
+    if (btn) { btn.style.color = 'var(--orange)'; btn.title = 'Alertas activas — clic para pausar'; }
+  }
+}
 
 
 /* ═══════════════════════════════════════════════
@@ -2069,20 +2265,15 @@ async function loadDrivers() {
 async function loadPedidos() {
   let text = null;
 
-  // Intento 1: gviz directo
   try {
     text = await fetchSheetCSV('Pedidos');
     _loadMethod = 'gviz-directo';
   } catch (e1) {
     console.warn('[loadPedidos] intento 1 falló:', e1.message);
-    // Intento 2: agregar parámetro headers=0 por si el sheet no tiene cabecera reconocida
     try {
       const url2 = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&sheet=Pedidos&t=${Date.now()}`;
       const r2 = await fetch(url2, { signal: AbortSignal.timeout(12000), cache: 'no-store' });
-      if (r2.ok) {
-        text = await r2.text();
-        _loadMethod = 'export-csv';
-      }
+      if (r2.ok) { text = await r2.text(); _loadMethod = 'export-csv'; }
     } catch (e2) {
       console.warn('[loadPedidos] intento 2 falló:', e2.message);
       setLastErr('Pedidos: ' + e1.message + ' / ' + e2.message);
@@ -2094,75 +2285,73 @@ async function loadPedidos() {
 
   const lines = parseCSVText(text);
 
-  // ── Paso 1: leer todas las filas crudas ──
-  const rawRows = lines.map(l => {
-    if (!col(l, 0) && !col(l, 6)) return null;
-    return {
-      id:           col(l, 0),
-      cliente:      col(l, 1),
-      tel:          col(l, 2),
-      metodo:       col(l, 3),
-      estadoRaw:    col(l, 4),
-      estado:       normEstado(col(l, 4)),
-      imagen:       col(l, 5),
-      producto:     col(l, 6),
-      marca:        col(l, 7),
-      cantidad:     col(l, 8),
-      vu:           col(l, 9),
-      vtotal:       col(l, 10),
-      direccion:    col(l, 11),
-      hora:         col(l, 12),
-      fecha:        col(l, 13),
-      total:        col(l, 14),
-      domi:         col(l, 15),          // P = NOMBRE_DOMI
-      horaProceso:  col(l, 16),          // Q = HORA_EN_PROCESO
-      horaCamino:   col(l, 17),          // R = HORA_EN_CAMINO
-      horaEntrega:  col(l, 18),          // S = HORA_ENTREGA
-      costoEnvio:   col(l, 19),          // T = VALOR_DOMICILIO
-      tipoEntrega:  col(l, 20),          // U = DOMICILIO O RECOGIDA
-      calificacion: col(l, 21) || ''     // V (si existe)
-    };
-  }).filter(Boolean);
- 
+  // ✅ PARCHE: filtrar SOLO filas que son pedidos reales
+  // Col A debe ser un número de 2-5 dígitos (ID pedido) O estar vacía (fila adicional del mismo pedido)
+  const lineasValidas = lines.filter(l => {
+    const a = col(l, 0).trim();
+    if (!a) {
+      // Fila adicional: solo válida si tiene producto en col G
+      return col(l, 6).trim().length > 0;
+    }
+    // Col A debe ser número puro (ID pedido tipo 275, 864, 682)
+    return /^\d{2,5}$/.test(a);
+  });
+
+  console.log('[loadPedidos] líneas totales:', lines.length, '→ válidas:', lineasValidas.length);
+
   const pedMap   = {};
   const pedOrder = [];
   let lastId     = null;
- 
-  rawRows.forEach(r => {
-    if (r.id) {
-      if (!pedMap[r.id]) {
-        pedMap[r.id] = {
-          id: r.id, cliente: r.cliente, tel: r.tel, metodo: r.metodo,
-          estadoRaw: r.estadoRaw, estado: r.estado, imagen: r.imagen,
-          direccion: r.direccion, hora: r.hora, fecha: r.fecha,
-          total: r.total, domi: r.domi,
-          horaTomo:    r.horaProceso,
-          horaCamino:  r.horaCamino,
-          horaEntrega: r.horaEntrega,
-          costoEnvio:  r.costoEnvio,
-          tipoEntrega: r.tipoEntrega,
-          calificacion:r.calificacion,
+
+  lineasValidas.forEach(l => {
+    const id = col(l, 0).trim();
+
+    if (id) {
+      // Fila principal del pedido
+      if (!pedMap[id]) {
+        pedMap[id] = {
+          id,
+          cliente:      col(l, 1),
+          tel:          col(l, 2),
+          metodo:       col(l, 3),
+          estadoRaw:    col(l, 4),
+          estado:       normEstado(col(l, 4)),
+          imagen:       col(l, 5),
+          direccion:    col(l, 11),
+          hora:         col(l, 12),
+          fecha:        col(l, 13),
+          total:        col(l, 14),
+          domi:         col(l, 15),
+          horaTomo:     col(l, 16),
+          horaCamino:   col(l, 17),
+          horaEntrega:  col(l, 18),
+          costoEnvio:   col(l, 19),
+          tipoEntrega:  col(l, 20),
+          calificacion: col(l, 21) || '',
           _prods: []
         };
-        pedOrder.push(r.id);
+        pedOrder.push(id);
       }
-      lastId = r.id;
+      lastId = id;
     }
- 
-    const activeId = r.id || lastId;
+
+    // Agregar producto (tanto en fila principal como en filas adicionales)
+    const activeId = id || lastId;
     const ped = pedMap[activeId];
-    const nom = (r.producto || '').replace(/\|cat$/, '').trim();
+    const nom = col(l, 6).replace(/\|cat$/, '').trim();
+
     if (ped && nom && !nom.toLowerCase().startsWith('domicilio (')) {
       ped._prods.push({
-        nom, marca: r.marca || '',
-        qty:    parseInt(r.cantidad) || 1,
-        vu:     parsePrecio(r.vu),
-        vtotal: parsePrecio(r.vtotal)
+        nom,
+        marca:  col(l, 7) || '',
+        qty:    parseInt(col(l, 8)) || 1,
+        vu:     parsePrecio(col(l, 9)),
+        vtotal: parsePrecio(col(l, 10))
       });
     }
   });
- 
-  // ── Invertir orden: últimos pedidos primero ──
+
+  // Invertir: últimos pedidos primero
   const parsed = pedOrder.reverse().map(id => {
     const p = pedMap[id];
     p.productos = p._prods.map(x => x.nom).join(';');
@@ -2172,19 +2361,20 @@ async function loadPedidos() {
     p.vtotal    = p._prods.map(x => x.vtotal).join(';');
     return p;
   });
- 
-  // Detectar pedidos nuevos
-  if (allPedidos.length > 0 && parsed.length > allPedidos.length) {
-    const idsViejos = new Set(allPedidos.map(p => p.id));
-    const nuevos = parsed.filter(p => !idsViejos.has(p.id));
-    nuevos.forEach(p => {
-      showToast('i', '🛵 Nuevo pedido', (p.cliente || '') + ' — ' + (p.id || ''));
-      VOZ.nuevoPedido(p.id, p.cliente);
-    });
-  }
-  allPedidos = parsed;
-  console.log('[loadPedidos] total:', parsed.length, 'primero:', parsed[0]);
 
+
+  // Detectar pedidos nuevos para notificación de voz
+if (allPedidos.length > 0 && parsed.length > allPedidos.length) {
+  const idsViejos = new Set(allPedidos.map(p => p.id));
+  parsed.filter(p => !idsViejos.has(p.id)).forEach(p => {
+    showToast('i', '🛵 Nuevo pedido', (p.cliente || '') + ' — ' + (p.id || ''));
+    SONIDO.nuevoPedido(); // ← AGREGAR ESTA LÍNEA
+    VOZ.nuevoPedido(p.id, p.cliente);
+  });
+}
+
+  allPedidos = parsed;
+  console.log('[loadPedidos] OK →', parsed.length, 'pedidos · primero:', parsed[0]?.id);
   return true;
 }
 

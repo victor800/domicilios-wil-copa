@@ -2793,67 +2793,37 @@ async function coEnviarPedido(){
 
   var GAS_URL='https://script.google.com/macros/s/AKfycbyNLLKk8S6bG-MgRLWx2zUVp4lXjaMl7txlUAAGLxAa-ZmoBrWN5mWWnnDNw-ZIs78NHA/exec';
 
-  console.log('🚀 [WIL] Iniciando envío pedido', idPedido);
-  console.log('🚀 [WIL] Payload:', JSON.stringify(payload).substring(0, 200));
-  console.log('🚀 [WIL] GAS_URL:', GAS_URL);
-
-  // ── MÉTODO 1: text/plain ──
-  try {
-    console.log('📡 [WIL] Método 1: fetch text/plain...');
-    var res = await fetch(GAS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify(payload)
+  try{
+    var res=await fetch(GAS_URL,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify(payload)
     });
-    console.log('📡 [WIL] M1 status:', res.status, '| ok:', res.ok, '| type:', res.type);
-    var txt = await res.text();
-    console.log('📡 [WIL] M1 respuesta raw:', txt.substring(0, 300));
-    var data = JSON.parse(txt);
-    console.log('📡 [WIL] M1 data.ok:', data.ok, '| error:', data.error);
-    if (data.ok) {
-      console.log('✅ [WIL] M1 EXITOSO');
-      _coExito(idPedido, tel);
-      return;
+    var txt=await res.text();
+    var data={ok:false};
+    try{ data=JSON.parse(txt); }catch(e){}
+    if(data.ok){ _coExito(idPedido,tel); return; }
+    throw new Error(data.error||'Error desconocido');
+  }catch(e1){
+    try{
+      var params=new URLSearchParams();
+      params.append('data',JSON.stringify(payload));
+      var res2=await fetch(GAS_URL,{method:'POST',body:params});
+      var txt2=await res2.text();
+      var data2={ok:false};
+      try{ data2=JSON.parse(txt2); }catch(e){}
+      if(data2.ok){ _coExito(idPedido,tel); return; }
+      throw new Error(data2.error||'Error método 2');
+    }catch(e2){
+      try{
+        await fetch(GAS_URL+'?fallback=1&data='+encodeURIComponent(JSON.stringify(payload)),{mode:'no-cors'});
+        _coExito(idPedido,tel);
+      }catch(e3){
+        btn.disabled=false;
+        btn.innerHTML='<span class="sym symf" style="font-size:18px">check_circle</span> Confirmar pedido';
+        alert('Error al enviar: '+e3.message);
+      }
     }
-    throw new Error(data.error || 'ok=false');
-  } catch(e1) {
-    console.warn('❌ [WIL] M1 falló:', e1.message);
-  }
-
-  // ── MÉTODO 2: URLSearchParams ──
-  try {
-    console.log('📡 [WIL] Método 2: URLSearchParams...');
-    var params = new URLSearchParams();
-    params.append('data', JSON.stringify(payload));
-    var res2 = await fetch(GAS_URL, { method: 'POST', body: params });
-    console.log('📡 [WIL] M2 status:', res2.status, '| type:', res2.type);
-    var txt2 = await res2.text();
-    console.log('📡 [WIL] M2 respuesta raw:', txt2.substring(0, 300));
-    var data2 = JSON.parse(txt2);
-    console.log('📡 [WIL] M2 data.ok:', data2.ok);
-    if (data2.ok) {
-      console.log('✅ [WIL] M2 EXITOSO');
-      _coExito(idPedido, tel);
-      return;
-    }
-    throw new Error(data2.error || 'ok=false');
-  } catch(e2) {
-    console.warn('❌ [WIL] M2 falló:', e2.message);
-  }
-
-  // ── MÉTODO 3: GET no-cors (último recurso) ──
-  try {
-    console.log('📡 [WIL] Método 3: GET no-cors...');
-    var getUrl = GAS_URL + '?fallback=1&data=' + encodeURIComponent(JSON.stringify(payload));
-    console.log('📡 [WIL] M3 URL length:', getUrl.length);
-    await fetch(getUrl, { mode: 'no-cors' });
-    console.log('⚠️ [WIL] M3 ejecutado (no-cors, no sabemos si llegó)');
-    _coExito(idPedido, tel);
-  } catch(e3) {
-    console.error('❌ [WIL] M3 también falló:', e3.message);
-    btn.disabled = false;
-    btn.innerHTML = '<span class="sym symf" style="font-size:18px">check_circle</span> Confirmar pedido';
-    alert('Error al enviar pedido: ' + e3.message + '\n\nRevisa la consola (F12)');
   }
 }
 
