@@ -283,7 +283,7 @@ function setLoading(v){
   document.getElementById('btnTxt').textContent=v?'Validando…':'Ingresar al panel';
 }
 
-/* ── PARSEO CSV MEJORADO ── */
+/* ── PARSEO CSV ── */
 function parseCSVLine(line){
   var cols=[],cur='',inQ=false;
   for(var i=0;i<line.length;i++){
@@ -293,7 +293,7 @@ function parseCSVLine(line){
     else{cur+=ch;}
   }
   cols.push(cur.trim());
-  return cols.map(function(c){return c.replace(/^"|"$/g,'').replace(/\r|\n|\t/g,'').trim();});
+  return cols.map(function(c){return c.replace(/^"|"$/g,'').trim();});
 }
 
 /* ── HANDLE LOGIN ── */
@@ -313,7 +313,7 @@ async function handleLogin(){
   setLoading(true);
 
   try{
-    // URL con sheet=Domiciliarios EXACTO y cache-bust
+    // Misma URL que usa el panel — gviz/tq funciona con hojas públicas
     var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
             + '/gviz/tq?tqx=out:csv&sheet=Domiciliarios&t=' + Date.now();
 
@@ -323,80 +323,73 @@ async function handleLogin(){
 
     var raw = await res.text();
 
-    // Detectar HTML de Google (no pública)
+    // Si Google devuelve HTML (hoja no pública o error) — detectar
     if(raw.trim().slice(0,5).toLowerCase().startsWith('<')){
-      throw new Error('❌ HOJA NO PÚBLICA. Ve a Google Sheets > Compartir > "Cualquiera con el enlace" > Lector. Luego recarga.');
+      throw new Error('Hoja no accesible. Comparte el Sheet como público (ver).');
     }
 
-    // Parsear CSV
+    // Parsear CSV — cada línea es una fila
     var lines = raw.split('\n').map(function(l){ return l.replace(/\r/g,''); }).filter(function(l){ return l.trim() !== ''; });
-    var header = parseCSVLine(lines[0]);
+
+    // Línea 0 = encabezado, datos desde línea 1
     var datos = lines.slice(1);
 
-    console.log('[WIL Login] HEADER:', header);
-    console.log('[WIL Login] Filas datos:', datos.length);
-    console.log('[WIL Login] Buscando ID:', rawId, 'CLAVE:', rawPw);
+    // DEBUG: mostrar en consola lo que lee
+    console.log('[WIL Login] Filas leídas:', datos.length);
+    datos.forEach(function(l, i){
+      var c = parseCSVLine(l);
+      console.log('Fila '+(i+1)+' | A=«'+c[0]+'» C=«'+c[2]+'»');
+    });
+    console.log('[WIL Login] Usuario ingresado: «'+rawId+'» Clave: «'+rawPw+'»');
 
     var match = null;
     for(var i = 0; i < datos.length; i++){
-      var cols = parseCSVLine(datos[i]);
-      
-      // Validar solo si hay ID_DOMI (col 0)
-      var sId = cols[0] || '';
+      var cols    = parseCSVLine(datos[i]);
+      // Col A = ID_DOMI, Col C = CLAVE
+      var sId = (cols[0] || '').replace(/\r|\n|\t/g,'').trim();
+      var sPw = (cols[2] || '').replace(/\r|\n|\t/g,'').trim();
+
       if(!sId) continue;
-
-      var sPw = cols[2] || '';  // CLAVE col 2 (C)
-      var sActivo = (cols[5] || '').toLowerCase().trim();  // ACTIVO col 5 (F)
-
-      // ✅ NUEVA VALIDACIÓN ACTIVO: SI, SÍ, 1, Activo, TRUE, etc.
-      var activoOk = sActivo === 'si' || sActivo === 'sí' || sActivo === '1' || 
-                     sActivo === 'activo' || sActivo === 'true' || sActivo === 's';
 
       var idOk = sId.toLowerCase() === rawId.toLowerCase();
       var pwOk = sPw === rawPw;
 
-      console.log('Fila',i+1,': ID=',sId,'| PW=',sPw?'***':'VACÍA','| ACTIVO=',sActivo,'| idOk=',idOk,'pwOk=',pwOk,'activoOk=',activoOk);
+      console.log('  Compare «'+sId+'» vs «'+rawId+'» =', idOk, '| «'+sPw+'» vs «'+rawPw+'» =', pwOk);
 
-      if(idOk && pwOk && activoOk){
+      if(idOk && pwOk){
         match = {
           id     : sId,
-          nombre : cols[1] || '',
-          tel    : cols[3] || '',
-          foto   : cols[4] || '',
-          activo : sActivo,
+          nombre : (cols[1] || '').trim(),
+          tel    : (cols[3] || '').trim(),
+          foto   : (cols[4] || '').trim(),
+          activo : (cols[5] || '').trim(),
         };
         break;
       }
     }
 
     if(!match){
-      showErr('❌ No encontrado. Verifica: ID exacto, clave, y ACTIVO=SI en Sheet.');
-      console.log('[WIL] No match para', rawId);
+      showErr('ID o clave incorrectos. Acceso denegado.');
       setLoading(false);
       _busy = false;
       return;
     }
 
-    // ✅ Login exitoso - redirige a panel DOMICILIARIO (ajusta si necesitas admin)
-    sessionStorage.setItem('wil_user', JSON.stringify({  // Cambié a 'wil_user' para diferenciar de admin
+    // ✅ Acceso confirmado
+    sessionStorage.setItem('wil_admin', JSON.stringify({
       id: match.id, nombre: match.nombre,
       tel: match.tel, foto: match.foto,
-      activo: match.activo,
       loginAt: new Date().toISOString()
     }));
 
-    showOk('¡Hola ' + (match.nombre.split(' ')[0] || match.id) + '! Bienvenido.');
-    setTimeout(function(){ 
-      location.href = 'panel-domiciliario.html';  // ← CAMBIA A TU PÁGINA DE DOMICILIARIO
-    }, 1400);
+    showOk('¡Hola ' + (match.nombre.split(' ')[0] || match.id) + '! Acceso correcto. Ingresando…');
+    setTimeout(function(){ location.href = 'panel-administrador.html'; }, 1400);
 
   } catch(e){
     var msg = 'Error de conexión. Intenta de nuevo.';
-    if(e.name === 'TimeoutError' || e.name === 'AbortError') msg = '⏰ Tiempo agotado. Verifica internet.';
-    else if(e.message.includes('HOJA')) msg = e.message;
-    else if(e.message.length < 140) msg = e.message;
+    if(e.name === 'TimeoutError' || e.name === 'AbortError') msg = 'Tiempo agotado. Verifica tu conexión.';
+    else if(e.message && e.message.length < 140) msg = e.message;
     showErr(msg);
-    console.error('[WIL Error]', e);
     setLoading(false);
     _busy = false;
   }
