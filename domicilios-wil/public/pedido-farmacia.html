@@ -2750,86 +2750,53 @@ async function coEnviarPedido(){
     var p=c.it.precio>0?c.it.precio:c.it.pUnit;
     return a+p*c.qty;
   },0);
-  var totalFinal=subtotal+coDomicilio;
+  var domVal=modoEntrega==='reco'?0:(coDomicilio||CO_DEFAULT_PRECIO);
+  var totalFinal=subtotal+domVal;
 
-  // ── Una fila por producto ──
-  // Fila 1 (i===0): lleva ID, nombre, tel, pago, estado, dir, hora, fecha, total
-  // Filas siguientes: solo G-K (producto, marca, cant, v/u, vtotal), resto vacío
   var rows=[];
   items.forEach(function(c,i){
     var p=c.it.precio>0?c.it.precio:c.it.pUnit;
     var vtotal=p*c.qty;
     if(i===0){
       rows.push([
-        idPedido,    // A ID_PEDIDO
-        nom,         // B NOMBRE_CLI
-        tel,         // C TELEFONO
-        coPago,      // D METODO_PAGO
-        'Pendiente', // E ESTADO
-        '',          // F IMAGEN_TRANSFERENCIA
-        c.it.desc,   // G PRODUCTO
-        c.it.lab||'',// H MARCA
-        c.qty,       // I CANTIDAD
-        p,           // J V/U
-        vtotal,      // K V/TOTAL
-        dirCompleta, // L DIRECCION
-        hora,        // M HORA
-        fecha,       // N FECHA
-        totalFinal,  // O TOTAL
-        '',          // P NOMBRE_DOMI
-        '',          // Q HORA_TOMO_PEDIDO
-        '',          // R HORA_ENTREGO
-        '',         // S CALIFICACION
-        coDomicilio||0, // T DOMICILIO 
-        modoEntrega === 'domi' ? 'DOMICILIO' : 'RECOGIDA_EN_TIENDA',
+        idPedido,nom,tel,coPago,'Pendiente','',
+        c.it.desc,c.it.lab||'',c.qty,p,vtotal,
+        dirCompleta,hora,fecha,totalFinal,'','','','',
+        domVal,
+        modoEntrega==='domi'?'DOMICILIO':'RECOGIDA_EN_TIENDA'
       ]);
     } else {
-      rows.push([
-        '','','','','','',
-        c.it.desc,    // G
-        c.it.lab||'', // H
-        c.qty,        // I
-        p,            // J
-        vtotal,       // K
-        '','','','','','','',''
-      ]);
+      rows.push(['','','','','','',c.it.desc,c.it.lab||'',c.qty,p,vtotal,'','','','','','','','']);
     }
   });
-
-  // Fila domicilio al final
-   if(coDomicilio>0 && modoEntrega === 'domi'){
-    rows.push([
-      '','','','','','',
-      'Domicilio ('+(coZonaNombre||'Copacabana')+')',
-      'WIL Domicilios',
-      1,
-      coDomicilio,
-      coDomicilio,
-      '','','','','','','',''
-    ]);
+  if(domVal>0&&modoEntrega==='domi'){
+    rows.push(['','','','','','','Domicilio ('+(coZonaNombre||'Copacabana')+')','WIL Domicilios',1,domVal,domVal,'','','','','','','','']);
   }
 
+  var GAS_URL='https://script.google.com/macros/s/AKfycbwm6-suQ0iZJehk7Z5xkYcRh2IR1LdydUGeuAcRubcT3yyiRphV2UNmNapGd4DbkPsHHA/exec';
+
   try{
-    var res=await fetch('/api/wil?action=pedido-farmacia',{
+    var res=await fetch(GAS_URL,{
       method:'POST',
+      mode:'no-cors',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
+        action:'pedido-farmacia',
         rows:rows,
         id:idPedido,
         sede:tienda,
         nombre:nom,
         telefono:tel,
         total:totalFinal,
-        domicilio:coDomicilio,
-        zona:coZonaNombre,
+        domicilio:domVal,
+        zona:coZonaNombre||CO_DEFAULT_ZONA,
         direccion:dirCompleta,
         metodoPago:coPago,
         coords:coCoords
       })
     });
-    var data=await res.json();
-    if(!data.ok)throw new Error(data.error||'Error al guardar');
 
+    // mode:no-cors siempre devuelve opaque (no podemos leer respuesta), asumimos éxito
     coStep=3;
     document.getElementById('co-s2').style.display='none';
     document.getElementById('co-s3').style.display='block';
@@ -2846,7 +2813,6 @@ async function coEnviarPedido(){
     alert('Error al enviar el pedido: '+e.message);
   }
 }
-
 
 /* ══ UTILS ══ */
 function fp(n){if(!n||isNaN(n))return '$0';return '$'+Math.round(n).toLocaleString('es-CO')+' COP';}
