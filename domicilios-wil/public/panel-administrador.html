@@ -4788,15 +4788,28 @@ async function ejecutarAsignacion() {
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify(payload)
     });
+    console.log('[asignar-domi] respuesta servidor:', json);
+if (json.error) showToast('w', 'Aviso script', json.error);
     const json = await res.json();
     if (json.ok !== false) {
-      showToast('s', '✓ Asignado', `${domiNombre} → Pedido ${pedAsignId}`);
-      VOZ.hablar(`Pedido asignado a ${domiNombre.split(' ')[0]}`);
-      cancelarAsignacion();
-      await doRefresh(false);
-    } else {
-      showToast('e', 'Error del servidor', json.error || 'El script no respondió OK');
-    }
+  showToast('s', '✓ Asignado', `${domiNombre} → Pedido ${pedAsignId}`);
+  VOZ.hablar(`Pedido asignado a ${domiNombre.split(' ')[0]}`);
+  
+  // Forzar en memoria inmediatamente
+  const pedLocal = allPedidos.find(p => p.id === pedAsignId);
+  if (pedLocal) {
+    pedLocal.domi      = domiNombre;
+    pedLocal.estado    = 'asignado';
+    pedLocal.estadoRaw = 'Asignado';
+  }
+  cancelarAsignacion();
+  renderAll();
+  await doRefresh(false);
+
+} else {
+  // ← ESTE ELSE FALTABA — mostraba éxito aunque el servidor fallara
+  showToast('e', 'Error del servidor', json.error || 'Pedido no encontrado en el sheet');
+}
   } catch(e) {
     showToast('e', 'Error de red', e.message.substring(0, 60));
   } finally {
