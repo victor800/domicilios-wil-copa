@@ -2752,36 +2752,95 @@ async function coEnviarPedido(){
   },0);
   var domVal=modoEntrega==='reco'?0:(coDomicilio||CO_DEFAULT_PRECIO);
   var totalFinal=subtotal+domVal;
+  var modoLabel=modoEntrega==='domi'?'DOMICILIO':'RECOGIDA_EN_TIENDA';
 
+  /* ─────────────────────────────────────────────────────────────
+     COLUMNAS A→U (21 cols):
+     A  ID_PEDIDO
+     B  NOMBRE_CLI
+     C  TELEFONO
+     D  METODO_PAGO
+     E  ESTADO
+     F  IMAGEN_TRANSFERENCIA
+     G  PRODUCTOS
+     H  MARCA
+     I  CANTIDAD
+     J  V/U
+     K  V/TOTAL
+     L  DIRECCION
+     M  HORA
+     N  FECHA
+     O  TOTAL
+     P  NOMBRE_DOMI
+     Q  HORA_EN_PROCESO
+     R  HORA_EN_CAMINO
+     S  HORA_ENTREGA
+     T  VALOR_DOMICILIO
+     U  DOMICILIO O RECOGIDA CLIENTE
+  ──────────────────────────────────────────────────────────── */
   var rows=[];
   items.forEach(function(c,i){
     var p=c.it.precio>0?c.it.precio:c.it.pUnit;
     var vtotal=p*c.qty;
     if(i===0){
+      /* Primera fila: todos los datos del pedido */
       rows.push([
-        idPedido,nom,tel,coPago,'Pendiente','',
-        c.it.desc,c.it.lab||'',c.qty,p,vtotal,
-        dirCompleta,hora,fecha,totalFinal,'','','','',
-        domVal,
-        modoEntrega==='domi'?'DOMICILIO':'RECOGIDA_EN_TIENDA'
+        idPedido,          /* A  ID_PEDIDO              */
+        nom,               /* B  NOMBRE_CLI             */
+        tel,               /* C  TELEFONO               */
+        coPago,            /* D  METODO_PAGO            */
+        'Pendiente',       /* E  ESTADO                 */
+        '',                /* F  IMAGEN_TRANSFERENCIA   */
+        c.it.desc,         /* G  PRODUCTOS              */
+        c.it.lab||'',      /* H  MARCA                  */
+        c.qty,             /* I  CANTIDAD               */
+        p,                 /* J  V/U                    */
+        vtotal,            /* K  V/TOTAL                */
+        dirCompleta,       /* L  DIRECCION              */
+        hora,              /* M  HORA                   */
+        fecha,             /* N  FECHA                  */
+        totalFinal,        /* O  TOTAL                  */
+        '',                /* P  NOMBRE_DOMI            */
+        '',                /* Q  HORA_EN_PROCESO        */
+        '',                /* R  HORA_EN_CAMINO         */
+        '',                /* S  HORA_ENTREGA           */
+        domVal,            /* T  VALOR_DOMICILIO        */
+        modoLabel          /* U  DOMICILIO O RECOGIDA   */
       ]);
     } else {
-      rows.push(['','','','','','',c.it.desc,c.it.lab||'',c.qty,p,vtotal,'','','','','','','','']);
+      /* Filas adicionales: solo el producto */
+      rows.push([
+        '','','','','','',
+        c.it.desc,
+        c.it.lab||'',
+        c.qty,
+        p,
+        vtotal,
+        '','','','','','','','','',''
+      ]);
     }
   });
-  if(domVal>0&&modoEntrega==='domi'){
-    rows.push(['','','','','','','Domicilio ('+(coZonaNombre||'Copacabana')+')','WIL Domicilios',1,domVal,domVal,'','','','','','','','']);
+
+  /* Fila de domicilio si aplica */
+  if(domVal>0 && modoEntrega==='domi'){
+    rows.push([
+      '','','','','','',
+      'Domicilio ('+(coZonaNombre||'Copacabana')+')',
+      'WIL Domicilios',
+      1, domVal, domVal,
+      '','','','','','','','','',''
+    ]);
   }
 
   var GAS_URL='https://script.google.com/macros/s/AKfycbyNLLKk8S6bG-MgRLWx2zUVp4lXjaMl7txlUAAGLxAa-ZmoBrWN5mWWnnDNw-ZIs78NHA/exec';
 
   try{
-    var res=await fetch(GAS_URL,{
+    await fetch(GAS_URL,{
       method:'POST',
       mode:'no-cors',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
-        action:'pedido-farmacia',
+        accion:'pedido-farmacia',   /* ← FIX: era "action", el GAS espera "accion" */
         rows:rows,
         id:idPedido,
         sede:tienda,
@@ -2796,7 +2855,6 @@ async function coEnviarPedido(){
       })
     });
 
-    // mode:no-cors siempre devuelve opaque (no podemos leer respuesta), asumimos éxito
     coStep=3;
     document.getElementById('co-s2').style.display='none';
     document.getElementById('co-s3').style.display='block';
