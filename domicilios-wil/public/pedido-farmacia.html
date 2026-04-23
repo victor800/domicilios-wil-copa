@@ -2754,46 +2754,101 @@ async function coEnviarPedido(){
   var totalFinal=subtotal+domVal;
   var modoLabel=modoEntrega==='domi'?'DOMICILIO':'RECOGIDA_EN_TIENDA';
 
+  /* ─────────────────────────────────────────────────────────
+     COLUMNAS A→U — exactamente 21 por fila, siempre.
+     A  ID_PEDIDO            B  NOMBRE_CLI           C  TELEFONO
+     D  METODO_PAGO          E  ESTADO               F  IMAGEN_TRANSFERENCIA
+     G  PRODUCTOS            H  MARCA                I  CANTIDAD
+     J  V/U                  K  V/TOTAL              L  DIRECCION
+     M  HORA                 N  FECHA                O  TOTAL
+     P  NOMBRE_DOMI          Q  HORA_EN_PROCESO      R  HORA_EN_CAMINO
+     S  HORA_ENTREGA         T  VALOR_DOMICILIO      U  DOMICILIO O RECOGIDA
+  ───────────────────────────────────────────────────────── */
   var rows=[];
+
   items.forEach(function(c,i){
     var p=c.it.precio>0?c.it.precio:c.it.pUnit;
     var vtotal=p*c.qty;
+
     if(i===0){
+      /* Fila principal — todos los datos del pedido */
       rows.push([
-        idPedido,    /* A  ID_PEDIDO            */
-        nom,         /* B  NOMBRE_CLI           */
-        tel,         /* C  TELEFONO             */
-        coPago,      /* D  METODO_PAGO          */
-        'Pendiente', /* E  ESTADO               */
-        '',          /* F  IMAGEN_TRANSFERENCIA */
-        c.it.desc,   /* G  PRODUCTOS            */
-        c.it.lab||'',/* H  MARCA                */
-        c.qty,       /* I  CANTIDAD             */
-        p,           /* J  V/U                  */
-        vtotal,      /* K  V/TOTAL              */
-        dirCompleta, /* L  DIRECCION            */
-        hora,        /* M  HORA                 */
-        fecha,       /* N  FECHA                */
-        totalFinal,  /* O  TOTAL                */
-        '',          /* P  NOMBRE_DOMI          */
-        '',          /* Q  HORA_EN_PROCESO      */
-        '',          /* R  HORA_EN_CAMINO       */
-        '',          /* S  HORA_ENTREGA         */
-        domVal,      /* T  VALOR_DOMICILIO      */
-        modoLabel    /* U  DOMICILIO O RECOGIDA */
-      ]);
+        idPedido,       /* A  ID_PEDIDO            */
+        nom,            /* B  NOMBRE_CLI           */
+        tel,            /* C  TELEFONO             */
+        coPago,         /* D  METODO_PAGO          */
+        'Pendiente',    /* E  ESTADO               */
+        '',             /* F  IMAGEN_TRANSFERENCIA */
+        c.it.desc,      /* G  PRODUCTOS            */
+        c.it.lab||'',   /* H  MARCA                */
+        c.qty,          /* I  CANTIDAD             */
+        p,              /* J  V/U                  */
+        vtotal,         /* K  V/TOTAL              */
+        dirCompleta,    /* L  DIRECCION            */
+        hora,           /* M  HORA                 */
+        fecha,          /* N  FECHA                */
+        totalFinal,     /* O  TOTAL                */
+        '',             /* P  NOMBRE_DOMI          */
+        '',             /* Q  HORA_EN_PROCESO      */
+        '',             /* R  HORA_EN_CAMINO       */
+        '',             /* S  HORA_ENTREGA         */
+        domVal,         /* T  VALOR_DOMICILIO      */
+        modoLabel       /* U  DOMICILIO O RECOGIDA */
+      ]); /* 21 columnas ✓ */
+
     } else {
-      rows.push(['','','','','','',
-        c.it.desc,c.it.lab||'',c.qty,p,vtotal,
-        '','','','','','','','','','']);
+      /* Filas adicionales — solo el producto, resto vacío */
+      rows.push([
+        '',             /* A */
+        '',             /* B */
+        '',             /* C */
+        '',             /* D */
+        '',             /* E */
+        '',             /* F */
+        c.it.desc,      /* G  PRODUCTOS  */
+        c.it.lab||'',   /* H  MARCA      */
+        c.qty,          /* I  CANTIDAD   */
+        p,              /* J  V/U        */
+        vtotal,         /* K  V/TOTAL    */
+        '',             /* L */
+        '',             /* M */
+        '',             /* N */
+        '',             /* O */
+        '',             /* P */
+        '',             /* Q */
+        '',             /* R */
+        '',             /* S */
+        '',             /* T */
+        ''              /* U */
+      ]); /* 21 columnas ✓ */
     }
   });
 
-  if(domVal>0&&modoEntrega==='domi'){
-    rows.push(['','','','','','',
-      'Domicilio ('+(coZonaNombre||'Copacabana')+')',
-      'WIL Domicilios',1,domVal,domVal,
-      '','','','','','','','','','']);
+  /* Fila de domicilio si aplica */
+  if(domVal>0 && modoEntrega==='domi'){
+    rows.push([
+      '',             /* A */
+      '',             /* B */
+      '',             /* C */
+      '',             /* D */
+      '',             /* E */
+      '',             /* F */
+      'Domicilio ('+(coZonaNombre||'Copacabana')+')', /* G */
+      'WIL Domicilios', /* H */
+      1,              /* I */
+      domVal,         /* J */
+      domVal,         /* K */
+      '',             /* L */
+      '',             /* M */
+      '',             /* N */
+      '',             /* O */
+      '',             /* P */
+      '',             /* Q */
+      '',             /* R */
+      '',             /* S */
+      '',             /* T */
+      ''              /* U */
+    ]); /* 21 columnas ✓ */
   }
 
   var GAS_URL='https://script.google.com/macros/s/AKfycbyNLLKk8S6bG-MgRLWx2zUVp4lXjaMl7txlUAAGLxAa-ZmoBrWN5mWWnnDNw-ZIs78NHA/exec';
@@ -2813,38 +2868,22 @@ async function coEnviarPedido(){
     coords:coCoords
   };
 
-  /* ══════════════════════════════════════════
-     🔍 DEBUG — ver exactamente qué se envía
-  ══════════════════════════════════════════ */
-  console.group('📦 coEnviarPedido — DEBUG');
-  console.log('🆔 ID pedido:', idPedido);
-  console.log('👤 Nombre:', nom);
-  console.log('📱 Teléfono:', tel);
-  console.log('💳 Pago:', coPago);
-  console.log('🏪 Tienda (sede):', tienda);
-  console.log('📍 Dirección:', dirCompleta);
-  console.log('💰 Subtotal:', subtotal, '| Domicilio:', domVal, '| Total:', totalFinal);
-  console.log('🛒 Items en carrito:', items.length);
-  console.log('📋 Rows a enviar:', JSON.stringify(rows, null, 2));
-  console.log('📤 Payload completo:', JSON.stringify(payload, null, 2));
-  console.log('🌐 URL GAS:', GAS_URL);
-  console.groupEnd();
+  /* Verificación rápida — confirma 21 cols en cada fila */
+  console.log('[coEnviarPedido] Filas:', rows.length);
+  rows.forEach(function(r,i){
+    console.log('  Fila '+i+' → '+r.length+' cols'+(r.length!==21?' ⚠️ MAL':'  ✓'));
+  });
+  console.log('[coEnviarPedido] Payload:', JSON.stringify(payload,null,2));
 
   try{
-    console.log('⏳ Ejecutando fetch al GAS...');
-
-    var res = await fetch(GAS_URL, {
-      method: 'POST',
-      mode:   'no-cors',
-      headers: {'Content-Type': 'application/json'},
-      body:   JSON.stringify(payload)
+    await fetch(GAS_URL,{
+      method:'POST',
+      mode:'no-cors',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
     });
 
-    /* mode:no-cors → response siempre es opaque (type='opaque')
-       no podemos leer res.ok ni res.json() — es normal */
-    console.log('✅ Fetch completado. Response type:', res.type);
-    console.log('   (Si es "opaque" = llegó al GAS — no-cors es correcto)');
-
+    /* no-cors → response opaque, asumimos éxito igual que siempre */
     coStep=3;
     document.getElementById('co-s2').style.display='none';
     document.getElementById('co-s3').style.display='block';
@@ -2857,9 +2896,7 @@ async function coEnviarPedido(){
     cart={};updFAB();renderCart();
 
   }catch(e){
-    console.error('❌ ERROR en fetch:', e.message);
-    console.error('   Tipo de error:', e.name);
-    console.error('   Stack:', e.stack);
+    console.error('[coEnviarPedido] ERROR:', e.message);
     btn.disabled=false;
     btn.innerHTML='<span class="sym symf" style="font-size:18px">check_circle</span> Confirmar pedido';
     alert('Error al enviar el pedido: '+e.message);
