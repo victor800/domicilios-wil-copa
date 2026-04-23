@@ -124,6 +124,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .stag.busy{background:var(--orange-l);color:var(--orange);}
 .stag.pendiente{background:var(--orange-l);color:var(--orange);}
 .stag.proceso{background:var(--blue-l);color:var(--blue);}
+.stag.asignado{background:#ede9fe;color:#6d28d9;}
 .stag.entregado{background:var(--green-l);color:var(--green);}
 
 .tbar{height:5px;border-radius:99px;background:var(--bg2);overflow:hidden;}
@@ -1038,6 +1039,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
     <div class="tabs" id="ped-tabs">
   <div class="tab on"  data-f="todos"     onclick="filterPed('todos',this)">Todos</div>
   <div class="tab"     data-f="pendiente" onclick="filterPed('pendiente',this)">Pendientes</div>
+  <div class="tab"     data-f="asignado"  onclick="filterPed('asignado',this)">Asignados</div>
   <div class="tab"     data-f="proceso"   onclick="filterPed('proceso',this)">En proceso</div>
   <div class="tab"     data-f="entregado" onclick="filterPed('entregado',this)">Entregados</div>
 </div>
@@ -2169,6 +2171,7 @@ function col(a, i) { return (a[i] || '').trim(); }
 function normEstado(s) {
   const v = s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   if (v.includes('entregad')) return 'entregado';
+  if (v.includes('asignado')) return 'asignado';          // ← NUEVO
   if (v.includes('proceso') || v.includes('ruta') || v.includes('camino')) return 'proceso';
   return 'pendiente';
 }
@@ -4777,7 +4780,7 @@ async function ejecutarAsignacion() {
       accion:    'asignar-domi',
       pedidoId:  pedAsignId,
       domi:      domiNombre,
-      estado:    'proceso',
+      estado:    'asignado',
       horaAsign: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
     };
     const res  = await fetch(SHEET_SCRIPT_URL, {
@@ -4813,9 +4816,10 @@ function renderPedidosTable(filter) {
   const tipoSel = (document.getElementById('ped-tipo-filter')?.value || '').trim();
  
   let list = filter === 'pendiente' ? allPedidos.filter(p => p.estado === 'pendiente')
-           : filter === 'proceso'   ? allPedidos.filter(p => p.estado === 'proceso')
-           : filter === 'entregado' ? allPedidos.filter(p => p.estado === 'entregado')
-           : allPedidos;
+         : filter === 'asignado'  ? allPedidos.filter(p => p.estado === 'asignado')   // ← NUEVO
+         : filter === 'proceso'   ? allPedidos.filter(p => p.estado === 'proceso')
+         : filter === 'entregado' ? allPedidos.filter(p => p.estado === 'entregado')
+         : allPedidos;
  
   if (domiSel) list = list.filter(p => (p.domi || '') === domiSel);
   if (tipoSel === 'domicilio') list = list.filter(p => !(p.tipoEntrega || '').toLowerCase().includes('recog'));
@@ -4859,7 +4863,12 @@ function renderPedidosTable(filter) {
               + Asignar
              </button>`}
       </td>
-      <td><span class="stag ${p.estado}">${p.estado === 'entregado' ? 'Entregado' : p.estado === 'proceso' ? 'En proceso' : 'Pendiente'}</span></td>
+     <span class="stag ${p.estado}">${
+  p.estado === 'entregado' ? 'Entregado ✓' :
+  p.estado === 'proceso'   ? 'En proceso'  :
+  p.estado === 'asignado'  ? '✦ Asignado'  :
+  'Pendiente'
+}</span>
       <td>
         ${esRecogida
           ? '<span style="font-size:9px;font-weight:800;background:#ede9fe;color:#7c3aed;padding:2px 8px;border-radius:99px;">🏪 Recogida</span>'
