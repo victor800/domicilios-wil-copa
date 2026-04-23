@@ -1483,17 +1483,30 @@ async function fetchPedidos() {
 
     todasFilas.forEach(function(cols){
       var id = (cols[0]||'').trim();
+
+      // ✅ PARCHE: ignorar filas que no son IDs de pedido
+      if(id && !/^\d{2,5}$/.test(id)) return;
+
       if(id){
         if(!pedMap[id]){
           pedMap[id] = {
-            id, cliente:(cols[1]||'').trim(), telefono:(cols[2]||'').trim(),
-            metodoPago:(cols[3]||'').trim(), estadoRaw:(cols[4]||'').trim(),
-            imagen:(cols[5]||'').trim(), direccion:(cols[11]||'').trim(),
-            hora:(cols[12]||'').trim(), fecha:(cols[13]||'').trim(),
-            total:(cols[14]||'').trim(), domiAsign:(cols[15]||'').trim(),
-            horaProceso:(cols[16]||'').trim(), horaCamino:(cols[17]||'').trim(),
-            horaEntrega:(cols[18]||'').trim(), domicilio:(cols[19]||'').trim(),
-            tipoEntrega:(cols[20]||'').trim(), _prods:[]
+            id,
+            cliente:     (cols[1]||'').trim(),
+            telefono:    (cols[2]||'').trim(),
+            metodoPago:  (cols[3]||'').trim(),
+            estadoRaw:   (cols[4]||'').trim(),
+            imagen:      (cols[5]||'').trim(),
+            direccion:   (cols[11]||'').trim(),
+            hora:        (cols[12]||'').trim(),
+            fecha:       (cols[13]||'').trim(),
+            total:       (cols[14]||'').trim(),
+            domiAsign:   (cols[15]||'').trim(),
+            horaProceso: (cols[16]||'').trim(),
+            horaCamino:  (cols[17]||'').trim(),
+            horaEntrega: (cols[18]||'').trim(),
+            domicilio:   (cols[19]||'').trim(),
+            tipoEntrega: (cols[20]||'').trim(),
+            _prods: []
           };
           pedOrder.push(id);
         }
@@ -1503,10 +1516,12 @@ async function fetchPedidos() {
       if(!aId || !pedMap[aId]) return;
       var nom = (cols[6]||'').replace(/\|cat$/,'').trim();
       if(nom && !/^domicilio\s*\(/i.test(nom)){
-        var vu=parseCOP(cols[9]||''), vtotal=parseCOP(cols[10]||'');
-        var qty=parseInt(cols[8])||1;
-        pedMap[aId]._prods.push({nom, marca:(cols[7]||'').trim(), qty, vu,
-          vtotal: vtotal||(vu*qty)});
+        var vu = parseCOP(cols[9]||''), vtotal = parseCOP(cols[10]||'');
+        var qty = parseInt(cols[8])||1;
+        pedMap[aId]._prods.push({
+          nom, marca:(cols[7]||'').trim(),
+          qty, vu, vtotal: vtotal||(vu*qty)
+        });
       }
     });
 
@@ -1526,34 +1541,46 @@ async function fetchPedidos() {
 
       var asgNorm  = _norm(p.domiAsign);
       var asgUpper = (p.domiAsign||'').toUpperCase();
-      var esMio    = p.domiAsign && (
+
+      // ✅ Pedido asignado a mí (tiene mi nombre en col P)
+      var esMio = p.domiAsign && (
         asgNorm.includes(nombreBase) || asgUpper.includes(idDomi)
       );
 
-      if(!esMio) return; /* Solo me interesan MIS pedidos */
+      if(!esMio) return;
 
-      /* Pedido en ruta */
-      if(p.estado==='proceso' || p.estado==='camino'){
-        enRuta = _cvtPed(p); return;
+      // Ya procesado o entregado → va al historial, no a la lista
+      if(idsProcesados.has(id)) return;
+      if(p.estado === 'entregado') return;
+
+      // En camino / proceso → pestaña Ruta
+      if(p.estado === 'proceso' || p.estado === 'camino'){
+        enRuta = _cvtPed(p);
+        return;
       }
 
-      /* Pendiente asignado a mí */
-      if(p.estado==='pendiente' && !idsProcesados.has(id)){
-        /* ¿Es nuevo? → disparar notificación fuerte */
+      // ✅ Pendiente asignado a mí → mostrar en lista de Pedidos
+      if(p.estado === 'pendiente'){
+        var ped = _cvtPed(p);
+        ped.asignadoAMi = true; // marcar para UI especial
+
+        // Notificación push SOLO la primera vez que veo este pedido
         if(!_idsAsignadosNotificados.has(id)){
           _idsAsignadosNotificados.add(id);
-          _notifAsignado(_cvtPed(p));
+          _notifAsignado(ped);
         }
-        misPendientes.push(_cvtPed(p));
+        misPendientes.push(ped);
       }
     });
 
+    // Detectar pedidos nuevos genéricos (sin asignación específica)
+    // — en tu caso con asignación siempre los ves, así que esto queda vacío
     state.pedidos = misPendientes;
 
-    /* Activar pedido en ruta si es nuevo */
+    // Activar pedido en ruta si es nuevo
     if(enRuta && (!state.pedidoActivo || state.pedidoActivo.id !== enRuta.id)){
-      state.pedidoActivo = enRuta;
-      state.estadoPedido = enRuta.estadoRaw;
+      state.pedidoActivo  = enRuta;
+      state.estadoPedido  = enRuta.estadoRaw;
       activarPedidoEnRuta(enRuta);
     }
 
@@ -1563,7 +1590,7 @@ async function fetchPedidos() {
     if('setAppBadge' in navigator){
       var n = state.pedidos.length;
       if(n>0) navigator.setAppBadge(n).catch(function(){});
-      else navigator.clearAppBadge().catch(function(){});
+      else    navigator.clearAppBadge().catch(function(){});
     }
 
   } catch(e){
@@ -1759,49 +1786,90 @@ function expandirPedidoCard(pid){
 }
 
 function renderPedidos(){
-  var lista=document.getElementById('listaPedidos');
-  var vacio=document.getElementById('sinPedidos');
-  var cnt=document.getElementById('contadorPedidos');
-  lista.innerHTML='';
-  if(!state.pedidos.length){vacio.style.display='flex';cnt.textContent='0 pedidos';actualizarBadgesNav();return;}
+  var lista = document.getElementById('listaPedidos');
+  var vacio = document.getElementById('sinPedidos');
+  var cnt   = document.getElementById('contadorPedidos');
+  lista.innerHTML = '';
+
+  if(!state.pedidos.length){
+    vacio.style.display='flex';
+    cnt.textContent='0 pedidos';
+    actualizarBadgesNav();
+    return;
+  }
   vacio.style.display='none';
-  cnt.textContent=state.pedidos.length+(state.pedidos.length===1?' pedido':' pedidos');
+  cnt.textContent = state.pedidos.length + (state.pedidos.length===1?' pedido':' pedidos');
   actualizarBadgesNav();
 
   state.pedidos.forEach(function(p){
-    var esFarm=p.tipo==='farmacia';
-    var alianza=esFarm?((p.productos||'').toLowerCase().includes('expertos')?'Farma Expertos':'Droguería Central'):'WIL General';
-    var dirRaw=p.direccion||'';
-    var refM=dirRaw.match(/\(Ref:\s*([^)]+)\)/);
-    var ref=refM?refM[1]:'';
-    var dir=dirRaw.replace(/\s*\(Ref:[^)]+\)/,'').replace(/\s*—\s*\S+/,'').replace(/\s*\[\d+\.\d+,\s*-?\d+\.\d+\]/,'').trim();
-    var pago=(p.metodoPago||'').includes('TRANSFER')?'🏦 Transf.':'💵 Efectivo';
-    var cliente=(p.cliente&&p.cliente!=='—')?p.cliente:'Sin nombre';
-    var ini=cliente.charAt(0).toUpperCase();
-    var pid='p'+p.id.replace(/[^a-z0-9]/gi,'');
-    var prodBlock=buildProdBlockCard(p,pid);
+    var dirRaw   = p.direccion||'';
+    var refM     = dirRaw.match(/\(Ref:\s*([^)]+)\)/);
+    var ref      = refM ? refM[1] : '';
+    var dir      = dirRaw.replace(/\s*\(Ref:[^)]+\)/,'').replace(/\s*—\s*\S+/,'').replace(/\s*\[\d+\.\d+,\s*-?\d+\.\d+\]/,'').trim();
+    var pago     = (p.metodoPago||'').includes('TRANSFER')? '🏦 Transf.':'💵 Efectivo';
+    var cliente  = (p.cliente && p.cliente!=='—') ? p.cliente : 'Sin nombre';
+    var ini      = cliente.charAt(0).toUpperCase();
+    var pid      = 'p'+p.id.replace(/[^a-z0-9]/gi,'');
+    var prodBlock= buildProdBlockCard(p,pid);
+
+    // ✅ Botón diferente si fue asignado específicamente a mí
+    var btnHTML;
+    if(p.asignadoAMi){
+      btnHTML =
+        '<div style="background:linear-gradient(135deg,rgba(124,58,237,.12),rgba(124,58,237,.06));'
+        +'border:1.5px solid rgba(124,58,237,.3);border-radius:12px;padding:8px 12px;'
+        +'margin-bottom:10px;display:flex;align-items:center;gap:8px;">'
+        +'<span style="font-size:18px;">🎯</span>'
+        +'<div style="flex:1"><div style="font-size:11px;font-weight:800;color:#7c3aed;">¡Pedido asignado a ti!</div>'
+        +'<div style="font-size:10px;color:#6c7a7b;">El admin te asignó este pedido directamente.</div></div></div>'
+        +'<button id="btn-'+p.id+'" onclick="aceptarPedidoAsignado(\''+p.id+'\')" '
+        +'style="width:100%;padding:13px;background:linear-gradient(135deg,#7c3aed,#8b5cf6);'
+        +'color:#fff;border:none;border-radius:16px;font-family:\'Plus Jakarta Sans\',sans-serif;'
+        +'font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;'
+        +'justify-content:center;gap:7px;box-shadow:0 4px 18px rgba(124,58,237,.35);">'
+        +'<span class="material-symbols-outlined text-white" '
+        +'style="font-size:16px;font-variation-settings:\'FILL\' 1">check_circle</span>'
+        +'Aceptar y ponerme en camino</button>';
+    } else {
+      btnHTML =
+        '<button id="btn-'+p.id+'" onclick="aceptarPedido(\''+p.id+'\')" '
+        +'style="width:100%;padding:13px;background:linear-gradient(135deg,#006970,#00bcc9);'
+        +'color:#fff;border:none;border-radius:16px;font-family:\'Plus Jakarta Sans\',sans-serif;'
+        +'font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;'
+        +'justify-content:center;gap:7px;box-shadow:0 4px 18px rgba(0,105,112,.28);">'
+        +'<span class="material-symbols-outlined text-white" '
+        +'style="font-size:16px;font-variation-settings:\'FILL\' 1">check_circle</span>'
+        +'Aceptar pedido</button>';
+    }
 
     lista.insertAdjacentHTML('beforeend',
       '<div class="bg-surf-white rounded-2xl p-4 shadow-sm border border-out-var/10 relative overflow-hidden card-in" id="pedido-'+p.id+'">'
       +'<div class="flex items-center gap-3 mb-3">'
-      +'<div style="width:40px;height:40px;border-radius:14px;background:rgba(0,105,112,.1);display:flex;align-items:center;justify-content:center;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:18px;color:#006970;flex-shrink:0">'+ini+'</div>'
+      +'<div style="width:40px;height:40px;border-radius:14px;background:rgba(0,105,112,.1);'
+      +'display:flex;align-items:center;justify-content:center;font-family:\'Plus Jakarta Sans\',sans-serif;'
+      +'font-weight:800;font-size:18px;color:#006970;flex-shrink:0">'+ini+'</div>'
       +'<div style="flex:1;min-width:0">'
-      +'<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:14px;color:#191c1d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(cliente)+'</p>'
-      +'<p style="font-size:11px;color:#6c7a7b;display:flex;align-items:center;gap:4px"><span class="material-symbols-outlined" style="font-size:12px">phone</span>'+escHtml(p.telefono||'—')+'</p>'
-      +'</div>'
+      +'<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:14px;'
+      +'color:#191c1d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(cliente)+'</p>'
+      +'<p style="font-size:11px;color:#6c7a7b;display:flex;align-items:center;gap:4px">'
+      +'<span class="material-symbols-outlined" style="font-size:12px">phone</span>'
+      +escHtml(p.telefono||'—')+'</p></div>'
       +'<div style="text-align:right;flex-shrink:0">'
-      +'<span style="font-size:10px;font-weight:800;background:#e7e8e9;padding:3px 8px;border-radius:20px;color:#6c7a7b">'+(p.hora||'—')+'</span><br>'
-      +'<span style="font-size:9px;font-weight:700;color:#9eaaac;margin-top:2px;display:inline-block">'+alianza+'</span>'
-      +'</div>'
-      +'</div>'
+      +'<span style="font-size:10px;font-weight:800;background:#e7e8e9;padding:3px 8px;'
+      +'border-radius:20px;color:#6c7a7b">'+(p.hora||'—')+'</span>'
+      +'</div></div>'
 
-      +'<div style="display:flex;align-items:flex-start;gap:7px;background:#f3f4f5;border-radius:12px;padding:8px 10px;margin-bottom:10px">'
-      +'<span class="material-symbols-outlined" style="font-size:15px;color:#4c56af;flex-shrink:0;margin-top:2px;font-variation-settings:\'FILL\' 1">location_on</span>'
+      +'<div style="display:flex;align-items:flex-start;gap:7px;background:#f3f4f5;'
+      +'border-radius:12px;padding:8px 10px;margin-bottom:10px">'
+      +'<span class="material-symbols-outlined" style="font-size:15px;color:#4c56af;'
+      +'flex-shrink:0;margin-top:2px;font-variation-settings:\'FILL\' 1">location_on</span>'
       +'<div style="min-width:0;flex:1">'
-      +'<p style="font-size:12px;font-weight:700;color:#191c1d;word-break:break-word;white-space:normal;line-height:1.35">'+escHtml(dir)+'</p>'
+      +'<p style="font-size:12px;font-weight:700;color:#191c1d;word-break:break-word;'
+      +'white-space:normal;line-height:1.35">'+escHtml(dir)+'</p>'
       +(ref?'<p style="font-size:10px;color:#6c7a7b">Ref: '+escHtml(ref)+'</p>':'')
       +'</div>'
-      +'<span style="font-size:10px;font-weight:800;color:#006970;flex-shrink:0;white-space:nowrap;margin-top:2px">'+(p.total||'—')+'</span>'
+      +'<span style="font-size:10px;font-weight:800;color:#006970;flex-shrink:0;'
+      +'white-space:nowrap;margin-top:2px">'+(p.total||'—')+'</span>'
       +'</div>'
 
       +prodBlock
@@ -1811,32 +1879,11 @@ function renderPedidos(){
       +'<span style="font-size:10px;color:#9eaaac">'+(p.fecha||'')+'</span>'
       +'</div>'
 
-      +( (() => {
-    const nombreBase = (domi.nombre||'').toLowerCase().split(' ')[0];
-    const esMio = p.domiAsign &&
-      ((p.domiAsign||'').toLowerCase().includes(nombreBase) ||
-       (p.domiAsign||'').toUpperCase().includes((domi.id||'').toUpperCase()));
-    if (esMio) {
-      return '<div style="background:linear-gradient(135deg,rgba(124,58,237,.12),rgba(124,58,237,.06));border:1.5px solid rgba(124,58,237,.3);border-radius:12px;padding:8px 12px;margin-bottom:10px;display:flex;align-items:center;gap:8px;">'
-        +'<span style="font-size:18px;">🎯</span>'
-        +'<div style="flex:1"><div style="font-size:11px;font-weight:800;color:#7c3aed;">¡Pedido asignado a ti!</div>'
-        +'<div style="font-size:10px;color:#6c7a7b;">El admin te asignó este pedido directamente.</div></div></div>'
-        +'<button id="btn-'+p.id+'" onclick="aceptarPedidoAsignado(\''+p.id+'\')" '
-        +'style="width:100%;padding:13px;background:linear-gradient(135deg,#7c3aed,#8b5cf6);'
-        +'color:#fff;border:none;border-radius:16px;font-family:\'Plus Jakarta Sans\',sans-serif;'
-        +'font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;'
-        +'justify-content:center;gap:7px;box-shadow:0 4px 18px rgba(124,58,237,.35);">'
-        +'<span class="material-symbols-outlined text-white" style="font-size:16px;font-variation-settings:\'FILL\' 1">check_circle</span>'
-        +'Aceptar y ponerme en ruta</button>';
-    }
-    return '<button id="btn-'+p.id+'" onclick="aceptarPedido(\''+p.id+'\')" '
-      +'style="width:100%;padding:13px;background:linear-gradient(135deg,#006970,#00bcc9);color:#fff;border:none;border-radius:16px;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;box-shadow:0 4px 18px rgba(0,105,112,.28)">'
-      +'<span class="material-symbols-outlined text-white" style="font-size:16px;font-variation-settings:\'FILL\' 1">check_circle</span>Aceptar pedido</button>';
-  })() )
+      +btnHTML
+      +'</div>'
     );
   });
 }
-
 /* ═══════════════════ ACEPTAR PEDIDO ═══════════════════ */
 async function aceptarPedido(id){
   var btn=document.getElementById('btn-'+id);
