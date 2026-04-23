@@ -2317,8 +2317,8 @@ async function loadPedidos() {
           cliente:      col(l, 1),
           tel:          col(l, 2),
           metodo:       col(l, 3),
-          estadoRaw:    col(l, 4),
-          estado:       normEstado(col(l, 4)),
+          estado: normEstado(col(l, 4)),
+          estadoRaw: col(l, 4),
           imagen:       col(l, 5),
           direccion:    col(l, 11),
           hora:         col(l, 12),
@@ -4761,13 +4761,12 @@ function cancelarAsignacion() {
   if (panel) panel.style.display = 'none';
 }
  
-/* ── Ejecutar asignación → escribe en el sheet vía Apps Script ── */
+
 /* ── REEMPLAZA ejecutarAsignacion() completa ── */
 async function ejecutarAsignacion() {
   if (!pedAsignId) { showToast('w', 'Sin pedido', 'Selecciona un pedido primero'); return; }
   const domiNombre = document.getElementById('asign-domi-select')?.value?.trim();
   if (!domiNombre) { showToast('w', 'Sin domiciliario', 'Selecciona un domi de la lista'); return; }
-
 
   const btn = document.getElementById('btn-ejecutar-asign');
   if (btn) {
@@ -4775,7 +4774,7 @@ async function ejecutarAsignacion() {
     btn.innerHTML = '<span class="material-symbols-rounded" style="animation:spin .8s linear infinite;font-size:15px;">progress_activity</span> Asignando…';
   }
 
- try {
+  try {
     const payload = {
       accion:    'asignar-domi',
       pedidoId:  String(pedAsignId).trim(),
@@ -4789,28 +4788,43 @@ async function ejecutarAsignacion() {
       body: JSON.stringify(payload)
     });
     const json = await res.json();
-    console.log('[asignar-domi] pedidoId:', String(pedAsignId).trim(), '| respuesta:', JSON.stringify(json));
 
-   if (json.ok !== false) {
-  showToast('s', '✓ Asignado', `${domiNombre} → Pedido ${pedAsignId}`);
-  VOZ.hablar(`Pedido asignado a ${domiNombre.split(' ')[0]}`);
-  
-  const idGuardado = pedAsignId; // ← guardar antes de cancelar
-  cancelarAsignacion();
-  renderAll();
-  
-  await new Promise(r => setTimeout(r, 2000));
-  await doRefresh(false);
-  
-  const pedDespues = allPedidos.find(p => p.id === idGuardado);
-  console.log('[check] estado raw:', JSON.stringify(pedDespues?.estadoRaw), '| normalizado:', pedDespues?.estado);
-} else {
+    if (json.ok !== false) {
+      const idGuardado = pedAsignId;
+
+      showToast('s', '✓ Asignado', `${domiNombre} → Pedido ${idGuardado}`);
+      VOZ.hablar(`Pedido asignado a ${domiNombre.split(' ')[0]}`);
+
+      // Forzar en memoria ANTES del refresh
+      const pedLocal = allPedidos.find(p => p.id === idGuardado);
+      if (pedLocal) {
+        pedLocal.domi      = domiNombre;
+        pedLocal.estado    = 'asignado';
+        pedLocal.estadoRaw = 'Asignado';
+      }
+      cancelarAsignacion();
+      renderAll();
+
+      // Esperar 4s para que el caché de gviz expire
+      await new Promise(r => setTimeout(r, 4000));
+      await doRefresh(false);
+
+      // Si el refresh pisó el estado por caché, restaurarlo
+      const pedFinal = allPedidos.find(p => p.id === idGuardado);
+      if (pedFinal && pedFinal.estado !== 'asignado') {
+        pedFinal.domi      = domiNombre;
+        pedFinal.estado    = 'asignado';
+        pedFinal.estadoRaw = 'Asignado';
+        renderAll();
+      }
+
+    } else {
       showToast('e', 'Error del servidor', json.error || 'Pedido no encontrado');
     }
+
   } catch(e) {
     showToast('e', 'Error de red', e.message.substring(0, 60));
-  }
-  finally {
+  } finally {
     if (btn) {
       btn.disabled = false;
       btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;">check_circle</span>Asignar';
