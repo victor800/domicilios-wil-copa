@@ -1566,7 +1566,7 @@ async function enviarPedido(tipo){
   var btn   = document.getElementById(btnId);
   btn.disabled = true;
   btn.innerHTML = '<span class="spin"></span> Enviando…';
- 
+
   /* ── Dirección completa ── */
   var dirCompleta = state.direccion;
   if(state.referencia)   dirCompleta += ' — Ref: ' + state.referencia;
@@ -1574,100 +1574,117 @@ async function enviarPedido(tipo){
     dirCompleta += ', ' + state.barrio;
   if(state.coords && state.coords.lat)
     dirCompleta += ' [' + state.coords.lat.toFixed(5) + ',' + state.coords.lng.toFixed(5) + ']';
- 
+
   var now   = new Date();
   var hora  = now.toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit', hour12:true});
   var fecha = now.toLocaleDateString('es-CO', {day:'2-digit', month:'2-digit', year:'numeric'});
-  var id    = String(Math.floor(100 + Math.random() * 900));  // 3 dígitos: 100-999
- 
-  /* ── Construir filas A→S (igual que pedido-farmacia) ── */
+  var id    = String(Math.floor(100 + Math.random() * 900));
+
+  /* ─────────────────────────────────────────────────────────────
+     COLUMNAS A→U (21 cols) — mismas que pedido-farmacia:
+     A  ID_PEDIDO         B  NOMBRE_CLI          C  TELEFONO
+     D  METODO_PAGO       E  ESTADO              F  IMAGEN_TRANSFERENCIA
+     G  PRODUCTOS         H  MARCA               I  CANTIDAD
+     J  V/U               K  V/TOTAL             L  DIRECCION
+     M  HORA              N  FECHA               O  TOTAL
+     P  NOMBRE_DOMI       Q  HORA_EN_PROCESO      R  HORA_EN_CAMINO
+     S  HORA_ENTREGA      T  VALOR_DOMICILIO      U  DOMICILIO O RECOGIDA
+  ──────────────────────────────────────────────────────────── */
   var rows = [];
- 
+
   if(tipo === 'libre' && state.productos && state.productos.length){
- 
+
     state.productos.forEach(function(p, i){
       if(i === 0){
-        // Fila principal: todos los datos del pedido
         rows.push([
-          id,                                                          // A ID_PEDIDO
-          state.nombre,                                                // B NOMBRE_CLI
-          state.telefono,                                              // C TELEFONO
-          state.metodoPago,                                            // D METODO_PAGO
-          'Pendiente',                                                 // E ESTADO
-          '',                                                          // F IMAGEN_TRANSFERENCIA
-          p.nombre,                                                    // G PRODUCTO
-          '',                                                          // H MARCA
-          p.qty,                                                       // I CANTIDAD
-          '',                                                          // J V/U
-          '',                                                          // K V/TOTAL
-          dirCompleta,                                                 // L DIRECCION
-          hora,                                                        // M HORA
-          fecha,                                                       // N FECHA
-          'Presupuesto: $' + (state.presupuesto||0).toLocaleString('es-CO'),  // O TOTAL
-          '',                                                          // P NOMBRE_DOMI
-          '',                                                          // Q HORA_TOMO_PEDIDO
-          '',                                                          // R HORA_ENTREGO
-          ''                                                           // S CALIFICACION
+          id,                                                        /* A  ID_PEDIDO            */
+          state.nombre,                                              /* B  NOMBRE_CLI           */
+          state.telefono,                                            /* C  TELEFONO             */
+          state.metodoPago,                                          /* D  METODO_PAGO          */
+          'Pendiente',                                               /* E  ESTADO               */
+          '',                                                        /* F  IMAGEN_TRANSFERENCIA */
+          p.nombre,                                                  /* G  PRODUCTOS            */
+          '',                                                        /* H  MARCA                */
+          p.qty,                                                     /* I  CANTIDAD             */
+          '',                                                        /* J  V/U                  */
+          '',                                                        /* K  V/TOTAL              */
+          dirCompleta,                                               /* L  DIRECCION            */
+          hora,                                                      /* M  HORA                 */
+          fecha,                                                     /* N  FECHA                */
+          'Presupuesto: $' + (state.presupuesto||0).toLocaleString('es-CO'), /* O TOTAL        */
+          '',                                                        /* P  NOMBRE_DOMI          */
+          '',                                                        /* Q  HORA_EN_PROCESO      */
+          '',                                                        /* R  HORA_EN_CAMINO       */
+          '',                                                        /* S  HORA_ENTREGA         */
+          0,                                                         /* T  VALOR_DOMICILIO      */
+          'DOMICILIO'                                                /* U  DOMICILIO O RECOGIDA */
         ]);
       } else {
-        // Filas adicionales: solo producto
         rows.push([
           '','','','','','',
           p.nombre, '', p.qty, '', '',
-          '','','','','','','',''
+          '','','','','','','','','',''
         ]);
       }
     });
- 
-    // Comercio como nota extra si aplica
+
+    /* Comercio como fila extra si aplica */
     if(state.comercioTiene && state.comercioNombre){
       rows.push([
         '','','','','','',
         'Comercio: ' + state.comercioNombre, '', 1, '', '',
-        '','','','','','','',''
+        '','','','','','','','','',''
       ]);
     }
- 
+
   } else {
-    // Paquetería o pedido sin lista de productos
+    /* Paquetería o pedido sin lista */
     var descripcion = tipo === 'paquete'
       ? (document.getElementById('paquete-descripcion').value.trim() || 'Paquete')
       : 'Pedido libre sin productos';
- 
+
     rows.push([
-      id,                                                              // A
-      state.nombre,                                                    // B
-      state.telefono,                                                  // C
-      state.metodoPago,                                                // D
-      'Pendiente',                                                     // E
-      '',                                                              // F
-      descripcion,                                                     // G
-      '',                                                              // H
-      1,                                                               // I
-      '',                                                              // J
-      '',                                                              // K
-      dirCompleta,                                                     // L
-      hora,                                                            // M
-      fecha,                                                           // N
+      id,                                                            /* A */
+      state.nombre,                                                  /* B */
+      state.telefono,                                                /* C */
+      state.metodoPago,                                              /* D */
+      'Pendiente',                                                   /* E */
+      '',                                                            /* F */
+      descripcion,                                                   /* G */
+      '',                                                            /* H */
+      1,                                                             /* I */
+      '',                                                            /* J */
+      '',                                                            /* K */
+      dirCompleta,                                                   /* L */
+      hora,                                                          /* M */
+      fecha,                                                         /* N */
       tipo === 'paquete'
         ? 'Destino: ' + (state.paqueteZonaNombre||'Zona') + ' · Por confirmar'
-        : 'Por confirmar',                                             // O
-      '',                                                              // P
-      '',                                                              // Q
-      '',                                                              // R
-      ''                                                               // S
+        : 'Por confirmar',                                           /* O */
+      '',                                                            /* P */
+      '',                                                            /* Q */
+      '',                                                            /* R */
+      '',                                                            /* S */
+      0,                                                             /* T  VALOR_DOMICILIO      */
+      tipo === 'paquete' ? 'PAQUETERIA' : 'DOMICILIO'               /* U  DOMICILIO O RECOGIDA */
     ]);
   }
- 
+
+  /* ── GAS URL — mismo endpoint que pedido-farmacia ── */
+  var GAS_URL = 'https://script.google.com/macros/s/AKfycbyNLLKk8S6bG-MgRLWx2zUVp4lXjaMl7txlUAAGLxAa-ZmoBrWN5mWWnnDNw-ZIs78NHA/exec';
+
   try{
-    /* ── Mismo endpoint que pedido-farmacia ── */
-    var res = await fetch(API_BASE + '/wil?action=pedido-farmacia', {
+    /* FIX CRÍTICO: POST directo al GAS con accion en el body,
+       NO a /api/wil?action= que es un endpoint distinto */
+    await fetch(GAS_URL, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      mode:    'no-cors',            /* GAS no devuelve CORS — igual que farmacia */
+      headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
+        accion:     'pedido-farmacia',   /* ← 'accion' en español, igual que GAS */
         rows:       rows,
         id:         id,
-        sede:       'wil-libre',        // identifica el origen en el sheet
+        sede:       tipo === 'paquete' ? 'wil-paqueteria' : 'wil-libre',
         nombre:     state.nombre,
         telefono:   state.telefono,
         total:      state.presupuesto || 0,
@@ -1678,17 +1695,14 @@ async function enviarPedido(tipo){
         coords:     state.coords || null
       })
     });
- 
-    var data = await res.json();
-    if(!data.ok) throw new Error(data.error || 'Error desconocido');
- 
-    /* ── Éxito: mostrar código igual que farmacia ── */
+
+    /* mode:no-cors siempre devuelve opaque — asumimos éxito igual que farmacia */
     state.idPedido = id;
     document.getElementById('idPedidoDisplay').textContent  = id;
     document.getElementById('success-msg').textContent =
       'Pedido #' + id + ' registrado. Un domiciliario te contactará al ' + state.telefono + '.';
     showView('view-confirmado');
- 
+
   } catch(e){
     btn.disabled = false;
     btn.innerHTML = '<span class="sym f" style="font-size:17px">check_circle</span>Confirmar '
@@ -1696,6 +1710,7 @@ async function enviarPedido(tipo){
     mostrarToast('Error al enviar: ' + e.message, 'error');
   }
 }
+
 /* ── RASTREADOR ── */
 var STEP_MAP={'Pendiente':0,'Confirmado':1,'En camino':2,'Entregado':3,'Cancelado':0};
 function rtActualizarStepper(estado){

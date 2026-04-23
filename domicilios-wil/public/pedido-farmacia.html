@@ -2754,106 +2754,96 @@ async function coEnviarPedido(){
   var totalFinal=subtotal+domVal;
   var modoLabel=modoEntrega==='domi'?'DOMICILIO':'RECOGIDA_EN_TIENDA';
 
-  /* ─────────────────────────────────────────────────────────────
-     COLUMNAS A→U (21 cols):
-     A  ID_PEDIDO
-     B  NOMBRE_CLI
-     C  TELEFONO
-     D  METODO_PAGO
-     E  ESTADO
-     F  IMAGEN_TRANSFERENCIA
-     G  PRODUCTOS
-     H  MARCA
-     I  CANTIDAD
-     J  V/U
-     K  V/TOTAL
-     L  DIRECCION
-     M  HORA
-     N  FECHA
-     O  TOTAL
-     P  NOMBRE_DOMI
-     Q  HORA_EN_PROCESO
-     R  HORA_EN_CAMINO
-     S  HORA_ENTREGA
-     T  VALOR_DOMICILIO
-     U  DOMICILIO O RECOGIDA CLIENTE
-  ──────────────────────────────────────────────────────────── */
   var rows=[];
   items.forEach(function(c,i){
     var p=c.it.precio>0?c.it.precio:c.it.pUnit;
     var vtotal=p*c.qty;
     if(i===0){
-      /* Primera fila: todos los datos del pedido */
       rows.push([
-        idPedido,          /* A  ID_PEDIDO              */
-        nom,               /* B  NOMBRE_CLI             */
-        tel,               /* C  TELEFONO               */
-        coPago,            /* D  METODO_PAGO            */
-        'Pendiente',       /* E  ESTADO                 */
-        '',                /* F  IMAGEN_TRANSFERENCIA   */
-        c.it.desc,         /* G  PRODUCTOS              */
-        c.it.lab||'',      /* H  MARCA                  */
-        c.qty,             /* I  CANTIDAD               */
-        p,                 /* J  V/U                    */
-        vtotal,            /* K  V/TOTAL                */
-        dirCompleta,       /* L  DIRECCION              */
-        hora,              /* M  HORA                   */
-        fecha,             /* N  FECHA                  */
-        totalFinal,        /* O  TOTAL                  */
-        '',                /* P  NOMBRE_DOMI            */
-        '',                /* Q  HORA_EN_PROCESO        */
-        '',                /* R  HORA_EN_CAMINO         */
-        '',                /* S  HORA_ENTREGA           */
-        domVal,            /* T  VALOR_DOMICILIO        */
-        modoLabel          /* U  DOMICILIO O RECOGIDA   */
+        idPedido,    /* A  ID_PEDIDO            */
+        nom,         /* B  NOMBRE_CLI           */
+        tel,         /* C  TELEFONO             */
+        coPago,      /* D  METODO_PAGO          */
+        'Pendiente', /* E  ESTADO               */
+        '',          /* F  IMAGEN_TRANSFERENCIA */
+        c.it.desc,   /* G  PRODUCTOS            */
+        c.it.lab||'',/* H  MARCA                */
+        c.qty,       /* I  CANTIDAD             */
+        p,           /* J  V/U                  */
+        vtotal,      /* K  V/TOTAL              */
+        dirCompleta, /* L  DIRECCION            */
+        hora,        /* M  HORA                 */
+        fecha,       /* N  FECHA                */
+        totalFinal,  /* O  TOTAL                */
+        '',          /* P  NOMBRE_DOMI          */
+        '',          /* Q  HORA_EN_PROCESO      */
+        '',          /* R  HORA_EN_CAMINO       */
+        '',          /* S  HORA_ENTREGA         */
+        domVal,      /* T  VALOR_DOMICILIO      */
+        modoLabel    /* U  DOMICILIO O RECOGIDA */
       ]);
     } else {
-      /* Filas adicionales: solo el producto */
-      rows.push([
-        '','','','','','',
-        c.it.desc,
-        c.it.lab||'',
-        c.qty,
-        p,
-        vtotal,
-        '','','','','','','','','',''
-      ]);
+      rows.push(['','','','','','',
+        c.it.desc,c.it.lab||'',c.qty,p,vtotal,
+        '','','','','','','','','','']);
     }
   });
 
-  /* Fila de domicilio si aplica */
-  if(domVal>0 && modoEntrega==='domi'){
-    rows.push([
-      '','','','','','',
+  if(domVal>0&&modoEntrega==='domi'){
+    rows.push(['','','','','','',
       'Domicilio ('+(coZonaNombre||'Copacabana')+')',
-      'WIL Domicilios',
-      1, domVal, domVal,
-      '','','','','','','','','',''
-    ]);
+      'WIL Domicilios',1,domVal,domVal,
+      '','','','','','','','','','']);
   }
 
   var GAS_URL='https://script.google.com/macros/s/AKfycbyNLLKk8S6bG-MgRLWx2zUVp4lXjaMl7txlUAAGLxAa-ZmoBrWN5mWWnnDNw-ZIs78NHA/exec';
 
+  var payload={
+    accion:'pedido-farmacia',
+    rows:rows,
+    id:idPedido,
+    sede:tienda,
+    nombre:nom,
+    telefono:tel,
+    total:totalFinal,
+    domicilio:domVal,
+    zona:coZonaNombre||CO_DEFAULT_ZONA,
+    direccion:dirCompleta,
+    metodoPago:coPago,
+    coords:coCoords
+  };
+
+  /* ══════════════════════════════════════════
+     🔍 DEBUG — ver exactamente qué se envía
+  ══════════════════════════════════════════ */
+  console.group('📦 coEnviarPedido — DEBUG');
+  console.log('🆔 ID pedido:', idPedido);
+  console.log('👤 Nombre:', nom);
+  console.log('📱 Teléfono:', tel);
+  console.log('💳 Pago:', coPago);
+  console.log('🏪 Tienda (sede):', tienda);
+  console.log('📍 Dirección:', dirCompleta);
+  console.log('💰 Subtotal:', subtotal, '| Domicilio:', domVal, '| Total:', totalFinal);
+  console.log('🛒 Items en carrito:', items.length);
+  console.log('📋 Rows a enviar:', JSON.stringify(rows, null, 2));
+  console.log('📤 Payload completo:', JSON.stringify(payload, null, 2));
+  console.log('🌐 URL GAS:', GAS_URL);
+  console.groupEnd();
+
   try{
-    await fetch(GAS_URL,{
-      method:'POST',
-      mode:'no-cors',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        accion:'pedido-farmacia',   /* ← FIX: era "action", el GAS espera "accion" */
-        rows:rows,
-        id:idPedido,
-        sede:tienda,
-        nombre:nom,
-        telefono:tel,
-        total:totalFinal,
-        domicilio:domVal,
-        zona:coZonaNombre||CO_DEFAULT_ZONA,
-        direccion:dirCompleta,
-        metodoPago:coPago,
-        coords:coCoords
-      })
+    console.log('⏳ Ejecutando fetch al GAS...');
+
+    var res = await fetch(GAS_URL, {
+      method: 'POST',
+      mode:   'no-cors',
+      headers: {'Content-Type': 'application/json'},
+      body:   JSON.stringify(payload)
     });
+
+    /* mode:no-cors → response siempre es opaque (type='opaque')
+       no podemos leer res.ok ni res.json() — es normal */
+    console.log('✅ Fetch completado. Response type:', res.type);
+    console.log('   (Si es "opaque" = llegó al GAS — no-cors es correcto)');
 
     coStep=3;
     document.getElementById('co-s2').style.display='none';
@@ -2865,7 +2855,11 @@ async function coEnviarPedido(){
     document.getElementById('co-exito-msg').textContent=
       'Tu pedido fue registrado. Un domiciliario WIL te contactará al '+tel+' pronto.';
     cart={};updFAB();renderCart();
+
   }catch(e){
+    console.error('❌ ERROR en fetch:', e.message);
+    console.error('   Tipo de error:', e.name);
+    console.error('   Stack:', e.stack);
     btn.disabled=false;
     btn.innerHTML='<span class="sym symf" style="font-size:18px">check_circle</span> Confirmar pedido';
     alert('Error al enviar el pedido: '+e.message);
