@@ -4775,10 +4775,10 @@ async function ejecutarAsignacion() {
     btn.innerHTML = '<span class="material-symbols-rounded" style="animation:spin .8s linear infinite;font-size:15px;">progress_activity</span> Asignando…';
   }
 
-  try {
+ try {
     const payload = {
       accion:    'asignar-domi',
-      pedidoId:  pedAsignId,
+      pedidoId:  String(pedAsignId).trim(),
       domi:      domiNombre,
       estado:    'asignado',
       horaAsign: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
@@ -4788,37 +4788,28 @@ async function ejecutarAsignacion() {
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify(payload)
     });
-    console.log('[asignar-domi] respuesta servidor:', json);
-    if (json.error) showToast('w', 'Aviso script', json.error);
     const json = await res.json();
-   
-console.log('[asignar-domi] pedidoId enviado:', JSON.stringify(pedAsignId));
-console.log('[asignar-domi] respuesta:', JSON.stringify(json));
-
-
+    console.log('[asignar-domi] pedidoId:', String(pedAsignId).trim(), '| respuesta:', JSON.stringify(json));
 
     if (json.ok !== false) {
-  showToast('s', '✓ Asignado', `${domiNombre} → Pedido ${pedAsignId}`);
-  VOZ.hablar(`Pedido asignado a ${domiNombre.split(' ')[0]}`);
-  
-  // Forzar en memoria inmediatamente
-  const pedLocal = allPedidos.find(p => p.id === pedAsignId);
-  if (pedLocal) {
-    pedLocal.domi      = domiNombre;
-    pedLocal.estado    = 'asignado';
-    pedLocal.estadoRaw = 'Asignado';
-  }
-  cancelarAsignacion();
-  renderAll();
-  await doRefresh(false);
-
-} else {
-  // ← ESTE ELSE FALTABA — mostraba éxito aunque el servidor fallara
-  showToast('e', 'Error del servidor', json.error || 'Pedido no encontrado en el sheet');
-}
+      showToast('s', '✓ Asignado', `${domiNombre} → Pedido ${pedAsignId}`);
+      VOZ.hablar(`Pedido asignado a ${domiNombre.split(' ')[0]}`);
+      const pedLocal = allPedidos.find(p => p.id === pedAsignId);
+      if (pedLocal) {
+        pedLocal.domi      = domiNombre;
+        pedLocal.estado    = 'asignado';
+        pedLocal.estadoRaw = 'Asignado';
+      }
+      cancelarAsignacion();
+      renderAll();
+      await doRefresh(false);
+    } else {
+      showToast('e', 'Error del servidor', json.error || 'Pedido no encontrado');
+    }
   } catch(e) {
     showToast('e', 'Error de red', e.message.substring(0, 60));
-  } finally {
+  }
+  finally {
     if (btn) {
       btn.disabled = false;
       btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;">check_circle</span>Asignar';
