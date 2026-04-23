@@ -195,14 +195,20 @@ body{min-height:max(820px,100dvh)}
   </div>
 </div>
 
+
 <script>
-var API_BASE = '/api';
+var API_BASE = 'https://script.google.com/macros/s/AKfycbyNLLKk8S6bG-MgRLWx2zUVp4lXjaMl7txlUAAGLxAa-ZmoBrWN5mWWnnDNw-ZIs78NHA/exec';  // ← ¡PON TU URL AQUÍ!
 
 function togglePass() {
   var inp = document.getElementById('inputClave');
   var ico = document.getElementById('eyeIcon');
-  if (inp.type === 'password') { inp.type = 'text'; ico.textContent = 'visibility_off'; }
-  else { inp.type = 'password'; ico.textContent = 'visibility'; }
+  if (inp.type === 'password') { 
+    inp.type = 'text'; 
+    ico.textContent = 'visibility_off'; 
+  } else { 
+    inp.type = 'password'; 
+    ico.textContent = 'visibility'; 
+  }
 }
 
 function mostrarError(msg) {
@@ -213,39 +219,35 @@ function mostrarError(msg) {
 }
 
 function ocultarError() {
-  var box = document.getElementById('errorMsg');
-  box.classList.add('hidden');
-  box.classList.remove('flex');
+  document.getElementById('errorMsg').classList.add('hidden');
 }
 
 function setBtnLoading(loading) {
-  var btn     = document.getElementById('btnLogin');
+  var btn = document.getElementById('btnLogin');
   var content = document.getElementById('btnContent');
   btn.disabled = loading;
   if (loading) {
-    content.innerHTML = '<span class="spin"></span><span>Verificando…</span>';
+    content.innerHTML = '<span class="spin"></span><span>Validando credenciales…</span>';
     btn.classList.add('opacity-80');
   } else {
-    content.innerHTML = '<span>Ingresar al sistema</span>'
-      + '<span class="material-symbols-outlined group-hover:translate-x-1 transition-transform" style="font-size:20px">arrow_forward</span>';
+    content.innerHTML = '<span>Ingresar al sistema</span><span class="material-symbols-outlined group-hover:translate-x-1 transition-transform" style="font-size:20px">arrow_forward</span>';
     btn.classList.remove('opacity-80');
   }
 }
 
 async function doLogin() {
-  var id    = document.getElementById('inputId').value.trim().toUpperCase();
+  var id = document.getElementById('inputId').value.trim().toUpperCase();
   var clave = document.getElementById('inputClave').value.trim();
 
   ocultarError();
 
-  // Validaciones locales
   if (!id) {
-    mostrarError('Ingresa tu ID de domiciliario. Ej: WIL-042');
+    mostrarError('Ingresa tu ID de domiciliario (ej: WIL-042)');
     document.getElementById('inputId').focus();
     return;
   }
   if (!clave) {
-    mostrarError('Ingresa tu clave de acceso.');
+    mostrarError('Ingresa tu clave de acceso');
     document.getElementById('inputClave').focus();
     return;
   }
@@ -253,51 +255,62 @@ async function doLogin() {
   setBtnLoading(true);
 
   try {
-    var res  = await fetch(API_BASE + '/wil?action=domi-login', {
-      method:  'POST',
+    var res = await fetch(API_BASE, {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ id, clave })
+      body: JSON.stringify({ action: 'domi-login', id: id, clave: clave })
     });
+
     var data = await res.json();
 
     if (!data.ok) {
-      mostrarError(data.error || 'ID o clave incorrectos. Verifica e intenta de nuevo.');
+      mostrarError(data.error || 'ID o clave incorrectos');
       setBtnLoading(false);
       document.getElementById('inputClave').value = '';
       document.getElementById('inputClave').focus();
       return;
     }
 
-    // Guardar sesión en sessionStorage
-    sessionStorage.setItem('wil_domi', JSON.stringify(data.domi));
+    // ✅ SIEMPRE A panel-domiciliario.html (como pediste)
+    sessionStorage.setItem('wil_domi', JSON.stringify({
+      id: data.domi.id,
+      nombre: data.domi.nombre,
+      tel: data.domi.tel,
+      foto: data.domi.foto,
+      activo: data.domi.activo,
+      actividad: data.domi.actividad,
+      rol: 'domiciliario',
+      loginAt: new Date().toISOString()
+    }));
 
-    // Animación de éxito antes de redirigir
+    // Éxito visual
     var content = document.getElementById('btnContent');
-    content.innerHTML = '<span class="material-symbols-outlined" style="font-variation-settings:\'FILL\' 1;font-size:20px">check_circle</span><span>¡Bienvenido, ' + data.domi.nombre.split(' ')[0] + '!</span>';
-    document.getElementById('btnLogin').style.background = 'linear-gradient(135deg,#2a9d5c,#1e7a45)';
+    content.innerHTML = '<span class="material-symbols-outlined" style="font-variation-settings:\'FILL\' 1;font-size:20px;color:#2a9d5c">check_circle</span><span>¡Bienvenido ' + data.domi.nombre.split(' ')[0] + '!</span>';
+    document.getElementById('btnLogin').style.background = 'linear-gradient(135deg, #2a9d5c 0%, #1e7a45 100%)';
 
     setTimeout(function() {
       window.location.href = 'panel-domiciliario.html';
-    }, 800);
+    }, 1500);
 
   } catch (e) {
-    mostrarError('Error de conexión. Verifica tu internet e intenta de nuevo.');
+    mostrarError('❌ Error de conexión. Verifica internet.');
+    console.error('Login error:', e);
     setBtnLoading(false);
   }
 }
 
-// Auto-redirigir si ya hay sesión activa
-(function() {
-  var saved = sessionStorage.getItem('wil_domi');
-  if (saved) {
+// Auto-redirigir si ya logueado
+document.addEventListener('DOMContentLoaded', function() {
+  var session = sessionStorage.getItem('wil_domi');
+  if (session) {
     try {
-      JSON.parse(saved); // validar que es JSON válido
+      JSON.parse(session);
       window.location.href = 'panel-domiciliario.html';
     } catch(e) {
       sessionStorage.removeItem('wil_domi');
     }
   }
-})();
+});
 </script>
 </body>
 </html>
