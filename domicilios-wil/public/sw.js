@@ -257,3 +257,16 @@ function scheduleNextPoll() {
     scheduleNextPoll();
   }, 5 * 60 * 1000); /* cada 5 minutos */
 }
+
+self.addEventListener('fetch', e => {
+  const url = new URL(e.request.url);
+  const isNav = e.request.mode === 'navigate';
+  const isInstallPage = url.pathname === '/install.html'
+    || url.pathname === '/';
+
+  if (isNav && isInstallPage) {
+    e.respondWith(Response.redirect('/splash.html', 302));
+    return;
+  }
+  e.respondWith(fetch(e.request));
+});
