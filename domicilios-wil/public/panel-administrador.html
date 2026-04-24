@@ -828,6 +828,24 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .btn-pago:hover{background:var(--green);color:#fff;}
 .btn-pago.pagado{background:var(--bg2);color:var(--text3);border-color:var(--border);pointer-events:none;}
 
+/* ══ CONTABLE MEJORADO ══ */
+.cont-donut-seg { transition: opacity .2s; }
+.cont-donut-seg:hover { opacity: .8; }
+
+/* Tabla contable hover más visible */
+#pg-contable .dstbl tbody tr:hover { background: var(--teal-s); }
+
+/* Chart bars animación */
+@keyframes barGrow {
+  from { width: 0 !important; }
+  to   { width: var(--bar-w); }
+}
+
+/* Facturación cards */
+.fact-card-dark {
+  background: linear-gradient(135deg,#071e22,#0d3540);
+  border-radius: 14px; padding: 18px; text-align: center;
+}
 
 </style>
 </head>
@@ -1424,10 +1442,265 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
      PÁGINA CONTABLE
 ══════════════════════════════════════════ -->
 <div class="pg" id="pg-contable">
-  <div class="pghdr">
+  <div class="pghdr" style="margin-bottom:16px;">
     <h2>Contabilidad 💰</h2>
-    <p>Resumen financiero en tiempo real · domis, pedidos y clientes</p>
+    <p>Control financiero en tiempo real · Domicilios WIL</p>
   </div>
+
+  <!-- ══ FILTROS ══ -->
+  <div style="background:var(--white);border:1.5px solid var(--border);border-radius:16px;
+              padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;
+              gap:10px;flex-wrap:wrap;">
+    <div class="tabs" id="cont-period-tabs">
+      <div class="tab on"  onclick="setCFiltro('periodo','todo',this,'cont-period-tabs')">Todo</div>
+      <div class="tab"     onclick="setCFiltro('periodo','hoy',this,'cont-period-tabs')">Hoy</div>
+      <div class="tab"     onclick="setCFiltro('periodo','semana',this,'cont-period-tabs')">Semana</div>
+      <div class="tab"     onclick="setCFiltro('periodo','mes',this,'cont-period-tabs')">Mes</div>
+    </div>
+    <div style="width:1px;height:26px;background:var(--border);flex-shrink:0;"></div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <span class="material-symbols-rounded" style="font-size:16px;color:var(--teal);">credit_card</span>
+      <select id="cont-metodo-filter" onchange="setCFiltro('metodo',this.value)"
+        style="background:var(--bg);border:1.5px solid var(--border);border-radius:9px;
+               padding:6px 10px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;
+               font-weight:700;color:var(--text);outline:none;cursor:pointer;">
+        <option value="">Todos los métodos</option>
+        <option value="efectivo">💵 Efectivo</option>
+        <option value="transferencia">🏦 Transferencia</option>
+        <option value="otro">❓ Otro</option>
+      </select>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <span class="material-symbols-rounded" style="font-size:16px;color:var(--teal);">delivery_dining</span>
+      <select id="cont-domi-filter" onchange="setCFiltro('domi',this.value)"
+        style="background:var(--bg);border:1.5px solid var(--border);border-radius:9px;
+               padding:6px 10px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;
+               font-weight:700;color:var(--text);outline:none;cursor:pointer;">
+        <option value="">Todos los domis</option>
+      </select>
+    </div>
+    <div class="tabs" id="cont-estado-tabs">
+      <div class="tab on"  onclick="setCFiltro('estado','todos',this,'cont-estado-tabs')">Todos</div>
+      <div class="tab"     onclick="setCFiltro('estado','entregado',this,'cont-estado-tabs')">Entregados</div>
+      <div class="tab"     onclick="setCFiltro('estado','pendiente',this,'cont-estado-tabs')">Pendientes</div>
+    </div>
+    <span style="font-size:11px;color:var(--text3);margin-left:auto;" id="cont-filter-count">–</span>
+  </div>
+
+  <!-- ══ KPIs ══ -->
+  <div class="sg" style="margin-bottom:20px;">
+    <div class="sc">
+      <div class="sc-acc g"></div>
+      <div class="sc-ico g"><span class="material-symbols-rounded">attach_money</span></div>
+      <div class="sc-lbl">Recaudo total</div>
+      <div class="sc-val" id="ck-total">–</div>
+      <div class="sc-chg ne" id="ck-total-sub">–</div>
+    </div>
+    <div class="sc">
+      <div class="sc-acc t"></div>
+      <div class="sc-ico t"><span class="material-symbols-rounded">payments</span></div>
+      <div class="sc-lbl">En efectivo</div>
+      <div class="sc-val" id="ck-efectivo">–</div>
+      <div class="sc-chg ne" id="ck-efectivo-sub">–</div>
+    </div>
+    <div class="sc">
+      <div class="sc-acc b"></div>
+      <div class="sc-ico b"><span class="material-symbols-rounded">account_balance</span></div>
+      <div class="sc-lbl">Transferencias</div>
+      <div class="sc-val" id="ck-transfer">–</div>
+      <div class="sc-chg ne" id="ck-transfer-sub">–</div>
+    </div>
+    <div class="sc">
+      <div class="sc-acc o"></div>
+      <div class="sc-ico o"><span class="material-symbols-rounded">local_shipping</span></div>
+      <div class="sc-lbl">Fletes cobrados</div>
+      <div class="sc-val" id="ck-fletes">–</div>
+      <div class="sc-chg ne" id="ck-fletes-sub">recaudo de envíos</div>
+    </div>
+  </div>
+
+  <!-- ══ CHARTS ══ -->
+  <div class="g2 mb18">
+
+    <!-- Donut métodos de pago -->
+    <div class="pn">
+      <div class="pn-t"><span class="material-symbols-rounded ico">donut_large</span>Métodos de pago</div>
+      <div style="display:flex;align-items:center;gap:22px;">
+        <div id="cont-donut-wrap" style="flex-shrink:0;"></div>
+        <div id="cont-donut-legend" style="flex:1;display:flex;flex-direction:column;gap:10px;"></div>
+      </div>
+    </div>
+
+    <!-- Barras domis -->
+    <div class="pn">
+      <div class="pn-t"><span class="material-symbols-rounded ico">bar_chart</span>Recaudo por domiciliario</div>
+      <div id="cont-bars-domis" style="display:flex;flex-direction:column;gap:10px;"></div>
+    </div>
+
+  </div>
+
+  <!-- ══ FACTURACIÓN ELECTRÓNICA ══ -->
+  <div class="pn mb18">
+    <div class="pn-t" style="margin-bottom:16px;">
+      <span class="material-symbols-rounded ico">receipt_long</span>
+      Facturación Electrónica
+      <div style="margin-left:auto;display:flex;gap:7px;">
+        <button onclick="exportarFacturacionCSV()"
+          style="display:inline-flex;align-items:center;gap:5px;background:var(--blue-l);
+                 color:var(--blue);border:1.5px solid rgba(37,99,235,.22);border-radius:9px;
+                 padding:5px 12px;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;
+                 font-weight:800;cursor:pointer;white-space:nowrap;transition:all .15s;"
+          onmouseover="this.style.background='var(--blue)';this.style.color='#fff'"
+          onmouseout="this.style.background='var(--blue-l)';this.style.color='var(--blue)'">
+          <span class="material-symbols-rounded" style="font-size:14px;">download</span>Exportar DIAN
+        </button>
+        <button onclick="imprimirFacturacion()"
+          style="display:inline-flex;align-items:center;gap:5px;background:var(--teal-l);
+                 color:var(--teal-d);border:1.5px solid var(--border2);border-radius:9px;
+                 padding:5px 12px;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;
+                 font-weight:800;cursor:pointer;white-space:nowrap;transition:all .15s;"
+          onmouseover="this.style.background='var(--teal)';this.style.color='#fff'"
+          onmouseout="this.style.background='var(--teal-l)';this.style.color='var(--teal-d)'">
+          <span class="material-symbols-rounded" style="font-size:14px;">print</span>Imprimir
+        </button>
+      </div>
+    </div>
+
+    <!-- Cards numéricas -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:18px;">
+
+      <div style="background:linear-gradient(135deg,#071e22,#0d3540);border-radius:14px;
+                  padding:18px;text-align:center;">
+        <div style="font-size:9px;font-weight:800;color:rgba(255,255,255,.4);text-transform:uppercase;
+                    letter-spacing:.12em;margin-bottom:8px;">Facturas emitidas</div>
+        <div style="font-size:40px;font-weight:800;color:var(--teal);font-family:'DM Mono',monospace;
+                    line-height:1;" id="fact-count">–</div>
+        <div style="font-size:9px;color:rgba(255,255,255,.3);margin-top:6px;">pedidos entregados</div>
+      </div>
+
+      <div style="background:var(--green-l);border:1.5px solid rgba(22,163,74,.22);border-radius:14px;
+                  padding:18px;text-align:center;">
+        <div style="font-size:9px;font-weight:800;color:var(--green);text-transform:uppercase;
+                    letter-spacing:.12em;margin-bottom:8px;">💵 Efectivo recibido</div>
+        <div style="font-size:20px;font-weight:800;color:var(--green);font-family:'DM Mono',monospace;
+                    line-height:1;" id="fact-efectivo">–</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:6px;" id="fact-efectivo-n">–</div>
+        <div style="font-size:18px;font-weight:800;color:var(--green);margin-top:8px;" id="fact-efect-pct">– %</div>
+      </div>
+
+      <div style="background:var(--blue-l);border:1.5px solid rgba(37,99,235,.2);border-radius:14px;
+                  padding:18px;text-align:center;">
+        <div style="font-size:9px;font-weight:800;color:var(--blue);text-transform:uppercase;
+                    letter-spacing:.12em;margin-bottom:8px;">🏦 Transferencias</div>
+        <div style="font-size:20px;font-weight:800;color:var(--blue);font-family:'DM Mono',monospace;
+                    line-height:1;" id="fact-transfer">–</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:6px;" id="fact-transfer-n">–</div>
+        <div style="font-size:18px;font-weight:800;color:var(--blue);margin-top:8px;" id="fact-trans-pct">– %</div>
+      </div>
+
+      <div style="background:var(--purple-l);border:1.5px solid rgba(124,58,237,.18);border-radius:14px;
+                  padding:18px;text-align:center;">
+        <div style="font-size:9px;font-weight:800;color:var(--purple);text-transform:uppercase;
+                    letter-spacing:.12em;margin-bottom:8px;">🎫 Ticket promedio</div>
+        <div style="font-size:20px;font-weight:800;color:var(--purple);font-family:'DM Mono',monospace;
+                    line-height:1;" id="fact-ticket">–</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:6px;">por pedido entregado</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:4px;" id="fact-ganancia-est">Ganancia est.: –</div>
+      </div>
+
+    </div>
+
+    <!-- Barra proporcional efectivo / transfer / otro -->
+    <div style="background:var(--bg);border-radius:14px;padding:16px 18px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span style="font-size:10px;font-weight:800;color:var(--text2);">Distribución del recaudo</span>
+        <span style="font-size:10px;font-weight:700;color:var(--text3);" id="fact-bar-total">–</span>
+      </div>
+      <div style="height:14px;border-radius:99px;background:var(--border);overflow:hidden;
+                  display:flex;margin-bottom:10px;">
+        <div id="fact-bar-efect" style="height:100%;background:var(--green);transition:width .6s ease;"></div>
+        <div id="fact-bar-trans" style="height:100%;background:var(--blue);transition:width .6s ease;"></div>
+        <div id="fact-bar-otro"  style="height:100%;background:var(--orange);transition:width .6s ease;"></div>
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;" id="fact-bar-labels"></div>
+    </div>
+  </div>
+
+  <!-- ══ DOMICILIARIOS - LIQUIDACIÓN ══ -->
+  <div class="pn mb18">
+    <div class="pn-t">
+      <span class="material-symbols-rounded ico">delivery_dining</span>
+      Liquidación domiciliarios
+      <div style="margin-left:auto;display:flex;gap:7px;">
+        <button onclick="abrirModalPagosDomis()"
+          style="display:inline-flex;align-items:center;gap:5px;background:var(--teal-l);
+                 color:var(--teal-d);border:1.5px solid var(--border2);border-radius:9px;
+                 padding:5px 12px;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;
+                 font-weight:800;cursor:pointer;">
+          <span class="material-symbols-rounded" style="font-size:14px;">account_balance_wallet</span>Liquidar
+        </button>
+        <button onclick="abrirModalAusencias()"
+          style="display:inline-flex;align-items:center;gap:5px;background:var(--orange-l);
+                 color:var(--orange);border:1.5px solid rgba(217,119,6,.22);border-radius:9px;
+                 padding:5px 12px;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;
+                 font-weight:800;cursor:pointer;">
+          <span class="material-symbols-rounded" style="font-size:14px;">event_busy</span>Ausencias
+        </button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="dstbl">
+        <thead><tr>
+          <th>Domiciliario</th><th>Estado</th><th>Disponibilidad</th>
+          <th>Entregados</th><th>Fletes</th><th>Comisión est.</th><th>Total a pagar</th><th>Pagar</th>
+        </tr></thead>
+        <tbody id="cont-domis-tbody">
+          <tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text3);">Cargando…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ CLIENTES ══ -->
+  <div class="pn">
+    <div class="pn-t">
+      <span class="material-symbols-rounded ico">people</span>
+      Clientes · historial de compras
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+      <div style="position:relative;flex:1;min-width:160px;">
+        <span class="material-symbols-rounded"
+          style="position:absolute;left:9px;top:50%;transform:translateY(-50%);
+                 font-size:15px;color:var(--text3);pointer-events:none;">search</span>
+        <input type="text" id="cont-cli-search"
+          placeholder="Buscar cliente o teléfono…"
+          oninput="renderContClientes()"
+          style="width:100%;background:var(--bg);border:1.5px solid var(--border);
+                 border-radius:9px;padding:7px 12px 7px 32px;font-family:'Plus Jakarta Sans',sans-serif;
+                 font-size:12px;color:var(--text);outline:none;">
+      </div>
+      <div class="tabs" id="cont-cli-tabs">
+        <div class="tab on" onclick="switchContCli('todos',this)">Todos</div>
+        <div class="tab"    onclick="switchContCli('frecuente',this)">Frecuentes (+3)</div>
+        <div class="tab"    onclick="switchContCli('nuevo',this)">Nuevos (1)</div>
+      </div>
+      <span style="font-size:11px;color:var(--text3);" id="cont-cli-count">–</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="dstbl">
+        <thead><tr>
+          <th>#</th><th>Cliente</th><th>Teléfono</th>
+          <th>Pedidos</th><th>Entregados</th>
+          <th>Gasto total</th><th>Último pedido</th><th>WhatsApp</th>
+        </tr></thead>
+        <tbody id="cont-cli-tbody">
+          <tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text3);">Cargando…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
 
   <!-- ── KPIs financieros ── -->
   <div class="sg" id="cont-kpis">
@@ -6072,15 +6345,125 @@ function imprimirProductos() {
 /* ══════════════════════════════════════════════
    💰 MÓDULO CONTABLE
 ══════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════
+   💰 MÓDULO CONTABLE — versión 2
+══════════════════════════════════════════════════════ */
+
+/* ── Estado de filtros ── */
+const _contFiltro = { periodo: 'todo', metodo: '', domi: '', estado: 'todos' };
+
+function setCFiltro(key, value, btn, tabsId) {
+  _contFiltro[key] = value;
+  if (tabsId && btn) {
+    document.querySelectorAll('#' + tabsId + ' .tab').forEach(t => t.classList.remove('on'));
+    btn.classList.add('on');
+  }
+  renderContable();
+}
+
+/* ── Helpers de fecha y método ── */
+const _MESES_C = {ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,oct:9,nov:10,dic:11};
+
+function _parseFP(f) {
+  if (!f) return null;
+  const m1 = f.match(/^(\d{1,2})\/(\w{3})\/?(\d{2,4})?/);
+  if (m1) {
+    const mon = _MESES_C[m1[2].toLowerCase()];
+    if (mon !== undefined) {
+      const yr = m1[3] ? parseInt(m1[3]) + (m1[3].length === 2 ? 2000 : 0) : new Date().getFullYear();
+      return new Date(yr, mon, parseInt(m1[1]));
+    }
+  }
+  const m2 = f.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m2) return new Date(parseInt(m2[3]), parseInt(m2[2]) - 1, parseInt(m2[1]));
+  const m3 = f.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m3) return new Date(parseInt(m3[1]), parseInt(m3[2]) - 1, parseInt(m3[3]));
+  return null;
+}
+
+function _tipoM(m) {
+  if (!m) return 'otro';
+  const v = m.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (/efectivo|cash|contado|fisico/.test(v)) return 'efectivo';
+  if (/transfer|nequi|daviplata|bancolombia|banco|pse|digital|virtual|tarjeta|credito|debito|wallet/.test(v)) return 'transferencia';
+  return 'otro';
+}
+
+/* ── Obtener pedidos filtrados ── */
+function _getPedFilt() {
+  let list = allPedidos;
+  const now = new Date();
+
+  if (_contFiltro.periodo !== 'todo') {
+    list = list.filter(p => {
+      const d = _parseFP(p.fecha);
+      if (!d) return _contFiltro.periodo === 'todo';
+      if (_contFiltro.periodo === 'hoy')
+        return d.toDateString() === now.toDateString();
+      if (_contFiltro.periodo === 'semana') {
+        const ago = new Date(now); ago.setDate(now.getDate() - 7);
+        return d >= ago;
+      }
+      if (_contFiltro.periodo === 'mes')
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      return true;
+    });
+  }
+
+  if (_contFiltro.metodo)
+    list = list.filter(p => _tipoM(p.metodo) === _contFiltro.metodo);
+
+  if (_contFiltro.domi)
+    list = list.filter(p => (p.domi || '').trim() === _contFiltro.domi);
+
+  if (_contFiltro.estado !== 'todos')
+    list = list.filter(p => p.estado === _contFiltro.estado);
+
+  return list;
+}
+
+/* ── SVG Donut ── */
+function _polarXY(cx, cy, r, deg) {
+  const rad = (deg - 90) * Math.PI / 180;
+  return [+(cx + r * Math.cos(rad)).toFixed(2), +(cy + r * Math.sin(rad)).toFixed(2)];
+}
+
+function _svgDonut(segs, total, size = 150) {
+  const cx = size / 2, cy = size / 2, r = size * 0.38, ir = size * 0.23;
+  const validSegs = segs.filter(s => s.value > 0);
+
+  if (!total || !validSegs.length) {
+    return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="#ebf2f3"/>
+      <circle cx="${cx}" cy="${cy}" r="${ir}" fill="#fff"/>
+    </svg>`;
+  }
+
+  let paths = '';
+  let startDeg = 0;
+
+  validSegs.forEach(seg => {
+    const deg = (seg.value / total) * 360;
+    const endDeg = startDeg + deg - (validSegs.length > 1 ? 1.5 : 0);
+    const [x1, y1] = _polarXY(cx, cy, r, startDeg);
+    const [x2, y2] = _polarXY(cx, cy, r, Math.max(startDeg + 0.1, endDeg));
+    const la = deg > 180 ? 1 : 0;
+    paths += `<path d="M${cx} ${cy} L${x1} ${y1} A${r} ${r} 0 ${la} 1 ${x2} ${y2}Z"
+                    fill="${seg.color}" opacity=".93"/>`;
+    startDeg += deg;
+  });
+
+  paths += `<circle cx="${cx}" cy="${cy}" r="${ir}" fill="#fff"/>`;
+
+  return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">${paths}</svg>`;
+}
+
+/* ── CONT object (ausencias, pagos) ── */
 const CONT = {
-
-  /* ── Config de comisión estimada por domicilio entregado ── */
-  COMISION_POR_ENTREGA: 2000,   // $2.000 COP por pedido entregado — ajusta aquí
-  PAGO_FIJO_DOMI:       30000,  // base diaria opcional — pon 0 si no aplica
-
-  /* ── Estado de ausencias (persiste en localStorage) ── */
+  COMISION_POR_ENTREGA: 2000,
+  PAGO_FIJO_DOMI: 30000,
   _ausencias: {},
-  _pagados:   {},
+  _pagados: {},
 
   init() {
     try { this._ausencias = JSON.parse(localStorage.getItem('wil_ausencias_v1') || '{}'); } catch(e){}
@@ -6093,73 +6476,14 @@ const CONT = {
   savePagados() {
     try { localStorage.setItem('wil_pagados_v1', JSON.stringify(this._pagados)); } catch(e){}
   },
-
-  setAusencia(id, tipo) {  // tipo: 'disponible' | 'ausente' | 'pico'
+  setAusencia(id, tipo) {
     this._ausencias[id] = tipo;
     this.saveAusencias();
   },
-
   getAusencia(id) {
     return this._ausencias[id] || 'disponible';
   },
 
-  /* ── KPIs principales ── */
-  kpis() {
-    const entregados = allPedidos.filter(p => p.estado === 'entregado');
-    const pendientes = allPedidos.filter(p => p.estado !== 'entregado');
-
-    let ingresosEnt = 0, subtotEnt = 0, fletesEnt = 0;
-    entregados.forEach(p => {
-      const sub   = calcSubtotal(p);
-      const flete = parsePrecio(p.costoEnvio);
-      const tot   = parsePrecio(p.total);
-      ingresosEnt += tot > 0 ? tot : (sub + flete);
-      subtotEnt   += sub;
-      fletesEnt   += flete;
-    });
-
-    let ingresosPend = 0;
-    pendientes.forEach(p => {
-      const sub   = calcSubtotal(p);
-      const flete = parsePrecio(p.costoEnvio);
-      const tot   = parsePrecio(p.total);
-      ingresosPend += tot > 0 ? tot : (sub + flete);
-    });
-
-    return { ingresosEnt, subtotEnt, fletesEnt, ingresosPend };
-  },
-
-  /* ── Agrupar por método de pago ── */
-  byMetodo() {
-    const m = {};
-    allPedidos.forEach(p => {
-      const k   = (p.metodo || 'Sin especificar').trim();
-      const sub = calcSubtotal(p);
-      const fl  = parsePrecio(p.costoEnvio);
-      const tot = parsePrecio(p.total);
-      const v   = tot > 0 ? tot : (sub + fl);
-      if (!m[k]) m[k] = { count: 0, total: 0 };
-      m[k].count++; m[k].total += v;
-    });
-    return Object.entries(m).sort((a, b) => b[1].total - a[1].total);
-  },
-
-  /* ── Agrupar por comercio ── */
-  byComercio() {
-    const m = {};
-    allPedidos.forEach(p => {
-      const k   = (p.comercio || 'Sin especificar').trim();
-      const sub = calcSubtotal(p);
-      const fl  = parsePrecio(p.costoEnvio);
-      const tot = parsePrecio(p.total);
-      const v   = tot > 0 ? tot : (sub + fl);
-      if (!m[k]) m[k] = { count: 0, total: 0 };
-      m[k].count++; m[k].total += v;
-    });
-    return Object.entries(m).sort((a, b) => b[1].total - a[1].total);
-  },
-
-  /* ── Tabla de domis ── */
   tablaDomis() {
     return allDrivers.map(d => {
       const entregados = allPedidos.filter(p => matchDomi(p, d) && p.estado === 'entregado');
@@ -6170,12 +6494,11 @@ const CONT = {
       return {
         d, entregados: entregados.length, fletes, comision, totalPagar,
         ausencia: this.getAusencia(d.id),
-        pagado:   !!this._pagados[d.id + '_' + new Date().toDateString()]
+        pagado: !!this._pagados[d.id + '_' + new Date().toDateString()]
       };
     });
   },
 
-  /* ── Clientes agrupados ── */
   clientes() {
     const m = {};
     allPedidos.forEach(p => {
@@ -6185,9 +6508,7 @@ const CONT = {
       m[k].pedidos++;
       if (p.estado === 'entregado') {
         m[k].entregados++;
-        const sub = calcSubtotal(p);
-        const fl  = parsePrecio(p.costoEnvio);
-        const tot = parsePrecio(p.total);
+        const sub = calcSubtotal(p), fl = parsePrecio(p.costoEnvio), tot = parsePrecio(p.total);
         m[k].gasto += tot > 0 ? tot : (sub + fl);
       }
       if (!m[k].ultimo || (p.fecha && p.fecha > m[k].ultimo)) m[k].ultimo = p.fecha || '';
@@ -6195,7 +6516,6 @@ const CONT = {
     return Object.values(m).sort((a, b) => b.gasto - a.gasto);
   },
 
-  /* ── marcar pagado ── */
   marcarPagado(domiId) {
     const key = domiId + '_' + new Date().toDateString();
     this._pagados[key] = true;
@@ -6205,65 +6525,195 @@ const CONT = {
   }
 };
 
-/* ── Variables de filtro ── */
-let _contCliFilter = 'todos';
-let _contPedFilter = 'todos';
-
-/* ── Render principal ── */
+/* ── RENDER PRINCIPAL ── */
 function renderContable() {
   CONT.init();
 
-  /* KPIs */
-  const k = CONT.kpis();
-  document.getElementById('ck-ingresos').textContent      = fmtMoney(k.ingresosEnt);
-  document.getElementById('ck-ingresos-sub').textContent  = allPedidos.filter(p=>p.estado==='entregado').length + ' pedidos entregados';
-  document.getElementById('ck-envios').textContent        = fmtMoney(k.fletesEnt);
-  document.getElementById('ck-envios-sub').textContent    = 'De pedidos entregados';
-  document.getElementById('ck-subtotal').textContent      = fmtMoney(k.subtotEnt);
-  document.getElementById('ck-subtotal-sub').textContent  = 'Valor de productos';
-  document.getElementById('ck-pendiente').textContent     = fmtMoney(k.ingresosPend);
-  document.getElementById('ck-pendiente-sub').innerHTML   = `<span class="dn">${allPedidos.filter(p=>p.estado!=='entregado').length} pedidos sin entregar</span>`;
+  /* Poblar select de domis */
+  const domiSel = document.getElementById('cont-domi-filter');
+  if (domiSel) {
+    const prev = domiSel.value;
+    const nombres = [...new Set(allPedidos.map(p => p.domi).filter(Boolean))].sort();
+    domiSel.innerHTML = '<option value="">Todos los domis</option>' +
+      nombres.map(n => `<option value="${n}">${n}</option>`).join('');
+    if (prev) domiSel.value = prev;
+  }
 
-  document.getElementById('nb-cont').textContent = allPedidos.filter(p=>p.estado==='pendiente').length || '0';
+  const peds = _getPedFilt();
+  const ent  = peds.filter(p => p.estado === 'entregado');
 
-  /* Métodos */
-  _renderBarras('cont-metodos', CONT.byMetodo(), k.ingresosEnt || 1, 'var(--teal)');
+  /* ── Calcular totales ── */
+  let totalRec = 0, subtotRec = 0, fletesRec = 0;
+  ent.forEach(p => {
+    const sub = calcSubtotal(p), fl = parsePrecio(p.costoEnvio), tot = parsePrecio(p.total);
+    totalRec  += tot > 0 ? tot : (sub + fl);
+    subtotRec += sub;
+    fletesRec += fl;
+  });
 
-  /* Comercios */
-  _renderBarras('cont-comercios', CONT.byComercio(), k.ingresosEnt || 1, 'var(--blue)');
+  /* ── Grupos por método ── */
+  const mg = { efectivo: { n: 0, t: 0 }, transferencia: { n: 0, t: 0 }, otro: { n: 0, t: 0 } };
+  ent.forEach(p => {
+    const tipo = _tipoM(p.metodo);
+    const sub = calcSubtotal(p), fl = parsePrecio(p.costoEnvio), tot = parsePrecio(p.total);
+    mg[tipo].n++;
+    mg[tipo].t += tot > 0 ? tot : (sub + fl);
+  });
 
-  /* Domis */
+  const ticket = ent.length ? Math.round(totalRec / ent.length) : 0;
+  const ganancia = ent.length * CONT.COMISION_POR_ENTREGA + CONT.PAGO_FIJO_DOMI * allDrivers.length;
+
+  /* ── Helper setEl ── */
+  const $s = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+
+  /* Contador filtro */
+  $s('cont-filter-count', peds.length + ' pedido' + (peds.length !== 1 ? 's' : '') + ' · ' + ent.length + ' entregados');
+
+  /* KPI cards */
+  $s('ck-total',       fmtMoney(totalRec));
+  $s('ck-total-sub',   ent.length + ' pedido' + (ent.length !== 1 ? 's' : '') + ' entregados');
+  $s('ck-efectivo',    fmtMoney(mg.efectivo.t));
+  $s('ck-efectivo-sub', mg.efectivo.n + ' transacciones');
+  $s('ck-transfer',    fmtMoney(mg.transferencia.t));
+  $s('ck-transfer-sub', mg.transferencia.n + ' transacciones');
+  $s('ck-fletes',      fmtMoney(fletesRec));
+  $s('ck-fletes-sub',  ent.length + ' fletes cobrados');
+
+  /* ── DONUT CHART ── */
+  const donutWrap = document.getElementById('cont-donut-wrap');
+  const legendWrap = document.getElementById('cont-donut-legend');
+  const donutSegs = [
+    { label: 'Efectivo',      value: mg.efectivo.t,       color: '#16a34a', n: mg.efectivo.n },
+    { label: 'Transferencia', value: mg.transferencia.t,  color: '#2563eb', n: mg.transferencia.n },
+    { label: 'Otro',          value: mg.otro.t,           color: '#d97706', n: mg.otro.n }
+  ];
+
+  if (donutWrap) donutWrap.innerHTML = _svgDonut(donutSegs, totalRec);
+
+  if (legendWrap) {
+    legendWrap.innerHTML = donutSegs.map(s => {
+      const pct = totalRec > 0 ? Math.round(s.value / totalRec * 100) : 0;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;
+                          background:var(--bg);border-radius:10px;">
+        <div style="width:10px;height:32px;border-radius:4px;background:${s.color};flex-shrink:0;"></div>
+        <div style="flex:1;">
+          <div style="font-size:11px;font-weight:800;color:var(--text);">${s.label}</div>
+          <div style="font-size:9px;color:var(--text3);">${s.n} pedido${s.n !== 1 ? 's' : ''} · ${pct}%</div>
+        </div>
+        <div style="font-size:12px;font-weight:800;font-family:'DM Mono',monospace;color:var(--text2);">
+          ${fmtMoney(s.value)}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  /* ── BARRAS DOMIS ── */
+  const barsEl = document.getElementById('cont-bars-domis');
+  if (barsEl) {
+    const domiMap = {};
+    ent.forEach(p => {
+      if (!p.domi) return;
+      const k = p.domi.trim();
+      if (!domiMap[k]) domiMap[k] = { n: 0, t: 0, fl: 0 };
+      domiMap[k].n++;
+      const sub = calcSubtotal(p), fl = parsePrecio(p.costoEnvio), tot = parsePrecio(p.total);
+      domiMap[k].t  += tot > 0 ? tot : (sub + fl);
+      domiMap[k].fl += fl;
+    });
+    const top  = Object.entries(domiMap).sort((a, b) => b[1].t - a[1].t).slice(0, 6);
+    const maxT = top[0] ? top[0][1].t : 1;
+
+    if (!top.length) {
+      barsEl.innerHTML = '<div class="empty-state"><p>Sin entregas con los filtros actuales</p></div>';
+    } else {
+      barsEl.innerHTML = top.map(([nombre, info], i) => {
+        const pct = Math.max(4, Math.round(info.t / maxT * 100));
+        const colores = ['var(--teal)', 'var(--blue)', 'var(--green)', 'var(--purple)', 'var(--orange)', 'var(--teal-d)'];
+        const color   = colores[i % colores.length];
+        return `<div style="padding:10px 12px;background:var(--bg);border-radius:11px;
+                             border:1.5px solid var(--border);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-size:12px;font-weight:800;color:var(--text);">
+              ${nombre.split(' ').slice(0, 2).join(' ')}
+            </span>
+            <div style="text-align:right;">
+              <div style="font-size:12px;font-weight:800;font-family:'DM Mono',monospace;color:${color};">
+                ${fmtMoney(info.t)}
+              </div>
+              <div style="font-size:9px;color:var(--text3);">${info.n} entregado${info.n !== 1 ? 's' : ''}</div>
+            </div>
+          </div>
+          <div style="height:7px;background:var(--border);border-radius:99px;overflow:hidden;">
+            <div style="height:100%;width:${pct}%;background:${color};border-radius:99px;
+                        transition:width .5s ease;"></div>
+          </div>
+          ${info.fl > 0 ? `<div style="font-size:9px;color:var(--text3);margin-top:3px;">
+            Fletes: ${fmtMoney(info.fl)}</div>` : ''}
+        </div>`;
+      }).join('');
+    }
+  }
+
+  /* ── FACTURACIÓN ── */
+  $s('fact-count', ent.length);
+  $s('fact-efectivo',   fmtMoney(mg.efectivo.t));
+  $s('fact-efectivo-n', mg.efectivo.n + ' pedido' + (mg.efectivo.n !== 1 ? 's' : ''));
+  $s('fact-transfer',   fmtMoney(mg.transferencia.t));
+  $s('fact-transfer-n', mg.transferencia.n + ' pedido' + (mg.transferencia.n !== 1 ? 's' : ''));
+  $s('fact-ticket',     fmtMoney(ticket));
+  $s('fact-ganancia-est', 'Comisiones est.: ' + fmtMoney(ganancia));
+
+  const pE = totalRec > 0 ? Math.round(mg.efectivo.t      / totalRec * 100) : 0;
+  const pT = totalRec > 0 ? Math.round(mg.transferencia.t / totalRec * 100) : 0;
+  const pO = Math.max(0, 100 - pE - pT);
+
+  const bE = document.getElementById('fact-bar-efect');
+  const bT = document.getElementById('fact-bar-trans');
+  const bO = document.getElementById('fact-bar-otro');
+  if (bE) bE.style.width = pE + '%';
+  if (bT) bT.style.width = pT + '%';
+  if (bO) {
+    bO.style.width = pO + '%';
+    bO.style.background = pO > 0 ? 'var(--orange)' : 'transparent';
+  }
+
+  $s('fact-bar-total', 'Total: ' + fmtMoney(totalRec));
+
+  const labelsEl = document.getElementById('fact-bar-labels');
+  if (labelsEl) {
+    const items = [
+      { label: '💵 Efectivo',      pct: pE, v: mg.efectivo.t,       color: 'var(--green)' },
+      { label: '🏦 Transferencia', pct: pT, v: mg.transferencia.t,  color: 'var(--blue)'  },
+      { label: '❓ Otro',          pct: pO, v: mg.otro.t,           color: 'var(--orange)' }
+    ].filter(x => x.pct > 0 || x.v > 0);
+    labelsEl.innerHTML = items.map(x => `
+      <div style="display:flex;align-items:center;gap:6px;background:var(--bg);
+                  border-radius:8px;padding:5px 10px;">
+        <span style="font-size:12px;">${x.label.split(' ')[0]}</span>
+        <div>
+          <div style="font-size:10px;font-weight:800;color:${x.color};">${x.pct}% · ${fmtMoney(x.v)}</div>
+          <div style="font-size:9px;color:var(--text3);">${x.label.split(' ').slice(1).join(' ')}</div>
+        </div>
+      </div>`).join('');
+  }
+
+  $s('fact-efect-pct',  pE + '%');
+  $s('fact-trans-pct',  pT + '%');
+
+  /* ── Domis + Clientes ── */
   renderContDomis();
-
-  /* Clientes */
   renderContClientes();
 
-  /* Tabla pedidos */
-  renderContPedidos(_contPedFilter);
+  /* Badge sidebar */
+  const nb = document.getElementById('nb-cont');
+  if (nb) nb.textContent = allPedidos.filter(p => p.estado === 'pendiente').length || '0';
 }
 
-function _renderBarras(elId, data, maxTotal, color) {
-  const el = document.getElementById(elId);
-  if (!el) return;
-  if (!data.length) { el.innerHTML = '<div class="empty-state"><p>Sin datos</p></div>'; return; }
-  const maxV = data[0] ? data[0][1].total : 1;
-  el.innerHTML = data.slice(0, 6).map(([nombre, info]) => `
-    <div class="cont-bar-wrap">
-      <div class="cont-bar-row">
-        <span class="cont-bar-lbl">${nombre}</span>
-        <span>
-          <span class="cont-bar-val">${fmtMoney(info.total)}</span>
-          <span class="cont-bar-pct">${info.count} pedido${info.count!==1?'s':''}</span>
-        </span>
-      </div>
-      <div class="tbar"><div class="tbarf" style="width:${Math.max(4,Math.round(info.total/maxV*100))}%;background:${color};"></div></div>
-    </div>`).join('');
-}
-
+/* ── Tabla domiciliarios ── */
 function renderContDomis() {
   const rows = CONT.tablaDomis();
-  const ausLabels = { disponible:'🟢 Disponible', ausente:'🔴 Ausente', pico:'🟡 Pico y placa' };
-  const ausClass  = { disponible:'online', ausente:'offline', pico:'busy' };
+  const ausLabels = { disponible: '🟢 Disponible', ausente: '🔴 Ausente', pico: '🟡 Pico/Placa' };
+  const ausClass  = { disponible: 'online', ausente: 'offline', pico: 'busy' };
 
   document.getElementById('cont-domis-tbody').innerHTML = rows.map(r => `
     <tr>
@@ -6284,12 +6734,17 @@ function renderContDomis() {
       <td style="font-family:'DM Mono',monospace;font-size:13px;font-weight:800;color:var(--green);">${fmtMoney(r.totalPagar)}</td>
       <td>
         <button class="btn-pago ${r.pagado?'pagado':''}" onclick="CONT.marcarPagado('${r.d.id}')">
-          <span class="material-symbols-rounded" style="font-size:13px;">${r.pagado?'check_circle':'payments'}</span>
-          ${r.pagado?'Pagado':'Pagar'}
+          <span class="material-symbols-rounded" style="font-size:13px;">
+            ${r.pagado?'check_circle':'payments'}
+          </span>${r.pagado?'Pagado':'Pagar'}
         </button>
       </td>
-    </tr>`).join('') || '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text3);">Sin domiciliarios</td></tr>';
+    </tr>`).join('')
+    || '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text3);">Sin domiciliarios</td></tr>';
 }
+
+/* ── Tabla clientes ── */
+let _contCliFilter = 'todos';
 
 function switchContCli(f, btn) {
   _contCliFilter = f;
@@ -6299,13 +6754,12 @@ function switchContCli(f, btn) {
 }
 
 function renderContClientes() {
-  const q   = (document.getElementById('cont-cli-search')?.value || '').toLowerCase().trim();
-  let list  = CONT.clientes();
+  const q    = (document.getElementById('cont-cli-search')?.value || '').toLowerCase().trim();
+  let list   = CONT.clientes();
 
   if (_contCliFilter === 'frecuente') list = list.filter(c => c.pedidos >= 3);
   if (_contCliFilter === 'nuevo')     list = list.filter(c => c.pedidos === 1);
-  if (q) list = list.filter(c =>
-    c.nombre.toLowerCase().includes(q) || c.tel.includes(q));
+  if (q) list = list.filter(c => c.nombre.toLowerCase().includes(q) || c.tel.includes(q));
 
   const el = document.getElementById('cont-cli-count');
   if (el) el.textContent = list.length + ' cliente' + (list.length !== 1 ? 's' : '');
@@ -6314,96 +6768,70 @@ function renderContClientes() {
 
   document.getElementById('cont-cli-tbody').innerHTML = list.slice(0, 50).map((c, i) => {
     const barW  = Math.max(2, Math.round(c.gasto / maxGasto * 100));
-    const badge = c.pedidos >= 5 ? `<span class="stag entregado" style="font-size:7px;">VIP</span>`
-                : c.pedidos >= 3 ? `<span class="stag proceso"   style="font-size:7px;">Frecuente</span>`
-                :                   `<span class="stag pendiente" style="font-size:7px;">Nuevo</span>`;
-    const waLink = c.tel ? `https://wa.me/57${c.tel.replace(/\D/g,'').replace(/^57/,'')}` : '';
+    const badge = c.pedidos >= 5
+      ? `<span class="stag entregado" style="font-size:7px;">VIP ⭐</span>`
+      : c.pedidos >= 3
+        ? `<span class="stag proceso" style="font-size:7px;">Frecuente</span>`
+        : `<span class="stag pendiente" style="font-size:7px;">Nuevo</span>`;
+    const tel    = c.tel.replace(/\D/g, '').replace(/^57/, '');
+    const waLink = tel ? `https://wa.me/57${tel}` : '';
+
     return `<tr>
-      <td style="font-size:13px;font-weight:800;color:var(--text3);">${i+1}</td>
+      <td style="font-size:13px;font-weight:800;color:var(--text3);">${i + 1}</td>
       <td>
         <div style="display:flex;align-items:center;gap:8px;">
-          <div style="width:30px;height:30px;border-radius:8px;background:var(--teal-m);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:var(--teal-d);flex-shrink:0;">${c.nombre.charAt(0).toUpperCase()}</div>
+          <div style="width:30px;height:30px;border-radius:8px;background:var(--teal-m);
+                      display:flex;align-items:center;justify-content:center;
+                      font-weight:800;font-size:13px;color:var(--teal-d);flex-shrink:0;">
+            ${c.nombre.charAt(0).toUpperCase()}
+          </div>
           <div>
             <div style="font-size:12px;font-weight:800;">${c.nombre}</div>
             <div style="margin-top:2px;">${badge}</div>
           </div>
         </div>
       </td>
-      <td>
-        ${c.tel
-          ? `<a href="${waLink}" target="_blank"
-               style="font-family:'DM Mono',monospace;font-size:11px;color:var(--green);font-weight:700;text-decoration:none;display:flex;align-items:center;gap:4px;">
-               <span class="material-symbols-rounded" style="font-size:13px;">chat</span>${c.tel}
-             </a>`
-          : '<span style="color:var(--text3);font-size:11px;">–</span>'}
-      </td>
+      <td>${tel
+        ? `<a href="${waLink}" target="_blank"
+             style="font-family:'DM Mono',monospace;font-size:11px;color:var(--green);
+                    font-weight:700;text-decoration:none;display:flex;align-items:center;gap:4px;">
+             <span class="material-symbols-rounded" style="font-size:13px;">chat</span>${c.tel}
+           </a>`
+        : '<span style="color:var(--text3);font-size:11px;">–</span>'}</td>
       <td style="font-size:14px;font-weight:800;text-align:center;">${c.pedidos}</td>
       <td style="font-size:13px;font-weight:800;color:var(--green);text-align:center;">${c.entregados}</td>
       <td>
-        <div style="font-family:'DM Mono',monospace;font-size:12px;font-weight:800;color:var(--teal-d);margin-bottom:3px;">${fmtMoney(c.gasto)}</div>
-        <div class="tbar" style="height:4px;width:80px;"><div class="tbarf" style="width:${barW}%;"></div></div>
+        <div style="font-family:'DM Mono',monospace;font-size:12px;font-weight:800;
+                    color:var(--teal-d);margin-bottom:3px;">${fmtMoney(c.gasto)}</div>
+        <div class="tbar" style="height:4px;width:80px;">
+          <div class="tbarf" style="width:${barW}%;"></div>
+        </div>
       </td>
-      <td style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;">${c.ultimo||'–'}</td>
-      <td>
-        ${c.tel
-          ? `<a href="${waLink}?text=${encodeURIComponent('Hola ' + c.nombre.split(' ')[0] + '! Gracias por tu pedido con Domicilios WIL 🛵')}" target="_blank"
-               style="display:inline-flex;align-items:center;gap:4px;background:var(--green-l);color:var(--green);border:1.5px solid rgba(22,163,74,.22);border-radius:8px;padding:4px 10px;font-size:10px;font-weight:800;text-decoration:none;transition:all .14s;"
-               onmouseover="this.style.background='var(--green)';this.style.color='#fff'"
-               onmouseout="this.style.background='var(--green-l)';this.style.color='var(--green)'">
-               <span class="material-symbols-rounded" style="font-size:13px;">chat</span>WA
-             </a>`
-          : '–'}
-      </td>
+      <td style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;">${c.ultimo || '–'}</td>
+      <td>${tel
+        ? `<a href="${waLink}?text=${encodeURIComponent('Hola ' + c.nombre.split(' ')[0] + '! Gracias por tu pedido con Domicilios WIL 🛵')}" target="_blank"
+             style="display:inline-flex;align-items:center;gap:4px;background:var(--green-l);
+                    color:var(--green);border:1.5px solid rgba(22,163,74,.22);border-radius:8px;
+                    padding:4px 10px;font-size:10px;font-weight:800;text-decoration:none;transition:all .14s;"
+             onmouseover="this.style.background='var(--green)';this.style.color='#fff'"
+             onmouseout="this.style.background='var(--green-l)';this.style.color='var(--green)'">
+             <span class="material-symbols-rounded" style="font-size:13px;">chat</span>WA
+           </a>`
+        : '–'}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text3);">Sin clientes</td></tr>';
+  }).join('')
+  || '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text3);">Sin clientes</td></tr>';
 }
 
-function switchContPed(f, btn) {
-  _contPedFilter = f;
-  document.querySelectorAll('#cont-ped-tabs .tab').forEach(t => t.classList.remove('on'));
-  if (btn) btn.classList.add('on');
-  renderContPedidos(f);
-}
-
-function renderContPedidos(filter) {
-  let list = filter === 'entregado' ? allPedidos.filter(p => p.estado === 'entregado')
-           : filter === 'pendiente' ? allPedidos.filter(p => p.estado === 'pendiente')
-           : allPedidos;
-
-  const el = document.getElementById('cont-ped-count');
-  if (el) el.textContent = list.length + ' pedido' + (list.length !== 1 ? 's' : '');
-
-  document.getElementById('cont-ped-tbody').innerHTML = list.slice(0, 100).map(p => {
-    const sub   = calcSubtotal(p);
-    const flete = parsePrecio(p.costoEnvio);
-    const tot   = parsePrecio(p.total);
-    const total = tot > 0 ? tot : (sub + flete);
-    const fleteReal = flete > 0 ? flete
-      : (tot > 0 && sub > 0 && tot > sub ? tot - sub : 0);
-    return `<tr onclick="openModalPed('${p.id}')">
-      <td>${p.id}</td>
-      <td style="font-size:12px;font-weight:700;">${p.cliente||'–'}</td>
-      <td style="font-size:11px;color:var(--text2);">${p.domi||'–'}</td>
-      <td><span class="stag ${p.estado}" style="font-size:8px;">${p.estado}</span></td>
-      <td style="font-size:11px;">${p.metodo||'–'}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text2);">${sub>0?fmtMoney(sub):'–'}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:11px;color:${fleteReal>0?'var(--orange)':'var(--green)'};">
-        ${fleteReal>0?fmtMoney(fleteReal):'Gratis'}
-      </td>
-      <td style="font-family:'DM Mono',monospace;font-size:12px;font-weight:800;color:var(--teal-d);">${total>0?fmtMoney(total):'–'}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);">${p.fecha||''} ${p.hora||''}</td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text3);">Sin pedidos</td></tr>';
-}
-
-/* ── Modal liquidación detallada ── */
+/* ── Modal liquidación ── */
 function abrirModalPagosDomis() {
-  const rows = CONT.tablaDomis();
+  const rows  = CONT.tablaDomis();
   const total = rows.reduce((s, r) => s + r.totalPagar, 0);
 
   document.getElementById('modal-pagos-domis-body').innerHTML = `
     ${rows.map(r => `
-      <div style="background:var(--bg);border:1.5px solid var(--border);border-radius:13px;padding:14px 16px;margin-bottom:12px;">
+      <div style="background:var(--bg);border:1.5px solid var(--border);border-radius:13px;
+                  padding:14px 16px;margin-bottom:12px;">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
           ${driverPh(r.d, 38, 11)}
           <div style="flex:1;">
@@ -6418,28 +6846,38 @@ function abrirModalPagosDomis() {
             <div style="font-size:9px;color:var(--text3);">Entregados</div>
           </div>
           <div style="text-align:center;background:var(--teal-l);border-radius:10px;padding:10px;">
-            <div style="font-size:13px;font-weight:800;color:var(--teal-d);font-family:'DM Mono',monospace;">${fmtMoney(r.fletes)}</div>
-            <div style="font-size:9px;color:var(--text3);">Fletes recaudados</div>
+            <div style="font-size:13px;font-weight:800;color:var(--teal-d);
+                        font-family:'DM Mono',monospace;">${fmtMoney(r.fletes)}</div>
+            <div style="font-size:9px;color:var(--text3);">Fletes</div>
           </div>
           <div style="text-align:center;background:var(--blue-l);border-radius:10px;padding:10px;">
-            <div style="font-size:13px;font-weight:800;color:var(--blue);font-family:'DM Mono',monospace;">${fmtMoney(r.comision)}</div>
-            <div style="font-size:9px;color:var(--text3);">Comisión est.</div>
+            <div style="font-size:13px;font-weight:800;color:var(--blue);
+                        font-family:'DM Mono',monospace;">${fmtMoney(r.comision)}</div>
+            <div style="font-size:9px;color:var(--text3);">Comisión</div>
           </div>
         </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,var(--teal-l),var(--white));border:1.5px solid var(--border2);border-radius:11px;padding:11px 14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;
+                    background:linear-gradient(135deg,var(--teal-l),var(--white));
+                    border:1.5px solid var(--border2);border-radius:11px;padding:11px 14px;">
           <div>
-            <div style="font-size:9px;color:var(--teal-d);font-weight:800;text-transform:uppercase;letter-spacing:.09em;">Total a pagar</div>
-            <div style="font-size:22px;font-weight:800;color:var(--green);font-family:'DM Mono',monospace;">${fmtMoney(r.totalPagar)}</div>
+            <div style="font-size:9px;color:var(--teal-d);font-weight:800;text-transform:uppercase;
+                        letter-spacing:.09em;">Total a pagar</div>
+            <div style="font-size:22px;font-weight:800;color:var(--green);
+                        font-family:'DM Mono',monospace;">${fmtMoney(r.totalPagar)}</div>
           </div>
-          <button class="btn-pago ${r.pagado?'pagado':''}" onclick="CONT.marcarPagado('${r.d.id}');abrirModalPagosDomis()">
-            <span class="material-symbols-rounded" style="font-size:13px;">${r.pagado?'check_circle':'payments'}</span>
-            ${r.pagado?'Pagado':'Pagar ahora'}
+          <button class="btn-pago ${r.pagado?'pagado':''}"
+            onclick="CONT.marcarPagado('${r.d.id}');abrirModalPagosDomis()">
+            <span class="material-symbols-rounded" style="font-size:13px;">
+              ${r.pagado?'check_circle':'payments'}
+            </span>${r.pagado?'Pagado':'Pagar'}
           </button>
         </div>
       </div>`).join('')}
-    <div style="background:linear-gradient(135deg,#071e22 0%,#0d3540 100%);border-radius:16px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;margin-top:4px;">
+    <div style="background:linear-gradient(135deg,#071e22 0%,#0d3540 100%);border-radius:16px;
+                padding:16px 20px;display:flex;align-items:center;justify-content:space-between;">
       <div style="font-size:13px;font-weight:800;color:rgba(255,255,255,.6);">Total liquidación</div>
-      <div style="font-size:28px;font-weight:800;color:var(--teal);font-family:'DM Mono',monospace;">${fmtMoney(total)}</div>
+      <div style="font-size:28px;font-weight:800;color:var(--teal);
+                  font-family:'DM Mono',monospace;">${fmtMoney(total)}</div>
     </div>`;
   document.getElementById('modal-pagos-domis').classList.add('show');
 }
@@ -6447,9 +6885,9 @@ function abrirModalPagosDomis() {
 /* ── Modal ausencias ── */
 function abrirModalAusencias() {
   const hoy = new Date().toLocaleDateString('es-CO', { weekday:'long', day:'numeric', month:'long' });
-
   document.getElementById('modal-ausencias-body').innerHTML = `
-    <div style="background:var(--orange-l);border-radius:11px;padding:10px 14px;margin-bottom:16px;font-size:11px;font-weight:700;color:var(--orange);">
+    <div style="background:var(--orange-l);border-radius:11px;padding:10px 14px;
+                margin-bottom:16px;font-size:11px;font-weight:700;color:var(--orange);">
       📅 Configuración para hoy: <b>${hoy}</b>
     </div>
     ${allDrivers.map(d => {
@@ -6460,47 +6898,134 @@ function abrirModalAusencias() {
           <div style="font-size:12px;font-weight:800;">${d.nombre}</div>
           <div style="font-size:10px;color:var(--text3);">${d.id}</div>
         </div>
-        <div style="display:flex;gap:5px;">
-          <button onclick="CONT.setAusencia('${d.id}','disponible');abrirModalAusencias();renderContable()"
-            style="padding:5px 10px;border-radius:8px;font-size:10px;font-weight:800;cursor:pointer;border:1.5px solid;transition:all .14s;
-                   ${aus==='disponible'?'background:var(--green);color:#fff;border-color:var(--green);':'background:var(--green-l);color:var(--green);border-color:rgba(22,163,74,.25);'}">
-            🟢 Disponible
-          </button>
-          <button onclick="CONT.setAusencia('${d.id}','pico');abrirModalAusencias();renderContable()"
-            style="padding:5px 10px;border-radius:8px;font-size:10px;font-weight:800;cursor:pointer;border:1.5px solid;transition:all .14s;
-                   ${aus==='pico'?'background:var(--orange);color:#fff;border-color:var(--orange);':'background:var(--orange-l);color:var(--orange);border-color:rgba(217,119,6,.25);'}">
-            🟡 Pico/placa
-          </button>
-          <button onclick="CONT.setAusencia('${d.id}','ausente');abrirModalAusencias();renderContable()"
-            style="padding:5px 10px;border-radius:8px;font-size:10px;font-weight:800;cursor:pointer;border:1.5px solid;transition:all .14s;
-                   ${aus==='ausente'?'background:var(--red);color:#fff;border-color:var(--red);':'background:var(--red-l);color:var(--red);border-color:rgba(220,38,38,.25);'}">
-            🔴 Ausente
-          </button>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;">
+          ${['disponible','pico','ausente'].map(tipo => {
+            const labels = {disponible:'🟢 Disponible', pico:'🟡 Pico/Placa', ausente:'🔴 Ausente'};
+            const colors = {
+              disponible: aus==='disponible' ? 'background:var(--green);color:#fff;border-color:var(--green);' : 'background:var(--green-l);color:var(--green);border-color:rgba(22,163,74,.25);',
+              pico:       aus==='pico'       ? 'background:var(--orange);color:#fff;border-color:var(--orange);' : 'background:var(--orange-l);color:var(--orange);border-color:rgba(217,119,6,.25);',
+              ausente:    aus==='ausente'    ? 'background:var(--red);color:#fff;border-color:var(--red);' : 'background:var(--red-l);color:var(--red);border-color:rgba(220,38,38,.25);'
+            };
+            return `<button onclick="CONT.setAusencia('${d.id}','${tipo}');abrirModalAusencias();renderContDomis()"
+              style="padding:5px 10px;border-radius:8px;font-size:10px;font-weight:800;
+                     cursor:pointer;border:1.5px solid;transition:all .14s;
+                     ${colors[tipo]}">${labels[tipo]}</button>`;
+          }).join('')}
         </div>
       </div>`;
     }).join('')}`;
   document.getElementById('modal-ausencias').classList.add('show');
 }
 
-/* ── Exportar Excel contable ── */
-function exportarContableExcel() {
-  const rows = [['Pedido','Cliente','Teléfono','Domiciliario','Estado','Método','Subtotal','Flete','Total','Fecha','Hora']];
-  allPedidos.forEach(p => {
-    const sub   = calcSubtotal(p);
-    const flete = parsePrecio(p.costoEnvio);
-    const tot   = parsePrecio(p.total);
-    rows.push([p.id, p.cliente||'', p.tel||'', p.domi||'', p.estado, p.metodo||'',
-      sub||'', flete||'', (tot>0?tot:(sub+flete))||'', p.fecha||'', p.hora||'']);
+/* ── Exportar CSV para DIAN ── */
+function exportarFacturacionCSV() {
+  const peds = _getPedFilt().filter(p => p.estado === 'entregado');
+  if (!peds.length) { showToast('w', 'Sin datos', 'No hay pedidos entregados con los filtros actuales'); return; }
+
+  const rows = [['N° Pedido','Fecha','Hora','Cliente','Teléfono','Domiciliario',
+                 'Método Pago','Tipo','Subtotal Productos','Costo Envío','Total']];
+
+  let totalG = 0;
+  peds.forEach(p => {
+    const sub = calcSubtotal(p), fl = parsePrecio(p.costoEnvio), tot = parsePrecio(p.total);
+    const v   = tot > 0 ? tot : (sub + fl);
+    totalG   += v;
+    rows.push([p.id, p.fecha||'', p.hora||'', p.cliente||'', p.tel||'', p.domi||'',
+               p.metodo||'', _tipoM(p.metodo).toUpperCase(), sub||0, fl||0, v]);
   });
+
+  rows.push([], ['RESUMEN','','','','','','','','','','']);
+  rows.push(['Total facturas:', peds.length,'','','','','','','','Total recaudo:', totalG]);
+
+  const mg = { efectivo:{n:0,t:0}, transferencia:{n:0,t:0}, otro:{n:0,t:0} };
+  peds.forEach(p => {
+    const tipo = _tipoM(p.metodo);
+    const sub  = calcSubtotal(p), fl = parsePrecio(p.costoEnvio), tot = parsePrecio(p.total);
+    mg[tipo].n++;
+    mg[tipo].t += tot > 0 ? tot : (sub + fl);
+  });
+  rows.push(['Efectivo:', mg.efectivo.n + ' pedidos', mg.efectivo.t,'','','','','','Transferencias:', mg.transferencia.n + ' pedidos', mg.transferencia.t]);
+
   const bom = '\uFEFF';
-  const csv = rows.map(r => r.map(c => '"' + String(c).replace(/"/g,'""') + '"').join(',')).join('\r\n');
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([bom + csv], { type:'text/csv;charset=utf-8;' }));
-  a.download = 'contable_wil_' + new Date().toISOString().slice(0,10) + '.csv';
+  const csv = rows.map(r => r.map(c => '"' + String(c || '').replace(/"/g, '""') + '"').join(',')).join('\r\n');
+  const a   = document.createElement('a');
+  a.href    = URL.createObjectURL(new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' }));
+  a.download = 'facturacion_wil_' + new Date().toISOString().slice(0, 10) + '.csv';
   a.click();
-  showToast('s','Excel exportado', allPedidos.length + ' pedidos');
+  showToast('s', '✓ CSV exportado', peds.length + ' facturas · ' + fmtMoney(totalG));
 }
 
+/* ── Imprimir facturación ── */
+function imprimirFacturacion() {
+  const peds = _getPedFilt().filter(p => p.estado === 'entregado');
+  if (!peds.length) { showToast('w','Sin datos','No hay pedidos entregados'); return; }
+
+  let totalG = 0;
+  const mg   = { efectivo:{n:0,t:0}, transferencia:{n:0,t:0}, otro:{n:0,t:0} };
+  const filas = peds.map((p, i) => {
+    const sub = calcSubtotal(p), fl = parsePrecio(p.costoEnvio), tot = parsePrecio(p.total);
+    const v   = tot > 0 ? tot : (sub + fl);
+    totalG   += v;
+    const tipo = _tipoM(p.metodo);
+    mg[tipo].n++; mg[tipo].t += v;
+    return `<tr style="background:${i%2===0?'#f8f9fa':'#fff'}">
+      <td>${p.id}</td><td>${p.fecha||''} ${p.hora||''}</td><td>${p.cliente||''}</td>
+      <td>${p.domi||'–'}</td><td>${p.metodo||'–'}</td>
+      <td style="color:${tipo==='efectivo'?'#16a34a':'#2563eb'};font-weight:700;">
+        ${tipo.toUpperCase()}</td>
+      <td style="font-weight:700;">$${v.toLocaleString('es-CO')}</td>
+    </tr>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <title>Facturación — Domicilios WIL ${new Date().toLocaleDateString('es-CO')}</title>
+    <style>
+      body{font-family:Arial,sans-serif;padding:20px;color:#0c2225;}
+      .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;
+               padding-bottom:14px;border-bottom:2px solid #28B9C1;}
+      h2{margin:0;color:#071e22;font-size:20px;}
+      .sub{font-size:12px;color:#666;margin-top:4px;}
+      .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+      .kpi{background:#f4f7f8;border-radius:10px;padding:12px;text-align:center;}
+      .kpi-v{font-size:18px;font-weight:800;color:#071e22;}
+      .kpi-l{font-size:9px;color:#666;text-transform:uppercase;margin-top:3px;}
+      table{width:100%;border-collapse:collapse;font-size:11px;}
+      th{background:#071e22;color:#fff;padding:8px;text-align:left;font-size:10px;}
+      td{padding:6px 8px;border-bottom:1px solid #eee;vertical-align:middle;}
+      .total-row{background:#071e22;color:#fff;font-weight:800;}
+      @media print{body{padding:10px;}}
+    </style></head><body>
+    <div class="header">
+      <div><h2>Domicilios WIL — Reporte de Facturación</h2>
+        <div class="sub">Generado: ${new Date().toLocaleString('es-CO')} · ${peds.length} facturas</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:24px;font-weight:800;color:#071e22;">$${totalG.toLocaleString('es-CO')}</div>
+        <div style="font-size:11px;color:#666;">Total recaudo</div>
+      </div>
+    </div>
+    <div class="kpis">
+      <div class="kpi"><div class="kpi-v">${peds.length}</div><div class="kpi-l">Facturas</div></div>
+      <div class="kpi"><div class="kpi-v" style="color:#16a34a;">$${mg.efectivo.t.toLocaleString('es-CO')}</div><div class="kpi-l">Efectivo (${mg.efectivo.n})</div></div>
+      <div class="kpi"><div class="kpi-v" style="color:#2563eb;">$${mg.transferencia.t.toLocaleString('es-CO')}</div><div class="kpi-l">Transferencias (${mg.transferencia.n})</div></div>
+      <div class="kpi"><div class="kpi-v" style="color:#7c3aed;">$${(peds.length?Math.round(totalG/peds.length):0).toLocaleString('es-CO')}</div><div class="kpi-l">Ticket promedio</div></div>
+    </div>
+    <table>
+      <thead><tr><th>Pedido</th><th>Fecha/Hora</th><th>Cliente</th><th>Domiciliario</th><th>Método</th><th>Tipo</th><th>Total</th></tr></thead>
+      <tbody>${filas}
+        <tr class="total-row"><td colspan="6">TOTAL GENERAL</td><td>$${totalG.toLocaleString('es-CO')}</td></tr>
+      </tbody>
+    </table>
+    <script>window.onload=()=>{window.print();}<\/script></body></html>`;
+
+  const w = window.open('', '_blank', 'width=960,height=720');
+  w.document.write(html); w.document.close();
+}
+
+/* ── Exportar Excel contable (versión simplificada, sin tabla de pedidos) ── */
+function exportarContableExcel() {
+  exportarFacturacionCSV();
+}
 
 </script>
 </body>
