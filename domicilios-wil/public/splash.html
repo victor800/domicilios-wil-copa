@@ -22,7 +22,7 @@ html,body{
 #bg-img{
   position:absolute;inset:0;width:100%;height:100%;
   object-fit:cover;object-position:center;display:block;
-  opacity:0; /* empieza invisible, el JS lo muestra */
+  opacity:0;
 }
 #overlay{
   position:absolute;inset:0;width:100%;height:100%;
@@ -60,13 +60,49 @@ html,body{
   font-family:monospace;
 }
 .fade-out{animation:fadeOut 0.4s ease forwards !important;}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes fadeOut{from{opacity:1}to{opacity:0}}
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
 </head>
 <body>
+
+<script>
+/* ══ REGISTRAR SW ══ */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js', { scope: '/' })
+    .catch(e => console.warn('[WIL SW] error:', e));
+}
+
+/* ══ RECOGER PROMPT DE install.html Y LANZAR INSTALACIÓN ══
+   Cuando el usuario deslizó en install.html, se guardó la señal
+   en sessionStorage y se navegó aquí. Chrome emitirá el prompt
+   en ESTA página, así la PWA queda registrada con splash.html
+   como URL de inicio. */
+(async () => {
+  const pendiente = sessionStorage.getItem('wil_install_pending');
+  if (!pendiente) return;
+  sessionStorage.removeItem('wil_install_pending');
+
+  let prompt = null;
+  await new Promise(resolve => {
+    const t = setTimeout(resolve, 6000);
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      prompt = e;
+      clearTimeout(t);
+      resolve();
+    }, { once: true });
+  });
+
+  if (prompt) {
+    prompt.prompt();
+    const { outcome } = await prompt.userChoice;
+    console.log('[WIL] instalación:', outcome);
+    /* Si acepta, la PWA abre splash.html — no hace falta redirigir */
+  }
+})();
+</script>
 
 <div id="splash">
   <img id="bg-img" src="" alt=""/>
@@ -107,25 +143,19 @@ function probarRuta() {
   dbg.textContent = `Probando (${idx+1}/${rutas.length}): ${ruta}`;
   const test = new Image();
   test.onload = () => {
-  // Primero quita la animación que bloquea opacity
-  img.style.animation = 'none';
-  img.style.opacity = '0';
-  
-  // Asigna el src
-  img.src = ruta;
-  
-  // Espera al siguiente frame para hacer fade in
-  requestAnimationFrame(() => {
+    img.style.animation = 'none';
+    img.style.opacity = '0';
+    img.src = ruta;
     requestAnimationFrame(() => {
-      img.style.transition = 'opacity 0.6s ease';
-      img.style.opacity = '1';
+      requestAnimationFrame(() => {
+        img.style.transition = 'opacity 0.6s ease';
+        img.style.opacity = '1';
+      });
     });
-  });
-
-  dbg.textContent = '✅ OK → ' + ruta;
-  dbg.style.background = 'rgba(0,130,0,0.8)';
-  setTimeout(() => { dbg.style.display = 'none'; }, 3000);
-};
+    dbg.textContent = '✅ OK → ' + ruta;
+    dbg.style.background = 'rgba(0,130,0,0.8)';
+    setTimeout(() => { dbg.style.display = 'none'; }, 3000);
+  };
   test.onerror = () => { idx++; probarRuta(); };
   test.src = ruta + '?t=' + Date.now();
 }
