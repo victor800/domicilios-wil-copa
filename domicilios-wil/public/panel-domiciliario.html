@@ -2602,26 +2602,65 @@ function stepActionClick(){if(stepState===0)marcarEncamino();else if(stepState==
 
 /* ═══════════════════ ESTADOS PEDIDO ═══════════════════ */
 async function cambiarEstadoPedido(nuevoEstado){
-  if(!state.pedidoActivo)return false;
-  try{
-    var r=await fetch(API_BASE+'/wil?action=cambiar-estado',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idPedido:state.pedidoActivo.id,estado:nuevoEstado,idDomi:domi.id})});
-    var d=await r.json();return d.ok;
-  }catch(e){return false;}
+  if(!state.pedidoActivo) return false;
+  try {
+    var horaActual = new Date().toLocaleTimeString('es-CO', {
+      hour:'2-digit', minute:'2-digit', timeZone: TZ
+    });
+
+    var payload = {
+      accion:    'asignar-domi',
+      pedidoId:  String(state.pedidoActivo.id).trim(),
+      domi:      domi.nombre,
+      estado:    nuevoEstado,
+      horaAsign: horaActual
+    };
+
+    // Si es "En camino" → usar campo horaCamino
+    if(nuevoEstado === 'En camino'){
+      payload.horaCamino = horaActual;
+    }
+    // Si es "Entregado" → usar campo horaEntrega
+    if(nuevoEstado === 'Entregado'){
+      payload.horaEntrega = horaActual;
+    }
+
+    var r = await fetch(SCRIPT_URL_DOMI, {
+      method:  'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body:    JSON.stringify(payload),
+      signal:  AbortSignal.timeout(15000)
+    });
+    var d = await r.json();
+    return d.ok !== false;
+
+  } catch(e) {
+    console.warn('[cambiarEstadoPedido]:', e.message);
+    return false;
+  }
 }
 
 function marcarEncamino(){
-  setStepLoading(true,'Guardando…');
+  setStepLoading(true, 'Guardando…');
   cambiarEstadoPedido('En camino').then(function(ok){
-    if(!ok){setStepLoading(false,'Ponerte en camino');showStepBtn('linear-gradient(135deg,#7c3aed,#8b5cf6)','0 4px 20px rgba(139,92,246,.35)','two_wheeler','Reintentar');alert('No se pudo cambiar el estado.');return;}
-    state.estadoPedido='En camino';
-    var s2=document.getElementById('tab_step2Time');if(s2)s2.textContent=horaAhora();
-    renderStepper(1);
-    /* Redibujar ruta con posición actual */
-    if(TRK.lat&&destLatGlobal){
-      dibujarRutaTab(TRK.lat,TRK.lng,destLatGlobal,destLngGlobal);
-      calcularEtaTab(TRK.lat,TRK.lng,destLatGlobal,destLngGlobal);
+    if(!ok){
+      setStepLoading(false, 'Ponerte en camino');
+      alert('No se pudo cambiar el estado. Verifica tu conexión.');
+      return;
     }
-  }).catch(function(e){setStepLoading(false,'Ponerte en camino');alert('Error de red: '+e.message);});
+    state.estadoPedido = 'En camino';
+    var s2 = document.getElementById('tab_step2Time');
+    if(s2) s2.textContent = horaAhora();
+    renderStepper(1);
+
+    // Redibujar ruta si hay GPS y destino
+    if(TRK.lat && destLatGlobal){
+      dibujarRutaOSRM(TRK.lat, TRK.lng, destLatGlobal, destLngGlobal);
+    }
+  }).catch(function(e){
+    setStepLoading(false, 'Ponerte en camino');
+    alert('Error de red: ' + e.message);
+  });
 }
 
 function marcarEntregado(){
