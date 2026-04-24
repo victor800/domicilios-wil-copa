@@ -296,15 +296,15 @@ body{min-height:100dvh;font-family:'Inter',sans-serif;background:#f8f9fa;color:#
     </div>
     <span id="statusText" class="text-xs font-bold text-green">En línea</span>
   </div>
-  <button onclick="fetchPedidos();fetchHistorialSheet();"
-    style="display:flex;align-items:center;gap:4px;padding:6px 10px;
-    border-radius:20px;background:rgba(0,105,112,.08);
-    border:1.5px solid rgba(0,105,112,.15);cursor:pointer;
-    font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;
-    font-weight:800;color:#006970;">
-    <span class="material-symbols-outlined" style="font-size:13px">refresh</span>
-    Actualizar
-  </button>
+  <button id="btnActualizar" onclick="manualRefreshDomi()"
+  style="display:flex;align-items:center;gap:4px;padding:6px 10px;
+  border-radius:20px;background:rgba(0,105,112,.08);
+  border:1.5px solid rgba(0,105,112,.15);cursor:pointer;
+  font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;
+  font-weight:800;color:#006970;">
+  <span class="material-symbols-outlined" style="font-size:13px" id="refreshIcon">refresh</span>
+  <span id="refreshTxt">Actualizar</span>
+</button>
 </div>
   </div>
 
@@ -3399,6 +3399,21 @@ window.WIL={
   mensajeCliente:function(texto,hora){recibirMensajeCliente(texto,hora);},
   setClienteOnline:function(online){setClienteOnline(online);}
 };
+
+async function manualRefreshDomi(){
+  var btn  = document.getElementById('btnActualizar');
+  var icon = document.getElementById('refreshIcon');
+  var txt  = document.getElementById('refreshTxt');
+  if(btn) btn.disabled = true;
+  if(icon) icon.style.animation = 'rot .7s linear infinite';
+  if(txt)  txt.textContent = 'Cargando…';
+
+  await Promise.all([fetchPedidos(), fetchHistorialSheet()]);
+
+  if(icon) icon.style.animation = '';
+  if(txt)  txt.textContent = 'Actualizar';
+  if(btn)  btn.disabled = false;
+}
 
 </script>
 </body>
