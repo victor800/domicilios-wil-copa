@@ -288,23 +288,26 @@ body{min-height:100dvh;font-family:'Inter',sans-serif;background:#f8f9fa;color:#
         <div id="headerSubtitle" class="mt-0.5"></div>
       </div>
     </div>
-    <div id="statusBadge" class="flex items-center gap-2 px-3 py-1.5 bg-green/10 rounded-full border border-green/20 cursor-pointer" onclick="toggleStatus()">
-      <div class="relative w-2 h-2">
-        <span id="pingDot" class="absolute inset-0 rounded-full bg-green ping-dot"></span>
-        <span class="relative rounded-full w-2 h-2 bg-green block"></span>
-      </div>
-      <span id="statusText" class="text-xs font-bold text-green">En línea</span>
+   <div class="flex items-center gap-2">
+  <div id="statusBadge" class="flex items-center gap-2 px-3 py-1.5 bg-green/10 rounded-full border border-green/20 cursor-pointer" onclick="toggleStatus()">
+    <div class="relative w-2 h-2">
+      <span id="pingDot" class="absolute inset-0 rounded-full bg-green ping-dot"></span>
+      <span class="relative rounded-full w-2 h-2 bg-green block"></span>
     </div>
+    <span id="statusText" class="text-xs font-bold text-green">En línea</span>
+  </div>
+  <button onclick="fetchPedidos();fetchHistorialSheet();"
+    style="display:flex;align-items:center;gap:4px;padding:6px 10px;
+    border-radius:20px;background:rgba(0,105,112,.08);
+    border:1.5px solid rgba(0,105,112,.15);cursor:pointer;
+    font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;
+    font-weight:800;color:#006970;">
+    <span class="material-symbols-outlined" style="font-size:13px">refresh</span>
+    Actualizar
+  </button>
+</div>
   </div>
 
-<button onclick="fetchPedidos();fetchHistorialSheet();" 
-  style="width:34px;height:34px;border-radius:50%;background:rgba(0,105,112,.08);
-  border:1.5px solid rgba(0,105,112,.15);display:flex;align-items:center;
-  justify-content:center;cursor:pointer;flex-shrink:0;"
-  title="Actualizar">
-  <span class="material-symbols-outlined" 
-    style="font-size:17px;color:#006970">refresh</span>
-</button>
 
 
 </header>
@@ -1792,24 +1795,16 @@ async function fetchHistorialSheet() {
 function iniciarPolling(){
   fetchPedidos();
   fetchHistorialSheet();
-  
-  // Pedidos cada 4 minutos (silencioso, sin cerrar nada)
-  pollingTimer = setInterval(function(){
-    if(state.pedidoActivo) return; // no interrumpir si hay pedido activo
-    fetchPedidos();
-  }, 4 * 60 * 1000);
-  
-  // Historial cada 4 minutos
-  setInterval(fetchHistorialSheet, 4 * 60 * 1000);
-  
-  // Barra de progreso — ciclo de 4 min
-  var fill = document.getElementById('pollingFill'), t0 = Date.now();
-  pollingBarTimer = setInterval(function(){
-    fill.style.width = ((Date.now() - t0) % (4 * 60 * 1000)) / (4 * 60 * 1000) * 100 + '%';
-  }, 500);
-  /* Historial: carga inicial + polling */
-fetchHistorialSheet();
 
+  // Silencioso cada 2 min — no interrumpe pedido activo
+  pollingTimer = setInterval(function(){
+    fetchPedidos();
+    fetchHistorialSheet();
+  }, 2 * 60 * 1000);
+
+  // Ocultar barra de progreso — ya no la usamos
+  var pw = document.querySelector('.polling-wrap');
+  if(pw) pw.style.display = 'none';
 }
 
 /* ═══════════════════ RENDER PEDIDOS ═══════════════════ */
