@@ -455,42 +455,55 @@ const esAndroid  = /android/i.test(navigator.userAgent);
 const esStandalone = window.matchMedia('(display-mode: standalone)').matches
                   || window.navigator.standalone === true;
 
-// Ya instalada → ir al inicio
+// Ya instalada como PWA → ir al inicio
 if (esStandalone) { window.location.replace('/index.html'); }
 
-// Nota según OS
 const noteEl = document.getElementById('install-note');
-const sliderTextEl = document.getElementById('sliderText');
-if (esIOS) {
-  noteEl.textContent = '📱 Te mostramos cómo instalarlo en iPhone / iPad';
-} else if (esAndroid) {
-  noteEl.textContent = '✅ Se agrega directo a tu pantalla de inicio';
-} else {
-  noteEl.textContent = '💻 Abre desde Chrome en tu celular para instalar';
+if (esIOS)         noteEl.textContent = '📱 Te mostramos cómo instalarlo en iPhone';
+else if (esAndroid) noteEl.textContent = '⏳ Preparando instalación...';
+else               noteEl.textContent = '💻 Abre desde Chrome en Android para instalar';
+
+/* ══════════════════════════════════════════════════════
+   REGISTRAR SW — Chrome REQUIERE SW activo para emitir
+   beforeinstallprompt. Si ya estaba registrado, no pasa nada.
+══════════════════════════════════════════════════════ */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js', { scope: '/' })
+    .then(r  => console.log('[WIL SW] ok:', r.scope))
+    .catch(e => console.warn('[WIL SW] err:', e));
 }
 
 /* ══════════════════════════════════════════════════════
-   CAPTURA DEL PROMPT — CRÍTICO
-   beforeinstallprompt se dispara ANTES de que el usuario
-   interactúe. Lo guardamos aquí para usarlo al deslizar.
+   CAPTURA DEL PROMPT
 ══════════════════════════════════════════════════════ */
 let deferredPrompt = null;
-let promptListo    = false;
 
 window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();          // evita que Chrome muestre el banner solo
+  e.preventDefault();
   deferredPrompt = e;
-  promptListo    = true;
-  console.log('[WIL PWA] ✅ prompt capturado');
-  // Cambiar nota a "listo para instalar"
+  console.log('[WIL PWA] ✅ prompt listo');
   noteEl.textContent = '🟢 ¡Listo! Desliza para instalar';
 });
 
 window.addEventListener('appinstalled', () => {
   deferredPrompt = null;
-  console.log('[WIL PWA] ✅ appinstalled');
   mostrarOverlayExito();
 });
+
+/* ══════════════════════════════════════════════════════
+   DETECTAR SI YA ESTÁ INSTALADA (sin ser standalone)
+   Esto pasa cuando abrieron la PWA y luego volvieron al navegador
+══════════════════════════════════════════════════════ */
+if ('getInstalledRelatedApps' in navigator) {
+  navigator.getInstalledRelatedApps().then(apps => {
+    if (apps.length > 0) {
+      document.getElementById('install-wrap').innerHTML = `
+        <button class="btn-instalada" onclick="window.location.href='/index.html'">
+          ✅ App instalada — Abrir Domicilios WIL
+        </button>`;
+    }
+  }).catch(() => {});
+}
 
 /* ══════════════════════════════════════════════════════
    OVERLAY DE ÉXITO
@@ -615,8 +628,6 @@ function snapBackReset() {
 /* ── Acción al completar el slider ── */
 async function completar() {
   done = true;
-
-  // Animar thumb hasta el final
   const tw = track.getBoundingClientRect().width;
   thumb.style.transition = fill.style.transition = 'all .25s ease';
   thumb.style.left  = (PAD + maxX) + 'px';
@@ -624,43 +635,68 @@ async function completar() {
   track.classList.add('done');
   thumb.innerHTML = '<span style="font-size:26px">✅</span>';
 
-  await esperar(500);
+  await esperar(400);
 
-  /* ── CASO 1: Android Chrome con prompt disponible ── */
-  if (deferredPrompt) {
-    try {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      deferredPrompt = null;
-      if (outcome === 'accepted') {
-        // 'appinstalled' llamará mostrarOverlayExito automáticamente
-        // pero por seguridad también lo llamamos aquí
-        await esperar(600);
-        mostrarOverlayExito();
-      } else {
-        toast('❌ Instalación cancelada — puedes intentarlo de nuevo');
-        snapBackReset();
-      }
-    } catch (err) {
-      console.warn('[WIL PWA] Error prompt:', err);
-      toast('Error al instalar. Usa Chrome en Android.');
-      snapBackReset();
+  /* ── iOS: siempre guía manual ── */
+  if (esIOS) {
+    mostrarPanelIOS();
+    return;
+  }
+
+  /* ── Android: intentar prompt, esperar hasta 3s si aún no llegó ── */
+  if (esAndroid || !esIOS) {
+    // Si ya tenemos el prompt → usar inmediatamente
+    if (deferredPrompt) {
+      await lanzarPrompt();
+      return;
     }
 
-  /* ── CASO 2: iOS Safari ── */
-  } else if (esIOS) {
-    await esperar(200);
-    mostrarPanelIOS();
+    // No tenemos prompt aún → esperar máximo 3 segundos
+    noteEl.textContent = '⏳ Iniciando instalación...';
+    const promptEsperado = await esperarPrompt(3000);
 
-  /* ── CASO 3: Android pero sin prompt aún (Chrome necesita más tiempo o criterios) ── */
-  } else if (esAndroid) {
-    // El prompt aún no llegó — mostrar instrucción del menú nativo
+    if (promptEsperado) {
+      await lanzarPrompt();
+    } else {
+      // Chrome no emitió el prompt → la PWA ya está instalada o no califica
+      mostrarGuiaAndroidManual();
+    }
+  }
+}
+
+/* Espera que llegue beforeinstallprompt hasta maxMs milisegundos */
+function esperarPrompt(maxMs) {
+  return new Promise(resolve => {
+    if (deferredPrompt) { resolve(true); return; }
+    const timeout = setTimeout(() => {
+      window.removeEventListener('beforeinstallprompt', handler);
+      resolve(false);
+    }, maxMs);
+    function handler(e) {
+      clearTimeout(timeout);
+      e.preventDefault();
+      deferredPrompt = e;
+      resolve(true);
+    }
+    window.addEventListener('beforeinstallprompt', handler, { once: true });
+  });
+}
+
+async function lanzarPrompt() {
+  try {
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    if (outcome === 'accepted') {
+      await esperar(700);
+      mostrarOverlayExito();
+    } else {
+      toast('❌ Cancelado — puedes intentarlo de nuevo');
+      snapBackReset();
+    }
+  } catch (err) {
+    console.warn('[WIL] prompt error:', err);
     mostrarGuiaAndroidManual();
-
-  /* ── CASO 4: Desktop u otro navegador ── */
-  } else {
-    toast('Abre este sitio en Chrome desde tu celular para instalar');
-    snapBackReset();
   }
 }
 
