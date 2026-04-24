@@ -1937,8 +1937,15 @@ function renderPedidos(){
   var lista = document.getElementById('listaPedidos');
   var vacio = document.getElementById('sinPedidos');
   var cnt   = document.getElementById('contadorPedidos');
+
+  // ✅ Guardar qué drawers están abiertos ANTES de limpiar el HTML
+  var drawersAbiertos = new Set();
+  lista.querySelectorAll('.card-detail-drawer.open').forEach(function(el){
+    drawersAbiertos.add(el.id); // ej: "drawer_p123"
+  });
+
   lista.innerHTML = '';
- 
+
   if(!state.pedidos.length){
     vacio.style.display='flex';
     cnt.textContent='0 pedidos';
@@ -1948,7 +1955,7 @@ function renderPedidos(){
   vacio.style.display='none';
   cnt.textContent = state.pedidos.length + (state.pedidos.length===1?' pedido':' pedidos');
   actualizarBadgesNav();
- 
+
   state.pedidos.forEach(function(p){
     var dirRaw   = p.direccion||'';
     var refM     = dirRaw.match(/\(Ref:\s*([^)]+)\)/);
@@ -1959,7 +1966,7 @@ function renderPedidos(){
     var ini      = cliente.charAt(0).toUpperCase();
     var pid      = 'p'+p.id.replace(/[^a-z0-9]/gi,'');
     var prodBlock= buildProdBlockCard(p,pid);
- 
+
     // Botón aceptar
     var btnAceptarId = 'btn-'+p.id;
     var btnAceptarOnclick = p.asignadoAMi
@@ -1972,7 +1979,7 @@ function renderPedidos(){
     var btnShadow = p.asignadoAMi
       ? '0 4px 14px rgba(124,58,237,.28)'
       : '0 4px 14px rgba(0,105,112,.22)';
- 
+
     // Resumen de productos (máx 2 nombres)
     var prods = parsearProductos(p);
     var prodResumen = '';
@@ -1980,7 +1987,7 @@ function renderPedidos(){
       var names = prods.slice(0,2).map(function(pr){ return pr.nombre; });
       prodResumen = names.join(', ') + (prods.length > 2 ? ' +' + (prods.length-2) + ' más' : '');
     }
- 
+
     // Badge asignado
     var asignadoBadge = p.asignadoAMi
       ? '<div style="background:linear-gradient(135deg,rgba(124,58,237,.1),rgba(124,58,237,.05));'
@@ -1990,14 +1997,20 @@ function renderPedidos(){
         +'<div style="flex:1"><div style="font-size:11px;font-weight:800;color:#7c3aed;">¡Pedido asignado a ti!</div>'
         +'<div style="font-size:10px;color:#6c7a7b">El admin te asignó este pedido directamente.</div></div></div>'
       : '';
- 
+
+    // ✅ ¿Este drawer estaba abierto antes del re-render?
+    var estabaAbierto = drawersAbiertos.has('drawer_'+pid);
+    var drawerClass   = estabaAbierto ? 'card-detail-drawer open' : 'card-detail-drawer';
+    var btnClass      = estabaAbierto ? 'ver-detalle-btn open' : 'ver-detalle-btn';
+    var btnTxt        = estabaAbierto ? 'Ocultar detalles' : 'Ver detalles';
+
     lista.insertAdjacentHTML('beforeend',
       // ── CARD WRAPPER ──
       '<div class="bg-surf-white rounded-2xl shadow-sm border border-out-var/10 relative overflow-hidden card-in" id="pedido-'+p.id+'" style="padding:0">'
- 
+
         // ── RESUMEN (siempre visible) ──
         +'<div style="padding:14px 14px 12px">'
- 
+
           // Fila avatar + cliente + hora
           +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
             +'<div style="width:40px;height:40px;border-radius:14px;background:rgba(0,105,112,.1);'
@@ -2015,7 +2028,7 @@ function renderPedidos(){
               +(p.asignadoAMi ? '<div style="margin-top:4px;font-size:9px;font-weight:800;color:#7c3aed">🎯 Asignado</div>' : '')
             +'</div>'
           +'</div>'
- 
+
           // Dirección resumida + total
           +'<div style="display:flex;align-items:center;gap:8px;background:#f3f4f5;'
           +'border-radius:12px;padding:8px 10px;margin-bottom:'+(prodResumen?'9':'10')+'px">'
@@ -2026,7 +2039,7 @@ function renderPedidos(){
             +'<span style="font-size:12px;font-weight:900;color:#006970;flex-shrink:0;'
             +'font-family:\'Plus Jakarta Sans\',sans-serif;white-space:nowrap">'+(p.total||'—')+'</span>'
           +'</div>'
- 
+
           // Productos resumen + pago
           +(prodResumen
             ? '<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">'
@@ -2036,7 +2049,7 @@ function renderPedidos(){
               +'<span style="font-size:10px;font-weight:700;color:#6c7a7b;flex-shrink:0">'+pago+'</span>'
               +'</div>'
             : '')
- 
+
           // Botones: Aceptar + Ver detalles
           +'<div style="display:flex;gap:8px;align-items:stretch">'
             // Aceptar (flex 3)
@@ -2050,22 +2063,22 @@ function renderPedidos(){
             +btnAceptarLabel
             +'</button>'
             // Ver detalles (flex 2)
-            +'<button id="vdbtn_'+pid+'" class="ver-detalle-btn" onclick="toggleDetalleCard(\''+pid+'\')">'
-            +'<span class="vd-txt">Ver detalles</span>'
+            +'<button id="vdbtn_'+pid+'" class="'+btnClass+'" onclick="toggleDetalleCard(\''+pid+'\')">'
+            +'<span class="vd-txt">'+btnTxt+'</span>'
             +'<div class="vd-icon"><span class="material-symbols-outlined" style="font-size:14px;color:#006970">expand_more</span></div>'
             +'</button>'
           +'</div>'
- 
+
         +'</div>'
         // ── FIN RESUMEN ──
- 
-        // ── DRAWER DETALLES (colapsado por defecto) ──
-        +'<div class="card-detail-drawer" id="drawer_'+pid+'">'
+
+        // ── DRAWER DETALLES ──
+        +'<div class="'+drawerClass+'" id="drawer_'+pid+'">'
           +'<div style="border-top:1px solid rgba(0,105,112,.1);padding:14px 14px 16px;background:rgba(0,105,112,.02)">'
- 
+
             // Badge asignado
             +asignadoBadge
- 
+
             // Ref
             +(ref
               ? '<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;'
@@ -2074,7 +2087,7 @@ function renderPedidos(){
                 +'<p style="font-size:11px;font-weight:700;color:#92400e;margin:0">Ref: '+escHtml(ref)+'</p>'
                 +'</div>'
               : '')
- 
+
             // Dirección completa
             +'<div style="display:flex;align-items:flex-start;gap:7px;background:#f8f9fa;'
             +'border-radius:12px;padding:9px 11px;margin-bottom:10px;border:1px solid rgba(76,86,175,.12)">'
@@ -2083,16 +2096,16 @@ function renderPedidos(){
             +'<div><p style="font-size:9px;font-weight:800;text-transform:uppercase;color:#9eaaac;margin:0 0 2px">Dirección completa</p>'
             +'<p style="font-size:12px;font-weight:700;color:#191c1d;line-height:1.4;word-break:break-word;margin:0">'+escHtml(dirRaw)+'</p></div>'
             +'</div>'
- 
+
             // Productos detallados (ticket completo)
             +prodBlock
- 
+
             // Pago + fecha
             +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">'
             +'<span style="font-size:11px;font-weight:700;color:#6c7a7b">'+pago+'</span>'
             +'<span style="font-size:10px;color:#9eaaac">'+(p.fecha||'')+'</span>'
             +'</div>'
- 
+
             // Botón cerrar detalles
             +'<button onclick="toggleDetalleCard(\''+pid+'\')"'
             +' style="width:100%;margin-top:12px;padding:9px;background:transparent;'
@@ -2102,11 +2115,11 @@ function renderPedidos(){
             +'<span class="material-symbols-outlined" style="font-size:13px">expand_less</span>'
             +'Cerrar detalles'
             +'</button>'
- 
+
           +'</div>'
         +'</div>'
         // ── FIN DRAWER ──
- 
+
       +'</div>'
     );
   });
