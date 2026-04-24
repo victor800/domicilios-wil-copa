@@ -296,6 +296,17 @@ body{min-height:100dvh;font-family:'Inter',sans-serif;background:#f8f9fa;color:#
       <span id="statusText" class="text-xs font-bold text-green">En línea</span>
     </div>
   </div>
+
+<button onclick="fetchPedidos();fetchHistorialSheet();" 
+  style="width:34px;height:34px;border-radius:50%;background:rgba(0,105,112,.08);
+  border:1.5px solid rgba(0,105,112,.15);display:flex;align-items:center;
+  justify-content:center;cursor:pointer;flex-shrink:0;"
+  title="Actualizar">
+  <span class="material-symbols-outlined" 
+    style="font-size:17px;color:#006970">refresh</span>
+</button>
+
+
 </header>
 
 <main class="pt-20 max-w-2xl mx-auto px-4" id="mainContent">
@@ -1779,32 +1790,26 @@ async function fetchHistorialSheet() {
 }
 
 function iniciarPolling(){
-  fetchPedidos().then(function() {
-    /* Notificar al entrar si hay pedidos */
-    setTimeout(function() {
-      var n = state.pedidos.length;
-      if (n > 0 && Notification.permission === 'granted') {
-        var titulo = '🛵 ' + n + ' pedido' + (n > 1 ? 's' : '') + ' te esperan';
-        var opts = {
-          body: 'Bienvenido. Hay ' + n + ' pedido' + (n > 1 ? 's pendientes' : ' pendiente') + ' ahora.',
-          icon: 'icons/icon-192.png', badge: 'icons/badge-72.png',
-          tag: 'wil-bienvenida', requireInteraction: false,
-          vibrate: [200, 80, 200], silent: false
-        };
-        navigator.serviceWorker.ready.then(function(reg) {
-          reg.showNotification(titulo, opts);
-        });
-      }
-    }, 2500); /* esperar que el fetch termine */
-  });
-  pollingTimer = setInterval(fetchPedidos, POLL_INTERVAL);
+  fetchPedidos();
+  fetchHistorialSheet();
+  
+  // Pedidos cada 4 minutos (silencioso, sin cerrar nada)
+  pollingTimer = setInterval(function(){
+    if(state.pedidoActivo) return; // no interrumpir si hay pedido activo
+    fetchPedidos();
+  }, 4 * 60 * 1000);
+  
+  // Historial cada 4 minutos
+  setInterval(fetchHistorialSheet, 4 * 60 * 1000);
+  
+  // Barra de progreso — ciclo de 4 min
   var fill = document.getElementById('pollingFill'), t0 = Date.now();
   pollingBarTimer = setInterval(function(){
-    fill.style.width = ((Date.now() - t0) % POLL_INTERVAL) / POLL_INTERVAL * 100 + '%';
-  }, 150);
+    fill.style.width = ((Date.now() - t0) % (4 * 60 * 1000)) / (4 * 60 * 1000) * 100 + '%';
+  }, 500);
   /* Historial: carga inicial + polling */
 fetchHistorialSheet();
-setInterval(fetchHistorialSheet, 10000);
+
 }
 
 /* ═══════════════════ RENDER PEDIDOS ═══════════════════ */
