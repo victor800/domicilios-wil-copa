@@ -222,6 +222,53 @@ body{min-height:100dvh;font-family:'Inter',sans-serif;background:#f8f9fa;color:#
 /* Mapa embebido en pestaña */
 #mapInTab{position:absolute;inset:0;width:100%;height:100%;z-index:1}
 .leaflet-container{background:#1a2a2a!important}
+
+/* ══ CARD DETALLE DRAWER ══ */
+.card-detail-drawer{
+  max-height:0;overflow:hidden;
+  transition:max-height .38s cubic-bezier(.22,1,.36,1),opacity .28s ease;
+  opacity:0;
+}
+.card-detail-drawer.open{
+  max-height:1400px;
+  opacity:1;
+}
+.ver-detalle-btn{
+  flex:2;
+  background:linear-gradient(135deg,rgba(0,105,112,.07),rgba(0,188,200,.04));
+  border:1.5px solid rgba(0,105,112,.18);
+  border-radius:14px;padding:11px 10px;
+  font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:12px;
+  color:#006970;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  transition:all .18s;
+}
+.ver-detalle-btn:hover{background:rgba(0,105,112,.12);border-color:rgba(0,105,112,.3);}
+.ver-detalle-btn .vd-icon{
+  width:24px;height:24px;border-radius:50%;
+  background:rgba(0,105,112,.1);
+  display:flex;align-items:center;justify-content:center;
+  transition:transform .3s cubic-bezier(.22,1,.36,1);
+}
+.ver-detalle-btn.open .vd-icon{transform:rotate(180deg);}
+ 
+/* ══ POPUP PEDIDO ACTIVO ══ */
+#popupPedidoActivo{
+  position:fixed;inset:0;z-index:700;
+  background:rgba(0,0,0,.55);
+  display:none;align-items:center;justify-content:center;
+  padding:20px;
+}
+#popupPedidoActivo.open{display:flex;}
+#popupPedidoActivoBox{
+  background:#fff;border-radius:28px;
+  max-width:360px;width:100%;
+  padding:28px 24px 24px;
+  box-shadow:0 16px 56px rgba(0,0,0,.35);
+  animation:cardIn .3s cubic-bezier(.22,1,.36,1);
+  text-align:center;
+}
+
 </style>
 </head>
 <body>
@@ -769,6 +816,47 @@ body{min-height:100dvh;font-family:'Inter',sans-serif;background:#f8f9fa;color:#
   </div>
   <div id="navProximoPaso" style="background:rgba(255,255,255,.06);border-radius:12px;padding:7px 11px;font-size:11px;color:rgba(255,255,255,.55);display:none">
     <span id="navProxIcono"></span> <span id="navProxTexto"></span>
+  </div>
+</div>
+
+<div id="popupPedidoActivo">
+  <div id="popupPedidoActivoBox">
+    <div style="width:72px;height:72px;border-radius:50%;
+      background:linear-gradient(135deg,#f59e0b,#f97316);
+      margin:0 auto 16px;display:flex;align-items:center;justify-content:center;
+      box-shadow:0 8px 24px rgba(245,158,11,.35);font-size:36px">🛵</div>
+    <h3 style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:900;
+      font-size:18px;color:#191c1d;margin:0 0 8px">
+      ¡Ya tienes un pedido activo!
+    </h3>
+    <p style="font-size:13px;color:#6c7a7b;line-height:1.55;margin-bottom:6px">
+      Solo puedes tener <strong>un pedido en ruta</strong> a la vez.<br>
+      Finaliza o cancela el pedido activo antes de tomar uno nuevo.
+    </p>
+    <div style="background:#fff8ec;border-radius:14px;padding:11px 14px;
+      margin:12px 0 20px;text-align:left;border-left:3px solid #f59e0b">
+      <p style="font-size:10px;font-weight:800;color:#9eaaac;
+        text-transform:uppercase;margin-bottom:4px">Pedido activo</p>
+      <p style="font-size:13px;font-weight:800;color:#191c1d;margin:0" id="popupPedActNombre">—</p>
+      <p style="font-size:11px;color:#6c7a7b;margin:2px 0 0" id="popupPedActDir">—</p>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button onclick="cerrarPopupPedidoActivo()"
+        style="flex:1;padding:12px;background:#f3f4f5;border:none;
+        border-radius:14px;font-family:'Plus Jakarta Sans',sans-serif;
+        font-weight:800;font-size:12px;color:#6c7a7b;cursor:pointer">
+        Cerrar
+      </button>
+      <button onclick="irAPedidoActivo()"
+        style="flex:2;padding:12px;
+        background:linear-gradient(135deg,#006970,#00bcc9);
+        border:none;border-radius:14px;font-family:'Plus Jakarta Sans',sans-serif;
+        font-weight:800;font-size:12px;color:#fff;cursor:pointer;
+        display:flex;align-items:center;justify-content:center;gap:6px">
+        <span class="material-symbols-outlined" style="font-size:15px;font-variation-settings:'FILL' 1">two_wheeler</span>
+        Ver pedido activo
+      </button>
+    </div>
   </div>
 </div>
 
@@ -1804,12 +1892,53 @@ function expandirPedidoCard(pid){
   }
 }
 
+function mostrarPopupPedidoActivo(){
+  var p = state.pedidoActivo;
+  if(p){
+    document.getElementById('popupPedActNombre').textContent =
+      (p.cliente && p.cliente!=='—') ? p.cliente : 'Sin nombre';
+    var dir = (p.direccion||'—')
+      .replace(/\s*\(Ref:[^)]+\)/g,'').replace(/\s*\[.+?\]/g,'').trim().substring(0,55);
+    document.getElementById('popupPedActDir').textContent = dir;
+  }
+  document.getElementById('popupPedidoActivo').classList.add('open');
+}
+function cerrarPopupPedidoActivo(){
+  document.getElementById('popupPedidoActivo').classList.remove('open');
+}
+function irAPedidoActivo(){
+  cerrarPopupPedidoActivo();
+  switchTab('ruta');
+}
+ 
+function toggleDetalleCard(pid){
+  var drawer = document.getElementById('drawer_'+pid);
+  var btn    = document.getElementById('vdbtn_'+pid);
+  if(!drawer) return;
+  var isOpen = drawer.classList.contains('open');
+  if(isOpen){
+    drawer.classList.remove('open');
+    btn.classList.remove('open');
+    btn.querySelector('.vd-txt').textContent = 'Ver detalles';
+  } else {
+    drawer.classList.add('open');
+    btn.classList.add('open');
+    btn.querySelector('.vd-txt').textContent = 'Ocultar detalles';
+  }
+}
+
+
+
+
+
+
+
 function renderPedidos(){
   var lista = document.getElementById('listaPedidos');
   var vacio = document.getElementById('sinPedidos');
   var cnt   = document.getElementById('contadorPedidos');
   lista.innerHTML = '';
-
+ 
   if(!state.pedidos.length){
     vacio.style.display='flex';
     cnt.textContent='0 pedidos';
@@ -1819,7 +1948,7 @@ function renderPedidos(){
   vacio.style.display='none';
   cnt.textContent = state.pedidos.length + (state.pedidos.length===1?' pedido':' pedidos');
   actualizarBadgesNav();
-
+ 
   state.pedidos.forEach(function(p){
     var dirRaw   = p.direccion||'';
     var refM     = dirRaw.match(/\(Ref:\s*([^)]+)\)/);
@@ -1830,81 +1959,165 @@ function renderPedidos(){
     var ini      = cliente.charAt(0).toUpperCase();
     var pid      = 'p'+p.id.replace(/[^a-z0-9]/gi,'');
     var prodBlock= buildProdBlockCard(p,pid);
-
-    // ✅ Botón diferente si fue asignado específicamente a mí
-    var btnHTML;
-    if(p.asignadoAMi){
-      btnHTML =
-        '<div style="background:linear-gradient(135deg,rgba(124,58,237,.12),rgba(124,58,237,.06));'
-        +'border:1.5px solid rgba(124,58,237,.3);border-radius:12px;padding:8px 12px;'
-        +'margin-bottom:10px;display:flex;align-items:center;gap:8px;">'
-        +'<span style="font-size:18px;">🎯</span>'
-        +'<div style="flex:1"><div style="font-size:11px;font-weight:800;color:#7c3aed;">¡Pedido asignado a ti!</div>'
-        +'<div style="font-size:10px;color:#6c7a7b;">El admin te asignó este pedido directamente.</div></div></div>'
-        +'<button id="btn-'+p.id+'" onclick="aceptarPedidoAsignado(\''+p.id+'\')" '
-        +'style="width:100%;padding:13px;background:linear-gradient(135deg,#7c3aed,#8b5cf6);'
-        +'color:#fff;border:none;border-radius:16px;font-family:\'Plus Jakarta Sans\',sans-serif;'
-        +'font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;'
-        +'justify-content:center;gap:7px;box-shadow:0 4px 18px rgba(124,58,237,.35);">'
-        +'<span class="material-symbols-outlined text-white" '
-        +'style="font-size:16px;font-variation-settings:\'FILL\' 1">check_circle</span>'
-        +'Aceptar y ponerme en camino</button>';
-    } else {
-      btnHTML =
-        '<button id="btn-'+p.id+'" onclick="aceptarPedido(\''+p.id+'\')" '
-        +'style="width:100%;padding:13px;background:linear-gradient(135deg,#006970,#00bcc9);'
-        +'color:#fff;border:none;border-radius:16px;font-family:\'Plus Jakarta Sans\',sans-serif;'
-        +'font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;'
-        +'justify-content:center;gap:7px;box-shadow:0 4px 18px rgba(0,105,112,.28);">'
-        +'<span class="material-symbols-outlined text-white" '
-        +'style="font-size:16px;font-variation-settings:\'FILL\' 1">check_circle</span>'
-        +'Aceptar pedido</button>';
+ 
+    // Botón aceptar
+    var btnAceptarId = 'btn-'+p.id;
+    var btnAceptarOnclick = p.asignadoAMi
+      ? "aceptarPedidoAsignado('"+p.id+"')"
+      : "aceptarPedido('"+p.id+"')";
+    var btnAceptarBg = p.asignadoAMi
+      ? 'linear-gradient(135deg,#7c3aed,#8b5cf6)'
+      : 'linear-gradient(135deg,#006970,#00bcc9)';
+    var btnAceptarLabel = p.asignadoAMi ? 'Aceptar y en camino' : 'Aceptar pedido';
+    var btnShadow = p.asignadoAMi
+      ? '0 4px 14px rgba(124,58,237,.28)'
+      : '0 4px 14px rgba(0,105,112,.22)';
+ 
+    // Resumen de productos (máx 2 nombres)
+    var prods = parsearProductos(p);
+    var prodResumen = '';
+    if(prods.length){
+      var names = prods.slice(0,2).map(function(pr){ return pr.nombre; });
+      prodResumen = names.join(', ') + (prods.length > 2 ? ' +' + (prods.length-2) + ' más' : '');
     }
-
+ 
+    // Badge asignado
+    var asignadoBadge = p.asignadoAMi
+      ? '<div style="background:linear-gradient(135deg,rgba(124,58,237,.1),rgba(124,58,237,.05));'
+        +'border:1.5px solid rgba(124,58,237,.25);border-radius:10px;padding:7px 11px;'
+        +'margin-bottom:10px;display:flex;align-items:center;gap:7px;">'
+        +'<span style="font-size:15px">🎯</span>'
+        +'<div style="flex:1"><div style="font-size:11px;font-weight:800;color:#7c3aed;">¡Pedido asignado a ti!</div>'
+        +'<div style="font-size:10px;color:#6c7a7b">El admin te asignó este pedido directamente.</div></div></div>'
+      : '';
+ 
     lista.insertAdjacentHTML('beforeend',
-      '<div class="bg-surf-white rounded-2xl p-4 shadow-sm border border-out-var/10 relative overflow-hidden card-in" id="pedido-'+p.id+'">'
-      +'<div class="flex items-center gap-3 mb-3">'
-      +'<div style="width:40px;height:40px;border-radius:14px;background:rgba(0,105,112,.1);'
-      +'display:flex;align-items:center;justify-content:center;font-family:\'Plus Jakarta Sans\',sans-serif;'
-      +'font-weight:800;font-size:18px;color:#006970;flex-shrink:0">'+ini+'</div>'
-      +'<div style="flex:1;min-width:0">'
-      +'<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:14px;'
-      +'color:#191c1d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(cliente)+'</p>'
-      +'<p style="font-size:11px;color:#6c7a7b;display:flex;align-items:center;gap:4px">'
-      +'<span class="material-symbols-outlined" style="font-size:12px">phone</span>'
-      +escHtml(p.telefono||'—')+'</p></div>'
-      +'<div style="text-align:right;flex-shrink:0">'
-      +'<span style="font-size:10px;font-weight:800;background:#e7e8e9;padding:3px 8px;'
-      +'border-radius:20px;color:#6c7a7b">'+(p.hora||'—')+'</span>'
-      +'</div></div>'
-
-      +'<div style="display:flex;align-items:flex-start;gap:7px;background:#f3f4f5;'
-      +'border-radius:12px;padding:8px 10px;margin-bottom:10px">'
-      +'<span class="material-symbols-outlined" style="font-size:15px;color:#4c56af;'
-      +'flex-shrink:0;margin-top:2px;font-variation-settings:\'FILL\' 1">location_on</span>'
-      +'<div style="min-width:0;flex:1">'
-      +'<p style="font-size:12px;font-weight:700;color:#191c1d;word-break:break-word;'
-      +'white-space:normal;line-height:1.35">'+escHtml(dir)+'</p>'
-      +(ref?'<p style="font-size:10px;color:#6c7a7b">Ref: '+escHtml(ref)+'</p>':'')
-      +'</div>'
-      +'<span style="font-size:10px;font-weight:800;color:#006970;flex-shrink:0;'
-      +'white-space:nowrap;margin-top:2px">'+(p.total||'—')+'</span>'
-      +'</div>'
-
-      +prodBlock
-
-      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
-      +'<span style="font-size:11px;font-weight:700;color:#6c7a7b">'+pago+'</span>'
-      +'<span style="font-size:10px;color:#9eaaac">'+(p.fecha||'')+'</span>'
-      +'</div>'
-
-      +btnHTML
+      // ── CARD WRAPPER ──
+      '<div class="bg-surf-white rounded-2xl shadow-sm border border-out-var/10 relative overflow-hidden card-in" id="pedido-'+p.id+'" style="padding:0">'
+ 
+        // ── RESUMEN (siempre visible) ──
+        +'<div style="padding:14px 14px 12px">'
+ 
+          // Fila avatar + cliente + hora
+          +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
+            +'<div style="width:40px;height:40px;border-radius:14px;background:rgba(0,105,112,.1);'
+            +'display:flex;align-items:center;justify-content:center;'
+            +'font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:18px;color:#006970;flex-shrink:0">'+ini+'</div>'
+            +'<div style="flex:1;min-width:0">'
+              +'<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:14px;'
+              +'color:#191c1d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(cliente)+'</p>'
+              +'<p style="font-size:11px;color:#6c7a7b;display:flex;align-items:center;gap:4px;margin-top:1px">'
+              +'<span class="material-symbols-outlined" style="font-size:12px">phone</span>'
+              +escHtml(p.telefono||'—')+'</p>'
+            +'</div>'
+            +'<div style="text-align:right;flex-shrink:0">'
+              +'<span style="font-size:10px;font-weight:800;background:#e7e8e9;padding:3px 8px;border-radius:20px;color:#6c7a7b">'+(p.hora||'—')+'</span>'
+              +(p.asignadoAMi ? '<div style="margin-top:4px;font-size:9px;font-weight:800;color:#7c3aed">🎯 Asignado</div>' : '')
+            +'</div>'
+          +'</div>'
+ 
+          // Dirección resumida + total
+          +'<div style="display:flex;align-items:center;gap:8px;background:#f3f4f5;'
+          +'border-radius:12px;padding:8px 10px;margin-bottom:'+(prodResumen?'9':'10')+'px">'
+            +'<span class="material-symbols-outlined" style="font-size:14px;color:#4c56af;'
+            +'flex-shrink:0;font-variation-settings:\'FILL\' 1">location_on</span>'
+            +'<p style="font-size:12px;font-weight:700;color:#191c1d;flex:1;min-width:0;'
+            +'overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(dir||'—')+'</p>'
+            +'<span style="font-size:12px;font-weight:900;color:#006970;flex-shrink:0;'
+            +'font-family:\'Plus Jakarta Sans\',sans-serif;white-space:nowrap">'+(p.total||'—')+'</span>'
+          +'</div>'
+ 
+          // Productos resumen + pago
+          +(prodResumen
+            ? '<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">'
+              +'<span class="material-symbols-outlined" style="font-size:13px;color:#2a9d5c;flex-shrink:0">medication</span>'
+              +'<p style="font-size:11px;color:#3c494b;font-weight:600;flex:1;min-width:0;'
+              +'overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(prodResumen)+'</p>'
+              +'<span style="font-size:10px;font-weight:700;color:#6c7a7b;flex-shrink:0">'+pago+'</span>'
+              +'</div>'
+            : '')
+ 
+          // Botones: Aceptar + Ver detalles
+          +'<div style="display:flex;gap:8px;align-items:stretch">'
+            // Aceptar (flex 3)
+            +'<button id="'+btnAceptarId+'" onclick="'+btnAceptarOnclick+'"'
+            +' style="flex:3;padding:11px 8px;background:'+btnAceptarBg+';color:#fff;'
+            +'border:none;border-radius:14px;font-family:\'Plus Jakarta Sans\',sans-serif;'
+            +'font-weight:800;font-size:12px;cursor:pointer;display:flex;align-items:center;'
+            +'justify-content:center;gap:6px;box-shadow:'+btnShadow+'">'
+            +'<span class="material-symbols-outlined text-white" '
+            +'style="font-size:15px;font-variation-settings:\'FILL\' 1">check_circle</span>'
+            +btnAceptarLabel
+            +'</button>'
+            // Ver detalles (flex 2)
+            +'<button id="vdbtn_'+pid+'" class="ver-detalle-btn" onclick="toggleDetalleCard(\''+pid+'\')">'
+            +'<span class="vd-txt">Ver detalles</span>'
+            +'<div class="vd-icon"><span class="material-symbols-outlined" style="font-size:14px;color:#006970">expand_more</span></div>'
+            +'</button>'
+          +'</div>'
+ 
+        +'</div>'
+        // ── FIN RESUMEN ──
+ 
+        // ── DRAWER DETALLES (colapsado por defecto) ──
+        +'<div class="card-detail-drawer" id="drawer_'+pid+'">'
+          +'<div style="border-top:1px solid rgba(0,105,112,.1);padding:14px 14px 16px;background:rgba(0,105,112,.02)">'
+ 
+            // Badge asignado
+            +asignadoBadge
+ 
+            // Ref
+            +(ref
+              ? '<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;'
+                +'background:#fff8ec;border-radius:10px;padding:7px 10px;border:1px solid #f59e0b33">'
+                +'<span class="material-symbols-outlined" style="font-size:13px;color:#f59e0b">info</span>'
+                +'<p style="font-size:11px;font-weight:700;color:#92400e;margin:0">Ref: '+escHtml(ref)+'</p>'
+                +'</div>'
+              : '')
+ 
+            // Dirección completa
+            +'<div style="display:flex;align-items:flex-start;gap:7px;background:#f8f9fa;'
+            +'border-radius:12px;padding:9px 11px;margin-bottom:10px;border:1px solid rgba(76,86,175,.12)">'
+            +'<span class="material-symbols-outlined" style="font-size:14px;color:#4c56af;'
+            +'flex-shrink:0;margin-top:2px;font-variation-settings:\'FILL\' 1">location_on</span>'
+            +'<div><p style="font-size:9px;font-weight:800;text-transform:uppercase;color:#9eaaac;margin:0 0 2px">Dirección completa</p>'
+            +'<p style="font-size:12px;font-weight:700;color:#191c1d;line-height:1.4;word-break:break-word;margin:0">'+escHtml(dirRaw)+'</p></div>'
+            +'</div>'
+ 
+            // Productos detallados (ticket completo)
+            +prodBlock
+ 
+            // Pago + fecha
+            +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">'
+            +'<span style="font-size:11px;font-weight:700;color:#6c7a7b">'+pago+'</span>'
+            +'<span style="font-size:10px;color:#9eaaac">'+(p.fecha||'')+'</span>'
+            +'</div>'
+ 
+            // Botón cerrar detalles
+            +'<button onclick="toggleDetalleCard(\''+pid+'\')"'
+            +' style="width:100%;margin-top:12px;padding:9px;background:transparent;'
+            +'border:1.5px dashed rgba(0,105,112,.25);border-radius:12px;'
+            +'font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:11px;'
+            +'color:#006970;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px">'
+            +'<span class="material-symbols-outlined" style="font-size:13px">expand_less</span>'
+            +'Cerrar detalles'
+            +'</button>'
+ 
+          +'</div>'
+        +'</div>'
+        // ── FIN DRAWER ──
+ 
       +'</div>'
     );
   });
 }
 /* ═══════════════════ ACEPTAR PEDIDO ═══════════════════ */
 async function aceptarPedido(id){
+
+  if(state.pedidoActivo){
+    mostrarPopupPedidoActivo();
+    return;
+  }
   // ✅ Evitar doble tap
   if(idsProcesados.has(id)) return;
 
