@@ -1962,33 +1962,43 @@ SONIDO.init();
 ═══════════════════════════════════════════════ */
 const ALERTA_PENDIENTES = {
   timer: null,
-  INTERVALO: 5 * 60 * 1000, // 5 minutos
+  INTERVALO: 5 * 60 * 1000,
 
   init() {
+    if (this.timer) clearInterval(this.timer);
     this.timer = setInterval(() => this.revisar(), this.INTERVALO);
     console.log('[ALERTA] Iniciada — revisará cada 5 min');
   },
 
-  revisar() {
-    // Solo alertar si la pestaña está visible
+  async revisar() {
     if (document.hidden) return;
+
+    // ✅ Siempre recargar del sheet antes de revisar
+    await loadPedidos();
 
     const sinAsignar = allPedidos.filter(p =>
       p.estado === 'pendiente' && (!p.domi || p.domi.trim() === '')
     );
 
+    console.log('[ALERTA] Revisando — pendientes sin asignar:', sinAsignar.length);
+
     if (!sinAsignar.length) return;
 
-    const n = sinAsignar.length;
+    const n      = sinAsignar.length;
     const nombres = sinAsignar.slice(0, 3).map(p => p.cliente || p.id).join(', ');
     const sufijo  = sinAsignar.length > 3 ? ` y ${sinAsignar.length - 3} más` : '';
 
-    // 🔔 Sonido urgente (más agresivo que el de nuevo pedido)
-    this.sonidoUrgente();
+    // 🔔 Sonido — forzar nuevo contexto si fue suspendido
+    try {
+      if (SONIDO.ctx && SONIDO.ctx.state === 'suspended') {
+        await SONIDO.ctx.resume();
+      }
+      this.sonidoUrgente();
+    } catch(e) { console.warn('[ALERTA sonido]:', e); }
 
     // 📢 Voz
     VOZ.hablar(
-      `Atención. Hay ${n} pedido${n !== 1 ? 's' : ''} pendiente${n !== 1 ? 's' : ''} sin asignar. Revisa el panel.`,
+      `Atención. Hay ${n} pedido${n !== 1 ? 's' : ''} pendiente${n !== 1 ? 's' : ''} sin asignar.`,
       1.0, 1.15
     );
 
@@ -1998,7 +2008,6 @@ const ALERTA_PENDIENTES = {
       nombres + sufijo
     );
 
-    // 📳 Vibración larga en móvil
     if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300, 100, 600]);
   },
 
@@ -2008,23 +2017,20 @@ const ALERTA_PENDIENTES = {
         SONIDO.ctx = new (window.AudioContext || window.webkitAudioContext)();
       }
       const ctx = SONIDO.ctx;
-
-      // Secuencia urgente: 6 pulsos rápidos descendentes
       const notas = [
         { freq: 1200, t: 0.00, dur: 0.12 },
         { freq: 1000, t: 0.15, dur: 0.12 },
         { freq: 1200, t: 0.30, dur: 0.12 },
         { freq: 1000, t: 0.45, dur: 0.12 },
         { freq: 1200, t: 0.60, dur: 0.12 },
-        { freq: 800,  t: 0.75, dur: 0.35 }, // nota larga final
+        { freq: 800,  t: 0.75, dur: 0.35 },
       ];
-
       notas.forEach(({ freq, t, dur }) => {
         const osc  = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain);
         gain.connect(ctx.destination);
-        osc.type = 'square'; // más estridente que sine
+        osc.type = 'square';
         osc.frequency.setValueAtTime(freq, ctx.currentTime + t);
         gain.gain.setValueAtTime(0, ctx.currentTime + t);
         gain.gain.linearRampToValueAtTime(0.8, ctx.currentTime + t + 0.01);
@@ -2032,16 +2038,8 @@ const ALERTA_PENDIENTES = {
         osc.start(ctx.currentTime + t);
         osc.stop(ctx.currentTime + t + dur + 0.05);
       });
-
     } catch(e) {
       console.warn('[ALERTA sonido]:', e.message);
-    }
-  },
-
-  test() {
-    this.revisar();
-    if (!allPedidos.filter(p => p.estado === 'pendiente' && !p.domi?.trim()).length) {
-      showToast('i', 'Sin pendientes ahora', 'La alerta solo suena si hay pedidos sin asignar');
     }
   },
 

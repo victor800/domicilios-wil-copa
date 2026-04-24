@@ -1533,56 +1533,63 @@ async function fetchPedidos() {
     var idDomi     = (domi.id||'').toUpperCase().trim();
 
     var misPendientes = [];
-    var enRuta        = null;
+var enRuta        = null;
 
-    pedOrder.forEach(function(id){
-      var p    = pedMap[id];
-      p.estado = _normEst(p.estadoRaw);
+pedOrder.forEach(function(id){
+  var p    = pedMap[id];
+  p.estado = _normEst(p.estadoRaw);
 
-      var asgNorm  = _norm(p.domiAsign);
-      var asgUpper = (p.domiAsign||'').toUpperCase();
+  // Pedido ya procesado localmente → ignorar
+  if(idsProcesados.has(id)) return;
 
-      // ✅ Pedido asignado a mí (tiene mi nombre en col P)
-      var esMio = p.domiAsign && (
-        asgNorm.includes(nombreBase) || asgUpper.includes(idDomi)
-      );
+  var asgNorm  = _norm(p.domiAsign || '');
+  var asgUpper = (p.domiAsign || '').toUpperCase();
+  var esMio    = p.domiAsign && (
+    asgNorm.includes(nombreBase) || asgUpper.includes(idDomi)
+  );
 
-      if(!esMio) return;
+  // ── EN RUTA: asignado a mí y en proceso/camino ──
+  if(esMio && (p.estado === 'proceso' || p.estado === 'camino' || p.estado === 'asignado')){
+    if(!enRuta) enRuta = _cvtPed(p);
+    return;
+  }
 
-      // Ya procesado o entregado → va al historial, no a la lista
-      if(idsProcesados.has(id)) return;
-      if(p.estado === 'entregado') return;
+  // ── ENTREGADO/CANCELADO → ignorar en lista ──
+  if(p.estado === 'entregado') return;
+  if((p.estadoRaw||'').toLowerCase().includes('cancelad')) return;
 
-      // En camino / proceso → pestaña Ruta
-      if(p.estado === 'proceso' || p.estado === 'camino'){
-        enRuta = _cvtPed(p);
-        return;
-      }
+  // ── PENDIENTE: mostrar a TODOS los domis ──
+  if(p.estado === 'pendiente'){
+    var ped = _cvtPed(p);
 
-      // ✅ Pendiente asignado a mí → mostrar en lista de Pedidos
-      if(p.estado === 'pendiente'){
-        var ped = _cvtPed(p);
-        ped.asignadoAMi = true; // marcar para UI especial
+    // Marcar si está asignado específicamente a mí
+    ped.asignadoAMi = esMio;
 
-        // Notificación push SOLO la primera vez que veo este pedido
-        if(!_idsAsignadosNotificados.has(id)){
-          _idsAsignadosNotificados.add(id);
-          _notifAsignado(ped);
-        }
-        misPendientes.push(ped);
-      }
-    });
-
-    // Detectar pedidos nuevos genéricos (sin asignación específica)
-    // — en tu caso con asignación siempre los ves, así que esto queda vacío
-    state.pedidos = misPendientes;
-
-    // Activar pedido en ruta si es nuevo
-    if(enRuta && (!state.pedidoActivo || state.pedidoActivo.id !== enRuta.id)){
-      state.pedidoActivo  = enRuta;
-      state.estadoPedido  = enRuta.estadoRaw;
-      activarPedidoEnRuta(enRuta);
+    // Notificación solo si está asignado a mí y es la primera vez
+    if(esMio && !_idsAsignadosNotificados.has(id)){
+      _idsAsignadosNotificados.add(id);
+      _notifAsignado(ped);
     }
+
+    misPendientes.push(ped);
+  }
+});
+
+// Ordenar: los asignados a mí primero
+misPendientes.sort(function(a, b){
+  if(a.asignadoAMi && !b.asignadoAMi) return -1;
+  if(!a.asignadoAMi && b.asignadoAMi) return 1;
+  return 0;
+});
+
+state.pedidos = misPendientes;
+
+// Activar pedido en ruta si es nuevo
+if(enRuta && (!state.pedidoActivo || state.pedidoActivo.id !== enRuta.id)){
+  state.pedidoActivo  = enRuta;
+  state.estadoPedido  = enRuta.estadoRaw;
+  activarPedidoEnRuta(enRuta);
+}
 
     renderPedidos();
     actualizarBadgesNav();
@@ -2984,7 +2991,8 @@ renderPerfil();
 iniciarPolling();
 buildDomiMiniAvatar();
 actualizarBadgesNav();
-fetchHistorialSheets();
+fetchHistorialSheet();
+
 
 /* ── Notificaciones push + polling background ── */
 setTimeout(function () {
