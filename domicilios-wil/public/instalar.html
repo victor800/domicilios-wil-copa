@@ -450,50 +450,53 @@ html,body{min-height:100dvh;font-family:'Inter',sans-serif;background:#00b5b0;-w
 /* ══════════════════════════════════════════════════════
    DETECCIÓN
 ══════════════════════════════════════════════════════ */
-const esIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-const esAndroid = /android/i.test(navigator.userAgent);
+const esIOS      = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const esAndroid  = /android/i.test(navigator.userAgent);
 const esStandalone = window.matchMedia('(display-mode: standalone)').matches
                   || window.navigator.standalone === true;
 
-// Si ya está instalada → ir directo al inicio
-if (esStandalone) {
-  window.location.replace('/');
-}
+// Ya instalada → ir al inicio
+if (esStandalone) { window.location.replace('/index.html'); }
 
-// Ajustar nota según OS
+// Nota según OS
 const noteEl = document.getElementById('install-note');
+const sliderTextEl = document.getElementById('sliderText');
 if (esIOS) {
-  noteEl.textContent = '📱 Desliza y te mostramos cómo instalar en iPhone';
-} else if (!esAndroid) {
-  // Desktop / otro
-  noteEl.textContent = '💻 Funciona mejor desde Chrome en Android';
+  noteEl.textContent = '📱 Te mostramos cómo instalarlo en iPhone / iPad';
+} else if (esAndroid) {
+  noteEl.textContent = '✅ Se agrega directo a tu pantalla de inicio';
+} else {
+  noteEl.textContent = '💻 Abre desde Chrome en tu celular para instalar';
 }
 
 /* ══════════════════════════════════════════════════════
-   PWA PROMPT (Android Chrome)
+   CAPTURA DEL PROMPT — CRÍTICO
+   beforeinstallprompt se dispara ANTES de que el usuario
+   interactúe. Lo guardamos aquí para usarlo al deslizar.
 ══════════════════════════════════════════════════════ */
 let deferredPrompt = null;
+let promptListo    = false;
 
 window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
+  e.preventDefault();          // evita que Chrome muestre el banner solo
   deferredPrompt = e;
-  console.log('[WIL] beforeinstallprompt capturado ✅');
+  promptListo    = true;
+  console.log('[WIL PWA] ✅ prompt capturado');
+  // Cambiar nota a "listo para instalar"
+  noteEl.textContent = '🟢 ¡Listo! Desliza para instalar';
 });
 
-// Cuando el sistema confirma que se instaló
 window.addEventListener('appinstalled', () => {
   deferredPrompt = null;
-  console.log('[WIL] appinstalled ✅');
+  console.log('[WIL PWA] ✅ appinstalled');
   mostrarOverlayExito();
 });
 
 /* ══════════════════════════════════════════════════════
-   OVERLAY ÉXITO
+   OVERLAY DE ÉXITO
 ══════════════════════════════════════════════════════ */
 function mostrarOverlayExito() {
-  const overlay = document.getElementById('overlayExito');
-  overlay.classList.add('visible');
-
+  document.getElementById('overlayExito').classList.add('visible');
   let n = 4;
   const iv = setInterval(() => {
     n--;
@@ -501,21 +504,17 @@ function mostrarOverlayExito() {
     if (el) el.textContent = n;
     if (n <= 0) {
       clearInterval(iv);
-      document.getElementById('exitoCountdown').textContent = '✅ ¡Ya puedes abrir la app!';
-      // Intentar cerrar la pestaña del navegador
+      const cd = document.getElementById('exitoCountdown');
+      if (cd) cd.textContent = '✅ ¡Abre la app desde tu pantalla de inicio!';
       setTimeout(() => {
-        window.close();
-        // Fallback: si window.close() es bloqueado, mostrar mensaje de instrucción
+        window.close();                       // funciona si la pestaña fue abierta por otra
+        // Fallback visual si window.close() falla
         setTimeout(() => {
-          const hint = document.createElement('div');
-          hint.style.cssText = `
-            position:absolute;bottom:40px;left:0;right:0;text-align:center;
-            font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;
-            color:rgba(255,255,255,.9);padding:0 20px;line-height:1.6;
-          `;
-          hint.innerHTML = '👆 Abre <strong>Domicilios WIL</strong><br>desde tu pantalla de inicio';
-          overlay.appendChild(hint);
-        }, 500);
+          const h = document.createElement('div');
+          h.style.cssText = 'position:absolute;bottom:40px;left:0;right:0;text-align:center;font-family:Plus Jakarta Sans,sans-serif;font-size:14px;color:rgba(255,255,255,.9);padding:0 24px;line-height:1.7';
+          h.innerHTML = '👆 Busca <strong>Domicilios WIL</strong><br>en tu pantalla de inicio y ábrela';
+          document.getElementById('overlayExito').appendChild(h);
+        }, 600);
       }, 300);
     }
   }, 1000);
@@ -531,7 +530,6 @@ function cerrarPanelIOS() {
   document.getElementById('panelIOS').classList.remove('visible');
   snapBackReset();
 }
-// Cerrar tocando el fondo oscuro
 document.getElementById('panelIOS').addEventListener('click', function(e) {
   if (e.target === this) cerrarPanelIOS();
 });
@@ -547,11 +545,15 @@ const hint  = track.querySelector('.slider-hint');
 const THUMB_W = 60, PAD = 4;
 let dragging = false, startX = 0, currentX = 0, maxX = 0, done = false;
 
-/* ── Touch ── */
+function calcMaxX() {
+  return track.getBoundingClientRect().width - THUMB_W - PAD * 2;
+}
+
+/* Touch */
 thumb.addEventListener('touchstart', e => {
   if (done) return;
   dragging = true;
-  maxX = track.getBoundingClientRect().width - THUMB_W - PAD * 2;
+  maxX   = calcMaxX();
   startX = e.touches[0].clientX;
   thumb.style.transition = fill.style.transition = 'none';
   e.preventDefault();
@@ -570,11 +572,11 @@ thumb.addEventListener('touchend', () => {
   currentX / maxX >= 0.88 ? completar() : snapBack();
 });
 
-/* ── Mouse (fallback desktop) ── */
+/* Mouse */
 thumb.addEventListener('mousedown', e => {
   if (done) return;
   dragging = true;
-  maxX = track.getBoundingClientRect().width - THUMB_W - PAD * 2;
+  maxX   = calcMaxX();
   startX = e.clientX;
   thumb.style.transition = fill.style.transition = 'none';
 });
@@ -590,102 +592,136 @@ document.addEventListener('mouseup', () => {
 });
 
 function mover(x) {
-  thumb.style.left = (PAD + x) + 'px';
-  fill.style.width = (THUMB_W + PAD + x) + 'px';
+  thumb.style.left  = (PAD + x) + 'px';
+  fill.style.width  = (THUMB_W + PAD + x) + 'px';
   hint.style.opacity = Math.max(0, 1 - (x / maxX) * 2);
 }
 
 function snapBack() {
   thumb.style.transition = 'left .4s cubic-bezier(.34,1.56,.64,1)';
   fill.style.transition  = 'width .4s cubic-bezier(.34,1.56,.64,1)';
-  thumb.style.left = PAD + 'px';
-  fill.style.width = THUMB_W + 'px';
+  thumb.style.left  = PAD + 'px';
+  fill.style.width  = THUMB_W + 'px';
   hint.style.opacity = '1';
-}
-
-/* ── Completar deslizamiento ── */
-async function completar() {
-  done = true;
-  const tw = track.getBoundingClientRect().width;
-  thumb.style.transition = fill.style.transition = 'all .25s ease';
-  thumb.style.left = (PAD + maxX) + 'px';
-  fill.style.width = tw + 'px';
-  track.classList.add('done');
-  // Mostrar checkmark en el thumb manteniendo el logo
-  thumb.innerHTML = '<span style="font-size:26px">✅</span>';
-
-  setTimeout(async () => {
-
-    /* ── Android Chrome: prompt nativo ── */
-    if (deferredPrompt) {
-      try {
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        deferredPrompt = null;
-        if (outcome === 'accepted') {
-          // La app se instaló → el evento 'appinstalled' disparará mostrarOverlayExito()
-          // pero por si acaso también lo llamamos aquí con pequeño delay
-          setTimeout(mostrarOverlayExito, 800);
-        } else {
-          toast('Puedes instalarla luego desde el menú ⋮');
-          snapBackReset();
-        }
-      } catch(err) {
-        console.warn('[WIL] prompt error:', err);
-        toast('Usa Chrome para instalar la app');
-        snapBackReset();
-      }
-
-    /* ── iOS Safari: guía paso a paso ── */
-    } else if (esIOS) {
-      mostrarPanelIOS();
-
-    /* ── Desktop Chrome sin prompt ── */
-    } else if (!deferredPrompt && !esIOS) {
-      // En escritorio Chrome: intentar a través del menú
-      toast('Abre el menú ⋮ del navegador → "Instalar aplicación"');
-      snapBackReset();
-    }
-
-  }, 600);
 }
 
 function snapBackReset() {
   done = false;
   track.classList.remove('done');
-  // Restaurar logo en el thumb
-  thumb.innerHTML = '<img src="/icons/icon-192.png" alt="WIL" onerror="this.parentElement.textContent=\'📲\'"/>';
+  thumb.innerHTML = '<img src="/icons/icon-192.png" alt="WIL" onerror="this.parentElement.innerHTML=\'📲\'"/>';
   snapBack();
 }
 
-/* ── Toast ── */
+/* ── Acción al completar el slider ── */
+async function completar() {
+  done = true;
+
+  // Animar thumb hasta el final
+  const tw = track.getBoundingClientRect().width;
+  thumb.style.transition = fill.style.transition = 'all .25s ease';
+  thumb.style.left  = (PAD + maxX) + 'px';
+  fill.style.width  = tw + 'px';
+  track.classList.add('done');
+  thumb.innerHTML = '<span style="font-size:26px">✅</span>';
+
+  await esperar(500);
+
+  /* ── CASO 1: Android Chrome con prompt disponible ── */
+  if (deferredPrompt) {
+    try {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      if (outcome === 'accepted') {
+        // 'appinstalled' llamará mostrarOverlayExito automáticamente
+        // pero por seguridad también lo llamamos aquí
+        await esperar(600);
+        mostrarOverlayExito();
+      } else {
+        toast('❌ Instalación cancelada — puedes intentarlo de nuevo');
+        snapBackReset();
+      }
+    } catch (err) {
+      console.warn('[WIL PWA] Error prompt:', err);
+      toast('Error al instalar. Usa Chrome en Android.');
+      snapBackReset();
+    }
+
+  /* ── CASO 2: iOS Safari ── */
+  } else if (esIOS) {
+    await esperar(200);
+    mostrarPanelIOS();
+
+  /* ── CASO 3: Android pero sin prompt aún (Chrome necesita más tiempo o criterios) ── */
+  } else if (esAndroid) {
+    // El prompt aún no llegó — mostrar instrucción del menú nativo
+    mostrarGuiaAndroidManual();
+
+  /* ── CASO 4: Desktop u otro navegador ── */
+  } else {
+    toast('Abre este sitio en Chrome desde tu celular para instalar');
+    snapBackReset();
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   GUÍA MANUAL ANDROID (cuando beforeinstallprompt no llegó)
+   Pasa cuando: ya está instalada, o Chrome aún no calificó la PWA,
+   o el usuario visitó hace menos de 30 segundos.
+══════════════════════════════════════════════════════ */
+function mostrarGuiaAndroidManual() {
+  const panel = document.getElementById('panelIOS'); // reutilizamos el panel
+  panel.querySelector('.ios-sheet').innerHTML = `
+    <h2>📲 Instalar en Android</h2>
+    <p>Chrome no lanzó el diálogo automáticamente.<br>Instálala desde el menú del navegador:</p>
+    <div class="ios-steps">
+      <div class="ios-step">
+        <div class="ios-step-num">1</div>
+        <div class="ios-step-txt">Toca el menú <strong>⋮</strong> (tres puntos) arriba a la derecha</div>
+      </div>
+      <div class="ios-step">
+        <div class="ios-step-num">2</div>
+        <div class="ios-step-txt">Toca <strong>"Instalar aplicación"</strong> o <strong>"Añadir a pantalla de inicio"</strong></div>
+      </div>
+      <div class="ios-step">
+        <div class="ios-step-num">3</div>
+        <div class="ios-step-txt">Toca <strong>Instalar</strong> — ¡listo! 🎉</div>
+      </div>
+    </div>
+    <button class="ios-btn-cerrar" onclick="cerrarPanelIOS()">Entendido</button>
+  `;
+  panel.classList.add('visible');
+}
+
+/* ══════════════════════════════════════════════════════
+   UTILS
+══════════════════════════════════════════════════════ */
+function esperar(ms) { return new Promise(r => setTimeout(r, ms)); }
+
 function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3500);
+  setTimeout(() => t.classList.remove('show'), 3800);
 }
 
 /* ══════════════════════════════════════════════════════
-   ANIMACIÓN DE ARRANQUE (muestra que se puede deslizar)
+   ANIMACIÓN DE ARRANQUE
 ══════════════════════════════════════════════════════ */
 function arranque() {
   if (done || dragging) return;
-  const tw = track.getBoundingClientRect().width;
-  maxX = tw - THUMB_W - PAD * 2;
+  maxX = calcMaxX();
   const empuje = Math.min(maxX * 0.28, 70);
-
   thumb.style.transition = 'left .45s cubic-bezier(.4,0,.2,1)';
   fill.style.transition  = 'width .45s cubic-bezier(.4,0,.2,1)';
-  thumb.style.left = (PAD + empuje) + 'px';
-  fill.style.width = (THUMB_W + PAD + empuje) + 'px';
+  thumb.style.left  = (PAD + empuje) + 'px';
+  fill.style.width  = (THUMB_W + PAD + empuje) + 'px';
   hint.style.opacity = String(Math.max(0, 1 - (empuje / maxX) * 2));
-
   setTimeout(() => {
     thumb.style.transition = 'left .5s cubic-bezier(.34,1.56,.64,1)';
     fill.style.transition  = 'width .5s cubic-bezier(.34,1.56,.64,1)';
-    thumb.style.left = PAD + 'px';
-    fill.style.width = THUMB_W + 'px';
+    thumb.style.left  = PAD + 'px';
+    fill.style.width  = THUMB_W + 'px';
     hint.style.opacity = '1';
   }, 500);
 }
@@ -695,5 +731,36 @@ setTimeout(() => {
   setInterval(() => { if (!done && !dragging) arranque(); }, 4000);
 }, 1200);
 </script>
+
+<!-- ══════════════════════════════════════════════════════
+     MANIFEST.JSON — COPIA ESTO EN /manifest.json DE TU SERVIDOR
+     (no va en el HTML, es un archivo separado)
+
+{
+  "name": "Domicilios WIL",
+  "short_name": "WIL",
+  "description": "Domicilios en Copacabana, Antioquia",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#00b5b0",
+  "theme_color": "#00b5b0",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
+
+══════════════════════════════════════════════════════ -->
 </body>
 </html>
