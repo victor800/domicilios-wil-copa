@@ -5,7 +5,7 @@
    - Sonido + vibración fuerte en notif asignados
    ═══════════════════════════════════════════════════════════ */
 
-const SW_VER  = 'wil-sw-v4.0';
+const SW_VER = 'wil-sw-v4.1';
 const SHEET_ID = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
 
 const DB_NAME  = 'wil_sw_db';
