@@ -1108,7 +1108,8 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
       <table class="wtbl">
         <thead><tr>
           <th>Pedido #</th><th>Cliente</th><th>Dirección</th>
-          <th>Domi</th><th>Estado</th><th>Tipo</th><th>Método</th>
+          <th>Domi</th><th>Estado</th><th>Comercio</th><th>Método</th>
+          
           <th>Subtotal</th><th>Domicilio</th><th>Total</th><th>Hora</th><th>Fecha</th>
         </tr></thead>
         <tbody id="ped-tbody"><tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text3);">Cargando…</td></tr></tbody>
@@ -2328,6 +2329,7 @@ async function loadPedidos() {
           horaEntrega:  col(l, 18),
           costoEnvio:   col(l, 19),
           tipoEntrega:  col(l, 20),
+          comercio:     col(l, 21),   // ← col V del sheet
           calificacion: col(l, 21) || '',
           _prods: []
         };
@@ -4859,56 +4861,58 @@ function renderPedidosTable(filter) {
   }
  
   tb.innerHTML = list.map(p => {
-    const subtotal    = calcSubtotal(p);
-    const costoEnvio  = parsePrecio(p.costoEnvio);
-    const totalSheet  = parsePrecio(p.total);
-    const totalMostrar= totalSheet > 0 ? totalSheet : (subtotal + costoEnvio) || 0;
-    const costoEnvioReal = costoEnvio > 0 ? costoEnvio
-      : (totalSheet > 0 && subtotal > 0 && totalSheet > subtotal ? totalSheet - subtotal : 0);
-    const esRecogida  = (p.tipoEntrega || '').toLowerCase().includes('recog');
- 
-    // Color de fila según estado
-    const rowBg = p.estado === 'pendiente' ? 'style="background:rgba(217,119,6,.04);"'
-                : p.estado === 'proceso'   ? 'style="background:rgba(37,99,235,.03);"'
-                : '';
- 
-    return `<tr ${rowBg} onclick="openModalPed('${p.id.replace(/'/g,"\\'")}');abrirAsignacion('${p.id.replace(/'/g,"\\'")}')">
-      <td>${p.id}</td>
-      <td><b style="font-size:12px;">${p.cliente || '–'}</b><br>
-          <span style="font-size:9px;color:var(--text3);">${p.tel || ''}</span></td>
-      <td style="font-size:11px;color:var(--text2);max-width:140px;">${p.direccion || '–'}</td>
-      <td>
-        ${p.domi
-          ? `<span style="font-size:11px;font-weight:700;">${p.domi}</span>`
-          : `<button onclick="event.stopPropagation();abrirAsignacion('${p.id.replace(/'/g,"\\'")}')"
-              style="background:var(--red-l);color:var(--red);border:1px solid rgba(220,38,38,.2);
-                     border-radius:8px;padding:3px 9px;font-size:10px;font-weight:800;cursor:pointer;">
-              + Asignar
-             </button>`}
-      </td>
-     <span class="stag ${p.estado}">${
-  p.estado === 'entregado' ? 'Entregado ✓' :
-  p.estado === 'proceso'   ? 'En proceso'  :
-  p.estado === 'asignado'  ? '✦ Asignado'  :
-  'Pendiente'
-}</span>
-      <td>
-        ${esRecogida
-          ? '<span style="font-size:9px;font-weight:800;background:#ede9fe;color:#7c3aed;padding:2px 8px;border-radius:99px;">🏪 Recogida</span>'
-          : '<span style="font-size:9px;font-weight:800;background:var(--teal-m);color:var(--teal-d);padding:2px 8px;border-radius:99px;">🛵 Domicilio</span>'}
-      </td>
-      <td style="font-size:11px;color:var(--text2);">${p.metodo || '–'}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:11px;font-weight:700;color:var(--text2);">${subtotal > 0 ? fmtMoney(subtotal) : '–'}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:11px;">
-        ${costoEnvioReal > 0
-          ? `<span style="color:var(--orange);font-weight:700;">${fmtMoney(costoEnvioReal)}</span>`
-          : `<span style="color:var(--green);font-size:9px;font-weight:800;">Gratis</span>`}
-      </td>
-      <td style="font-family:'DM Mono',monospace;font-size:12px;font-weight:800;color:var(--teal-d);">${totalMostrar > 0 ? fmtMoney(totalMostrar) : '–'}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:10px;">${p.hora || '–'}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:10px;">${p.fecha || '–'}</td>
-    </tr>`;
-  }).join('');
+  const subtotal    = calcSubtotal(p);
+  const costoEnvio  = parsePrecio(p.costoEnvio);
+  const totalSheet  = parsePrecio(p.total);
+  const totalMostrar= totalSheet > 0 ? totalSheet : (subtotal + costoEnvio) || 0;
+  const costoEnvioReal = costoEnvio > 0 ? costoEnvio
+    : (totalSheet > 0 && subtotal > 0 && totalSheet > subtotal ? totalSheet - subtotal : 0);
+
+  const rowBg = p.estado === 'pendiente' ? 'style="background:rgba(217,119,6,.04);"'
+              : p.estado === 'proceso'   ? 'style="background:rgba(37,99,235,.03);"'
+              : '';
+
+  return `<tr ${rowBg} onclick="openModalPed('${p.id.replace(/'/g,"\\'")}');abrirAsignacion('${p.id.replace(/'/g,"\\'")}')">
+    <td>${p.id}</td>
+    <td>
+      <b style="font-size:12px;">${p.cliente || '–'}</b><br>
+      <span style="font-size:9px;color:var(--text3);">${p.tel || ''}</span>
+    </td>
+    <td style="font-size:11px;color:var(--text2);max-width:140px;">${p.direccion || '–'}</td>
+    <td>
+      ${p.domi
+        ? `<span style="font-size:11px;font-weight:700;">${p.domi}</span>`
+        : `<button onclick="event.stopPropagation();abrirAsignacion('${p.id.replace(/'/g,"\\'")}')"
+            style="background:var(--red-l);color:var(--red);border:1px solid rgba(220,38,38,.2);
+                   border-radius:8px;padding:3px 9px;font-size:10px;font-weight:800;cursor:pointer;">
+            + Asignar
+           </button>`}
+    </td>
+    <td>
+      <span class="stag ${p.estado}">${
+        p.estado === 'entregado' ? 'Entregado ✓' :
+        p.estado === 'proceso'   ? 'En proceso'  :
+        p.estado === 'asignado'  ? '✦ Asignado'  :
+        'Pendiente'
+      }</span>
+    </td>
+    <td style="font-size:11px;color:var(--text2);">${p.comercio || '–'}</td>
+    <td style="font-size:11px;color:var(--text2);">${p.metodo || '–'}</td>
+    <td style="font-family:'DM Mono',monospace;font-size:11px;font-weight:700;color:var(--text2);">
+      ${subtotal > 0 ? fmtMoney(subtotal) : '–'}
+    </td>
+    <td style="font-family:'DM Mono',monospace;font-size:11px;">
+      ${costoEnvioReal > 0
+        ? `<span style="color:var(--orange);font-weight:700;">${fmtMoney(costoEnvioReal)}</span>`
+        : `<span style="color:var(--green);font-size:9px;font-weight:800;">Gratis</span>`}
+    </td>
+    <td style="font-family:'DM Mono',monospace;font-size:12px;font-weight:800;color:var(--teal-d);">
+      ${totalMostrar > 0 ? fmtMoney(totalMostrar) : '–'}
+    </td>
+    <td style="font-family:'DM Mono',monospace;font-size:10px;">${p.hora || '–'}</td>
+    <td style="font-family:'DM Mono',monospace;font-size:10px;">${p.fecha || '–'}</td>
+  </tr>`;
+}).join('');
 }
 
 
