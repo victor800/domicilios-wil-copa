@@ -544,13 +544,37 @@ body{min-height:100dvh;font-family:'Inter',sans-serif;background:#f8f9fa;color:#
 <div id="tab-historial" class="tab-content">
 <div class="mt-4">
   <h3 class="font-head text-lg font-extrabold text-primary mb-4">Mis Entregas</h3>
-  <div class="flex gap-2 mb-4 overflow-x-auto pb-1">
-  <button onclick="setFiltroHist(this,'todos')"      class="filtro-btn flex-shrink-0 px-4 py-2 bg-primary text-white text-xs font-bold rounded-full">Todos</button>
-  <button onclick="setFiltroHist(this,'hoy')"        class="filtro-btn flex-shrink-0 px-4 py-2 bg-surf-high text-on-var text-xs font-bold rounded-full">Hoy</button>
-  <button onclick="setFiltroHist(this,'semana')"     class="filtro-btn flex-shrink-0 px-4 py-2 bg-surf-high text-on-var text-xs font-bold rounded-full">Esta semana</button>
-  <button onclick="setFiltroHist(this,'entregados')" class="filtro-btn flex-shrink-0 px-4 py-2 bg-surf-high text-on-var text-xs font-bold rounded-full">✅ Entregados</button>
-  <button onclick="setFiltroHist(this,'cancelados')" class="filtro-btn flex-shrink-0 px-4 py-2 bg-surf-high text-on-var text-xs font-bold rounded-full">❌ Cancelados</button>
-</div>
+  <div style="display:flex;gap:7px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px">
+  <button onclick="setFiltroHist(this,'todos')"
+    class="filtro-btn flex-shrink-0"
+    style="padding:7px 14px;border-radius:20px;background:#006970;color:#fff;
+    border:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer">
+    📋 Todos
+  </button>
+  <button onclick="setFiltroHist(this,'hoy')"
+    class="filtro-btn flex-shrink-0"
+    style="padding:7px 14px;border-radius:20px;background:#f3f4f5;color:#3c494b;
+    border:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer">
+    🗓 Hoy
+  </button>
+  <button onclick="setFiltroHist(this,'semana')"
+    class="filtro-btn flex-shrink-0"
+    style="padding:7px 14px;border-radius:20px;background:#f3f4f5;color:#3c494b;
+    border:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer">
+    📆 Esta semana
+  </button>
+  <button onclick="setFiltroHist(this,'entregados')"
+    class="filtro-btn flex-shrink-0"
+    style="padding:7px 14px;border-radius:20px;background:#f3f4f5;color:#3c494b;
+    border:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer">
+    ✅ Entregados
+  </button>
+  <button onclick="setFiltroHist(this,'cancelados')"
+    class="filtro-btn flex-shrink-0"
+    style="padding:7px 14px;border-radius:20px;background:#f3f4f5;color:#3c494b;
+    border:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer">
+    ❌ Cancelados
+  </button>
   <div class="flex gap-3 mb-5">
     <div class="flex-1 bg-surf-white rounded-2xl p-3 shadow-sm border border-out-var/10 text-center">
       <p class="font-head font-extrabold text-xl text-primary" id="histTotalEntregas">0</p>
@@ -885,6 +909,7 @@ var TZ            = 'America/Bogota';
 var OSRM_BASE     = 'https://router.project-osrm.org/route/v1/driving/';
 var _tabRouteLayer  = null;
 var _tabRouteGlow   = null;
+var _ultimoConteoNotif = -1; // -1 = nunca notificado
 
 const SHEET_ID_DOMI   = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
 const SCRIPT_URL_DOMI = 'https://script.google.com/macros/s/AKfycbzPriKpQz0jI9AaYtylsDR_b5oRwMym0rM-dwQKAnjeqhEyxg4HhQ6MBGN_95U4PYJ6tA/exec';
@@ -1218,6 +1243,27 @@ function cargarMapaTab(destLat, destLng, clienteNombre){
   }, 120);
 }
 
+function _animarMarcador(marker, destLat, destLng, durMs) {
+  if (!marker) return;
+  var start  = marker.getLatLng();
+  var startT = performance.now();
+  durMs = durMs || 1500;
+ 
+  function step(now) {
+    var t = Math.min((now - startT) / durMs, 1);
+    // ease-out cubic
+    t = 1 - Math.pow(1 - t, 3);
+    var lat = start.lat + (destLat - start.lat) * t;
+    var lng = start.lng + (destLng - start.lng) * t;
+    marker.setLatLng([lat, lng]);
+    if (t < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+
+
+
 function iniciarUpdateMapaTab(){
   clearInterval(_tabMapInterval);
   var _rutaLastRecalc = 0;
@@ -1225,7 +1271,8 @@ function iniciarUpdateMapaTab(){
     if(!_tabDomiMarker || !_tabMap) return;
     if(!TRK.activo || TRK.lat===null) return;
 
-    _tabDomiMarker.setLatLng([TRK.lat, TRK.lng]);
+          _animarMarcador(_tabDomiMarker, TRK.lat, TRK.lng, 1500);
+
     _tabDomiMarker.setIcon(iconDomi(domi ? domi.nombre : 'WIL', true));
 
     if(destLatGlobal){
@@ -1692,6 +1739,72 @@ async function fetchPedidos() {
 
     state.pedidos = misPendientes;
 
+
+// ── Detectar pedidos EN PROCESO asignados a mí → notificar ──
+    pedOrder.forEach(function(id){
+      var p = pedMap[id];
+      if(!p) return;
+      var est = (p.estadoRaw||'').toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+
+      // Solo "en proceso" o "asignado"
+      if(!est.includes('proceso') && !est.includes('asignado')) return;
+
+      var asgNorm  = (p.domiAsign||'').toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+        .replace(/[^a-z0-9]/g,' ').trim();
+      var asgUpper = (p.domiAsign||'').toUpperCase();
+      var _nb      = (domi.nombre||'').toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+        .replace(/[^a-z0-9]/g,' ').trim().split(' ')[0];
+      var _id      = (domi.id||'').toUpperCase().trim();
+
+      var esMio = p.domiAsign && (
+        asgNorm.includes(_nb) || asgUpper.includes(_id)
+      );
+      if(!esMio) return;
+
+      // Solo notificar UNA vez por pedido
+      if(_idsAsignadosNotificados.has(id)) return;
+      _idsAsignadosNotificados.add(id);
+
+      var ped = _cvtPed(p);
+      ped.asignadoAMi = true;
+
+      // Banner visual
+      _mostrarBannerAsignado(ped);
+
+      // Sonido + vibración
+      _tocarSonidoAsignado();
+
+      // Push nativo Android
+      if(window.WilNativo){
+        WilNativo.notificarPedidos(
+          1,
+          '🎯 ¡Te asignaron un pedido!',
+          (p.cliente||'Cliente') + ' · ' + (p.direccion||'').substring(0,50)
+        );
+      }
+
+      // Push del navegador (PWA)
+      if(Notification.permission === 'granted'){
+        navigator.serviceWorker.ready.then(function(reg){
+          reg.showNotification('🎯 ¡Te asignaron un pedido!', {
+            body:   (p.cliente||'Cliente') + ' · ' + (p.total||''),
+            icon:   'icons/icon-192.png',
+            badge:  'icons/badge-72.png',
+            tag:    'wil-asignado-' + id,
+            requireInteraction: true,
+            vibrate:[500,150,500,150,500],
+            data:   { pedidoId: id }
+          });
+        });
+      }
+    });
+
+
+
+
     // ── Activar pedido en ruta si es nuevo o cambió ──
     if(enRuta){
       if(!state.pedidoActivo || state.pedidoActivo.id !== enRuta.id){
@@ -1715,15 +1828,17 @@ async function fetchPedidos() {
     }
 
     // Badge nativo Android
-    var _n = state.pedidos.length;
+     var _n = state.pedidos.length;
     if (window.WilNativo) {
-      if (_n > 0) {
+      if (_n > 0 && _n !== _ultimoConteoNotif) {
+        _ultimoConteoNotif = _n;
         WilNativo.notificarPedidos(
           _n,
           '🛵 ' + _n + ' pedido' + (_n > 1 ? 's' : '') + ' esperando',
           'Hay ' + _n + ' pedido' + (_n > 1 ? 's pendientes' : ' pendiente') + ' sin tomar'
         );
-      } else {
+      } else if (_n === 0 && _ultimoConteoNotif > 0) {
+        _ultimoConteoNotif = 0;
         WilNativo.limpiarBadge();
       }
     }
@@ -2725,121 +2840,199 @@ function marcarEntregado(){
 }
 
 /* ═══════════════════ HISTORIAL ═══════════════════ */
-function renderHistorial(){
-  var lista  = document.getElementById('listaHistorial');
-  var vacio  = document.getElementById('sinHistorial');
+function renderHistorial() {
+  var lista = document.getElementById('listaHistorial');
+  var vacio = document.getElementById('sinHistorial');
   lista.innerHTML = '';
-
-  var hoy     = state.historial.filter(function(h){ return h.periodo==='hoy'; });
-  var entregados = state.historial.filter(function(h){ return h.estado==='Entregado'; });
-  var cancelados = state.historial.filter(function(h){ return h.estado==='Cancelado'; });
-  var hoyEnt  = hoy.filter(function(h){ return h.estado==='Entregado'; });
-
-  document.getElementById('histEntHoy').textContent    = hoyEnt.length;
+ 
+  var entregados  = state.historial.filter(function(h){ return h.estado === 'Entregado'; });
+  var cancelados  = state.historial.filter(function(h){ return h.estado === 'Cancelado'; });
+  var hoyStr      = new Date().toLocaleDateString('es-CO', {timeZone: TZ});
+  var hoyEnt      = entregados.filter(function(h){ return h.fecha === hoyStr; });
+ 
+  // Calcular ganancia total del día
+  var gananciaDia = 0;
+  hoyEnt.forEach(function(h) { gananciaDia += parseCOP(h.domicilio || '0'); });
+ 
+  // Actualizar stats
+  document.getElementById('histEntHoy').textContent      = hoyEnt.length;
   document.getElementById('histTotalEntregas').textContent = entregados.length;
-  document.getElementById('histCalHoy').textContent    = cancelados.length > 0
+  document.getElementById('histCalHoy').textContent       = cancelados.length > 0
     ? cancelados.length + '✗' : '—';
-  document.getElementById('statHoy').textContent       = hoyEnt.length;
-  document.getElementById('statEntregas').textContent  = entregados.length;
-
-  var items = state.historial.filter(function(h){
-    if (filtroHist === 'hoy')    return h.periodo === 'hoy';
-    if (filtroHist === 'semana') return h.periodo === 'hoy' || h.periodo === 'semana';
+  if (document.getElementById('statHoy'))      document.getElementById('statHoy').textContent      = hoyEnt.length;
+  if (document.getElementById('statEntregas')) document.getElementById('statEntregas').textContent = entregados.length;
+ 
+  // Filtrar según filtroHist
+  var items = state.historial.filter(function(h) {
+    if (filtroHist === 'hoy')        return h.fecha === hoyStr;
+    if (filtroHist === 'semana')     return h.periodo === 'hoy' || h.periodo === 'semana';
     if (filtroHist === 'entregados') return h.estado === 'Entregado';
     if (filtroHist === 'cancelados') return h.estado === 'Cancelado';
     return true;
   });
-
-  if (!items.length) { vacio.style.display = 'flex'; return; }
+ 
+  // Banner resumen del día (solo en filtro hoy o todos)
+  if ((filtroHist === 'hoy' || filtroHist === 'todos') && hoyEnt.length > 0) {
+    lista.insertAdjacentHTML('beforeend',
+      '<div style="background:linear-gradient(135deg,#006970,#00a3b4);border-radius:18px;'
+      + 'padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;'
+      + 'box-shadow:0 4px 16px rgba(0,105,112,.2)">'
+        + '<div style="font-size:32px">📊</div>'
+        + '<div style="flex:1">'
+          + '<div style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:900;font-size:14px;color:#fff">Resumen de hoy</div>'
+          + '<div style="font-size:11px;color:rgba(255,255,255,.75);margin-top:2px">'
+            + hoyEnt.length + ' entrega' + (hoyEnt.length !== 1 ? 's' : '') + ' completada' + (hoyEnt.length !== 1 ? 's' : '')
+          + '</div>'
+        + '</div>'
+        + (gananciaDia > 0
+          ? '<div style="text-align:right">'
+              + '<div style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:900;font-size:18px;color:#4ade80">'
+              + fmtCOP(gananciaDia) + '</div>'
+              + '<div style="font-size:9px;color:rgba(255,255,255,.6);text-transform:uppercase">en domicilios</div>'
+            + '</div>'
+          : '')
+      + '</div>'
+    );
+  }
+ 
+  if (!items.length) {
+    vacio.style.display = 'flex';
+    return;
+  }
   vacio.style.display = 'none';
-
-  /* Agrupar por fecha */
+ 
+  // Agrupar por fecha
   var grupos = {}, orden = [];
-  items.forEach(function(h){
-    var f = h.fecha || (h.periodo==='hoy' ? new Date().toLocaleDateString('es-CO',{timeZone:TZ}) : '—');
+  items.forEach(function(h) {
+    var f = h.fecha || '—';
     if (!grupos[f]) { grupos[f] = []; orden.push(f); }
     grupos[f].push(h);
   });
-
+ 
   var cfgEst = {
-    Entregado:{ color:'#2a9d5c', bg:'rgba(42,157,92,.1)', icon:'check_circle', emoji:'✅' },
-    Cancelado:{ color:'#ba1a1a', bg:'rgba(186,26,26,.08)', icon:'cancel',       emoji:'❌' },
-    'En camino':{ color:'#8b5cf6', bg:'rgba(139,92,246,.1)', icon:'two_wheeler', emoji:'🛵' }
+    'Entregado': { color:'#2a9d5c', bg:'#f0fdf4', border:'#86efac', icon:'check_circle', emoji:'✅', label:'Entregado' },
+    'Cancelado': { color:'#ba1a1a', bg:'#fff5f5', border:'#fca5a5', icon:'cancel',       emoji:'❌', label:'Cancelado' }
   };
-
-  orden.forEach(function(fecha){
-    /* Separador de fecha */
+ 
+  orden.forEach(function(fecha) {
+    var esHoy    = fecha === hoyStr;
+    var labelF   = esHoy ? '🗓 Hoy — ' + fecha : '📅 ' + fecha;
+    var entHoy   = grupos[fecha].filter(function(h){ return h.estado === 'Entregado'; }).length;
+    var ganHoy   = 0;
+    grupos[fecha].forEach(function(h){ ganHoy += parseCOP(h.domicilio || '0'); });
+ 
+    // Separador de fecha con resumen
     lista.insertAdjacentHTML('beforeend',
-      '<div style="text-align:center;margin:14px 0 8px">'
-      +'<span style="background:#e7e8e9;color:#6c7a7b;font-size:10px;font-weight:800;'
-      +'padding:3px 14px;border-radius:20px;font-family:\'Plus Jakarta Sans\',sans-serif">'
-      +escHtml(fecha)+'</span></div>');
-
-    grupos[fecha].forEach(function(h){
-      var cfg = cfgEst[h.estado] || cfgEst['En camino'];
-      var dir = (h.direccion||'—').replace(/\s*\[.+\]/,'').replace(/\s*\(Ref:[^)]+\)/,'')
-                .trim().substring(0,46);
-      var esTrans = (h.metodoPago||'').toLowerCase().includes('transfer');
+      '<div style="display:flex;align-items:center;gap:8px;margin:16px 0 10px">'
+        + '<div style="flex:1;height:1px;background:#e7e8e9"></div>'
+        + '<div style="background:#f3f4f5;border-radius:20px;padding:4px 12px;display:flex;align-items:center;gap:6px">'
+          + '<span style="font-size:10px;font-weight:800;color:#6c7a7b;font-family:\'Plus Jakarta Sans\',sans-serif">' + escHtml(labelF) + '</span>'
+          + (entHoy > 0 ? '<span style="background:#2a9d5c;color:#fff;font-size:9px;font-weight:800;padding:1px 7px;border-radius:20px">' + entHoy + ' ✓</span>' : '')
+          + (ganHoy > 0 ? '<span style="background:#e8f5e9;color:#2a9d5c;font-size:9px;font-weight:800;padding:1px 7px;border-radius:20px">' + fmtCOP(ganHoy) + '</span>' : '')
+        + '</div>'
+        + '<div style="flex:1;height:1px;background:#e7e8e9"></div>'
+      + '</div>'
+    );
+ 
+    grupos[fecha].forEach(function(h) {
+      var cfg      = cfgEst[h.estado] || cfgEst['Entregado'];
+      var dir      = (h.direccion || '—').replace(/\s*\[.+\]/, '').replace(/\s*\(Ref:[^)]+\)/, '').trim().substring(0, 50);
+      var esTrans  = (h.metodoPago || '').toLowerCase().includes('transfer');
       var totalNum = parseCOP(h.total);
       var domiNum  = parseCOP(h.domicilio || '0');
-      var ganancia = domiNum > 0 ? domiNum : 0;
-
+      var ini      = (h.cliente || 'C').charAt(0).toUpperCase();
+ 
       lista.insertAdjacentHTML('beforeend',
         '<div class="card-in" style="background:#fff;border-radius:20px;overflow:hidden;'
-        +'box-shadow:0 2px 14px rgba(0,0,0,.07);border:1px solid rgba(0,0,0,.06);margin-bottom:10px">'
-
-        /* Header color */
-        +'<div style="background:' + cfg.bg + ';border-bottom:1px solid ' + cfg.color + '22;'
-        +'padding:10px 14px;display:flex;align-items:center;justify-content:space-between">'
-        +'<div style="display:flex;align-items:center;gap:8px">'
-        +'<div style="width:32px;height:32px;border-radius:50%;background:' + cfg.color + ';'
-        +'display:flex;align-items:center;justify-content:center">'
-        +'<span class="material-symbols-outlined" style="font-size:15px;color:#fff;font-variation-settings:\'FILL\' 1">'
-        +cfg.icon+'</span></div>'
-        +'<div>'
-        +'<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:13px;'
-        +'color:#191c1d;line-height:1.2">'+escHtml(h.cliente||'—')+'</p>'
-        +'<p style="font-size:10px;color:#6c7a7b;margin-top:1px">'+escHtml(h.telefono||'—')+'</p>'
-        +'</div></div>'
-        +'<div style="text-align:right">'
-        +'<span style="font-size:10px;font-weight:800;color:'+cfg.color+';background:'+cfg.bg+';'
-        +'padding:3px 10px;border-radius:20px;font-family:\'Plus Jakarta Sans\',sans-serif">'
-        +cfg.emoji+' '+h.estado+'</span>'
-        +'<p style="font-size:10px;color:#9eaaac;margin-top:3px">'+(h.hora||'—')+'</p>'
-        +'</div></div>'
-
-        /* Cuerpo */
-        +'<div style="padding:11px 14px 12px">'
-        +'<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:9px">'
-        +'<span class="material-symbols-outlined" style="font-size:14px;color:#4c56af;margin-top:1px;'
-        +'flex-shrink:0;font-variation-settings:\'FILL\' 1">location_on</span>'
-        +'<p style="font-size:12px;color:#3c494b;font-weight:600;line-height:1.4">'+escHtml(dir)+'</p>'
-        +'</div>'
-        +'<div style="display:flex;gap:8px">'
-        +(totalNum > 0
-          ? '<div style="flex:1;background:#f3f4f5;border-radius:11px;padding:7px;text-align:center">'
-            +'<p style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase">Total</p>'
-            +'<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:14px;font-weight:900;'
-            +'color:#006970">'+fmtCOP(totalNum)+'</p></div>' : '')
-        +(ganancia > 0
-          ? '<div style="flex:1;background:#f0fdf4;border-radius:11px;padding:7px;text-align:center">'
-            +'<p style="font-size:9px;font-weight:700;color:#2a9d5c;text-transform:uppercase">Domicilio</p>'
-            +'<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:14px;font-weight:900;'
-            +'color:#2a9d5c">'+fmtCOP(ganancia)+'</p></div>' : '')
-        +'<div style="flex:1;background:#f3f4f5;border-radius:11px;padding:7px;text-align:center">'
-        +'<p style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase">Pago</p>'
-        +'<p style="font-size:11px;font-weight:800;color:#191c1d">'+(esTrans?'🏦 Transf.':'💵 Efectivo')+'</p>'
-        +'</div></div></div></div>'
+        + 'box-shadow:0 2px 12px rgba(0,0,0,.06);border:1.5px solid ' + cfg.border + ';margin-bottom:10px">'
+ 
+          // Header
+          + '<div style="background:' + cfg.bg + ';padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid ' + cfg.border + '">'
+            + '<div style="width:36px;height:36px;border-radius:50%;background:' + cfg.color + ';'
+            + 'display:flex;align-items:center;justify-content:center;flex-shrink:0">'
+              + '<span class="material-symbols-outlined" style="font-size:16px;color:#fff;font-variation-settings:\'FILL\' 1">' + cfg.icon + '</span>'
+            + '</div>'
+            + '<div style="flex:1;min-width:0">'
+              + '<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:13px;color:#191c1d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(h.cliente || '—') + '</p>'
+              + '<p style="font-size:10px;color:#6c7a7b;margin-top:1px;display:flex;align-items:center;gap:4px">'
+                + '<span class="material-symbols-outlined" style="font-size:11px">phone</span>'
+                + escHtml(h.telefono || '—')
+              + '</p>'
+            + '</div>'
+            + '<div style="text-align:right;flex-shrink:0">'
+              + '<span style="font-size:10px;font-weight:800;color:' + cfg.color + ';background:#fff;'
+              + 'padding:3px 10px;border-radius:20px;font-family:\'Plus Jakarta Sans\',sans-serif;border:1.5px solid ' + cfg.border + '">'
+              + cfg.emoji + ' ' + cfg.label + '</span>'
+              + '<p style="font-size:10px;color:#9eaaac;margin-top:4px">' + escHtml(h.hora || '—') + '</p>'
+            + '</div>'
+          + '</div>'
+ 
+          // Cuerpo
+          + '<div style="padding:12px 14px">'
+ 
+            // Dirección
+            + '<div style="display:flex;align-items:flex-start;gap:7px;background:#f8f9fa;'
+            + 'border-radius:12px;padding:9px 11px;margin-bottom:10px;border:1px solid rgba(76,86,175,.1)">'
+              + '<span class="material-symbols-outlined" style="font-size:14px;color:#4c56af;flex-shrink:0;margin-top:1px;font-variation-settings:\'FILL\' 1">location_on</span>'
+              + '<p style="font-size:12px;font-weight:700;color:#191c1d;line-height:1.4;word-break:break-word;margin:0">' + escHtml(dir) + '</p>'
+            + '</div>'
+ 
+            // Chips de info
+            + '<div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px">'
+              + (totalNum > 0
+                ? '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:12px;padding:6px 11px;display:flex;flex-direction:column;align-items:center;flex:1;min-width:70px">'
+                    + '<span style="font-size:9px;font-weight:700;color:#2a9d5c;text-transform:uppercase">Total</span>'
+                    + '<span style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:15px;font-weight:900;color:#006970">' + fmtCOP(totalNum) + '</span>'
+                  + '</div>'
+                : '')
+              + (domiNum > 0
+                ? '<div style="background:#e8f5e9;border:1px solid #86efac;border-radius:12px;padding:6px 11px;display:flex;flex-direction:column;align-items:center;flex:1;min-width:70px">'
+                    + '<span style="font-size:9px;font-weight:700;color:#2a9d5c;text-transform:uppercase">🛵 Domicilio</span>'
+                    + '<span style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:15px;font-weight:900;color:#2a9d5c">' + fmtCOP(domiNum) + '</span>'
+                  + '</div>'
+                : '')
+              + '<div style="background:#f3f4f5;border:1px solid #e7e8e9;border-radius:12px;padding:6px 11px;display:flex;flex-direction:column;align-items:center;flex:1;min-width:70px">'
+                + '<span style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase">Pago</span>'
+                + '<span style="font-size:12px;font-weight:800;color:#191c1d">' + (esTrans ? '🏦 Transf.' : '💵 Efectivo') + '</span>'
+              + '</div>'
+            + '</div>'
+ 
+            // Acciones rápidas
+            + '<div style="display:flex;gap:7px">'
+              + '<a href="https://wa.me/57' + (h.telefono || '').replace(/\D/g,'') + '" target="_blank" '
+                + 'style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;'
+                + 'background:#dcfce7;border:1.5px solid #86efac;border-radius:12px;padding:8px;'
+                + 'text-decoration:none;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:11px;color:#166534">'
+                + '<svg width="13" height="13" viewBox="0 0 24 24" fill="#16a34a"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.096.537 4.066 1.479 5.779L0 24l6.432-1.687A11.93 11.93 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.006-1.368l-.36-.214-3.716.975.992-3.625-.235-.373A9.818 9.818 0 1112 21.818z"/></svg>'
+                + 'WhatsApp'
+              + '</a>'
+              + '<div style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;'
+                + 'background:#f3f4f5;border:1.5px solid #e7e8e9;border-radius:12px;padding:8px;'
+                + 'font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:11px;color:#6c7a7b">'
+                + '📦 ' + (h.prods > 0 ? h.prods + ' prod.' : 'Pedido')
+              + '</div>'
+            + '</div>'
+ 
+          + '</div>'
+        + '</div>'
       );
     });
   });
 }
-function setFiltroHist(btn,f){
-  filtroHist=f;
-  document.querySelectorAll('.filtro-btn').forEach(function(b){b.className='filtro-btn flex-shrink-0 px-4 py-2 bg-surf-high text-on-var text-xs font-bold rounded-full';});
-  btn.className='filtro-btn flex-shrink-0 px-4 py-2 bg-primary text-white text-xs font-bold rounded-full';
+
+
+
+function setFiltroHist(btn, f) {
+  filtroHist = f;
+  document.querySelectorAll('.filtro-btn').forEach(function(b) {
+    b.style.background = '#f3f4f5';
+    b.style.color = '#3c494b';
+  });
+  btn.style.background = '#006970';
+  btn.style.color = '#fff';
   renderHistorial();
 }
+ 
 
 /* ═══════════════════ PERFIL ═══════════════════ */
 function renderPerfil(){
@@ -3288,6 +3481,45 @@ async function aceptarPedidoAsignado(id) {
     console.warn('[BroadcastChannel no soportado]:', e.message);
   }
 })();
+
+
+function _tocarSonidoAsignado() {
+  if(navigator.vibrate)
+    navigator.vibrate([500,150,500,150,500,300,300,100,300,100,300]);
+  try {
+    var ctx   = new (window.AudioContext || window.webkitAudioContext)();
+    var freqs = [440, 587, 784, 1047];
+    var dur   = 0.18, gap = 0.04;
+
+    function jingle(t0) {
+      freqs.forEach(function(freq, i) {
+        var osc = ctx.createOscillator(), g = ctx.createGain();
+        osc.connect(g); g.connect(ctx.destination);
+        osc.type = 'square'; osc.frequency.value = freq;
+        var t = t0 + i * (dur + gap);
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.6, t + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        osc.start(t); osc.stop(t + dur + 0.01);
+      });
+      // nota larga de cierre
+      var oF = ctx.createOscillator(), gF = ctx.createGain();
+      oF.connect(gF); gF.connect(ctx.destination);
+      oF.type = 'sine'; oF.frequency.value = 1047;
+      var tf = t0 + freqs.length * (dur + gap);
+      gF.gain.setValueAtTime(0, tf);
+      gF.gain.linearRampToValueAtTime(0.5, tf + 0.04);
+      gF.gain.exponentialRampToValueAtTime(0.001, tf + 0.55);
+      oF.start(tf); oF.stop(tf + 0.56);
+      return tf + 0.56;
+    }
+
+    // 3 repeticiones
+    var cursor = ctx.currentTime + 0.05;
+    for(var r = 0; r < 3; r++) cursor = jingle(cursor) + 0.8;
+
+  } catch(e) {}
+}
  
  
 /* ══ 2. RECORDATORIO PENDIENTES CADA 3 MIN ══ */
