@@ -1,0 +1,555 @@
+/* ═══════════════════════════════════════════════════════════════
+   domi-notif.js — WIL Domicilios · Sistema de Notificaciones
+   Versión: 2.0
+   ═══════════════════════════════════════════════════════════════
+   Qué hace:
+   1. Pide permiso de notificaciones al cargar.
+   2. Polling al sheet cada 10 s → detecta pedidos nuevos (Pendiente).
+   3. Notifica (push + sonido + vibración) cuando llega uno nuevo.
+   4. Cada 5 min recuerda si hay pendientes sin asignar.
+   5. Expone WIL_NOTIF.init(domi) y WIL_NOTIF.destroy()
+   ═══════════════════════════════════════════════════════════════ */
+
+var WIL_NOTIF = (function () {
+
+  /* ── CONFIG ── */
+  var SHEET_ID   = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+  var POLL_MS    = 10 * 1000;          /* revisar cada 10 s           */
+  var REMIND_MS  = 5  * 60 * 1000;    /* recordatorio cada 5 min     */
+  var ICON       = 'icons/icon-192.png';
+  var BADGE_ICON = 'icons/badge-72.png';
+  var TZ         = 'America/Bogota';
+
+  /* ── ESTADO INTERNO ── */
+  var _domi          = null;
+  var _pollTimer     = null;
+  var _remindTimer   = null;
+  var _swReg         = null;
+  var _idsPedidos    = new Set();   /* IDs ya notificados en esta sesión */
+  var _ultimaRemind  = 0;
+  var _pendientesCnt = 0;           /* cuántos pendientes hay ahora */
+  var _destruido     = false;
+
+  /* ════════════════════════════════
+     HELPERS
+  ════════════════════════════════ */
+
+  function _horaAhora() {
+    return new Date().toLocaleTimeString('es-CO', {
+      hour: '2-digit', minute: '2-digit', timeZone: TZ
+    });
+  }
+
+  /* Parser CSV mínimo (igual al del panel) */
+  function _parsearCSV(text) {
+    return text.trim().split('\n').filter(Boolean).slice(1).map(function (line) {
+      var cols = [], cur = '', inQ = false;
+      for (var i = 0; i < line.length; i++) {
+        var ch = line[i];
+        if (ch === '"')      inQ = !inQ;
+        else if (ch === ',' && !inQ) { cols.push(cur.replace(/^"|"$/g, '').trim()); cur = ''; }
+        else cur += ch;
+      }
+      cols.push(cur.replace(/^"|"$/g, '').trim());
+      return cols;
+    }).filter(function (c) { return c[0] || c[6]; });
+  }
+
+  function _normEst(s) {
+    var v = (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (v.includes('entregad')) return 'entregado';
+    if (v.includes('cancelad')) return 'cancelado';
+    if (v.includes('camino'))   return 'camino';
+    if (v.includes('proceso') || v.includes('ruta')) return 'proceso';
+    return 'pendiente';
+  }
+
+  function _normStr(s) {
+    return (s || '').toLowerCase().normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, ' ').trim();
+  }
+
+  /* ════════════════════════════════
+     SONIDOS
+  ════════════════════════════════ */
+
+  /* Sonido nuevo pedido — 4 beeps agresivos ascendentes */
+  function _sonarNuevoPedido() {
+    try {
+      var ctx = new (window.AudioContext || window.webkitAudioContext)();
+      var freqs = [440, 587, 784, 1047];
+      freqs.forEach(function (freq, i) {
+        var osc  = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = 'square';
+        osc.frequency.value = freq;
+        var t = ctx.currentTime + i * 0.22;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.55, t + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.20);
+        osc.start(t); osc.stop(t + 0.21);
+      });
+      /* 5º beep largo de confirmación */
+      var oscF  = ctx.createOscillator();
+      var gainF = ctx.createGain();
+      oscF.connect(gainF); gainF.connect(ctx.destination);
+      oscF.type = 'sine'; oscF.frequency.value = 1047;
+      var tf = ctx.currentTime + freqs.length * 0.22;
+      gainF.gain.setValueAtTime(0, tf);
+      gainF.gain.linearRampToValueAtTime(0.45, tf + 0.04);
+      gainF.gain.exponentialRampToValueAtTime(0.001, tf + 0.55);
+      oscF.start(tf); oscF.stop(tf + 0.56);
+    } catch (e) {}
+  }
+
+  /* Sonido recordatorio — 2 pings suaves */
+  function _sonarRecordatorio() {
+    try {
+      var ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [523, 659].forEach(function (freq, i) {
+        var osc = ctx.createOscillator(), g = ctx.createGain();
+        osc.connect(g); g.connect(ctx.destination);
+        osc.type = 'sine'; osc.frequency.value = freq;
+        var t = ctx.currentTime + i * 0.28;
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.30, t + 0.04);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
+        osc.start(t); osc.stop(t + 0.33);
+      });
+    } catch (e) {}
+  }
+
+  /* ════════════════════════════════
+     NOTIFICACIÓN DE SISTEMA (push)
+  ════════════════════════════════ */
+
+  function _pushNotif(titulo, opts) {
+    if (Notification.permission !== 'granted') return;
+    if (_swReg && _swReg.showNotification) {
+      _swReg.showNotification(titulo, opts);
+    } else {
+      navigator.serviceWorker.ready.then(function (reg) {
+        _swReg = reg;
+        reg.showNotification(titulo, opts);
+      }).catch(function () {
+        /* fallback sin SW */
+        new Notification(titulo, opts);
+      });
+    }
+  }
+
+  /* ════════════════════════════════
+     BANNER IN-APP
+  ════════════════════════════════ */
+
+  function _inyectarEstilosBanner() {
+    if (document.getElementById('_wn_style')) return;
+    var st = document.createElement('style');
+    st.id = '_wn_style';
+    st.textContent =
+      '@keyframes _wnDown{from{transform:translateY(-110%);opacity:0}to{transform:translateY(0);opacity:1}}' +
+      '@keyframes _wnUp{from{transform:translateY(0);opacity:1}to{transform:translateY(-110%);opacity:0}}' +
+      '._wn-banner{animation:_wnDown .38s cubic-bezier(.22,1,.36,1)}' +
+      '._wn-banner.out{animation:_wnUp .3s ease forwards}';
+    document.head.appendChild(st);
+  }
+
+  function _cerrarBanner(bid) {
+    var b = document.getElementById(bid);
+    if (!b) return;
+    b.classList.add('out');
+    setTimeout(function () { b && b.parentNode && b.parentNode.removeChild(b); }, 340);
+  }
+
+  function _mostrarBannerNuevoPedido(p) {
+    _inyectarEstilosBanner();
+    var bid = '_wn_' + p.id;
+    if (document.getElementById(bid)) return;
+
+    var cliente  = p.cliente || 'Cliente';
+    var total    = p.total || '';
+    var esTrans  = (p.metodoPago || '').toLowerCase().includes('transfer');
+    var dir      = (p.direccion || '—')
+      .replace(/\s*\(Ref:[^)]+\)/g, '').replace(/\s*\[.+?\]/g, '').trim().substring(0, 52);
+
+    var div = document.createElement('div');
+    div.id        = bid;
+    div.className = '_wn-banner';
+    div.style.cssText =
+      'position:fixed;top:0;left:0;right:0;z-index:99999;' +
+      'background:linear-gradient(135deg,#005a60,#007f8c,#00a3b4);' +
+      'color:#fff;padding:14px 16px;' +
+      'padding-top:calc(14px + env(safe-area-inset-top));' +
+      'box-shadow:0 8px 28px rgba(0,0,0,.4);' +
+      "font-family:'Plus Jakarta Sans',Inter,sans-serif;cursor:pointer;";
+
+    div.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">' +
+        '<div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">' +
+          '<div style="width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.2);' +
+               'display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">🛵</div>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="font-size:14px;font-weight:900;line-height:1.2;margin-bottom:2px">¡Nuevo pedido!</div>' +
+            '<div style="font-size:11px;color:rgba(255,255,255,.85);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+              _escHtml(cliente) + ' · ' + _escHtml(dir) +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<button onclick="_WN_cerrarBanner(\'' + bid + '\')" ' +
+          'style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.18);' +
+               'border:none;cursor:pointer;color:#fff;font-size:16px;flex-shrink:0;' +
+               'display:flex;align-items:center;justify-content:center">✕</button>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px">' +
+        (total ? '<div style="flex:1;background:rgba(255,255,255,.13);border-radius:10px;padding:7px 10px;text-align:center">' +
+          '<div style="font-size:9px;font-weight:800;text-transform:uppercase;color:rgba(255,255,255,.6)">Total</div>' +
+          '<div style="font-size:14px;font-weight:900">' + _escHtml(total) + '</div></div>' : '') +
+        '<div style="flex:1;background:rgba(255,255,255,.13);border-radius:10px;padding:7px 10px;text-align:center">' +
+          '<div style="font-size:9px;font-weight:800;text-transform:uppercase;color:rgba(255,255,255,.6)">Pago</div>' +
+          '<div style="font-size:12px;font-weight:800">' + (esTrans ? '🏦 Transf.' : '💵 Efectivo') + '</div>' +
+        '</div>' +
+        '<button onclick="if(window.switchTab)switchTab(\'pedidos\');_WN_cerrarBanner(\'' + bid + '\')" ' +
+          'style="flex:2;background:#fff;color:#005a60;border:none;border-radius:10px;' +
+          "font-family:'Plus Jakarta Sans',sans-serif;" +
+          'font-weight:900;font-size:12px;cursor:pointer;padding:7px 12px;' +
+          'display:flex;align-items:center;justify-content:center;gap:5px">' +
+          '<span style="font-size:16px">📋</span> Ver pedidos' +
+        '</button>' +
+      '</div>';
+
+    document.body.appendChild(div);
+
+    /* Ir a pedidos al tocar el banner */
+    div.addEventListener('click', function (e) {
+      if (e.target.tagName === 'BUTTON') return;
+      if (window.switchTab) switchTab('pedidos');
+      _cerrarBanner(bid);
+    });
+
+    /* Auto-cerrar en 15 s */
+    setTimeout(function () { _cerrarBanner(bid); }, 15000);
+  }
+
+  function _mostrarBannerRecordatorio(n) {
+    _inyectarEstilosBanner();
+    var bid = '_wn_rem_' + Date.now();
+    var div = document.createElement('div');
+    div.id        = bid;
+    div.className = '_wn-banner';
+    div.style.cssText =
+      'position:fixed;top:0;left:0;right:0;z-index:99998;' +
+      'background:linear-gradient(135deg,#7c3aed,#8b5cf6);' +
+      'color:#fff;padding:12px 16px;' +
+      'padding-top:calc(12px + env(safe-area-inset-top));' +
+      'box-shadow:0 8px 22px rgba(0,0,0,.35);' +
+      "font-family:'Plus Jakarta Sans',Inter,sans-serif;cursor:pointer;";
+
+    div.innerHTML =
+      '<div style="display:flex;align-items:center;gap:12px">' +
+        '<div style="font-size:26px">⏰</div>' +
+        '<div style="flex:1">' +
+          '<div style="font-size:14px;font-weight:900">' + n + ' pedido' + (n > 1 ? 's' : '') + ' esperando</div>' +
+          '<div style="font-size:11px;color:rgba(255,255,255,.8)">Pedidos pendientes sin tomar</div>' +
+        '</div>' +
+        '<button onclick="if(window.switchTab)switchTab(\'pedidos\');_WN_cerrarBanner(\'' + bid + '\')" ' +
+          'style="background:rgba(255,255,255,.22);border:none;border-radius:10px;' +
+          'color:#fff;font-weight:900;font-size:11px;padding:7px 12px;cursor:pointer;white-space:nowrap">' +
+          'Ver →' +
+        '</button>' +
+      '</div>';
+
+    document.body.appendChild(div);
+    div.addEventListener('click', function (e) {
+      if (e.target.tagName === 'BUTTON') return;
+      if (window.switchTab) switchTab('pedidos');
+      _cerrarBanner(bid);
+    });
+    setTimeout(function () { _cerrarBanner(bid); }, 8000);
+  }
+
+  /* Exponer la función de cerrar globalmente (necesario para onclick inline) */
+  window._WN_cerrarBanner = _cerrarBanner;
+
+  function _escHtml(t) {
+    return (t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /* ════════════════════════════════
+     BADGE APP (ícono PWA)
+  ════════════════════════════════ */
+
+  function _setBadge(n) {
+    if (!('setAppBadge' in navigator)) return;
+    if (n > 0) navigator.setAppBadge(n).catch(function () {});
+    else       navigator.clearAppBadge().catch(function () {});
+  }
+
+  /* ════════════════════════════════
+     POLLING AL SHEET
+  ════════════════════════════════ */
+
+  function _poll() {
+    if (_destruido || !_domi) return;
+
+    var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
+            + '/gviz/tq?tqx=out:csv&sheet=Pedidos&cachebust=' + Date.now();
+
+    fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(14000) })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.text();
+      })
+      .then(function (text) {
+        if (!text || text.length < 20) return;
+        _procesarSheet(text);
+      })
+      .catch(function (e) {
+        console.warn('[WIL_NOTIF] poll error:', e.message);
+      });
+  }
+
+  function _procesarSheet(text) {
+    var filas = _parsearCSV(text);
+    var pedMap = {}, lastId = null;
+
+    filas.forEach(function (cols) {
+      var id = (cols[0] || '').trim();
+      if (id && /^\d{2,5}$/.test(id)) {
+        if (!pedMap[id]) {
+          pedMap[id] = {
+            id:         id,
+            cliente:    (cols[1]  || '').trim(),
+            telefono:   (cols[2]  || '').trim(),
+            metodoPago: (cols[3]  || '').trim(),
+            estadoRaw:  (cols[4]  || '').trim(),
+            direccion:  (cols[11] || '').trim(),
+            total:      (cols[14] || '').trim(),
+            domiAsign:  (cols[15] || '').trim()
+          };
+        }
+        lastId = id;
+      }
+    });
+
+    var _nombreBase = _normStr(_domi.nombre || '').split(' ')[0];
+    var _idDomi     = (_domi.id || '').toUpperCase().trim();
+
+    var pendientesSinAsignar = [];
+    var nuevos = [];
+
+    Object.values(pedMap).forEach(function (p) {
+      var est = _normEst(p.estadoRaw);
+
+      /* Solo nos interesan los pendientes */
+      if (est !== 'pendiente') return;
+
+      /* Filtrar si ya fue asignado a otro domi */
+      var asgNorm = _normStr(p.domiAsign);
+      var asgUp   = (p.domiAsign || '').toUpperCase();
+      var esMio   = p.domiAsign && (asgNorm.includes(_nombreBase) || asgUp.includes(_idDomi));
+      var tieneAsig = p.domiAsign && p.domiAsign.trim() !== '';
+
+      /* Pendiente visible: sin asignar O asignado a mí */
+      if (!tieneAsig || esMio) {
+        pendientesSinAsignar.push(p);
+      }
+
+      /* ¿Es nuevo para notificar? */
+      if (!_idsPedidos.has(p.id)) {
+        _idsPedidos.add(p.id);
+
+        /* Solo notificar los sin asignar (los asignados los maneja _notifAsignado del panel) */
+        if (!tieneAsig) {
+          nuevos.push(p);
+        }
+      }
+    });
+
+    _pendientesCnt = pendientesSinAsignar.length;
+
+    /* Badge siempre actualizado */
+    _setBadge(_pendientesCnt);
+
+    /* Notificar nuevos pedidos encontrados */
+    nuevos.forEach(function (p) {
+      _notificarNuevoPedido(p);
+    });
+
+    /* También actualizar el panel principal si está cargado */
+    if (window.state && window.renderPedidos) {
+      /* No reinvocamos fetch aquí para no duplicar; el panel ya hace su propio poll */
+    }
+  }
+
+  /* ════════════════════════════════
+     NOTIFICAR NUEVO PEDIDO
+  ════════════════════════════════ */
+
+  function _notificarNuevoPedido(p) {
+    /* 1. Sonido */
+    _sonarNuevoPedido();
+
+    /* 2. Vibración larga */
+    if (navigator.vibrate) navigator.vibrate([300, 80, 300, 80, 500, 160, 300, 80, 300]);
+
+    /* 3. Banner in-app */
+    _mostrarBannerNuevoPedido(p);
+
+    /* 4. Flash del badge en la nav */
+    var nb = document.getElementById('navBadge');
+    if (nb) {
+      nb.style.transition = 'transform .15s';
+      nb.style.transform  = 'scale(1.8)';
+      setTimeout(function () { nb.style.transform = 'scale(1)'; }, 350);
+    }
+
+    /* 5. Push notification del sistema */
+    var esTrans  = (p.metodoPago || '').toLowerCase().includes('transfer');
+    var dirLimpia = (p.direccion || '')
+      .replace(/\s*\(Ref:[^)]+\)/g, '').replace(/\s*\[.+?\]/g, '').trim().substring(0, 65);
+
+    _pushNotif('🛵 ¡Nuevo pedido WIL!', {
+      body: (p.cliente || 'Cliente') + ' · ' + dirLimpia +
+            '\n' + (p.total || '') + ' · ' + (esTrans ? 'Transferencia' : 'Efectivo'),
+      icon:             ICON,
+      badge:            BADGE_ICON,
+      tag:              'wil-nuevo-' + p.id,
+      requireInteraction: true,
+      vibrate:          [300, 80, 300, 80, 500],
+      silent:           false,
+      data:             { tipo: 'nuevo', pedidoId: p.id }
+    });
+  }
+
+  /* ════════════════════════════════
+     RECORDATORIO CADA 5 MIN
+  ════════════════════════════════ */
+
+  function _tickRecordatorio() {
+    if (_destruido) return;
+    var ahora = Date.now();
+    if (ahora - _ultimaRemind < REMIND_MS) return;
+    if (_pendientesCnt === 0) return;
+
+    _ultimaRemind = ahora;
+
+    /* Sonido suave */
+    _sonarRecordatorio();
+
+    /* Vibración suave */
+    if (navigator.vibrate) navigator.vibrate([150, 60, 150]);
+
+    /* Banner morado */
+    _mostrarBannerRecordatorio(_pendientesCnt);
+
+    /* Push */
+    _pushNotif('⏰ ' + _pendientesCnt + ' pedido' + (_pendientesCnt > 1 ? 's' : '') + ' esperando', {
+      body: 'Hay ' + _pendientesCnt + ' pedido' + (_pendientesCnt > 1 ? 's pendientes' : ' pendiente') +
+            ' sin tomar en WIL Domicilios',
+      icon:  ICON,
+      badge: BADGE_ICON,
+      tag:   'wil-pend-remind',
+      requireInteraction: false,
+      silent: false,
+      vibrate: [200, 80, 200]
+    });
+
+    /* Badge */
+    _setBadge(_pendientesCnt);
+  }
+
+  /* ════════════════════════════════
+     SERVICE WORKER
+  ════════════════════════════════ */
+
+  function _registrarSW() {
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+      .then(function (reg) {
+        _swReg = reg;
+        window._wilSwReg = reg;
+
+        navigator.serviceWorker.ready.then(function () {
+          if (navigator.serviceWorker.controller && _domi) {
+            navigator.serviceWorker.controller.postMessage({
+              type:     'GUARDAR_DOMI',
+              domi:     _domi,
+              notifIds: []
+            });
+          }
+        });
+      })
+      .catch(function (e) { console.warn('[WIL_NOTIF] SW error:', e); });
+
+    navigator.serviceWorker.addEventListener('message', function (e) {
+      var msg = e.data || {};
+      if (msg.type === 'OPEN_PEDIDOS' && window.switchTab) switchTab('pedidos');
+      if (msg.type === 'BG_POLL_RESULT' && msg.asignadosCount > 0) _poll();
+    });
+  }
+
+  /* ════════════════════════════════
+     PEDIR PERMISO
+  ════════════════════════════════ */
+
+  function _pedirPermiso() {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }
+
+  /* ════════════════════════════════
+     API PÚBLICA
+  ════════════════════════════════ */
+
+  function init(domiObj) {
+    if (_destruido) _destruido = false;
+    _domi = domiObj;
+
+    _pedirPermiso();
+    _registrarSW();
+
+    /* Primer poll inmediato para cargar los IDs ya existentes sin notificar */
+    _cargaInicialSilenciosa(function () {
+      /* Después de la carga inicial, el polling activo sí notifica */
+      _pollTimer   = setInterval(_poll, POLL_MS);
+      /* Revisión del recordatorio cada 30 s (dispara cada 5 min reales) */
+      _remindTimer = setInterval(_tickRecordatorio, 30 * 1000);
+    });
+  }
+
+  /* Carga silenciosa: marca los IDs actuales para NO notificarlos */
+  function _cargaInicialSilenciosa(cb) {
+    var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
+            + '/gviz/tq?tqx=out:csv&sheet=Pedidos&cachebust=' + Date.now();
+
+    fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(14000) })
+      .then(function (r) { return r.text(); })
+      .then(function (text) {
+        if (!text || text.length < 20) { if (cb) cb(); return; }
+        var filas = _parsearCSV(text);
+        filas.forEach(function (cols) {
+          var id  = (cols[0] || '').trim();
+          var est = _normEst((cols[4] || ''));
+          if (id && /^\d{2,5}$/.test(id) && est === 'pendiente') {
+            _idsPedidos.add(id); /* marcar como ya visto → no notificar */
+          }
+        });
+        if (cb) cb();
+      })
+      .catch(function () { if (cb) cb(); });
+  }
+
+  function destroy() {
+    _destruido = true;
+    clearInterval(_pollTimer);
+    clearInterval(_remindTimer);
+    _pollTimer  = null;
+    _remindTimer = null;
+  }
+
+  return { init: init, destroy: destroy };
+
+})();

@@ -1,13 +1,15 @@
 /* ═══════════════════════════════════════════════════════════
-   sw.js — WIL Domicilios — Service Worker v4.0
-   - Pendientes: notifican SIEMPRE cada 5 min (no se guardan)
-   - Asignados: se guardan para no repetirse
-   - Sonido + vibración fuerte en notif asignados
+   sw.js — WIL Domicilios — Service Worker v5.0
+   
+   LÓGICA PRINCIPAL:
+   - Pendientes sin asignar: notifica SOLO cuando el número SUBE
+     (tenías 3, llegó uno nuevo → ahora hay 4 → notifica)
+   - Asignados a mí: notifica UNA sola vez por ID de pedido
+   - Guarda estado en IndexedDB para persistir entre reinicios
    ═══════════════════════════════════════════════════════════ */
 
-const SW_VER = 'wil-sw-v4.1';
+const SW_VER   = 'wil-sw-v5.0';
 const SHEET_ID = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
-
 const DB_NAME  = 'wil_sw_db';
 const DB_STORE = 'kv';
 let _db = null;
@@ -24,16 +26,15 @@ function openDB() {
 async function dbGet(key) {
   const db = await openDB();
   return new Promise((res, rej) => {
-    const tx = db.transaction(DB_STORE, 'readonly');
-    const r  = tx.objectStore(DB_STORE).get(key);
-    r.onsuccess = () => res(r.result);
+    const r = db.transaction(DB_STORE,'readonly').objectStore(DB_STORE).get(key);
+    r.onsuccess = () => res(r.result ?? null);
     r.onerror   = rej;
   });
 }
 async function dbSet(key, val) {
   const db = await openDB();
   return new Promise((res, rej) => {
-    const tx = db.transaction(DB_STORE, 'readwrite');
+    const tx = db.transaction(DB_STORE,'readwrite');
     tx.objectStore(DB_STORE).put(val, key);
     tx.oncomplete = res;
     tx.onerror    = rej;
@@ -42,7 +43,37 @@ async function dbSet(key, val) {
 
 self.addEventListener('install',  () => self.skipWaiting());
 self.addEventListener('activate', e => {
-  e.waitUntil(clients.claim().then(() => scheduleNextPoll()));
+  e.waitUntil(clients.claim().then(() => agendarPoll()));
+});
+
+self.addEventListener('message', e => {
+  const msg = e.data || {};
+  if (msg.type === 'GUARDAR_DOMI') {
+    dbSet('domi', msg.domi).catch(() => {});
+  }
+  if (msg.type === 'POLL_AHORA') {
+    pollPedidosBackground().catch(() => {});
+  }
+  if (msg.type === 'LIMPIAR_SESION') {
+    dbSet('domi', null).catch(() => {});
+    dbSet('asignados_ids', []).catch(() => {});
+    dbSet('ultimo_conteo_pendientes', 0).catch(() => {});
+  }
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(
+    clients.matchAll({ type:'window', includeUncontrolled:true }).then(cs => {
+      for (const c of cs) {
+        if (c.url && (c.url.includes('domi-panel') || c.url.includes('index'))) {
+          c.postMessage({ type: 'OPEN_PEDIDOS' });
+          return c.focus();
+        }
+      }
+      return clients.openWindow('/domi-panel.html');
+    })
+  );
 });
 
 self.addEventListener('push', e => {
@@ -50,184 +81,167 @@ self.addEventListener('push', e => {
   try { data = e.data.json(); } catch {}
   e.waitUntil(
     self.registration.showNotification(data.title || '🛵 Domicilios WIL', {
-      body: data.body || 'Tienes un pedido pendiente',
-      tag:  data.tag  || 'wil-push',
-      icon:  '/icons/icon-192.png',
-      badge: '/icons/badge-72.png',
-      vibrate: [300, 100, 300, 100, 500, 100, 500],
+      body:    data.body || 'Tienes un pedido pendiente',
+      tag:     data.tag  || 'wil-push',
+      icon:    '/icons/icon-192.png',
+      badge:   '/icons/badge-72.png',
+      vibrate: [300,100,300,100,500],
       requireInteraction: true,
       data
     })
   );
 });
 
-
-
-self.addEventListener('notificationclick', e => {
-  e.notification.close();
-  const data = e.notification.data || {};
-  e.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cs => {
-      /* Buscar pestaña de la PWA ya abierta */
-      for (const c of cs) {
-        if (c.url && (c.url.includes('domi-panel') || c.url.includes('index'))) {
-          c.postMessage({ type: data.tipo === 'asignado' ? 'OPEN_PEDIDOS' : 'OPEN_PEDIDOS' });
-          return c.focus();
-        }
-      }
-      /* Si no hay pestaña abierta, abrir la app */
-      return clients.openWindow('/domi-panel.html');
-    })
-  );
-});
-
-self.addEventListener('periodicsync', e => {
-  if (e.tag === 'wil-poll-pedidos') e.waitUntil(pollPedidosBackground());
-});
-
-self.addEventListener('sync', e => {
-  if (e.tag === 'wil-poll-now') e.waitUntil(pollPedidosBackground());
-});
-
-self.addEventListener('message', e => {
-  const msg = e.data || {};
-  if (msg.type === 'GUARDAR_DOMI') {
-    dbSet('domi', msg.domi).catch(() => {});
-    dbSet('asignados_ids', msg.notifIds || []).catch(() => {});
-  }
-  if (msg.type === 'POLL_AHORA')     pollPedidosBackground().catch(() => {});
-  if (msg.type === 'LIMPIAR_SESION') {
-    dbSet('domi', null).catch(() => {});
-    dbSet('asignados_ids', []).catch(() => {});
-  }
-});
-
+/* ════════════════════════════════════════════
+   POLL PRINCIPAL
+   ════════════════════════════════════════════ */
 async function pollPedidosBackground() {
   const domi = await dbGet('domi');
   if (!domi || !domi.id) return;
 
-  const asignadosIds = new Set((await dbGet('asignados_ids')) || []);
+  const asignadosIds  = new Set((await dbGet('asignados_ids')) || []);
+  const ultimoConteo  = (await dbGet('ultimo_conteo_pendientes')) || 0;
 
   try {
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Pedidos&cachebust=${Date.now()}`;
-    const r   = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(15000) });
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}`
+              + `/gviz/tq?tqx=out:csv&sheet=Pedidos&cachebust=${Date.now()}`;
+    const r   = await fetch(url, { cache:'no-store', signal: AbortSignal.timeout(15000) });
     if (!r.ok) return;
     const text = await r.text();
     if (!text || text.length < 10) return;
 
     const filas      = _csvRows(text);
-    const nombreBase = (domi.nombre || '').toLowerCase().split(' ')[0];
-    const idDomi     = (domi.id     || '').toUpperCase();
+    const nombreBase = _norm(domi.nombre || '').split(' ')[0];
+    const idDomi     = (domi.id || '').toUpperCase();
 
-    let pendientes = 0;
-    let asignados  = [];
-    const vistos   = {};
+    let pendientesSinAsignar = 0;
+    const asignadosNuevos   = [];
+    const vistos             = {};
 
     filas.forEach(cols => {
       const id     = (cols[0]  || '').trim();
       const estado = _normEst(cols[4] || '');
-      const asign  = (cols[15] || '').toLowerCase().trim();
-      if (!id || vistos[id]) return;
+      const asign  = (cols[15] || '').trim();
+
+      if (!id || !/^\d{2,5}$/.test(id) || vistos[id]) return;
       vistos[id] = true;
+      if (estado !== 'pendiente') return;
 
+      const asignNorm  = _norm(asign);
+      const asignUpper = asign.toUpperCase();
       const esMio = asign && (
-        asign.includes(nombreBase) ||
-        asign.toUpperCase().includes(idDomi)
+        asignNorm.includes(nombreBase) ||
+        asignUpper.includes(idDomi)
       );
+      const sinAsignar = !asign || asign.trim() === '';
 
-      if (estado === 'pendiente') {
-        if (esMio && !asignadosIds.has(id)) {
-          asignados.push({
-            id,
-            cliente: (cols[1] || '').trim(),
-            dir:     (cols[11]|| '').trim(),
-            total:   (cols[14]|| '').trim(),
-            pago:    (cols[3] || '').trim()
-          });
-        } else if (!asign) {
-          pendientes++;
-        }
+      if (sinAsignar) pendientesSinAsignar++;
+
+      if (esMio && !asignadosIds.has(id)) {
+        asignadosNuevos.push({
+          id,
+          cliente: (cols[1]  || '').trim(),
+          dir:     (cols[11] || '').trim(),
+          total:   (cols[14] || '').trim(),
+          pago:    (cols[3]  || '').trim()
+        });
       }
     });
 
-    /* ASIGNADOS → notificar y guardar para no repetir */
-    for (const p of asignados) {
-      await mostrarNotifAsignado(p);
+    /* 1. Asignados nuevos → notificar siempre */
+    for (const p of asignadosNuevos) {
+      await _notifAsignado(p);
       asignadosIds.add(p.id);
     }
-    if (asignados.length) {
-      await dbSet('asignados_ids', [...asignadosIds].slice(-200));
+    if (asignadosNuevos.length) {
+      await dbSet('asignados_ids', [...asignadosIds].slice(-300));
     }
 
-    /* PENDIENTES → NO guardar → repite cada 5 min */
-    if (pendientes > 0) {
+    /* 2. Pendientes → notificar SOLO si el número SUBIÓ */
+    if (pendientesSinAsignar > ultimoConteo) {
       const appAbierta = await _appEnForeground();
-      if (!appAbierta) await mostrarNotifPendientes(pendientes);
+      if (!appAbierta) {
+        await _notifPendientes(pendientesSinAsignar, ultimoConteo);
+      }
     }
 
-    await _broadcastToApp({
-      type: 'BG_POLL_RESULT',
-      pendientes,
-      asignadosCount: asignados.length
+    /* Guardar conteo actual para próxima comparación */
+    await dbSet('ultimo_conteo_pendientes', pendientesSinAsignar);
+
+    await _broadcast({
+      type:           'BG_POLL_RESULT',
+      pendientes:     pendientesSinAsignar,
+      asignadosCount: asignadosNuevos.length
     });
 
-  } catch (e) {}
+  } catch (e) {
+    console.error('[SW poll]', e);
+  }
 }
 
-async function mostrarNotifAsignado(p) {
+async function _notifAsignado(p) {
   const dir = (p.dir || '')
-    .replace(/\s*\(Ref:[^)]+\)/g, '')
-    .replace(/\s*\[.+?\]/g, '')
-    .trim()
-    .substring(0, 70);
-
-  /* Cerrar notif anterior del mismo pedido si existe */
+    .replace(/\s*\(Ref:[^)]+\)/g, '').replace(/\s*\[.+?\]/g, '')
+    .trim().substring(0, 70);
+  const esTrans = (p.pago || '').toLowerCase().includes('transfer');
   const prev = await self.registration.getNotifications({ tag: 'wil-asignado-' + p.id });
   prev.forEach(n => n.close());
-
   return self.registration.showNotification('🎯 ¡Pedido asignado a ti!', {
-    body: `${p.cliente || 'Cliente'} · ${dir}\n${p.total || ''} · ${
-      (p.pago || '').toLowerCase().includes('transfer') ? 'Transferencia' : 'Efectivo'
-    }`,
-    icon:  '/icons/icon-192.png',
-    badge: '/icons/badge-72.png',
-    tag:   'wil-asignado-' + p.id,
+    body:    `${p.cliente || 'Cliente'} · ${dir}\n${p.total || ''} · ${esTrans ? 'Transferencia' : 'Efectivo'}`,
+    icon:    '/icons/icon-192.png',
+    badge:   '/icons/badge-72.png',
+    tag:     'wil-asignado-' + p.id,
     requireInteraction: true,
-    /* Vibración intensa tipo radar: 3 pulsos fuertes */
-    vibrate: [400, 100, 400, 100, 600, 200, 400, 100, 400],
+    vibrate: [400,100,400,100,600,200,400,100,400],
     silent:  false,
-    data: { tipo: 'asignado', pedidoId: p.id }
+    data:    { tipo: 'asignado', pedidoId: p.id }
   });
 }
 
-async function mostrarNotifPendientes(n) {
-  /* Cerrar notif anterior de pendientes */
+async function _notifPendientes(actual, anterior) {
+  const nuevos = actual - anterior;
   const prev = await self.registration.getNotifications({ tag: 'wil-pendientes' });
-  prev.forEach(notif => notif.close());
-
-  return self.registration.showNotification(
-    `🛵 ${n} pedido${n > 1 ? 's' : ''} esperando`,
-    {
-      body: `Hay ${n} pedido${n > 1 ? 's' : ''} pendiente${n > 1 ? 's' : ''} sin tomar en Domicilios WIL`,
-      icon:  '/icons/icon-192.png',
-      badge: '/icons/badge-72.png',
-      tag:   'wil-pendientes',
-      requireInteraction: false,
-      vibrate: [200, 80, 200, 80, 200],
-      silent:  false,
-      data: { tipo: 'pendientes', cantidad: n }
-    }
-  );
+  prev.forEach(n => n.close());
+  const titulo = nuevos === 1
+    ? '🛵 ¡Nuevo pedido disponible!'
+    : `🛵 +${nuevos} pedidos nuevos`;
+  const cuerpo = actual === 1
+    ? 'Hay 1 pedido pendiente sin tomar'
+    : `Hay ${actual} pedidos pendientes sin tomar`;
+  return self.registration.showNotification(titulo, {
+    body:    cuerpo,
+    icon:    '/icons/icon-192.png',
+    badge:   '/icons/badge-72.png',
+    tag:     'wil-pendientes',
+    requireInteraction: false,
+    vibrate: [200,80,200,80,200],
+    silent:  false,
+    data:    { tipo: 'pendientes', cantidad: actual }
+  });
 }
 
 async function _appEnForeground() {
-  const cs = await clients.matchAll({ type: 'window', includeUncontrolled: false });
+  const cs = await clients.matchAll({ type:'window', includeUncontrolled:false });
   return cs.some(c => c.visibilityState === 'visible');
 }
 
-async function _broadcastToApp(msg) {
-  const cs = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+async function _broadcast(msg) {
+  const cs = await clients.matchAll({ type:'window', includeUncontrolled:true });
   cs.forEach(c => c.postMessage(msg));
+}
+
+function _norm(s) {
+  return (s || '').toLowerCase().normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,' ').trim();
+}
+
+function _normEst(s) {
+  const v = (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if (v.includes('entregad'))                      return 'entregado';
+  if (v.includes('cancelad'))                      return 'cancelado';
+  if (v.includes('camino'))                        return 'camino';
+  if (v.includes('proceso') || v.includes('ruta')) return 'proceso';
+  return 'pendiente';
 }
 
 function _csvRows(text) {
@@ -235,40 +249,23 @@ function _csvRows(text) {
     const cols = []; let cur = '', inQ = false;
     for (const ch of line) {
       if (ch === '"') inQ = !inQ;
-      else if (ch === ',' && !inQ) { cols.push(cur.replace(/^"|"$/g, '').trim()); cur = ''; }
+      else if (ch === ',' && !inQ) { cols.push(cur.replace(/^"|"$/g,'').trim()); cur = ''; }
       else cur += ch;
     }
-    cols.push(cur.replace(/^"|"$/g, '').trim());
+    cols.push(cur.replace(/^"|"$/g,'').trim());
     return cols;
   });
 }
 
-function _normEst(s) {
-  const v = (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  if (v.includes('entregad'))                       return 'entregado';
-  if (v.includes('camino'))                         return 'camino';
-  if (v.includes('proceso') || v.includes('ruta'))  return 'proceso';
-  return 'pendiente';
-}
-
 let _pollTimeout = null;
-function scheduleNextPoll() {
+function agendarPoll() {
   if (_pollTimeout) clearTimeout(_pollTimeout);
   _pollTimeout = setTimeout(async () => {
     await pollPedidosBackground().catch(() => {});
-    scheduleNextPoll();
-  }, 5 * 60 * 1000); /* cada 5 minutos */
+    agendarPoll();
+  }, 5 * 60 * 1000);
 }
 
 self.addEventListener('fetch', e => {
-  const url = new URL(e.request.url);
-  const isNav = e.request.mode === 'navigate';
-  const isInstallPage = url.pathname === '/install.html'
-    || url.pathname === '/';
-
-  if (isNav && isInstallPage) {
-    e.respondWith(Response.redirect('/splash.html', 302));
-    return;
-  }
-  e.respondWith(fetch(e.request));
+  e.respondWith(fetch(e.request).catch(() => new Response('offline')));
 });
