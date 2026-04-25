@@ -61,6 +61,109 @@ self.addEventListener('push', e => {
   );
 });
 
+async function swPollSheet() {
+  if (!_swDomi) return;
+  try {
+    var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID_DOMI_SW
+            + '/gviz/tq?tqx=out:csv&sheet=Pedidos&cachebust=' + Date.now();
+    var r    = await fetch(url, { cache: 'no-store' });
+    var text = await r.text();
+    if (!text || text.length < 20) return;
+ 
+    var filas = swParsearCSV(text);
+    var nombre  = (_swDomi.nombre || '').toLowerCase().normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,' ').trim()
+                    .split(' ')[0];
+    var idDomiU = (_swDomi.id || '').toUpperCase().trim();
+ 
+    var nuevoPendiente = null;
+    var asignado       = null;
+ 
+    filas.forEach(function(cols) {
+      var id   = (cols[0]||'').trim();
+      if (!id || !/^\d{2,5}$/.test(id)) return;
+      var est  = (cols[4]||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      var asig = (cols[15]||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,' ').trim();
+      var asigU= (cols[15]||'').toUpperCase();
+ 
+      if (est.includes('entregad') || est.includes('cancelad')) return;
+      if (_swNotifIds.has(id)) return;
+ 
+      var esMio = asig.includes(nombre) || asigU.includes(idDomiU);
+ 
+      if (esMio && (est.includes('proceso') || est.includes('asignad') || est.includes('camino'))) {
+        _swNotifIds.add(id);
+        asignado = { id, cliente: (cols[1]||'').trim(), total: (cols[14]||'').trim(), dir: (cols[11]||'').trim() };
+        return;
+      }
+ 
+      if (est.includes('pendiente') && (!cols[15] || !cols[15].trim())) {
+        _swNotifIds.add(id);
+        nuevoPendiente = { id, cliente: (cols[1]||'').trim(), total: (cols[14]||'').trim(), dir: (cols[11]||'').trim() };
+      }
+    });
+ 
+    if (asignado) {
+      await self.registration.showNotification('🎯 ¡Te asignaron un pedido!', {
+        body:  asignado.cliente + ' · ' + asignado.total,
+        icon:  '/icons/icon-192.png',
+        badge: '/icons/badge-72.png',
+        tag:   'wil-asig-' + asignado.id,
+        requireInteraction: true,
+        vibrate: [500,150,500,150,500],
+        data: { tipo: 'asignado', pedidoId: asignado.id }
+      });
+    }
+ 
+    if (nuevoPendiente && !asignado) {
+      await self.registration.showNotification('📦 Pedido nuevo disponible', {
+        body:  nuevoPendiente.cliente + ' · ' + nuevoPendiente.total,
+        icon:  '/icons/icon-192.png',
+        badge: '/icons/badge-72.png',
+        tag:   'wil-nuevo-' + nuevoPendiente.id,
+        requireInteraction: false,
+        vibrate: [200,80,200],
+        data: { tipo: 'nuevo', pedidoId: nuevoPendiente.id }
+      });
+    }
+ 
+    var clients = await self.clients.matchAll({ type:'window', includeUncontrolled:true });
+    if (clients.length > 0) {
+      clients[0].postMessage({ type: 'BG_POLL_RESULT', asignadosCount: asignado ? 1 : 0 });
+    }
+ 
+  } catch(e) {}
+}
+ 
+function swParsearCSV(text) {
+  return text.trim().split('\n').filter(Boolean).slice(1).map(function(line) {
+    var cols = [], cur = '', inQ = false;
+    for (var i = 0; i < line.length; i++) {
+      var ch = line[i];
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { cols.push(cur.replace(/^"|"$/g,'').trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    cols.push(cur.replace(/^"|"$/g,'').trim());
+    return cols;
+  }).filter(function(c) { return c[0] || c[6]; });
+}
+ 
+self.addEventListener('notificationclick', function(e) {
+  e.notification.close();
+  var data = e.notification.data || {};
+  e.waitUntil(
+    self.clients.matchAll({ type:'window', includeUncontrolled:true }).then(function(cls) {
+      if (cls.length > 0) {
+        cls[0].focus();
+        cls[0].postMessage({ type: data.tipo === 'asignado' ? 'OPEN_RUTA' : 'OPEN_PEDIDOS' });
+      } else {
+        self.clients.openWindow('/');
+      }
+    })
+  );
+});
+
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   const data = e.notification.data || {};
