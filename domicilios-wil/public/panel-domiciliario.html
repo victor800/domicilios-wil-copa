@@ -911,7 +911,6 @@ var _tabRouteLayer  = null;
 var _tabRouteGlow   = null;
 var _ultimoConteoNotif = -1; // -1 = nunca notificado
 var _idsNotifNuevo = new Set();
-var _trkEnviando = false;
 
 
 const SHEET_ID_DOMI   = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
@@ -974,107 +973,6 @@ function _estadoAPaso(raw) {
   return 0;
 }
 
-function _liberarPedidoActivo() {
-  if (_tabRouteLayer && _tabMap) { _tabMap.removeLayer(_tabRouteLayer); _tabRouteLayer = null; }
-  if (_tabRouteGlow  && _tabMap) { _tabMap.removeLayer(_tabRouteGlow);  _tabRouteGlow  = null; }
-  if (_tabDestMarker && _tabMap) { _tabMap.removeLayer(_tabDestMarker); _tabDestMarker = null; }
-  clearInterval(_tabMapInterval);
-  detenerNavegacion();
-  detenerChatPoll();
-  document.getElementById('wazeFloatBtn').style.display = 'none';
-  state.pedidoActivo = null;
-  state.estadoPedido = null;
-  destLatGlobal = null;
-  destLngGlobal = null;
-  actualizarBadgesNav();
-  document.getElementById('pedidoActivoPanel').style.display = 'none';
-  document.getElementById('sinPedidoEnRuta').style.display   = 'flex';
-}
- 
-/* Completa la entrega detectada desde el sheet (sin necesitar botón) */
-function _completarEntregadoDesdeSheet(p, hoyStr) {
-  var horaReal = p.horaEntrega || horaAhora();
- 
-  /* Actualizar stepper visualmente */
-  var s3 = document.getElementById('tab_step3Time');
-  if (s3) s3.textContent = horaReal;
-  renderStepper(2);
- 
-  /* Agregar al historial local si no existe ya */
-  var yaEsta = state.historial.some(function(h) { return h.id === p.id; });
-  if (!yaEsta) {
-    state.historial.unshift({
-      id:         p.id,
-      cliente:    p.cliente,
-      telefono:   p.telefono,
-      direccion:  p.direccion,
-      total:      p.total,
-      metodoPago: p.metodoPago,
-      domicilio:  p.domicilio,
-      hora:       horaReal,
-      fecha:      p.fecha || hoyStr,
-      estado:     'Entregado',
-      periodo:    (p.fecha === hoyStr || !p.fecha) ? 'hoy' : 'anterior',
-      prods:      (p._prods || []).length
-    });
-  }
- 
-  setTimeout(function() {
-    _liberarPedidoActivo();
-    actualizarBadgesNav();
-    if (currentTab === 'ruta') {
-      setTimeout(function() { switchTab('historial'); renderHistorial(); }, 600);
-    }
-  }, 2000);
-}
- 
-/* Notificación de pedido NUEVO (sin asignar) */
-function _notifPedidoNuevo(p) {
-  /* Vibración */
-  if (navigator.vibrate) navigator.vibrate([200, 80, 200]);
- 
-  /* Flash badge */
-  var nb = document.getElementById('navBadge');
-  if (nb) { nb.style.transform = 'scale(1.6)'; setTimeout(function() { nb.style.transform = ''; }, 350); }
- 
-  /* Sonido suave (2 notas) */
-  try {
-    var ctx = new (window.AudioContext || window.webkitAudioContext)();
-    [523, 784].forEach(function(freq, i) {
-      var osc = ctx.createOscillator(), g = ctx.createGain();
-      osc.connect(g); g.connect(ctx.destination);
-      osc.type = 'sine'; osc.frequency.value = freq;
-      var t = ctx.currentTime + i * 0.22;
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.4, t + 0.04);
-      g.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
-      osc.start(t); osc.stop(t + 0.29);
-    });
-  } catch(e) {}
- 
-  /* Notificación del sistema */
-  if (Notification.permission === 'granted') {
-    var opts = {
-      body:  (p.cliente || 'Cliente') + ' · ' + (p.total || '') + ' · '
-             + (p.direccion || '').replace(/\s*\[.+\]/, '').substring(0, 60),
-      icon:  'icons/icon-192.png',
-      badge: 'icons/badge-72.png',
-      tag:   'wil-nuevo-' + p.id,
-      requireInteraction: true,
-      vibrate: [200, 80, 200],
-      data: { tipo: 'nuevo', pedidoId: p.id }
-    };
-    var titulo = '📦 Nuevo pedido disponible';
-    if (window._wilSwReg) {
-      window._wilSwReg.showNotification(titulo, opts);
-    } else {
-      navigator.serviceWorker.ready.then(function(reg) {
-        window._wilSwReg = reg;
-        reg.showNotification(titulo, opts);
-      }).catch(function() {});
-    }
-  }
-}
 
 
 
@@ -1521,81 +1419,61 @@ function trkSyncUI(on){
   var ds2=document.getElementById('trkDrawerSub');if(ds2)ds2.textContent=on?'Eres visible en el mapa':'Activa para ser visible en el mapa';
 }
 
-function trkActivar() {
-  if (!navigator.geolocation) {
-    _gpsError('Tu navegador no soporta GPS. Usa Chrome o Firefox actualizado.');
-    return;
-  }
-  if (TRK.activo) return; /* ya activo */
- 
-  TRK.activo = true;
-  localStorage.setItem(TRK_KEY, JSON.stringify({ domiId: domi.id, nombre: domi.nombre }));
-  trkLog('info', 'Activando GPS…');
-  trkSyncUI(true);
- 
-  /* Paso 1: getCurrentPosition para "despertar" el permiso en Android PWA */
-  navigator.geolocation.getCurrentPosition(
-    function(pos) {
-      /* Primera posición obtenida — actualizar todo inmediatamente */
-      _aplicarPosicion(pos);
-      trkLog('ok', 'GPS obtenido · ' + pos.coords.latitude.toFixed(5) + ', ' + pos.coords.longitude.toFixed(5));
- 
-      /* Paso 2: lanzar watchPosition ahora que el permiso está activo */
-      _iniciarWatch();
-    },
-    function(err) {
-      TRK.activo = false;
-      trkSyncUI(false);
-      localStorage.removeItem(TRK_KEY);
-      _gpsError(_mensajeErrorGPS(err));
-      trkLog('err', _mensajeErrorGPS(err));
-    },
-    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-  );
- 
-  /* Iniciar envíos al sheet (aunque aún no haya coords, el timer espera) */
-  if (TRK.envTimer) clearInterval(TRK.envTimer);
-  TRK.envTimer = setInterval(trkEnviarUbicacion, TRK_INTERVAL_MS);
-}
- 
+function trkActivar(){
+  if(!navigator.geolocation){trkLog('err','GPS no disponible');return;}
+  TRK.activo=true;
+  localStorage.setItem(TRK_KEY,JSON.stringify({domiId:domi.id,nombre:domi.nombre}));
+  trkLog('ok','Tracker activado — buscando GPS…');
+  if(currentTab==='ruta')document.getElementById('trkFloatBtn').style.display='flex';
+  setTimeout(function(){trkSyncUI(true);},300);
 
-function trkDesactivar() {
-  TRK.activo = false;
-  _watchRetries = 0;
-  localStorage.removeItem(TRK_KEY);
- 
-  if (TRK.watchId !== null) {
-    navigator.geolocation.clearWatch(TRK.watchId);
-    TRK.watchId = null;
-  }
-  clearInterval(TRK.envTimer);
-  TRK.envTimer = null;
- 
-  trkSyncUI(false);
- 
-  /* Limpiar UI GPS */
-  var el2 = document.getElementById('trkGpsTxt2');
-  if (el2) el2.textContent = 'GPS desactivado';
-  var sgt = document.getElementById('shareGpsTxt');
-  if (sgt) sgt.textContent = 'Sin señal GPS';
-  var t2 = document.getElementById('trkAccTag2');
-  if (t2) t2.classList.add('hidden');
-  var glTab = document.getElementById('gpsLabelTab');
-  if (glTab) glTab.textContent = '· sin GPS';
-  var dotTab = document.getElementById('gpsDotTab');
-  if (dotTab) { dotTab.style.background = '#bbc9cb'; dotTab.classList.remove('trk-gps-live'); }
- 
-  /* Mover marcador al ancla si no hay pedido activo */
-  if (_tabDomiMarker && _tabMap) {
-    if (!state.pedidoActivo) {
-      _tabDomiMarker.setLatLng([ANCLA_LAT, ANCLA_LNG]);
-    }
-    _tabDomiMarker.setIcon(iconDomi(domi ? domi.nombre : 'WIL', false));
-  }
- 
-  trkLog('info', 'Tracker desactivado');
+  TRK.watchId=navigator.geolocation.watchPosition(
+    function(pos){
+      TRK.lat=pos.coords.latitude;
+      TRK.lng=pos.coords.longitude;
+      TRK.acc=Math.round(pos.coords.accuracy);
+      var coord=TRK.lat.toFixed(5)+', '+TRK.lng.toFixed(5);
+      var el2=document.getElementById('trkGpsTxt2');if(el2)el2.textContent=coord;
+      var t2=document.getElementById('trkAccTag2');if(t2){t2.textContent='±'+TRK.acc+'m';t2.classList.remove('hidden');}
+      var sgt=document.getElementById('shareGpsTxt');if(sgt)sgt.textContent=coord+' ±'+TRK.acc+'m';
+      var h=horaAhora();
+      var tus=document.getElementById('trkUltSync2');if(tus)tus.textContent=h;
+
+      /* Actualizar marcador en mapa de pestaña */
+      if(_tabDomiMarker&&_tabMap){
+        _tabDomiMarker.setLatLng([TRK.lat,TRK.lng]);
+        _tabDomiMarker.setIcon(iconDomi(domi?domi.nombre:'WIL',true));
+        if(!state.pedidoActivo&&currentTab==='ruta'){
+          _tabMap.setView([TRK.lat,TRK.lng],16,{animate:true});
+        }
+      }
+
+      /* Actualizar labels GPS tab */
+      var glTab=document.getElementById('gpsLabelTab');
+      if(glTab)glTab.textContent='· GPS activo';
+      var dotTab=document.getElementById('gpsDotTab');
+      if(dotTab){dotTab.style.background='#2a9d5c';dotTab.classList.add('trk-gps-live');}
+    },
+    function(e){trkLog('err','GPS bloqueado: '+e.message);},
+    {enableHighAccuracy:true,maximumAge:10000,timeout:20000}
+  );
+  trkEnviarUbicacion();
+  TRK.envTimer=setInterval(trkEnviarUbicacion,TRK_INTERVAL_MS);
 }
- 
+
+function trkDesactivar(){
+  TRK.activo=false;localStorage.removeItem(TRK_KEY);
+  if(TRK.watchId!==null){navigator.geolocation.clearWatch(TRK.watchId);TRK.watchId=null;}
+  clearInterval(TRK.envTimer);TRK.envTimer=null;
+  trkSyncUI(false);
+  var el2=document.getElementById('trkGpsTxt2');if(el2)el2.textContent='GPS desactivado';
+  var sgt=document.getElementById('shareGpsTxt');if(sgt)sgt.textContent='Sin señal GPS';
+  var t2=document.getElementById('trkAccTag2');if(t2)t2.classList.add('hidden');
+  if(_tabDomiMarker&&_tabMap){
+    if(!state.pedidoActivo)_tabDomiMarker.setLatLng([ANCLA_LAT,ANCLA_LNG]);
+    _tabDomiMarker.setIcon(iconDomi(domi?domi.nombre:'WIL',false));
+  }
+}
 
 function trkEnviarUbicacion() {
   if (!TRK.activo || TRK.lat === null) {
@@ -1636,23 +1514,6 @@ fetch('https://script.google.com/macros/s/AKfycbzPriKpQz0jI9AaYtylsDR_b5oRwMym0r
     trkLog('err', 'Sin conexión: ' + e.message.slice(0, 35));
   });
 }
-
-function _trkBeacon(payload, ts) {
-  if (!navigator.sendBeacon) {
-    trkLog('err', 'Sin conexión y sin beacon disponible');
-    return;
-  }
-  var blob = new Blob([payload], { type: 'text/plain' });
-  var ok   = navigator.sendBeacon(SCRIPT_URL_DOMI, blob);
-  if (ok) {
-    trkLog('ok', 'GPS beacon enviado · ' + ts);
-    var tus = document.getElementById('trkUltSync2');
-    if (tus) tus.textContent = ts;
-  } else {
-    trkLog('err', 'Beacon falló — sin conexión');
-  }
-}
-
 
 function trkLog(tipo,msg){
   var list=document.getElementById('trkLogList');var ts=horaAhora();
@@ -1961,81 +1822,51 @@ async function fetchHistorialSheet() {
   try {
     var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID_DOMI
             + '/gviz/tq?tqx=out:csv&sheet=Pedidos&cachebust=' + Date.now();
-    var r = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(14000) });
+    var r = await fetch(url, { cache:'no-store', signal:AbortSignal.timeout(14000) });
     if (!r.ok) return;
     var text = await r.text();
     if (!text || text.length < 20) return;
- 
-    var filas = _parsearCSV(text);
-    var pedMap = {}, lastId = null;
- 
+
+    var filas = _parsearCSV(text), pedMap = {}, lastId = null;
     filas.forEach(function(cols) {
-      var id = (cols[0] || '').trim();
-      if (id && !/^\d{2,5}$/.test(id)) return;
+      var id = (cols[0]||'').trim();
       if (id) {
-        if (!pedMap[id]) {
-          pedMap[id] = {
-            id,
-            cliente:    (cols[1]  || '').trim(),
-            telefono:   (cols[2]  || '').trim(),
-            metodoPago: (cols[3]  || '').trim(),
-            estadoRaw:  (cols[4]  || '').trim(),
-            direccion:  (cols[11] || '').trim(),
-            hora:       (cols[12] || '').trim(),
-            fecha:      (cols[13] || '').trim(),
-            total:      (cols[14] || '').trim(),
-            domiAsign:  (cols[15] || '').trim(),
-            horaEntrega:(cols[18] || '').trim(),
-            domicilio:  (cols[19] || '').trim(),
-            _prods: []
-          };
-        }
+        if (!pedMap[id]) pedMap[id] = {
+          id, cliente:(cols[1]||'').trim(), telefono:(cols[2]||'').trim(),
+          metodoPago:(cols[3]||'').trim(), estadoRaw:(cols[4]||'').trim(),
+          direccion:(cols[11]||'').trim(), hora:(cols[12]||'').trim(),
+          fecha:(cols[13]||'').trim(), total:(cols[14]||'').trim(),
+          domiAsign:(cols[15]||'').trim(), horaEntrega:(cols[18]||'').trim(),
+          domicilio:(cols[19]||'').trim(), _prods:[]
+        };
         lastId = id;
       }
-      var aId = id || lastId;
-      if (!aId || !pedMap[aId]) return;
-      var nom = (cols[6] || '').replace(/\|cat$/, '').trim();
+      var aId = id || lastId; if (!aId || !pedMap[aId]) return;
+      var nom = (cols[6]||'').replace(/\|cat$/,'').trim();
       if (nom && !/^domicilio\s*\(/i.test(nom)) {
-        pedMap[aId]._prods.push({
-          nom, qty: parseInt(cols[8]) || 1,
-          vu: parseCOP(cols[9] || ''), vtotal: parseCOP(cols[10] || '')
-        });
+        pedMap[aId]._prods.push({ nom, qty:parseInt(cols[8])||1,
+          vu:parseCOP(cols[9]||''), vtotal:parseCOP(cols[10]||'') });
       }
     });
- 
-    var _norm = function(s) {
-      return (s || '').toLowerCase().normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, ' ').trim();
-    };
-    var nombreBase = _norm(domi.nombre || '').split(' ')[0];
-    var idDomi     = (domi.id || '').toUpperCase().trim();
-    var hoyStr     = new Date().toLocaleDateString('es-CO', { timeZone: TZ });
- 
-    /* Obtener fecha de hace 7 días para "semana" */
-    var hace7 = new Date();
-    hace7.setDate(hace7.getDate() - 7);
-    var hace7Str = hace7.toLocaleDateString('es-CO', { timeZone: TZ });
- 
+
+    var _norm = function(s){ return (s||'').toLowerCase().normalize('NFD')
+      .replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,' ').trim(); };
+    var nombreBase = _norm(domi.nombre||'').split(' ')[0];
+    var idDomi     = (domi.id||'').toUpperCase().trim();
+    var hoyStr     = new Date().toLocaleDateString('es-CO',{timeZone:TZ});
+
     var items = [];
- 
     Object.values(pedMap).forEach(function(p) {
-      var estNorm = (p.estadoRaw || '').toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      var esEntregado = estNorm.includes('entregad');
-      var esCancelado = estNorm.includes('cancelad') || estNorm.includes('cancel');
+      var est = (p.estadoRaw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      var esEntregado = est.includes('entregad');
+      var esCancelado = est.includes('cancelad') || est.includes('cancel');
       if (!esEntregado && !esCancelado) return;
- 
-      /* Verificar que sea de este domi */
-      var asgNorm  = _norm(p.domiAsign || '');
-      var asgUpper = (p.domiAsign || '').toUpperCase();
-      var esM = p.domiAsign && (asgNorm.includes(nombreBase) || asgUpper.includes(idDomi));
-      if (!esM) return;
- 
-      /* Determinar periodo */
-      var periodo = 'anterior';
-      if (p.fecha === hoyStr) periodo = 'hoy';
-      else if (p.fecha >= hace7Str) periodo = 'semana';
- 
+
+      var asgNorm  = _norm(p.domiAsign);
+      var asgUpper = (p.domiAsign||'').toUpperCase();
+      var esMio    = p.domiAsign && (asgNorm.includes(nombreBase)||asgUpper.includes(idDomi));
+      if (!esMio) return;
+
       items.push({
         id:         p.id,
         cliente:    p.cliente,
@@ -2043,31 +1874,38 @@ async function fetchHistorialSheet() {
         direccion:  p.direccion,
         total:      p.total,
         metodoPago: p.metodoPago,
-        domicilio:  p.domicilio,
         hora:       p.horaEntrega || p.hora,
         fecha:      p.fecha,
         estado:     esEntregado ? 'Entregado' : 'Cancelado',
-        periodo:    periodo,
-        prods:      p._prods.length
+        periodo:    p.fecha === hoyStr ? 'hoy' : 'anterior',
+        prods:      p._prods.length,
+        domicilio:  p.domicilio
       });
     });
- 
+
     /* Más reciente primero */
-    items.sort(function(a, b) { return (b.hora || '').localeCompare(a.hora || ''); });
- 
-    /* Mezclar con historial local (prioriza sheet, evita duplicados) */
-    var idsSheet = new Set(items.map(function(i) { return i.id; }));
-    var soloLocal = state.historial.filter(function(h) { return !idsSheet.has(h.id); });
-    state.historial = items.concat(soloLocal);
-    state.historial.sort(function(a, b) { return (b.hora || '').localeCompare(a.hora || ''); });
- 
+    items.sort(function(a,b){ return (b.hora||'').localeCompare(a.hora||''); });
+    state.historial = items;
     if (currentTab === 'historial') renderHistorial();
     actualizarBadgesNav();
- 
-  } catch(e) {
-    console.warn('[fetchHistorialSheet]:', e.message);
-  }
+  } catch(e) { console.warn('[fetchHistorialSheet]:', e.message); }
 }
+
+function iniciarPolling(){
+  fetchPedidos();
+  fetchHistorialSheet();
+ 
+  // Pedidos: cada 10 segundos
+  pollingTimer = setInterval(fetchPedidos, 10000);
+ 
+  // Historial: cada 60 segundos (no necesita ser tan frecuente)
+  setInterval(fetchHistorialSheet, 60000);
+ 
+  // Ocultar barra de progreso
+  var pw = document.querySelector('.polling-wrap');
+  if(pw) pw.style.display = 'none';
+}
+
 /* ═══════════════════ RENDER PEDIDOS ═══════════════════ */
 var CARD_MAX_VIS=50;
 
@@ -2486,118 +2324,6 @@ function extraerCoordenadasPedido(p){
   return null; // no hay coords → usar dirección de texto
 }
 
-var _watchRetries = 0;
-var _MAX_WATCH_RETRIES = 3;
- 
-function _iniciarWatch() {
-  /* Limpiar watch anterior si existe */
-  if (TRK.watchId !== null) {
-    navigator.geolocation.clearWatch(TRK.watchId);
-    TRK.watchId = null;
-  }
- 
-  TRK.watchId = navigator.geolocation.watchPosition(
-    function(pos) {
-      _watchRetries = 0; /* resetear contador en cada éxito */
-      _aplicarPosicion(pos);
-    },
-    function(err) {
-      trkLog('warn', 'Watch GPS: ' + _mensajeErrorGPS(err));
- 
-      /* Reintento automático si no es denegación permanente */
-      if (err.code !== 1 && _watchRetries < _MAX_WATCH_RETRIES) {
-        _watchRetries++;
-        trkLog('info', 'Reintentando GPS (' + _watchRetries + '/' + _MAX_WATCH_RETRIES + ')…');
-        setTimeout(_iniciarWatch, 4000 * _watchRetries);
-      } else if (err.code === 1) {
-        /* Permiso denegado — desactivar limpiamente */
-        trkDesactivar();
-        _gpsError('Permiso de GPS denegado. Ve a Configuración del navegador y permite la ubicación para este sitio.');
-      }
-    },
-    {
-      enableHighAccuracy: true,
-      maximumAge: 8000,   /* acepta posición de hasta 8s de antigüedad */
-      timeout: 20000
-    }
-  );
-}
-
-function _aplicarPosicion(pos) {
-  TRK.lat = pos.coords.latitude;
-  TRK.lng = pos.coords.longitude;
-  TRK.acc = Math.round(pos.coords.accuracy);
- 
-  var coord = TRK.lat.toFixed(5) + ', ' + TRK.lng.toFixed(5);
-  var hora  = horaAhora();
- 
-  /* Drawer */
-  var el2 = document.getElementById('trkGpsTxt2');
-  if (el2) el2.textContent = coord;
-  var t2 = document.getElementById('trkAccTag2');
-  if (t2) { t2.textContent = '±' + TRK.acc + 'm'; t2.classList.remove('hidden'); }
-  var tus = document.getElementById('trkUltSync2');
-  if (tus) tus.textContent = hora;
- 
-  /* Share popup */
-  var sgt = document.getElementById('shareGpsTxt');
-  if (sgt) sgt.textContent = coord + ' ±' + TRK.acc + 'm';
- 
-  /* GPS strip en tab ruta */
-  var glTab = document.getElementById('gpsLabelTab');
-  if (glTab) glTab.textContent = '· GPS activo';
-  var dotTab = document.getElementById('gpsDotTab');
-  if (dotTab) { dotTab.style.background = '#2a9d5c'; dotTab.classList.add('trk-gps-live'); }
- 
-  /* Marcador en mapa */
-  if (_tabDomiMarker && _tabMap) {
-    _animarMarcador(_tabDomiMarker, TRK.lat, TRK.lng, 1200);
-    _tabDomiMarker.setIcon(iconDomi(domi ? domi.nombre : 'WIL', true));
-    /* Si no hay pedido activo, centrar en mí */
-    if (!state.pedidoActivo && currentTab === 'ruta') {
-      _tabMap.setView([TRK.lat, TRK.lng], 16, { animate: true });
-    }
-  }
- 
-  /* Envío inmediato si hay coords nuevas */
-  trkEnviarUbicacion();
-}
- 
- 
-/* ───────────────────────────────────────────────────────────────
-   NUEVO HELPER: mensajes de error GPS legibles
-   ─────────────────────────────────────────────────────────────── */
-function _mensajeErrorGPS(err) {
-  switch (err.code) {
-    case 1: return 'Permiso denegado. Habilita la ubicación en el navegador.';
-    case 2: return 'GPS no disponible. Verifica que el GPS del dispositivo esté activo.';
-    case 3: return 'Tiempo de espera agotado. Asegúrate de tener señal GPS.';
-    default: return 'Error GPS: ' + (err.message || 'desconocido');
-  }
-}
- 
- 
-/* ───────────────────────────────────────────────────────────────
-   NUEVO HELPER: mostrar error GPS al usuario
-   ─────────────────────────────────────────────────────────────── */
-function _gpsError(msg) {
-  /* Toast rojo breve */
-  var t = document.createElement('div');
-  t.style.cssText =
-    'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);z-index:9999;' +
-    'background:#ba1a1a;color:#fff;font-family:\'Plus Jakarta Sans\',sans-serif;' +
-    'font-weight:700;font-size:12px;padding:10px 18px;border-radius:20px;' +
-    'box-shadow:0 4px 20px rgba(0,0,0,.3);max-width:80vw;text-align:center;' +
-    'animation:cardIn .3s ease both';
-  t.textContent = msg;
-  document.body.appendChild(t);
-  setTimeout(function() {
-    t.style.opacity = '0';
-    t.style.transition = 'opacity .4s';
-    setTimeout(function() { t.remove(); }, 400);
-  }, 5000);
-  trkLog('err', msg);
-}
 
 
 
@@ -2974,142 +2700,115 @@ function stepActionClick(){if(stepState===0)marcarEncamino();else if(stepState==
 
 
 /* ═══════════════════ ESTADOS PEDIDO ═══════════════════ */
-async function cambiarEstadoPedido(nuevoEstado) {
-  if (!state.pedidoActivo) return false;
+async function cambiarEstadoPedido(nuevoEstado){
+  if(!state.pedidoActivo) return false;
   try {
     var horaActual = new Date().toLocaleTimeString('es-CO', {
-      hour: '2-digit', minute: '2-digit', timeZone: TZ
+      hour:'2-digit', minute:'2-digit', timeZone: TZ
     });
- 
-    /* Construimos el payload con TODOS los campos que el script necesita */
+
     var payload = {
-      accion:    'asignar-domi',       /* acción que el script ya conoce */
+      accion:    'asignar-domi',
       pedidoId:  String(state.pedidoActivo.id).trim(),
       domi:      domi.nombre,
       estado:    nuevoEstado,
       horaAsign: horaActual
     };
- 
-    /* Campos de hora específicos por columna */
-    if (nuevoEstado === 'En camino') {
-      payload.horaCamino  = horaActual;
+
+    // Si es "En camino" → usar campo horaCamino
+    if(nuevoEstado === 'En camino'){
+      payload.horaCamino = horaActual;
     }
-    if (nuevoEstado === 'Entregado') {
+    // Si es "Entregado" → usar campo horaEntrega
+    if(nuevoEstado === 'Entregado'){
       payload.horaEntrega = horaActual;
     }
- 
-    var res = await fetch(SCRIPT_URL_DOMI, {
+
+    var r = await fetch(SCRIPT_URL_DOMI, {
       method:  'POST',
       headers: { 'Content-Type': 'text/plain' },
       body:    JSON.stringify(payload),
       signal:  AbortSignal.timeout(15000)
     });
-    var d = await res.json();
- 
-    /* Aceptar ok:true O filasActualizadas > 0 */
-    return d.ok !== false && (d.filasActualizadas === undefined || d.filasActualizadas > 0);
- 
+    var d = await r.json();
+    return d.ok !== false;
+
   } catch(e) {
     console.warn('[cambiarEstadoPedido]:', e.message);
     return false;
   }
 }
 
-function marcarEncamino() {
-  var btnCamino = document.getElementById('btnEnCamino');
-  if (btnCamino) { btnCamino.disabled = true; btnCamino.innerHTML = '<span class="spin"></span> Guardando…'; }
- 
-  cambiarEstadoPedido('En camino').then(function(ok) {
-    if (!ok) {
-      if (btnCamino) {
-        btnCamino.disabled = false;
-        btnCamino.innerHTML = '<span class="material-symbols-outlined text-white" style="font-size:17px;font-variation-settings:\'FILL\' 1">two_wheeler</span> Ponerte en camino';
-      }
+function marcarEncamino(){
+  setStepLoading(true, 'Guardando…');
+  cambiarEstadoPedido('En camino').then(function(ok){
+    if(!ok){
+      setStepLoading(false, 'Ponerte en camino');
       alert('No se pudo cambiar el estado. Verifica tu conexión.');
       return;
     }
- 
     state.estadoPedido = 'En camino';
     var s2 = document.getElementById('tab_step2Time');
-    if (s2) s2.textContent = horaAhora();
+    if(s2) s2.textContent = horaAhora();
     renderStepper(1);
- 
-    /* Redibujar ruta si hay GPS y destino */
-    if (TRK.lat && destLatGlobal) {
+
+    // Redibujar ruta si hay GPS y destino
+    if(TRK.lat && destLatGlobal){
       dibujarRutaOSRM(TRK.lat, TRK.lng, destLatGlobal, destLngGlobal);
     }
- 
-    /* Activar Waze si no estaba */
-    var waze = document.getElementById('wazeFloatBtn');
-    if (waze) { waze.style.display = 'flex'; waze.classList.add('live'); }
- 
-  }).catch(function(e) {
-    if (btnCamino) {
-      btnCamino.disabled = false;
-      btnCamino.innerHTML = '<span class="material-symbols-outlined text-white" style="font-size:17px;font-variation-settings:\'FILL\' 1">two_wheeler</span> Ponerte en camino';
-    }
+  }).catch(function(e){
+    setStepLoading(false, 'Ponerte en camino');
     alert('Error de red: ' + e.message);
   });
 }
 
-function marcarEntregado() {
-  var horaReal   = horaAhora();
-  var btnEntrego = document.getElementById('btnEntregado');
-  if (btnEntrego) { btnEntrego.disabled = true; btnEntrego.innerHTML = '<span class="spin"></span> Confirmando…'; }
- 
-  cambiarEstadoPedido('Entregado').then(function(ok) {
-    if (!ok) {
-      if (btnEntrego) {
-        btnEntrego.disabled = false;
-        btnEntrego.innerHTML = '<span class="material-symbols-outlined text-white" style="font-size:17px;font-variation-settings:\'FILL\' 1">check_circle</span> Confirmar entrega';
-      }
-      alert('No se pudo confirmar la entrega.');
-      return;
+function marcarEntregado(){
+  var horaReal = horaAhora(); // ← capturar AHORA antes de todo
+  setStepLoading(true,'Confirmando…');
+  cambiarEstadoPedido('Entregado').then(function(ok){
+    if(!ok){
+      setStepLoading(false,'Confirmar entrega');
+      showStepBtn('linear-gradient(135deg,#1a7a3a,#2a9d5c)','0 4px 20px rgba(42,157,92,.35)','check_circle','Confirmar entrega');
+      alert('No se pudo confirmar la entrega.'); return;
     }
- 
-    state.estadoPedido = 'Entregado';
-    var s3 = document.getElementById('tab_step3Time');
-    if (s3) s3.textContent = horaReal;
+    state.estadoPedido='Entregado';
+    var s3=document.getElementById('tab_step3Time');
+    if(s3) s3.textContent = horaReal; // ← usar hora capturada
     renderStepper(2);
- 
-    /* Agregar al historial local */
-    var hoyStr = new Date().toLocaleDateString('es-CO', { timeZone: TZ });
-    var yaEsta = state.historial.some(function(h) { return h.id === state.pedidoActivo.id; });
-    if (!yaEsta) {
-      state.historial.unshift({
-        id:         state.pedidoActivo.id,
-        cliente:    state.pedidoActivo.cliente,
-        telefono:   state.pedidoActivo.telefono,
-        direccion:  state.pedidoActivo.direccion,
-        total:      state.pedidoActivo.total,
-        metodoPago: state.pedidoActivo.metodoPago,
-        domicilio:  state.pedidoActivo.domicilio || '',
-        hora:       horaReal,
-        fecha:      hoyStr,
-        estado:     'Entregado',
-        periodo:    'hoy',
-        prods:      parsearProductos(state.pedidoActivo).length
-      });
-    }
- 
+    state.historial.unshift({
+      id:state.pedidoActivo.id, cliente:state.pedidoActivo.cliente,
+      direccion:state.pedidoActivo.direccion, total:state.pedidoActivo.total,
+      metodoPago:state.pedidoActivo.metodoPago,
+      hora: horaReal, // ← hora real
+      fecha:new Date().toLocaleDateString('es-CO',{timeZone:TZ}),
+      estado:'Entregado', periodo:'hoy'
+    });
     actualizarBadgesNav();
-    idsProcesados.add(state.pedidoActivo.id);
- 
-    /* Esperar 2.5 s para que el usuario vea el paso 3 completado */
-    setTimeout(function() {
-      _liberarPedidoActivo();
-      renderHistorial();
-      setTimeout(function() { switchTab('historial'); }, 600);
-    }, 2500);
- 
-  }).catch(function(e) {
-    if (btnEntrego) {
-      btnEntrego.disabled = false;
-      btnEntrego.innerHTML = '<span class="material-symbols-outlined text-white" style="font-size:17px;font-variation-settings:\'FILL\' 1">check_circle</span> Confirmar entrega';
-    }
-    alert('Error: ' + e.message);
-  });
+    setTimeout(function(){
+      if(_tabRouteLayer){ _tabMap&&_tabMap.removeLayer(_tabRouteLayer);_tabRouteLayer=null; }
+      if(_tabRouteGlow) { _tabMap&&_tabMap.removeLayer(_tabRouteGlow); _tabRouteGlow=null;  }
+      if(_tabDestMarker&&_tabMap){_tabMap.removeLayer(_tabDestMarker);_tabDestMarker=null;}
+      if(_tabDomiMarker&&_tabMap){
+        _tabDomiMarker.setLatLng([TRK.lat||ANCLA_LAT,TRK.lng||ANCLA_LNG]);
+        _tabDomiMarker.setIcon(iconDomi(domi?domi.nombre:'WIL',TRK.activo));
+      }
+      clearInterval(_tabMapInterval); detenerNavegacion();
+      document.getElementById('mapEtaBadgeTab').style.display='none';
+      state.pedidoActivo=null; state.estadoPedido=null;
+      destLatGlobal=null; destLngGlobal=null;
+      actualizarBadgesNav(); detenerChatPoll();
+      document.getElementById('pedidoActivoPanel').style.display='none';
+      /* Mostrar botón Waze flotante */
+  var waze = document.getElementById('wazeFloatBtn');
+  if(waze) waze.style.display = 'flex';
+      document.getElementById('sinPedidoEnRuta').style.display='flex';
+      /* Ocultar botón Waze flotante */
+      document.getElementById('wazeFloatBtn').style.display='none';
+      setTimeout(function(){switchTab('historial');renderHistorial();},600);
+    },2500);
+  }).catch(function(e){setStepLoading(false,'Confirmar entrega');alert('Error: '+e.message);});
 }
+
 /* ═══════════════════ HISTORIAL ═══════════════════ */
 function renderHistorial() {
   var lista = document.getElementById('listaHistorial');
@@ -3980,9 +3679,6 @@ setTimeout(function () {
     navigator.serviceWorker.addEventListener('message', function (e) {
       var msg = e.data || {};
       if (msg.type === 'OPEN_PEDIDOS') switchTab('pedidos');
-  if (msg.type === 'OPEN_RUTA')    switchTab('ruta');
-  if (msg.type === 'BG_POLL_RESULT' && msg.asignadosCount > 0) fetchPedidos();
-
       if (msg.type === 'BG_POLL_RESULT' && msg.asignadosCount > 0) fetchPedidos();
     });
   }
@@ -4207,65 +3903,48 @@ function _wwSetNotif(ok, denied) {
 async function _wwActivarTodo() {
   var btn = document.getElementById('wwBtnActivar');
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Activando…'; }
- 
-  /* ── 1. GPS ── */
+
+  // 1. Pedir GPS
   if (!_wwGps) {
-    var gpsConcedido = await new Promise(function(resolve) {
-      navigator.geolocation.getCurrentPosition(
-        function(pos) {
-          /* Guardar coords iniciales */
-          TRK.lat = pos.coords.latitude;
-          TRK.lng = pos.coords.longitude;
-          TRK.acc = Math.round(pos.coords.accuracy);
-          _wwSetGps(true);
-          resolve(true);
-        },
-        function(err) {
-          _wwSetGps(false, err.code === 1);
-          resolve(false);
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-      );
-    });
- 
-    if (!gpsConcedido) {
-      /* Mostrar qué hacer */
-      var row = document.getElementById('wwRowGps');
-      if (row) {
-        row.insertAdjacentHTML('afterend',
-          '<div style="background:#fff8ec;border-radius:12px;padding:10px 12px;margin-bottom:8px;'
-          + 'border-left:3px solid #f59e0b;border-radius:0;">'
-          + '<p style="font-size:11px;color:#92400e;margin:0;font-weight:700">'
-          + 'Para activar el GPS: abre Configuración del navegador → Permisos del sitio → Ubicación → Permitir para este sitio.</p>'
-          + '</div>'
+    try {
+      await new Promise(function(resolve, reject) {
+        navigator.geolocation.getCurrentPosition(
+          function(pos) {
+            // Guardar coords iniciales en TRK
+            TRK.lat = pos.coords.latitude;
+            TRK.lng = pos.coords.longitude;
+            TRK.acc = Math.round(pos.coords.accuracy);
+            _wwSetGps(true);
+            resolve();
+          },
+          function(err) {
+            _wwSetGps(false, err.code === 1); // 1 = PERMISSION_DENIED
+            resolve(); // no bloquear aunque falle
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
-      }
-    }
+      });
+    } catch(e) { _wwSetGps(false, true); }
   }
- 
-  /* ── 2. Notificaciones ── */
+
+  // 2. Pedir Notificaciones
   if (!_wwNotif && 'Notification' in window) {
     try {
       var perm = await Notification.requestPermission();
       _wwSetNotif(perm === 'granted', perm === 'denied');
-    } catch(e) { /* Safari no soporta async */ }
+    } catch(e) {}
   }
- 
-  /* ── 3. Activar tracker GPS si fue concedido ── */
+
+  // 3. Activar tracker GPS automáticamente si se concedió GPS
   if (_wwGps && !TRK.activo) {
     trkActivar();
   }
- 
-  /* ── 4. Actualizar botón y cerrar ── */
-  if (btn) {
-    btn.innerHTML = (_wwGps
-      ? '<span style="font-size:16px">✅</span> ¡Listo!'
-      : '<span style="font-size:16px">⚠️</span> Continuar sin GPS');
-  }
- 
-  setTimeout(function() { _wwCerrar(false); }, 900);
+
+  // 4. Cerrar popup después de 800ms para que el usuario vea los badges verdes
+  setTimeout(function() {
+    _wwCerrar(false);
+  }, 900);
 }
- 
 
 function _wwCerrar(omitido) {
   var ov = document.getElementById('wilWelcomeOverlay');
@@ -4296,157 +3975,25 @@ function _wwCerrar(omitido) {
 
 /* ── INICIAR: mostrar popup al cargar si no se ha mostrado ── */
 (function iniciarWelcomeFlow() {
-  /* Si ya se mostró en esta sesión, intentar activar directamente */
+  // No mostrar si ya se mostró en esta sesión
   try {
     if (sessionStorage.getItem('wil_welcome_shown') === '1') {
-      _intentarActivarGPSDirecto();
+      // Solo reactivar tracker si ya tenía GPS
+      if (navigator.permissions) {
+        navigator.permissions.query({ name: 'geolocation' })
+          .then(function(r) { if (r.state === 'granted' && !TRK.activo) trkActivar(); })
+          .catch(function(){});
+      }
       return;
     }
   } catch(e) {}
- 
-  /* Primera vez: verificar si ya tiene permiso */
-  if (navigator.permissions) {
-    navigator.permissions.query({ name: 'geolocation' })
-      .then(function(result) {
-        if (result.state === 'granted') {
-          /* Ya tiene permiso → activar directo, sin popup */
-          trkActivar();
-          try { sessionStorage.setItem('wil_welcome_shown', '1'); } catch(e) {}
- 
-          /* Verificar notificaciones también */
-          if (Notification.permission === 'default') {
-            Notification.requestPermission().catch(function() {});
-          }
-        } else {
-          /* Necesita dar permiso → mostrar popup */
-          setTimeout(_crearWelcomePopup, 1200);
-        }
- 
-        /* Listener de cambios: si el usuario activa GPS en config, activar auto */
-        result.addEventListener('change', function() {
-          if (result.state === 'granted' && !TRK.activo) {
-            trkActivar();
-          }
-        });
-      })
-      .catch(function() {
-        /* API permissions no disponible (iOS Safari) → mostrar popup */
-        setTimeout(_crearWelcomePopup, 1200);
-      });
-  } else {
-    /* Navegadores sin permissions API → mostrar popup */
-    setTimeout(_crearWelcomePopup, 1200);
-  }
+
+  // Esperar a que el DOM esté listo y el usuario vea el panel
+  setTimeout(function() {
+    _crearWelcomePopup();
+  }, 1200);
 })();
 
-function _intentarActivarGPSDirecto() {
-  if (TRK.activo) return;
- 
-  /* Intentar activar silenciosamente */
-  if (navigator.permissions) {
-    navigator.permissions.query({ name: 'geolocation' })
-      .then(function(result) {
-        if (result.state === 'granted') {
-          trkActivar();
-        } else if (result.state === 'prompt') {
-          /* Aún necesita preguntar → mostrar botón GPS en header */
-          _mostrarBtnGPSHeader();
-        } else {
-          /* Denegado → indicador en header */
-          _mostrarBtnGPSHeader(true);
-        }
-      })
-      .catch(function() {
-        /* Sin permissions API → intentar directamente */
-        trkActivar();
-      });
-  } else {
-    trkActivar();
-  }
-}
- 
- 
-/* ───────────────────────────────────────────────────────────────
-   NUEVO HELPER: _mostrarBtnGPSHeader
-   Botón flotante en header para activar GPS si no está activo
-   ─────────────────────────────────────────────────────────────── */
-function _mostrarBtnGPSHeader(denegado) {
-  if (document.getElementById('_gpsHeaderBtn')) return;
- 
-  var sub = document.getElementById('headerSubtitle');
-  if (!sub) return;
- 
-  var btn = document.createElement('button');
-  btn.id = '_gpsHeaderBtn';
-  btn.style.cssText =
-    'display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;' +
-    'background:' + (denegado ? 'rgba(186,26,26,.1)' : 'rgba(245,158,11,.12)') + ';' +
-    'border:1.5px solid ' + (denegado ? 'rgba(186,26,26,.25)' : 'rgba(245,158,11,.3)') + ';' +
-    'cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-size:10px;' +
-    'font-weight:800;color:' + (denegado ? '#ba1a1a' : '#854F0B') + ';margin-top:2px';
- 
-  btn.innerHTML = denegado
-    ? '<span class="material-symbols-outlined" style="font-size:12px">location_off</span> GPS bloqueado'
-    : '<span class="material-symbols-outlined" style="font-size:12px">my_location</span> Activar GPS';
- 
-  if (!denegado) {
-    btn.onclick = function() {
-      btn.remove();
-      trkActivar();
-    };
-  } else {
-    btn.onclick = function() {
-      _gpsError('Ve a Configuración > Permisos del sitio > Ubicación y permite el acceso.');
-    };
-  }
- 
-  sub.appendChild(btn);
-}
- 
- 
-/* ───────────────────────────────────────────────────────────────
-   AGREGA: reconexión GPS automática cuando la app vuelve al foco
-   Pega esto en el bloque de inicialización (al final del script)
-   ─────────────────────────────────────────────────────────────── */
-document.addEventListener('visibilitychange', function() {
-  if (document.visibilityState !== 'visible') return;
-  /* App vuelve al frente */
-  if (TRK.activo && TRK.watchId === null) {
-    /* Watch perdido (Android mata el watch al poner app en background) */
-    trkLog('info', 'App vuelve al foco — reconectando GPS watch…');
-    _watchRetries = 0;
-    _iniciarWatch();
-  }
-  /* Si el tracker debería estar activo (guardado en localStorage) pero no lo está */
-  if (!TRK.activo) {
-    var saved = localStorage.getItem(TRK_KEY);
-    if (saved) {
-      try {
-        var data = JSON.parse(saved);
-        if (data.domiId === domi.id) {
-          trkLog('info', 'Restaurando tracker GPS desde sesión previa…');
-          trkActivar();
-        }
-      } catch(e) {}
-    }
-  }
-});
- 
- 
-/* ───────────────────────────────────────────────────────────────
-   AGREGA: keepalive GPS cada 45 s
-   En Android, el watchPosition se "congela" si hay poca actividad.
-   Este ping fuerza al navegador a mantener el GPS despierto.
-   Pega esto en el bloque de inicialización.
-   ─────────────────────────────────────────────────────────────── */
-setInterval(function() {
-  if (!TRK.activo) return;
-  if (TRK.watchId !== null) return; /* watch sano → no hacer nada */
-  /* Watch muerto → reiniciar */
-  trkLog('warn', 'GPS watch inactivo — reiniciando…');
-  _watchRetries = 0;
-  _iniciarWatch();
-}, 45000);
 
 </script>
 </body>
