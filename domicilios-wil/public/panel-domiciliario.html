@@ -540,63 +540,79 @@ body{min-height:100dvh;font-family:'Inter',sans-serif;background:#f8f9fa;color:#
   </div>
 </div>
 
-<!-- TAB HISTORIAL -->
 <div id="tab-historial" class="tab-content">
 <div class="mt-4">
-  <h3 class="font-head text-lg font-extrabold text-primary mb-4">Mis Entregas</h3>
-  <div style="display:flex;gap:7px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px">
-  <button onclick="setFiltroHist(this,'todos')"
-    class="filtro-btn flex-shrink-0"
-    style="padding:7px 14px;border-radius:20px;background:#006970;color:#fff;
-    border:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer">
-    📋 Todos
-  </button>
-  <button onclick="setFiltroHist(this,'hoy')"
-    class="filtro-btn flex-shrink-0"
-    style="padding:7px 14px;border-radius:20px;background:#f3f4f5;color:#3c494b;
-    border:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer">
-    🗓 Hoy
-  </button>
-  <button onclick="setFiltroHist(this,'semana')"
-    class="filtro-btn flex-shrink-0"
-    style="padding:7px 14px;border-radius:20px;background:#f3f4f5;color:#3c494b;
-    border:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer">
-    📆 Esta semana
-  </button>
-  <button onclick="setFiltroHist(this,'entregados')"
-    class="filtro-btn flex-shrink-0"
-    style="padding:7px 14px;border-radius:20px;background:#f3f4f5;color:#3c494b;
-    border:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer">
-    ✅ Entregados
-  </button>
-  <button onclick="setFiltroHist(this,'cancelados')"
-    class="filtro-btn flex-shrink-0"
-    style="padding:7px 14px;border-radius:20px;background:#f3f4f5;color:#3c494b;
-    border:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer">
-    ❌ Cancelados
-  </button>
-  <div class="flex gap-3 mb-5">
-    <div class="flex-1 bg-surf-white rounded-2xl p-3 shadow-sm border border-out-var/10 text-center">
+  <h3 class="font-head text-lg font-extrabold text-primary mb-3">Mis Entregas</h3>
+ 
+  <!-- FILTROS: sin fechas, solo estado + buscar -->
+  <div id="histFiltrosWrap" style="display:flex;gap:7px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none">
+    <button onclick="setFiltroHist(this,'todos')"
+      class="filtro-btn flex-shrink-0 hist-fil-activo"
+      style="padding:7px 14px;border-radius:20px;background:#006970;color:#fff;
+      border:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap">
+      📋 Todos
+    </button>
+    <button onclick="setFiltroHist(this,'entregados')"
+      class="filtro-btn flex-shrink-0"
+      style="padding:7px 14px;border-radius:20px;background:#f3f4f5;color:#3c494b;
+      border:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap">
+      ✅ Entregados
+    </button>
+    <button onclick="setFiltroHist(this,'cancelados')"
+      class="filtro-btn flex-shrink-0"
+      style="padding:7px 14px;border-radius:20px;background:#f3f4f5;color:#3c494b;
+      border:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap">
+      ❌ Cancelados
+    </button>
+    <button onclick="setFiltroHist(this,'efectivo')"
+      class="filtro-btn flex-shrink-0"
+      style="padding:7px 14px;border-radius:20px;background:#f3f4f5;color:#3c494b;
+      border:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap">
+      💵 Efectivo
+    </button>
+    <button onclick="setFiltroHist(this,'transferencia')"
+      class="filtro-btn flex-shrink-0"
+      style="padding:7px 14px;border-radius:20px;background:#f3f4f5;color:#3c494b;
+      border:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap">
+      🏦 Transferencia
+    </button>
+  </div>
+ 
+  <!-- STATS resumen -->
+  <div style="display:flex;gap:8px;margin-bottom:14px">
+    <div style="flex:1;background:#fff;border-radius:16px;padding:11px;text-align:center;border:1px solid rgba(0,105,112,.1);box-shadow:0 1px 6px rgba(0,0,0,.05)">
       <p class="font-head font-extrabold text-xl text-primary" id="histTotalEntregas">0</p>
-      <p class="text-[9px] text-on-var font-bold uppercase tracking-wide">Entregas</p>
+      <p style="font-size:9px;color:#6c7a7b;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-top:2px">Total</p>
     </div>
-    <div class="flex-1 bg-surf-white rounded-2xl p-3 shadow-sm border border-out-var/10 text-center">
-      <p class="font-head font-extrabold text-xl text-primary" id="histEntHoy">0</p>
-      <p class="text-[9px] text-on-var font-bold uppercase tracking-wide">Hoy</p>
+    <div style="flex:1;background:#fff;border-radius:16px;padding:11px;text-align:center;border:1px solid rgba(42,157,92,.15);box-shadow:0 1px 6px rgba(0,0,0,.05)">
+      <p class="font-head font-extrabold text-xl" style="color:#2a9d5c" id="histEntHoy">0</p>
+      <p style="font-size:9px;color:#6c7a7b;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-top:2px">Hoy</p>
     </div>
-    <div class="flex-1 bg-surf-white rounded-2xl p-3 shadow-sm border border-out-var/10 text-center">
-      <p class="font-head font-extrabold text-xl text-primary" id="histCalHoy">—</p>
-      <p class="text-[9px] text-on-var font-bold uppercase tracking-wide">★ Prom.</p>
+    <div style="flex:1;background:#fff;border-radius:16px;padding:11px;text-align:center;border:1px solid rgba(245,158,11,.15);box-shadow:0 1px 6px rgba(0,0,0,.05)">
+      <p class="font-head font-extrabold text-xl" style="color:#d97706" id="histGananciaDia">$0</p>
+      <p style="font-size:9px;color:#6c7a7b;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-top:2px">Domicilios hoy</p>
     </div>
   </div>
+ 
+  <!-- Lista -->
   <div id="listaHistorial" class="space-y-3"></div>
-  <div id="sinHistorial" class="empty-state">
+ 
+  <!-- Loader -->
+  <div id="histCargando" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;gap:12px">
+    <div style="width:40px;height:40px;border:3px solid rgba(0,105,112,.15);border-top-color:#006970;border-radius:50%;animation:rot .7s linear infinite"></div>
+    <p style="font-size:13px;color:#6c7a7b;font-weight:600">Cargando entregas…</p>
+  </div>
+ 
+  <!-- Vacío -->
+  <div id="sinHistorial" class="empty-state" style="display:none">
     <div class="w-16 h-16 rounded-2xl bg-surf-high flex items-center justify-center">
       <span class="material-symbols-outlined text-outline" style="font-size:32px">history</span>
     </div>
-    <p class="font-head font-bold text-base">Sin entregas aún</p>
+    <p class="font-head font-bold text-base">Sin entregas</p>
     <p class="text-sm text-on-var">Las entregas completadas aparecerán aquí.</p>
   </div>
+ 
+</div>
 </div>
 </div>
 
@@ -1849,54 +1865,98 @@ async function fetchPedidos() {
 }
 
 async function fetchHistorialSheet() {
+  /* Mostrar loader solo si la lista está vacía */
+  var loader = document.getElementById('histCargando');
+  var lista  = document.getElementById('listaHistorial');
+  if (loader && (!lista || !lista.children.length)) loader.style.display = 'flex';
+ 
   try {
     var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID_DOMI
             + '/gviz/tq?tqx=out:csv&sheet=Pedidos&cachebust=' + Date.now();
-    var r = await fetch(url, { cache:'no-store', signal:AbortSignal.timeout(14000) });
-    if (!r.ok) return;
+ 
+    var r = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(14000) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     var text = await r.text();
-    if (!text || text.length < 20) return;
-
-    var filas = _parsearCSV(text), pedMap = {}, lastId = null;
+    if (!text || text.length < 20) throw new Error('vacío');
+ 
+    /* ── Parser CSV ── */
+    var filas   = _parsearCSV(text);
+    var pedMap  = {};
+    var lastId  = null;
+ 
     filas.forEach(function(cols) {
-      var id = (cols[0]||'').trim();
+      var id = (cols[0] || '').trim();
+      /* Solo IDs numéricos 2-5 dígitos */
+      if (id && !/^\d{2,5}$/.test(id)) return;
+ 
       if (id) {
-        if (!pedMap[id]) pedMap[id] = {
-          id, cliente:(cols[1]||'').trim(), telefono:(cols[2]||'').trim(),
-          metodoPago:(cols[3]||'').trim(), estadoRaw:(cols[4]||'').trim(),
-          direccion:(cols[11]||'').trim(), hora:(cols[12]||'').trim(),
-          fecha:(cols[13]||'').trim(), total:(cols[14]||'').trim(),
-          domiAsign:(cols[15]||'').trim(), horaEntrega:(cols[18]||'').trim(),
-          domicilio:(cols[19]||'').trim(), _prods:[]
-        };
+        if (!pedMap[id]) {
+          pedMap[id] = {
+            id,
+            cliente:     (cols[1]  || '').trim(),
+            telefono:    (cols[2]  || '').trim(),
+            metodoPago:  (cols[3]  || '').trim(),
+            estadoRaw:   (cols[4]  || '').trim(),
+            direccion:   (cols[11] || '').trim(),
+            hora:        (cols[12] || '').trim(),
+            fecha:       (cols[13] || '').trim(),
+            total:       (cols[14] || '').trim(),
+            domiAsign:   (cols[15] || '').trim(),
+            horaCamino:  (cols[17] || '').trim(),
+            horaEntrega: (cols[18] || '').trim(),
+            domicilio:   (cols[19] || '').trim(),
+            _prods: []
+          };
+        }
         lastId = id;
       }
-      var aId = id || lastId; if (!aId || !pedMap[aId]) return;
-      var nom = (cols[6]||'').replace(/\|cat$/,'').trim();
+ 
+      var aId = id || lastId;
+      if (!aId || !pedMap[aId]) return;
+ 
+      var nom = (cols[6] || '').replace(/\|cat$/, '').trim();
       if (nom && !/^domicilio\s*\(/i.test(nom)) {
-        pedMap[aId]._prods.push({ nom, qty:parseInt(cols[8])||1,
-          vu:parseCOP(cols[9]||''), vtotal:parseCOP(cols[10]||'') });
+        var vu     = parseCOP(cols[9]  || '');
+        var vtotal = parseCOP(cols[10] || '');
+        var qty    = parseInt(cols[8]) || 1;
+        pedMap[aId]._prods.push({
+          nom, marca: (cols[7] || '').trim(),
+          qty, vu, vtotal: vtotal || (vu * qty)
+        });
       }
     });
-
-    var _norm = function(s){ return (s||'').toLowerCase().normalize('NFD')
-      .replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,' ').trim(); };
-    var nombreBase = _norm(domi.nombre||'').split(' ')[0];
-    var idDomi     = (domi.id||'').toUpperCase().trim();
-    var hoyStr     = new Date().toLocaleDateString('es-CO',{timeZone:TZ});
-
+ 
+    /* ── Identificar si es mi pedido ── */
+    var _norm = function(s) {
+      return (s || '').toLowerCase().normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, ' ').trim();
+    };
+    var nombreBase = _norm(domi.nombre || '').split(' ')[0];
+    var idDomi     = (domi.id || '').toUpperCase().trim();
+ 
     var items = [];
+ 
     Object.values(pedMap).forEach(function(p) {
-      var est = (p.estadoRaw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      var est = (p.estadoRaw || '').toLowerCase().normalize('NFD')
+                  .replace(/[\u0300-\u036f]/g, '');
+ 
+      /* Solo entregados y cancelados */
       var esEntregado = est.includes('entregad');
       var esCancelado = est.includes('cancelad') || est.includes('cancel');
       if (!esEntregado && !esCancelado) return;
-
+ 
+      /* Solo mis pedidos */
       var asgNorm  = _norm(p.domiAsign);
-      var asgUpper = (p.domiAsign||'').toUpperCase();
-      var esMio    = p.domiAsign && (asgNorm.includes(nombreBase)||asgUpper.includes(idDomi));
+      var asgUpper = (p.domiAsign || '').toUpperCase();
+      var esMio    = p.domiAsign && (
+        asgNorm.includes(nombreBase) || asgUpper.includes(idDomi)
+      );
       if (!esMio) return;
-
+ 
+      /* Calcular subtotal de productos */
+      var subtotalProds = 0;
+      p._prods.forEach(function(pr) { subtotalProds += pr.vtotal || 0; });
+ 
       items.push({
         id:         p.id,
         cliente:    p.cliente,
@@ -1904,21 +1964,33 @@ async function fetchHistorialSheet() {
         direccion:  p.direccion,
         total:      p.total,
         metodoPago: p.metodoPago,
-        hora:       p.horaEntrega || p.hora,
+        hora:       p.horaEntrega || p.horaCamino || p.hora,
         fecha:      p.fecha,
         estado:     esEntregado ? 'Entregado' : 'Cancelado',
-        periodo:    p.fecha === hoyStr ? 'hoy' : 'anterior',
+        domicilio:  p.domicilio,
         prods:      p._prods.length,
-        domicilio:  p.domicilio
+        subtotal:   subtotalProds
       });
     });
-
-    /* Más reciente primero */
-    items.sort(function(a,b){ return (b.hora||'').localeCompare(a.hora||''); });
+ 
+    /* Más reciente primero — ordenar por fecha desc, luego hora desc */
+    items.sort(function(a, b) {
+      var fd = (b.fecha || '').localeCompare(a.fecha || '');
+      if (fd !== 0) return fd;
+      return (b.hora || '').localeCompare(a.hora || '');
+    });
+ 
     state.historial = items;
+ 
+    if (loader) loader.style.display = 'none';
     if (currentTab === 'historial') renderHistorial();
     actualizarBadgesNav();
-  } catch(e) { console.warn('[fetchHistorialSheet]:', e.message); }
+ 
+  } catch(e) {
+    console.warn('[fetchHistorialSheet]:', e.message);
+    if (loader) loader.style.display = 'none';
+    /* Dejar la lista con lo que había */
+  }
 }
 
 function iniciarPolling(){
@@ -1929,7 +2001,8 @@ function iniciarPolling(){
   pollingTimer = setInterval(fetchPedidos, 10000);
  
   // Historial: cada 60 segundos (no necesita ser tan frecuente)
-  setInterval(fetchHistorialSheet, 60000);
+      setInterval(fetchHistorialSheet, 30000);
+
  
   // Ocultar barra de progreso
   var pw = document.querySelector('.polling-wrap');
@@ -2841,176 +2914,230 @@ function marcarEntregado(){
 
 /* ═══════════════════ HISTORIAL ═══════════════════ */
 function renderHistorial() {
-  var lista = document.getElementById('listaHistorial');
-  var vacio = document.getElementById('sinHistorial');
+  var lista  = document.getElementById('listaHistorial');
+  var vacio  = document.getElementById('sinHistorial');
+  var loader = document.getElementById('histCargando');
+  if (!lista) return;
+ 
   lista.innerHTML = '';
+  if (loader) loader.style.display = 'none';
  
-  var entregados  = state.historial.filter(function(h){ return h.estado === 'Entregado'; });
-  var cancelados  = state.historial.filter(function(h){ return h.estado === 'Cancelado'; });
-  var hoyStr      = new Date().toLocaleDateString('es-CO', {timeZone: TZ});
-  var hoyEnt      = entregados.filter(function(h){ return h.fecha === hoyStr; });
- 
-  // Calcular ganancia total del día
-  var gananciaDia = 0;
-  hoyEnt.forEach(function(h) { gananciaDia += parseCOP(h.domicilio || '0'); });
- 
-  // Actualizar stats
-  document.getElementById('histEntHoy').textContent      = hoyEnt.length;
-  document.getElementById('histTotalEntregas').textContent = entregados.length;
-  document.getElementById('histCalHoy').textContent       = cancelados.length > 0
-    ? cancelados.length + '✗' : '—';
-  if (document.getElementById('statHoy'))      document.getElementById('statHoy').textContent      = hoyEnt.length;
-  if (document.getElementById('statEntregas')) document.getElementById('statEntregas').textContent = entregados.length;
- 
-  // Filtrar según filtroHist
-  var items = state.historial.filter(function(h) {
-    if (filtroHist === 'hoy')        return h.fecha === hoyStr;
-    if (filtroHist === 'semana')     return h.periodo === 'hoy' || h.periodo === 'semana';
-    if (filtroHist === 'entregados') return h.estado === 'Entregado';
-    if (filtroHist === 'cancelados') return h.estado === 'Cancelado';
-    return true;
+  /* ── Calcular stats globales (sin filtro) ── */
+  var todosEntregados = state.historial.filter(function(h) {
+    return h.estado === 'Entregado';
   });
  
-  // Banner resumen del día (solo en filtro hoy o todos)
-  if ((filtroHist === 'hoy' || filtroHist === 'todos') && hoyEnt.length > 0) {
-    lista.insertAdjacentHTML('beforeend',
-      '<div style="background:linear-gradient(135deg,#006970,#00a3b4);border-radius:18px;'
-      + 'padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;'
-      + 'box-shadow:0 4px 16px rgba(0,105,112,.2)">'
-        + '<div style="font-size:32px">📊</div>'
-        + '<div style="flex:1">'
-          + '<div style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:900;font-size:14px;color:#fff">Resumen de hoy</div>'
-          + '<div style="font-size:11px;color:rgba(255,255,255,.75);margin-top:2px">'
-            + hoyEnt.length + ' entrega' + (hoyEnt.length !== 1 ? 's' : '') + ' completada' + (hoyEnt.length !== 1 ? 's' : '')
-          + '</div>'
-        + '</div>'
-        + (gananciaDia > 0
-          ? '<div style="text-align:right">'
-              + '<div style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:900;font-size:18px;color:#4ade80">'
-              + fmtCOP(gananciaDia) + '</div>'
-              + '<div style="font-size:9px;color:rgba(255,255,255,.6);text-transform:uppercase">en domicilios</div>'
-            + '</div>'
-          : '')
-      + '</div>'
-    );
-  }
+  /* "Hoy" = mismo string de fecha que hoy en TZ Colombia */
+  var hoyStr  = new Date().toLocaleDateString('es-CO', { timeZone: TZ });
+  var hoyEnt  = todosEntregados.filter(function(h) { return h.fecha === hoyStr; });
+  var ganHoy  = 0;
+  hoyEnt.forEach(function(h) { ganHoy += parseCOP(h.domicilio || '0'); });
+ 
+  /* Actualizar stats fijos */
+  var elTotal  = document.getElementById('histTotalEntregas');
+  var elHoy    = document.getElementById('histEntHoy');
+  var elGan    = document.getElementById('histGananciaDia');
+  var elStatH  = document.getElementById('statHoy');
+  var elStatE  = document.getElementById('statEntregas');
+ 
+  if (elTotal) elTotal.textContent = todosEntregados.length;
+  if (elHoy)   elHoy.textContent   = hoyEnt.length;
+  if (elGan)   elGan.textContent   = ganHoy > 0 ? fmtCOP(ganHoy) : '$0';
+  if (elStatH) elStatH.textContent = hoyEnt.length;
+  if (elStatE) elStatE.textContent = todosEntregados.length;
+ 
+  /* ── Aplicar filtro actual ── */
+  var items = state.historial.filter(function(h) {
+    if (filtroHist === 'entregados')    return h.estado === 'Entregado';
+    if (filtroHist === 'cancelados')    return h.estado === 'Cancelado';
+    if (filtroHist === 'efectivo')      return !(h.metodoPago || '').toLowerCase().includes('transfer');
+    if (filtroHist === 'transferencia') return (h.metodoPago  || '').toLowerCase().includes('transfer');
+    return true; /* todos */
+  });
  
   if (!items.length) {
-    vacio.style.display = 'flex';
+    if (vacio) vacio.style.display = 'flex';
     return;
   }
-  vacio.style.display = 'none';
+  if (vacio) vacio.style.display = 'none';
  
-  // Agrupar por fecha
+  /* ── Agrupar por fecha ── */
   var grupos = {}, orden = [];
   items.forEach(function(h) {
-    var f = h.fecha || '—';
+    var f = h.fecha || 'Sin fecha';
     if (!grupos[f]) { grupos[f] = []; orden.push(f); }
     grupos[f].push(h);
   });
  
   var cfgEst = {
-    'Entregado': { color:'#2a9d5c', bg:'#f0fdf4', border:'#86efac', icon:'check_circle', emoji:'✅', label:'Entregado' },
-    'Cancelado': { color:'#ba1a1a', bg:'#fff5f5', border:'#fca5a5', icon:'cancel',       emoji:'❌', label:'Cancelado' }
+    'Entregado': {
+      color: '#2a9d5c', bg: '#f0fdf4', border: '#86efac',
+      icon: 'check_circle', emoji: '✅', label: 'Entregado'
+    },
+    'Cancelado': {
+      color: '#ba1a1a', bg: '#fff5f5', border: '#fca5a5',
+      icon: 'cancel', emoji: '❌', label: 'Cancelado'
+    }
   };
  
+  /* ── Render por grupos de fecha ── */
   orden.forEach(function(fecha) {
-    var esHoy    = fecha === hoyStr;
-    var labelF   = esHoy ? '🗓 Hoy — ' + fecha : '📅 ' + fecha;
-    var entHoy   = grupos[fecha].filter(function(h){ return h.estado === 'Entregado'; }).length;
-    var ganHoy   = 0;
-    grupos[fecha].forEach(function(h){ ganHoy += parseCOP(h.domicilio || '0'); });
+    var esHoy   = fecha === hoyStr;
+    var labelF  = esHoy ? '🗓 Hoy — ' + fecha : '📅 ' + fecha;
+    var entGrupo = grupos[fecha].filter(function(h) { return h.estado === 'Entregado'; });
+    var ganGrupo = 0;
+    entGrupo.forEach(function(h) { ganGrupo += parseCOP(h.domicilio || '0'); });
  
-    // Separador de fecha con resumen
+    /* Separador de fecha */
     lista.insertAdjacentHTML('beforeend',
-      '<div style="display:flex;align-items:center;gap:8px;margin:16px 0 10px">'
+      '<div style="display:flex;align-items:center;gap:8px;margin:14px 0 10px">'
         + '<div style="flex:1;height:1px;background:#e7e8e9"></div>'
-        + '<div style="background:#f3f4f5;border-radius:20px;padding:4px 12px;display:flex;align-items:center;gap:6px">'
-          + '<span style="font-size:10px;font-weight:800;color:#6c7a7b;font-family:\'Plus Jakarta Sans\',sans-serif">' + escHtml(labelF) + '</span>'
-          + (entHoy > 0 ? '<span style="background:#2a9d5c;color:#fff;font-size:9px;font-weight:800;padding:1px 7px;border-radius:20px">' + entHoy + ' ✓</span>' : '')
-          + (ganHoy > 0 ? '<span style="background:#e8f5e9;color:#2a9d5c;font-size:9px;font-weight:800;padding:1px 7px;border-radius:20px">' + fmtCOP(ganHoy) + '</span>' : '')
+        + '<div style="background:#f3f4f5;border-radius:20px;padding:4px 12px;'
+          + 'display:flex;align-items:center;gap:6px;flex-shrink:0">'
+          + '<span style="font-size:10px;font-weight:800;color:#6c7a7b;'
+            + "font-family:'Plus Jakarta Sans',sans-serif\">" + escHtml(labelF) + '</span>'
+          + (entGrupo.length > 0
+            ? '<span style="background:#2a9d5c;color:#fff;font-size:9px;font-weight:800;'
+              + 'padding:1px 7px;border-radius:20px">' + entGrupo.length + ' ✓</span>'
+            : '')
+          + (ganGrupo > 0
+            ? '<span style="background:#e8f5e9;color:#2a9d5c;font-size:9px;font-weight:800;'
+              + 'padding:1px 7px;border-radius:20px">' + fmtCOP(ganGrupo) + '</span>'
+            : '')
         + '</div>'
         + '<div style="flex:1;height:1px;background:#e7e8e9"></div>'
       + '</div>'
     );
  
+    /* Cards individuales */
     grupos[fecha].forEach(function(h) {
       var cfg      = cfgEst[h.estado] || cfgEst['Entregado'];
-      var dir      = (h.direccion || '—').replace(/\s*\[.+\]/, '').replace(/\s*\(Ref:[^)]+\)/, '').trim().substring(0, 50);
+      var dir      = (h.direccion || '—')
+                      .replace(/\s*\[.+?\]/, '')
+                      .replace(/\s*\(Ref:[^)]+\)/, '')
+                      .trim()
+                      .substring(0, 55);
       var esTrans  = (h.metodoPago || '').toLowerCase().includes('transfer');
       var totalNum = parseCOP(h.total);
       var domiNum  = parseCOP(h.domicilio || '0');
-      var ini      = (h.cliente || 'C').charAt(0).toUpperCase();
+      var telLimpio = (h.telefono || '').replace(/\D/g, '');
  
       lista.insertAdjacentHTML('beforeend',
         '<div class="card-in" style="background:#fff;border-radius:20px;overflow:hidden;'
-        + 'box-shadow:0 2px 12px rgba(0,0,0,.06);border:1.5px solid ' + cfg.border + ';margin-bottom:10px">'
+          + 'box-shadow:0 2px 12px rgba(0,0,0,.06);border:1.5px solid ' + cfg.border
+          + ';margin-bottom:10px">'
  
-          // Header
-          + '<div style="background:' + cfg.bg + ';padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid ' + cfg.border + '">'
+          /* Header */
+          + '<div style="background:' + cfg.bg + ';padding:10px 14px;'
+            + 'display:flex;align-items:center;gap:10px;border-bottom:1px solid ' + cfg.border + '">'
             + '<div style="width:36px;height:36px;border-radius:50%;background:' + cfg.color + ';'
-            + 'display:flex;align-items:center;justify-content:center;flex-shrink:0">'
-              + '<span class="material-symbols-outlined" style="font-size:16px;color:#fff;font-variation-settings:\'FILL\' 1">' + cfg.icon + '</span>'
+              + 'display:flex;align-items:center;justify-content:center;flex-shrink:0">'
+              + '<span class="material-symbols-outlined" style="font-size:16px;color:#fff;'
+                + "font-variation-settings:'FILL' 1\">" + cfg.icon + '</span>'
             + '</div>'
             + '<div style="flex:1;min-width:0">'
-              + '<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:13px;color:#191c1d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(h.cliente || '—') + '</p>'
-              + '<p style="font-size:10px;color:#6c7a7b;margin-top:1px;display:flex;align-items:center;gap:4px">'
+              + '<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:13px;'
+                + 'color:#191c1d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+                + escHtml(h.cliente || '—') + '</p>'
+              + '<p style="font-size:10px;color:#6c7a7b;margin-top:1px;'
+                + 'display:flex;align-items:center;gap:4px">'
                 + '<span class="material-symbols-outlined" style="font-size:11px">phone</span>'
                 + escHtml(h.telefono || '—')
               + '</p>'
             + '</div>'
             + '<div style="text-align:right;flex-shrink:0">'
               + '<span style="font-size:10px;font-weight:800;color:' + cfg.color + ';background:#fff;'
-              + 'padding:3px 10px;border-radius:20px;font-family:\'Plus Jakarta Sans\',sans-serif;border:1.5px solid ' + cfg.border + '">'
-              + cfg.emoji + ' ' + cfg.label + '</span>'
-              + '<p style="font-size:10px;color:#9eaaac;margin-top:4px">' + escHtml(h.hora || '—') + '</p>'
+                + 'padding:3px 10px;border-radius:20px;'
+                + "font-family:'Plus Jakarta Sans',sans-serif;"
+                + 'border:1.5px solid ' + cfg.border + '">'
+                + cfg.emoji + ' ' + cfg.label
+              + '</span>'
+              + '<p style="font-size:10px;color:#9eaaac;margin-top:4px">'
+                + escHtml(h.hora || '—') + '</p>'
             + '</div>'
           + '</div>'
  
-          // Cuerpo
+          /* Cuerpo */
           + '<div style="padding:12px 14px">'
  
-            // Dirección
+            /* Dirección */
             + '<div style="display:flex;align-items:flex-start;gap:7px;background:#f8f9fa;'
-            + 'border-radius:12px;padding:9px 11px;margin-bottom:10px;border:1px solid rgba(76,86,175,.1)">'
-              + '<span class="material-symbols-outlined" style="font-size:14px;color:#4c56af;flex-shrink:0;margin-top:1px;font-variation-settings:\'FILL\' 1">location_on</span>'
-              + '<p style="font-size:12px;font-weight:700;color:#191c1d;line-height:1.4;word-break:break-word;margin:0">' + escHtml(dir) + '</p>'
+              + 'border-radius:12px;padding:9px 11px;margin-bottom:10px;'
+              + 'border:1px solid rgba(76,86,175,.1)">'
+              + '<span class="material-symbols-outlined" style="font-size:14px;color:#4c56af;'
+                + "flex-shrink:0;margin-top:1px;font-variation-settings:'FILL' 1\">location_on</span>"
+              + '<p style="font-size:12px;font-weight:700;color:#191c1d;line-height:1.4;'
+                + 'word-break:break-word;margin:0">' + escHtml(dir) + '</p>'
             + '</div>'
  
-            // Chips de info
+            /* Chips totales */
             + '<div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px">'
+ 
               + (totalNum > 0
-                ? '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:12px;padding:6px 11px;display:flex;flex-direction:column;align-items:center;flex:1;min-width:70px">'
-                    + '<span style="font-size:9px;font-weight:700;color:#2a9d5c;text-transform:uppercase">Total</span>'
-                    + '<span style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:15px;font-weight:900;color:#006970">' + fmtCOP(totalNum) + '</span>'
+                ? '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:12px;'
+                  + 'padding:7px 11px;display:flex;flex-direction:column;align-items:center;'
+                  + 'flex:1;min-width:65px">'
+                  + '<span style="font-size:9px;font-weight:700;color:#2a9d5c;text-transform:uppercase">Total</span>'
+                  + '<span style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:15px;'
+                    + 'font-weight:900;color:#006970">' + fmtCOP(totalNum) + '</span>'
                   + '</div>'
                 : '')
+ 
               + (domiNum > 0
-                ? '<div style="background:#e8f5e9;border:1px solid #86efac;border-radius:12px;padding:6px 11px;display:flex;flex-direction:column;align-items:center;flex:1;min-width:70px">'
-                    + '<span style="font-size:9px;font-weight:700;color:#2a9d5c;text-transform:uppercase">🛵 Domicilio</span>'
-                    + '<span style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:15px;font-weight:900;color:#2a9d5c">' + fmtCOP(domiNum) + '</span>'
+                ? '<div style="background:#e8f5e9;border:1px solid #86efac;border-radius:12px;'
+                  + 'padding:7px 11px;display:flex;flex-direction:column;align-items:center;'
+                  + 'flex:1;min-width:65px">'
+                  + '<span style="font-size:9px;font-weight:700;color:#2a9d5c;text-transform:uppercase">🛵 Domicilio</span>'
+                  + '<span style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:15px;'
+                    + 'font-weight:900;color:#2a9d5c">' + fmtCOP(domiNum) + '</span>'
                   + '</div>'
                 : '')
-              + '<div style="background:#f3f4f5;border:1px solid #e7e8e9;border-radius:12px;padding:6px 11px;display:flex;flex-direction:column;align-items:center;flex:1;min-width:70px">'
+ 
+              + '<div style="background:#f3f4f5;border:1px solid #e7e8e9;border-radius:12px;'
+                + 'padding:7px 11px;display:flex;flex-direction:column;align-items:center;'
+                + 'flex:1;min-width:65px">'
                 + '<span style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase">Pago</span>'
-                + '<span style="font-size:12px;font-weight:800;color:#191c1d">' + (esTrans ? '🏦 Transf.' : '💵 Efectivo') + '</span>'
+                + '<span style="font-size:12px;font-weight:800;color:#191c1d">'
+                  + (esTrans ? '🏦 Transf.' : '💵 Efectivo') + '</span>'
               + '</div>'
+ 
+              + (h.prods > 0
+                ? '<div style="background:#f3f4f5;border:1px solid #e7e8e9;border-radius:12px;'
+                  + 'padding:7px 11px;display:flex;flex-direction:column;align-items:center;'
+                  + 'flex:1;min-width:50px">'
+                  + '<span style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase">Prods</span>'
+                  + '<span style="font-size:14px;font-weight:900;color:#006970">' + h.prods + '</span>'
+                  + '</div>'
+                : '')
+ 
             + '</div>'
  
-            // Acciones rápidas
+            /* Acciones rápidas */
             + '<div style="display:flex;gap:7px">'
-              + '<a href="https://wa.me/57' + (h.telefono || '').replace(/\D/g,'') + '" target="_blank" '
-                + 'style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;'
-                + 'background:#dcfce7;border:1.5px solid #86efac;border-radius:12px;padding:8px;'
-                + 'text-decoration:none;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:11px;color:#166534">'
-                + '<svg width="13" height="13" viewBox="0 0 24 24" fill="#16a34a"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.096.537 4.066 1.479 5.779L0 24l6.432-1.687A11.93 11.93 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.006-1.368l-.36-.214-3.716.975.992-3.625-.235-.373A9.818 9.818 0 1112 21.818z"/></svg>'
-                + 'WhatsApp'
+ 
+              + (telLimpio
+                ? '<a href="https://wa.me/57' + telLimpio + '" target="_blank"'
+                  + ' style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;'
+                  + 'background:#dcfce7;border:1.5px solid #86efac;border-radius:12px;padding:9px;'
+                  + 'text-decoration:none;font-family:\'Plus Jakarta Sans\',sans-serif;'
+                  + 'font-weight:800;font-size:11px;color:#166534">'
+                  + '<svg width="13" height="13" viewBox="0 0 24 24" fill="#16a34a">'
+                    + '<path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/>'
+                    + '<path d="M12 0C5.373 0 0 5.373 0 12c0 2.096.537 4.066 1.479 5.779L0 24l6.432-1.687A11.93 11.93 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.006-1.368l-.36-.214-3.716.975.992-3.625-.235-.373A9.818 9.818 0 1112 21.818z"/>'
+                  + '</svg>'
+                  + 'WhatsApp'
+                + '</a>'
+                : '')
+ 
+              + '<a href="tel:' + escHtml(h.telefono || '') + '"'
+                + ' style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;'
+                + 'background:#f3f4f5;border:1.5px solid #e7e8e9;border-radius:12px;padding:9px;'
+                + 'text-decoration:none;font-family:\'Plus Jakarta Sans\',sans-serif;'
+                + 'font-weight:800;font-size:11px;color:#3c494b">'
+                + '<span class="material-symbols-outlined" style="font-size:14px;font-variation-settings:\'FILL\' 1;color:#006970">call</span>'
+                + 'Llamar'
               + '</a>'
-              + '<div style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;'
-                + 'background:#f3f4f5;border:1.5px solid #e7e8e9;border-radius:12px;padding:8px;'
-                + 'font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:11px;color:#6c7a7b">'
-                + '📦 ' + (h.prods > 0 ? h.prods + ' prod.' : 'Pedido')
-              + '</div>'
+ 
             + '</div>'
  
           + '</div>'
@@ -3021,15 +3148,14 @@ function renderHistorial() {
 }
 
 
-
 function setFiltroHist(btn, f) {
   filtroHist = f;
   document.querySelectorAll('.filtro-btn').forEach(function(b) {
     b.style.background = '#f3f4f5';
-    b.style.color = '#3c494b';
+    b.style.color      = '#3c494b';
   });
   btn.style.background = '#006970';
-  btn.style.color = '#fff';
+  btn.style.color      = '#fff';
   renderHistorial();
 }
  
