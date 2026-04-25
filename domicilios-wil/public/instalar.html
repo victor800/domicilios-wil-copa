@@ -294,81 +294,22 @@ const APK_URL = 'https://domicilios-wil.vercel.app/app-release.apk';
 
 
 /* ══ DESCARGA CON PROGRESO ══ */
-async function iniciarDescarga() {
-  const btn      = document.getElementById('btnDescargar');
-  const progress = document.getElementById('downloadProgress');
-  const okEl     = document.getElementById('downloadOk');
-  const fill     = document.getElementById('dpFill');
-  const pct      = document.getElementById('dpPct');
-  const size     = document.getElementById('dpSize');
-  const speed    = document.getElementById('dpSpeed');
-  const label    = document.getElementById('dpLabel');
-
+function iniciarDescarga() {
+  const btn = document.getElementById('btnDescargar');
+  btn.innerHTML = `⏳ Preparando descarga...`;
   btn.disabled = true;
-  btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Descargando...`;
-  progress.classList.add('visible');
 
-  try {
-    const resp = await fetch(APK_URL);
-    if (!resp.ok) throw new Error('Error al descargar');
+  const a = document.createElement('a');
+  a.href = 'https://domicilios-wil.vercel.app/app-release.apk';
+  a.download = 'DomiciliosWIL.apk';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 
-    const total   = parseInt(resp.headers.get('Content-Length') || '0');
-    const reader  = resp.body.getReader();
-    const chunks  = [];
-    let received  = 0;
-    let t0        = Date.now();
-    let lastBytes = 0;
-
-    const speedTimer = setInterval(() => {
-      const elapsed = (Date.now() - t0) / 1000;
-      const kbps    = ((received - lastBytes) / 1024).toFixed(0);
-      lastBytes     = received;
-      speed.textContent = kbps > 0 ? `${kbps} KB/s` : '';
-    }, 800);
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      received += value.length;
-
-      const p = total ? Math.round((received / total) * 100) : 0;
-      fill.style.width = p + '%';
-      pct.textContent  = p + '%';
-      const recMB      = (received / 1048576).toFixed(1);
-      const totMB      = total ? (total / 1048576).toFixed(1) : '?';
-      size.textContent = `${recMB} MB / ${totMB} MB`;
-    }
-
-    clearInterval(speedTimer);
-
-    /* Crear blob y descargar */
-    const blob    = new Blob(chunks, { type: 'application/vnd.android.package-archive' });
-    const url     = URL.createObjectURL(blob);
-    const a       = document.createElement('a');
-    a.href        = url;
-    a.download    = 'DomiciliosWIL.apk';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    /* Mostrar éxito */
-    fill.style.width = '100%';
-    pct.textContent  = '100%';
-    label.textContent = '¡Descarga completa!';
-    speed.textContent = '';
-    progress.style.marginBottom = '10px';
-    okEl.classList.add('visible');
-    btn.innerHTML = '✅ Descargado — Instala el archivo APK';
-
-  } catch (err) {
-    clearInterval(speedTimer || null);
+  setTimeout(() => {
+    btn.innerHTML = `✅ Descargando — Abre el archivo e instala`;
     btn.disabled = false;
-    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Descargar App Android`;
-    progress.classList.remove('visible');
-    toast('❌ Error al descargar. Intenta de nuevo.');
-  }
+  }, 2000);
 }
 
 /* ══ DETECCIÓN ══ */
