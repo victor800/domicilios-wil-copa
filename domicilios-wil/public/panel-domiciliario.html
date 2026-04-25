@@ -1714,6 +1714,20 @@ async function fetchPedidos() {
       else    navigator.clearAppBadge().catch(function(){});
     }
 
+    // Badge nativo Android
+    var _n = state.pedidos.length;
+    if (window.WilNativo) {
+      if (_n > 0) {
+        WilNativo.notificarPedidos(
+          _n,
+          '🛵 ' + _n + ' pedido' + (_n > 1 ? 's' : '') + ' esperando',
+          'Hay ' + _n + ' pedido' + (_n > 1 ? 's pendientes' : ' pendiente') + ' sin tomar'
+        );
+      } else {
+        WilNativo.limpiarBadge();
+      }
+    }
+
   } catch(e){
     console.warn('[fetchPedidos]:', e.message);
   }
@@ -1795,14 +1809,14 @@ async function fetchHistorialSheet() {
 function iniciarPolling(){
   fetchPedidos();
   fetchHistorialSheet();
-
-  // Silencioso cada 2 min — no interrumpe pedido activo
-  pollingTimer = setInterval(function(){
-    fetchPedidos();
-    fetchHistorialSheet();
-  }, 2 * 60 * 1000);
-
-  // Ocultar barra de progreso — ya no la usamos
+ 
+  // Pedidos: cada 10 segundos
+  pollingTimer = setInterval(fetchPedidos, 10000);
+ 
+  // Historial: cada 60 segundos (no necesita ser tan frecuente)
+  setInterval(fetchHistorialSheet, 60000);
+ 
+  // Ocultar barra de progreso
   var pw = document.querySelector('.polling-wrap');
   if(pw) pw.style.display = 'none';
 }
@@ -2990,61 +3004,98 @@ function _parsearCSV(text) {
  
 /* Notificación cuando te asignan un pedido */
 function _notifAsignado(p) {
-  /* 1. Vibración radar intensa */
-  if (navigator.vibrate) navigator.vibrate([400, 100, 400, 100, 600, 200, 400, 100, 400]);
-
-  /* 2. Sonido radar fuerte — 4 pitidos ascendentes */
-  try {
-    var ctx = new (window.AudioContext || window.webkitAudioContext)();
-    var freqs = [440, 587, 784, 1047]; /* La-Re-Sol-Do */
+  /* 1. Vibración larga repetida */
+  if (navigator.vibrate) {
+    navigator.vibrate([
+      500, 150, 500, 150, 500,   // 3 pulsos fuertes
+      300,                        // pausa
+      300, 100, 300, 100, 300,   // 3 pulsos medios
+      300,                        // pausa
+      600, 150, 600              // 2 pulsos finales largos
+    ]);
+  }
+ 
+  /* 2. Sonido — 3 repeticiones del jingle con pausa entre ellas */
+  function tocarJingle(ctx, startTime) {
+    var freqs  = [440, 587, 784, 1047]; // La-Re-Sol-Do
+    var durNota = 0.18;
+    var pausa   = 0.04;
+ 
     freqs.forEach(function(freq, i) {
       var osc  = ctx.createOscillator();
       var gain = ctx.createGain();
-      /* Distorsión leve para sonar más fuerte */
-      var wshaper = ctx.createWaveShaper();
+      var dist = ctx.createWaveShaper();
+ 
+      // Curva de distorsión suave para sonar más gordo
       var curve = new Float32Array(256);
       for (var k = 0; k < 256; k++) {
         var x = (k * 2) / 256 - 1;
-        curve[k] = (Math.PI + 200) * x / (Math.PI + 200 * Math.abs(x));
+        curve[k] = (Math.PI + 80) * x / (Math.PI + 80 * Math.abs(x));
       }
-      wshaper.curve = curve;
-      osc.connect(wshaper);
-      wshaper.connect(gain);
+      dist.curve = curve;
+ 
+      osc.connect(dist);
+      dist.connect(gain);
       gain.connect(ctx.destination);
-      osc.type = 'square'; /* cuadrada → más agresiva */
+ 
+      osc.type = 'square';
       osc.frequency.value = freq;
-      var t = ctx.currentTime + i * 0.22;
+ 
+      var t = startTime + i * (durNota + pausa);
       gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.55, t + 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.20);
+      gain.gain.linearRampToValueAtTime(0.6, t + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + durNota);
       osc.start(t);
-      osc.stop(t + 0.21);
+      osc.stop(t + durNota + 0.01);
     });
-    /* 5º beep más largo como "confirmación" */
+ 
+    // Nota final larga — "golpe de cierre"
     var oscF  = ctx.createOscillator();
     var gainF = ctx.createGain();
-    oscF.connect(gainF); gainF.connect(ctx.destination);
-    oscF.type = 'sine'; oscF.frequency.value = 1047;
-    var tf = ctx.currentTime + freqs.length * 0.22;
+    oscF.connect(gainF);
+    gainF.connect(ctx.destination);
+    oscF.type = 'sine';
+    oscF.frequency.value = 1047;
+    var tf = startTime + freqs.length * (durNota + pausa);
     gainF.gain.setValueAtTime(0, tf);
-    gainF.gain.linearRampToValueAtTime(0.45, tf + 0.04);
+    gainF.gain.linearRampToValueAtTime(0.5, tf + 0.04);
     gainF.gain.exponentialRampToValueAtTime(0.001, tf + 0.55);
-    oscF.start(tf); oscF.stop(tf + 0.56);
-  } catch(e) {}
-
+    oscF.start(tf);
+    oscF.stop(tf + 0.56);
+ 
+    // Duración total de un jingle ≈ 4*(0.18+0.04)+0.55 ≈ 1.43s
+    return tf + 0.56;
+  }
+ 
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var REPETICIONES = 3;
+    var PAUSA_ENTRE  = 0.8; // segundos entre repeticiones
+    var cursor       = ctx.currentTime + 0.05;
+ 
+    for (var rep = 0; rep < REPETICIONES; rep++) {
+      cursor = tocarJingle(ctx, cursor) + PAUSA_ENTRE;
+    }
+  } catch(e) {
+    console.warn('[Sonido notif]:', e.message);
+  }
+ 
   /* 3. Banner interno */
   _mostrarBannerAsignado(p);
-
-  /* 4. Notificación de sistema via SW → va a la PWA instalada */
+ 
+  /* 4. Notificación de sistema */
   if (Notification.permission !== 'granted') {
     Notification.requestPermission();
     return;
   }
+ 
   var dirLimpia = (p.direccion || '')
-    .replace(/\s*\(Ref:[^)]+\)/g, '').replace(/\s*\[.+?\]/g, '').trim().substring(0, 70);
+    .replace(/\s*\(Ref:[^)]+\)/g, '')
+    .replace(/\s*\[.+?\]/g, '')
+    .trim()
+    .substring(0, 70);
   var esTrans = (p.metodoPago || '').toLowerCase().includes('transfer');
-
-  var titulo = '🎯 ¡Pedido asignado a ti!';
+ 
   var opts = {
     body: (p.cliente || 'Cliente') + ' · ' + dirLimpia
       + '\n' + (p.total || '') + ' · ' + (esTrans ? 'Transferencia' : 'Efectivo'),
@@ -3052,17 +3103,17 @@ function _notifAsignado(p) {
     badge: 'icons/badge-72.png',
     tag:   'wil-asignado-' + p.id,
     requireInteraction: true,
-    vibrate: [400, 100, 400, 100, 600, 200, 400, 100, 400],
-    silent:  false,
+    vibrate: [500, 150, 500, 150, 500, 300, 300, 100, 300, 100, 300],
+    silent: false,
     data: { tipo: 'asignado', pedidoId: p.id }
   };
-
+ 
   if (window._wilSwReg && window._wilSwReg.showNotification) {
-    window._wilSwReg.showNotification(titulo, opts);
+    window._wilSwReg.showNotification('🎯 ¡Pedido asignado a ti!', opts);
   } else {
     navigator.serviceWorker.ready.then(function(reg) {
       window._wilSwReg = reg;
-      reg.showNotification(titulo, opts);
+      reg.showNotification('🎯 ¡Pedido asignado a ti!', opts);
     });
   }
 }
@@ -3254,20 +3305,25 @@ async function aceptarPedidoAsignado(id) {
     _ultimaNotif = Date.now();
  
     /* Sonido suave */
-    try {
-      var ctx = new (window.AudioContext || window.webkitAudioContext)();
-      [523, 659].forEach(function(freq, i) {
-        var osc = ctx.createOscillator(), g = ctx.createGain();
-        osc.connect(g); g.connect(ctx.destination);
-        osc.type = 'sine'; osc.frequency.value = freq;
-        var t = ctx.currentTime + i * 0.28;
-        g.gain.setValueAtTime(0, t);
-        g.gain.linearRampToValueAtTime(0.3, t + 0.04);
-        g.gain.exponentialRampToValueAtTime(0.001, t + 0.30);
-        osc.start(t); osc.stop(t + 0.31);
+    function _sonarPendientes() {
+  try {
+    var ctx2 = new (window.AudioContext || window.webkitAudioContext)();
+    [[523, 659], [523, 659]].forEach(function(par, rep) {
+      par.forEach(function(freq, i) {
+        var osc  = ctx2.createOscillator();
+        var gain = ctx2.createGain();
+        osc.connect(gain); gain.connect(ctx2.destination);
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        var t = ctx2.currentTime + rep * 0.9 + i * 0.28;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.35, t + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
+        osc.start(t); osc.stop(t + 0.33);
       });
-    } catch(e) {}
- 
+    });
+  } catch(e) {}
+}
     /* Vibración */
     if (navigator.vibrate) navigator.vibrate([150, 60, 150]);
  
@@ -3453,6 +3509,289 @@ async function manualRefreshDomi(){
   if(txt)  txt.textContent = 'Actualizar';
   if(btn)  btn.disabled = false;
 }
+
+(function inyectarEstilosWelcome() {
+  var st = document.createElement('style');
+  st.textContent = `
+    #wilWelcomeOverlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,.6);
+      display: flex; align-items: flex-end; justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+    #wilWelcomeBox {
+      width: 100%; max-width: 520px;
+      background: #fff; border-radius: 28px 28px 0 0;
+      padding: 28px 20px calc(28px + env(safe-area-inset-bottom));
+      box-shadow: 0 -8px 48px rgba(0,0,0,.3);
+      animation: slideUp .4s cubic-bezier(.22,1,.36,1);
+    }
+    .ww-handle {
+      width: 40px; height: 4px; background: #dde2e4;
+      border-radius: 4px; margin: 0 auto 20px;
+    }
+    .ww-avatar {
+      width: 72px; height: 72px; border-radius: 50%;
+      background: linear-gradient(135deg,#006970,#00bcc9);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 34px; margin: 0 auto 14px;
+      box-shadow: 0 6px 24px rgba(0,105,112,.3);
+    }
+    .ww-title {
+      font-family: 'Plus Jakarta Sans',sans-serif;
+      font-weight: 900; font-size: 20px; color: #191c1d;
+      text-align: center; margin-bottom: 4px;
+    }
+    .ww-sub {
+      font-size: 13px; color: #6c7a7b;
+      text-align: center; margin-bottom: 20px; line-height: 1.5;
+    }
+    .ww-perm-row {
+      display: flex; align-items: center; gap: 12px;
+      background: #f3f4f5; border-radius: 16px;
+      padding: 13px 14px; margin-bottom: 10px;
+      border: 1.5px solid transparent; transition: border-color .2s;
+    }
+    .ww-perm-row.granted { border-color: #2a9d5c; background: #f0fdf4; }
+    .ww-perm-row.denied  { border-color: #ba1a1a; background: #fff5f5; }
+    .ww-perm-ico {
+      width: 44px; height: 44px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; flex-shrink: 0;
+    }
+    .ww-perm-ico.gps   { background: rgba(0,105,112,.1); }
+    .ww-perm-ico.notif { background: rgba(245,158,11,.1); }
+    .ww-perm-info { flex: 1; min-width: 0; }
+    .ww-perm-lbl {
+      font-family: 'Plus Jakarta Sans',sans-serif;
+      font-weight: 800; font-size: 13px; color: #191c1d;
+    }
+    .ww-perm-desc { font-size: 11px; color: #6c7a7b; margin-top: 2px; }
+    .ww-perm-badge {
+      font-size: 10px; font-weight: 800; padding: 3px 10px;
+      border-radius: 20px; white-space: nowrap; flex-shrink: 0;
+    }
+    .ww-perm-badge.ok     { background: #dcfce7; color: #166534; }
+    .ww-perm-badge.pend   { background: #fef3c7; color: #92400e; }
+    .ww-perm-badge.denied { background: #fee2e2; color: #991b1b; }
+    .ww-btn-primary {
+      width: 100%; padding: 15px;
+      background: linear-gradient(135deg,#006970,#00bcc9);
+      color: #fff; border: none; border-radius: 16px;
+      font-family: 'Plus Jakarta Sans',sans-serif;
+      font-weight: 900; font-size: 15px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      box-shadow: 0 4px 18px rgba(0,105,112,.3);
+      transition: opacity .2s; margin-top: 16px;
+    }
+    .ww-btn-primary:disabled { opacity: .6; cursor: default; }
+    .ww-btn-skip {
+      width: 100%; padding: 10px; background: transparent;
+      border: none; font-size: 12px; color: #9eaaac;
+      cursor: pointer; margin-top: 8px;
+      font-family: 'Plus Jakarta Sans',sans-serif; font-weight: 700;
+    }
+  `;
+  document.head.appendChild(st);
+})();
+
+/* ── ESTADO DE PERMISOS ── */
+var _wwGps   = false; // GPS concedido
+var _wwNotif = false; // Notificaciones concedidas
+
+/* ── CREAR EL POPUP ── */
+function _crearWelcomePopup() {
+  if (document.getElementById('wilWelcomeOverlay')) return;
+
+  var nombreCorto = domi && domi.nombre
+    ? domi.nombre.split(' ')[0]
+    : 'domiciliario';
+
+  var div = document.createElement('div');
+  div.id = 'wilWelcomeOverlay';
+  div.innerHTML = `
+    <div id="wilWelcomeBox">
+      <div class="ww-handle"></div>
+      <div class="ww-avatar">🛵</div>
+      <div class="ww-title">¡Hola, ${escHtml(nombreCorto)}!</div>
+      <div class="ww-sub">
+        Para recibir pedidos y ser visible en el mapa,<br>
+        activa los siguientes permisos:
+      </div>
+
+      <!-- GPS -->
+      <div class="ww-perm-row" id="wwRowGps">
+        <div class="ww-perm-ico gps">📍</div>
+        <div class="ww-perm-info">
+          <div class="ww-perm-lbl">Ubicación GPS</div>
+          <div class="ww-perm-desc">Para mostrarte en el mapa y rastrear entregas</div>
+        </div>
+        <span class="ww-perm-badge pend" id="wwBadgeGps">Pendiente</span>
+      </div>
+
+      <!-- Notificaciones -->
+      <div class="ww-perm-row" id="wwRowNotif">
+        <div class="ww-perm-ico notif">🔔</div>
+        <div class="ww-perm-info">
+          <div class="ww-perm-lbl">Notificaciones</div>
+          <div class="ww-perm-desc">Para alertarte de nuevos pedidos asignados</div>
+        </div>
+        <span class="ww-perm-badge pend" id="wwBadgeNotif">Pendiente</span>
+      </div>
+
+      <button class="ww-btn-primary" id="wwBtnActivar" onclick="_wwActivarTodo()">
+        <span class="material-symbols-outlined" style="font-size:20px;font-variation-settings:'FILL' 1">bolt</span>
+        Activar todo y comenzar
+      </button>
+      <button class="ww-btn-skip" onclick="_wwCerrar(true)">
+        Omitir por ahora
+      </button>
+    </div>
+  `;
+  document.body.appendChild(div);
+
+  // Si ya tenía GPS granted antes, actualizar badge
+  if (navigator.permissions) {
+    navigator.permissions.query({ name: 'geolocation' }).then(function(r) {
+      if (r.state === 'granted') _wwSetGps(true);
+      else if (r.state === 'denied') _wwSetGps(false, true);
+    }).catch(function(){});
+    navigator.permissions.query({ name: 'notifications' }).then(function(r) {
+      if (r.state === 'granted') _wwSetNotif(true);
+      else if (r.state === 'denied') _wwSetNotif(false, true);
+    }).catch(function(){});
+  }
+
+  // Si ya tiene permiso de notificaciones
+  if (Notification.permission === 'granted') _wwSetNotif(true);
+}
+
+function _wwSetGps(ok, denied) {
+  _wwGps = ok;
+  var row = document.getElementById('wwRowGps');
+  var badge = document.getElementById('wwBadgeGps');
+  if (!row || !badge) return;
+  if (ok) {
+    row.className   = 'ww-perm-row granted';
+    badge.className = 'ww-perm-badge ok';
+    badge.textContent = '✅ Activo';
+  } else if (denied) {
+    row.className   = 'ww-perm-row denied';
+    badge.className = 'ww-perm-badge denied';
+    badge.textContent = '❌ Bloqueado';
+  }
+}
+
+function _wwSetNotif(ok, denied) {
+  _wwNotif = ok;
+  var row = document.getElementById('wwRowNotif');
+  var badge = document.getElementById('wwBadgeNotif');
+  if (!row || !badge) return;
+  if (ok) {
+    row.className   = 'ww-perm-row granted';
+    badge.className = 'ww-perm-badge ok';
+    badge.textContent = '✅ Activo';
+  } else if (denied) {
+    row.className   = 'ww-perm-row denied';
+    badge.className = 'ww-perm-badge denied';
+    badge.textContent = '❌ Bloqueado';
+  }
+}
+
+async function _wwActivarTodo() {
+  var btn = document.getElementById('wwBtnActivar');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Activando…'; }
+
+  // 1. Pedir GPS
+  if (!_wwGps) {
+    try {
+      await new Promise(function(resolve, reject) {
+        navigator.geolocation.getCurrentPosition(
+          function(pos) {
+            // Guardar coords iniciales en TRK
+            TRK.lat = pos.coords.latitude;
+            TRK.lng = pos.coords.longitude;
+            TRK.acc = Math.round(pos.coords.accuracy);
+            _wwSetGps(true);
+            resolve();
+          },
+          function(err) {
+            _wwSetGps(false, err.code === 1); // 1 = PERMISSION_DENIED
+            resolve(); // no bloquear aunque falle
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      });
+    } catch(e) { _wwSetGps(false, true); }
+  }
+
+  // 2. Pedir Notificaciones
+  if (!_wwNotif && 'Notification' in window) {
+    try {
+      var perm = await Notification.requestPermission();
+      _wwSetNotif(perm === 'granted', perm === 'denied');
+    } catch(e) {}
+  }
+
+  // 3. Activar tracker GPS automáticamente si se concedió GPS
+  if (_wwGps && !TRK.activo) {
+    trkActivar();
+  }
+
+  // 4. Cerrar popup después de 800ms para que el usuario vea los badges verdes
+  setTimeout(function() {
+    _wwCerrar(false);
+  }, 900);
+}
+
+function _wwCerrar(omitido) {
+  var ov = document.getElementById('wilWelcomeOverlay');
+  if (!ov) return;
+
+  // Animación salida
+  var box = document.getElementById('wilWelcomeBox');
+  if (box) {
+    box.style.transition = 'transform .35s ease, opacity .3s ease';
+    box.style.transform  = 'translateY(100%)';
+    box.style.opacity    = '0';
+  }
+
+  setTimeout(function() {
+    ov.remove();
+    // Si omitió pero sí tenía GPS ya concedido → activar tracker igual
+    if (omitido && !TRK.activo) {
+      if (navigator.permissions) {
+        navigator.permissions.query({ name: 'geolocation' })
+          .then(function(r) { if (r.state === 'granted') trkActivar(); })
+          .catch(function(){});
+      }
+    }
+    // Marcar como ya mostrado en esta sesión
+    try { sessionStorage.setItem('wil_welcome_shown', '1'); } catch(e) {}
+  }, 380);
+}
+
+/* ── INICIAR: mostrar popup al cargar si no se ha mostrado ── */
+(function iniciarWelcomeFlow() {
+  // No mostrar si ya se mostró en esta sesión
+  try {
+    if (sessionStorage.getItem('wil_welcome_shown') === '1') {
+      // Solo reactivar tracker si ya tenía GPS
+      if (navigator.permissions) {
+        navigator.permissions.query({ name: 'geolocation' })
+          .then(function(r) { if (r.state === 'granted' && !TRK.activo) trkActivar(); })
+          .catch(function(){});
+      }
+      return;
+    }
+  } catch(e) {}
+
+  // Esperar a que el DOM esté listo y el usuario vea el panel
+  setTimeout(function() {
+    _crearWelcomePopup();
+  }, 1200);
+})();
+
 
 </script>
 </body>
