@@ -1165,45 +1165,47 @@ async function dibujarRutaOSRM(oriLat, oriLng, destLat, destLng) {
   }
 }
 
-async function cancelarPedidoActivo(){
-  if(!state.pedidoActivo) return;
-  if(!confirm('¿Cancelar este pedido?')) return;
-  var btn = document.getElementById('btnCancelarPed');
-  if(btn){btn.disabled=true; btn.textContent='Cancelando…';}
-  try{
-    var r = await fetch(API_BASE+'/wil?action=cambiar-estado',{
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({idPedido:state.pedidoActivo.id,
-        estado:'Cancelado', idDomi:domi.id})
+async function cambiarEstadoPedido(nuevoEstado){
+  if(!state.pedidoActivo) return false;
+  try {
+    var horaActual = new Date().toLocaleTimeString('es-CO', {
+      hour:'2-digit', minute:'2-digit', timeZone: TZ
+    });
+
+    var payload = {
+      accion:    'asignar-domi',
+      pedidoId:  String(state.pedidoActivo.id).trim(),
+      domi:      domi.nombre,
+      estado:    nuevoEstado,
+      horaAsign: horaActual
+    };
+
+    if(nuevoEstado === 'En camino')  payload.horaCamino  = horaActual;
+    if(nuevoEstado === 'Entregado')  payload.horaEntrega = horaActual;
+
+    var r = await fetch(SCRIPT_URL_DOMI, {
+      method:  'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body:    JSON.stringify(payload),
+      signal:  AbortSignal.timeout(15000)
     });
     var d = await r.json();
-    if(d.ok!==false){
-      var horaCancel = horaAhora();
-      state.historial.unshift({
-        id:state.pedidoActivo.id, cliente:state.pedidoActivo.cliente,
-        telefono:state.pedidoActivo.telefono, direccion:state.pedidoActivo.direccion,
-        total:state.pedidoActivo.total, metodoPago:state.pedidoActivo.metodoPago,
-        hora:horaCancel, fecha:new Date().toLocaleDateString('es-CO',{timeZone:TZ}),
-        estado:'Cancelado', periodo:'hoy'
-      });
-      if(_tabRouteLayer){_tabMap&&_tabMap.removeLayer(_tabRouteLayer);_tabRouteLayer=null;}
-      if(_tabRouteGlow) {_tabMap&&_tabMap.removeLayer(_tabRouteGlow); _tabRouteGlow=null;}
-      clearInterval(_tabMapInterval);
-      detenerNavegacion(); detenerChatPoll();
-      document.getElementById('wazeFloatBtn').style.display='none';
-      state.pedidoActivo=null; state.estadoPedido=null;
-      destLatGlobal=null; destLngGlobal=null;
-      document.getElementById('pedidoActivoPanel').style.display='none';
-      document.getElementById('sinPedidoEnRuta').style.display='flex';
-      actualizarBadgesNav();
-      setTimeout(function(){switchTab('historial');renderHistorial();},500);
-    }else{
-      if(btn){btn.disabled=false;btn.innerHTML='<span class="material-symbols-outlined" style="font-size:15px;font-variation-settings:\'FILL\' 1">cancel</span> Cancelar pedido';}
-      alert('No se pudo cancelar: '+(d.error||'error'));
+
+    // ← BUG CORREGIDO: verificar filasActualizadas además de ok
+    if(d.ok === false){
+      console.warn('[cambiarEstadoPedido] ok:false →', d.error);
+      return false;
     }
-  }catch(e){
-    if(btn){btn.disabled=false;btn.textContent='Cancelar pedido';}
-    alert('Error: '+e.message);
+    if(d.filasActualizadas === 0){
+      console.warn('[cambiarEstadoPedido] filasActualizadas=0 para pedidoId:', payload.pedidoId,
+                   '— verificar que el ID existe en el sheet');
+      return false;
+    }
+    return true;
+
+  } catch(e) {
+    console.warn('[cambiarEstadoPedido] excepción:', e.message);
+    return false;
   }
 }
 
@@ -1640,28 +1642,26 @@ async function fetchPedidos() {
   try {
     var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID_DOMI
             + '/gviz/tq?tqx=out:csv&sheet=Pedidos&cachebust=' + Date.now();
-    var r = await fetch(url, {cache:'no-store', signal:AbortSignal.timeout(14000)});
-    if(!r.ok) throw new Error('HTTP ' + r.status);
+    var r = await fetch(url, { cache:'no-store', signal:AbortSignal.timeout(14000) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     var text = await r.text();
-    if(!text || text.length < 20) throw new Error('vacío');
+    if (!text || text.length < 20) throw new Error('vacío');
 
     var todasFilas = _parsearCSV(text);
     var pedMap = {}, pedOrder = [], lastId = null;
 
     todasFilas.forEach(function(cols){
       var id = (cols[0]||'').trim();
-      // ✅ Solo IDs numéricos de 2-5 dígitos
-      if(id && !/^\d{2,5}$/.test(id)) return;
-
-      if(id){
-        if(!pedMap[id]){
+      if (id && !/^\d{2,5}$/.test(id)) return;
+      if (id) {
+        if (!pedMap[id]) {
           pedMap[id] = {
             id,
-            cliente:     (cols[1]||'').trim(),
-            telefono:    (cols[2]||'').trim(),
-            metodoPago:  (cols[3]||'').trim(),
-            estadoRaw:   (cols[4]||'').trim(),
-            imagen:      (cols[5]||'').trim(),
+            cliente:     (cols[1] ||'').trim(),
+            telefono:    (cols[2] ||'').trim(),
+            metodoPago:  (cols[3] ||'').trim(),
+            estadoRaw:   (cols[4] ||'').trim(),
+            imagen:      (cols[5] ||'').trim(),
             direccion:   (cols[11]||'').trim(),
             hora:        (cols[12]||'').trim(),
             fecha:       (cols[13]||'').trim(),
@@ -1679,189 +1679,90 @@ async function fetchPedidos() {
         }
         lastId = id;
       }
-
       var aId = id || lastId;
-      if(!aId || !pedMap[aId]) return;
+      if (!aId || !pedMap[aId]) return;
       var nom = (cols[6]||'').replace(/\|cat$/,'').trim();
-      if(nom && !/^domicilio\s*\(/i.test(nom)){
+      if (nom && !/^domicilio\s*\(/i.test(nom)) {
         var vu = parseCOP(cols[9]||''), vtotal = parseCOP(cols[10]||'');
         var qty = parseInt(cols[8])||1;
-        pedMap[aId]._prods.push({
-          nom, marca:(cols[7]||'').trim(),
-          qty, vu, vtotal: vtotal||(vu*qty)
-        });
+        pedMap[aId]._prods.push({ nom, marca:(cols[7]||'').trim(), qty, vu, vtotal:vtotal||(vu*qty) });
       }
     });
 
-    var _norm = function(s){
+    var _norm2 = function(s){
       return (s||'').toLowerCase().normalize('NFD')
         .replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,' ').trim();
     };
-    var nombreBase = _norm(domi.nombre||'').split(' ')[0];
+    var nombreBase = _norm2(domi.nombre||'').split(' ')[0];
     var idDomi     = (domi.id||'').toUpperCase().trim();
 
     var misPendientes = [];
     var enRuta        = null;
 
     pedOrder.forEach(function(id){
-      var p    = pedMap[id];
-      var est  = (p.estadoRaw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      var p = pedMap[id];
       p.estado = _normEst(p.estadoRaw);
+      var est  = (p.estadoRaw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 
-      // ── ENTREGADO / CANCELADO → ignorar siempre ──
-      if(est.includes('entregad') || est.includes('cancelad')) return;
+      /* Ignorar entregados y cancelados */
+      if (est.includes('entregad') || est.includes('cancelad')) return;
 
-      // ── Ya procesado localmente ──
-      if(idsProcesados.has(id)) return;
-
-      var asgNorm  = _norm(p.domiAsign || '');
+      var asgNorm  = _norm2(p.domiAsign || '');
       var asgUpper = (p.domiAsign || '').toUpperCase();
       var esMio    = p.domiAsign && (
-        asgNorm.split(' ').some(function(w){ return w.length > 2 && nombreBase.length > 2 && nombreBase.includes(w); }) ||
-        asgNorm.includes(nombreBase) ||
-        asgUpper.includes(idDomi)
+        asgNorm.includes(nombreBase) || asgUpper.includes(idDomi)
       );
 
-      // ── PEDIDO EN RUTA (asignado a mí y en proceso/camino/asignado) ──
-      if(esMio && (p.estado === 'proceso' || p.estado === 'camino' || p.estado === 'asignado')){
-        if(!enRuta) enRuta = _cvtPed(p);
-        return; // NO mostrar en pendientes
-      }
-
-      // ── PENDIENTE sin domi → lo ven TODOS ──
-      if(p.estado === 'pendiente' && (!p.domiAsign || p.domiAsign.trim() === '')){
-        var ped = _cvtPed(p);
-        ped.asignadoAMi = false;
-        misPendientes.push(ped);
+      /* ▶ EN RUTA — siempre chequear ANTES de idsProcesados */
+      if (esMio && (p.estado === 'proceso' || p.estado === 'camino' || p.estado === 'asignado')) {
+        if (!enRuta) enRuta = _cvtPed(p);
         return;
       }
 
-      // ── PENDIENTE con domi asignado a MÍ → solo yo lo veo ──
-      if(p.estado === 'pendiente' && esMio){
-        var ped = _cvtPed(p);
-        ped.asignadoAMi = true;
+      /* Ya procesado → no mostrar en pendientes */
+      if (idsProcesados.has(id)) return;
 
-        if(!_idsAsignadosNotificados.has(id)){
-          _idsAsignadosNotificados.add(id);
-          _notifAsignado(ped);
-        }
-        misPendientes.unshift(ped); // al inicio de la lista
-        return;
-      }
-
-      // ── PENDIENTE con domi asignado a OTRO → no mostrar ──
-      if(p.estado === 'pendiente' && p.domiAsign && p.domiAsign.trim() !== '' && !esMio){
-        return; // No visible para este domi
+      /* Solo Pendiente sin asignar → visible para todos */
+      if (p.estado === 'pendiente' && (!p.domiAsign || !p.domiAsign.trim())) {
+        misPendientes.push(_cvtPed(p));
       }
     });
 
     state.pedidos = misPendientes;
 
-
-// ── Detectar pedidos EN PROCESO asignados a mí → notificar ──
-    pedOrder.forEach(function(id){
-      var p = pedMap[id];
-      if(!p) return;
-      var est = (p.estadoRaw||'').toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-
-      // Solo "en proceso" o "asignado"
-      if(!est.includes('proceso') && !est.includes('asignado')) return;
-
-      var asgNorm  = (p.domiAsign||'').toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-        .replace(/[^a-z0-9]/g,' ').trim();
-      var asgUpper = (p.domiAsign||'').toUpperCase();
-      var _nb      = (domi.nombre||'').toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-        .replace(/[^a-z0-9]/g,' ').trim().split(' ')[0];
-      var _id      = (domi.id||'').toUpperCase().trim();
-
-      var esMio = p.domiAsign && (
-        asgNorm.includes(_nb) || asgUpper.includes(_id)
-      );
-      if(!esMio) return;
-
-      // Solo notificar UNA vez por pedido
-      if(_idsAsignadosNotificados.has(id)) return;
-      _idsAsignadosNotificados.add(id);
-
-      var ped = _cvtPed(p);
-      ped.asignadoAMi = true;
-
-      // Banner visual
-      _mostrarBannerAsignado(ped);
-
-      // Sonido + vibración
-      _tocarSonidoAsignado();
-
-      // Push nativo Android
-      if(window.WilNativo){
-        WilNativo.notificarPedidos(
-          1,
-          '🎯 ¡Te asignaron un pedido!',
-          (p.cliente||'Cliente') + ' · ' + (p.direccion||'').substring(0,50)
-        );
-      }
-
-      // Push del navegador (PWA)
-      if(Notification.permission === 'granted'){
-        navigator.serviceWorker.ready.then(function(reg){
-          reg.showNotification('🎯 ¡Te asignaron un pedido!', {
-            body:   (p.cliente||'Cliente') + ' · ' + (p.total||''),
-            icon:   'icons/icon-192.png',
-            badge:  'icons/badge-72.png',
-            tag:    'wil-asignado-' + id,
-            requireInteraction: true,
-            vibrate:[500,150,500,150,500],
-            data:   { pedidoId: id }
-          });
-        });
-      }
-    });
-
-
-
-
-    // ── Activar pedido en ruta si es nuevo o cambió ──
-    if(enRuta){
-      if(!state.pedidoActivo || state.pedidoActivo.id !== enRuta.id){
-        state.pedidoActivo  = enRuta;
-        state.estadoPedido  = enRuta.estadoRaw;
+    /* Activar pedido en ruta si apareció o cambió */
+    if (enRuta) {
+      if (!state.pedidoActivo || state.pedidoActivo.id !== enRuta.id) {
+        state.pedidoActivo = enRuta;
+        state.estadoPedido = enRuta.estadoRaw;
         activarPedidoEnRuta(enRuta);
-        // Si estamos en pestaña pedidos, ir a ruta
-        if(currentTab === 'pedidos'){
-          setTimeout(function(){ switchTab('ruta'); }, 800);
-        }
+        if (currentTab === 'pedidos') setTimeout(function(){ switchTab('ruta'); }, 800);
       }
     }
 
     renderPedidos();
     actualizarBadgesNav();
 
-    if('setAppBadge' in navigator){
+    if ('setAppBadge' in navigator) {
       var n = state.pedidos.length;
-      if(n>0) navigator.setAppBadge(n).catch(function(){});
-      else    navigator.clearAppBadge().catch(function(){});
+      if (n > 0) navigator.setAppBadge(n).catch(function(){});
+      else        navigator.clearAppBadge().catch(function(){});
     }
 
-    // Badge nativo Android
-     var _n = state.pedidos.length;
     if (window.WilNativo) {
+      var _n = state.pedidos.length;
       if (_n > 0 && _n !== _ultimoConteoNotif) {
         _ultimoConteoNotif = _n;
-        WilNativo.notificarPedidos(
-          _n,
+        WilNativo.notificarPedidos(_n,
           '🛵 ' + _n + ' pedido' + (_n > 1 ? 's' : '') + ' esperando',
-          'Hay ' + _n + ' pedido' + (_n > 1 ? 's pendientes' : ' pendiente') + ' sin tomar'
-        );
+          'Hay ' + _n + ' pedido' + (_n > 1 ? 's pendientes' : ' pendiente') + ' sin tomar');
       } else if (_n === 0 && _ultimoConteoNotif > 0) {
         _ultimoConteoNotif = 0;
         WilNativo.limpiarBadge();
       }
     }
 
-  } catch(e){
+  } catch(e) {
     console.warn('[fetchPedidos]:', e.message);
   }
 }
@@ -2329,78 +2230,68 @@ function renderPedidos(){
   });
 }
 /* ═══════════════════ ACEPTAR PEDIDO ═══════════════════ */
-async function aceptarPedido(id){
+async function aceptarPedido(id) {
+  if (state.pedidoActivo) { mostrarPopupPedidoActivo(); return; }
+  if (idsProcesados.has(id)) return;
 
-  if(state.pedidoActivo){
-    mostrarPopupPedidoActivo();
-    return;
-  }
-  // ✅ Evitar doble tap
-  if(idsProcesados.has(id)) return;
-
-  var btn = document.getElementById('btn-'+id);
-  if(!btn) return;
+  var btn = document.getElementById('btn-' + id);
+  if (!btn) return;
   btn.disabled = true;
   btn.innerHTML = '<span class="spin"></span> Tomando pedido…';
 
-  try{
-    // Paso 1: Marcar en el sheet estado=En proceso + domi
-    var payload = JSON.stringify({
-      accion:    'asignar-domi',
-      pedidoId:  String(id).trim(),
-      domi:      domi.nombre,
-      estado:    'En proceso',
-      horaAsign: new Date().toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'})
-    });
+  var hora = new Date().toLocaleTimeString('es-CO',
+    { hour:'2-digit', minute:'2-digit', timeZone: TZ });
 
+  try {
     var r = await fetch(SCRIPT_URL_DOMI, {
       method:  'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body:    payload
+      headers: { 'Content-Type':'text/plain' },
+      body: JSON.stringify({
+        accion:    'asignar-domi',
+        pedidoId:  String(id).trim(),
+        domi:      domi.nombre,
+        estado:    'En proceso',
+        horaAsign: hora
+      }),
+      signal: AbortSignal.timeout(20000)
     });
     var d = await r.json();
+    console.log('[aceptarPedido]', id, d);
 
-    if(d.ok === false || d.filasActualizadas === 0){
-      // Pedido ya fue tomado por otro domi
+    if (d.ok === false || d.filasActualizadas === 0) {
       btn.innerHTML = '⚠️ Ya fue tomado por otro domi';
       btn.style.background = '#f59e0b';
       idsProcesados.add(id);
       setTimeout(function(){
         state.pedidos = state.pedidos.filter(function(p){ return p.id !== id; });
         renderPedidos();
-      }, 2000);
+      }, 2200);
       return;
     }
 
-    // Paso 2: Éxito — marcar localmente y activar en ruta
     idsProcesados.add(id);
-    btn.innerHTML = '<span class="material-symbols-outlined text-white" '
-      + 'style="font-size:15px;font-variation-settings:\'FILL\' 1">check_circle</span>'
-      + ' ¡Pedido tomado!';
+    btn.innerHTML = '✅ ¡Pedido tomado!';
     btn.style.background = '#2a9d5c';
 
     var pedido = state.pedidos.find(function(p){ return p.id === id; });
-    // Actualizar estado local
-    if(pedido){
-      pedido.domiAsign = domi.nombre;
-      pedido.estadoRaw = 'En proceso';
-      pedido.estado    = 'proceso';
+    if (pedido) {
+      pedido.domiAsign    = domi.nombre;
+      pedido.estadoRaw    = 'En proceso';
+      pedido.estado       = 'proceso';
+      pedido.horaAceptado = hora;
     }
 
-    state.pedidos = state.pedidos.filter(function(p){ return p.id !== id; });
+    state.pedidos      = state.pedidos.filter(function(p){ return p.id !== id; });
     state.pedidoActivo = pedido;
     state.estadoPedido = 'proceso';
 
     actualizarBadgesNav();
     activarPedidoEnRuta(pedido);
-
-    // Ir a pestaña En Ruta
     setTimeout(function(){ switchTab('ruta'); }, 600);
 
-  } catch(e){
+  } catch(e) {
     btn.disabled = false;
-    btn.innerHTML = '<span class="material-symbols-outlined text-white" '
-      + 'style="font-size:15px">check_circle</span> Aceptar pedido';
+    btn.innerHTML = '<span class="material-symbols-outlined text-white" style="font-size:15px">check_circle</span> Aceptar pedido';
     btn.style.background = '';
     alert('Error de conexión: ' + e.message);
   }
@@ -2625,26 +2516,33 @@ function distHaversine(lat1,lng1,lat2,lng2){
 /* ═══ NAVEGAR CON WAZE (sin splash, sin perder sesión) ═══ */
 function abrirNavegacion() {
   if (!state.pedidoActivo) { alert('Sin pedido activo.'); return; }
-  var p = state.pedidoActivo;
   try { localStorage.setItem('wil_domi', JSON.stringify(domi)); } catch(e) {}
 
-  /* Usar coords ya resueltas o extraer del pedido */
   var lat = destLatGlobal, lng = destLngGlobal;
   if (!lat) {
-    var coords = extraerCoordenadasPedido(p);
+    var coords = extraerCoordenadasPedido(state.pedidoActivo);
     if (coords) { lat = coords.lat; lng = coords.lng; }
   }
 
+  var _abrir = function(la, lo) {
+    // ── Android nativo: sin splash, sin perder sesión ──
+    if (window.WilNativo && window.WilNativo.abrirWaze) {
+      window.WilNativo.abrirWaze(String(la), String(lo));
+      return;
+    }
+    // ── Fallback web ──
+    _wazeDir(la, lo, null);
+  };
+
   if (lat && lng) {
-    _wazeDir(lat, lng, null);
+    _abrir(lat, lng);
   } else {
-    var dir = (p.direccion || '')
+    var dir = (state.pedidoActivo.direccion || '')
       .replace(/\s*\(Ref:[^)]+\)/g,'').replace(/\s*\[.+?\]/g,'')
       .replace(/\s*—\s*\S+/g,'').trim();
     if (!dir) { alert('Sin dirección de entrega.'); return; }
-    /* Geocodificar antes de abrir Waze para pasarle coords directas */
     geocodificarDireccion(dir + ' Copacabana Antioquia Colombia', function(la, lo) {
-      if (la && lo) { destLatGlobal = la; destLngGlobal = lo; _wazeDir(la, lo, null); }
+      if (la && lo) { destLatGlobal = la; destLngGlobal = lo; _abrir(la, lo); }
       else _wazeDir(null, null, dir + ' Copacabana Antioquia Colombia');
     });
   }
@@ -2805,114 +2703,137 @@ function stepActionClick(){if(stepState===0)marcarEncamino();else if(stepState==
 
 
 /* ═══════════════════ ESTADOS PEDIDO ═══════════════════ */
-async function cambiarEstadoPedido(nuevoEstado){
-  if(!state.pedidoActivo) return false;
-  try {
-    var horaActual = new Date().toLocaleTimeString('es-CO', {
-      hour:'2-digit', minute:'2-digit', timeZone: TZ
-    });
+async function cambiarEstadoPedido(nuevoEstado) {
+  if (!state.pedidoActivo) return false;
 
-    var payload = {
-      accion:    'asignar-domi',
-      pedidoId:  String(state.pedidoActivo.id).trim(),
-      domi:      domi.nombre,
-      estado:    nuevoEstado,
-      horaAsign: horaActual
-    };
+  var hora = new Date().toLocaleTimeString('es-CO',
+    { hour:'2-digit', minute:'2-digit', timeZone: TZ });
 
-    // Si es "En camino" → usar campo horaCamino
-    if(nuevoEstado === 'En camino'){
-      payload.horaCamino = horaActual;
+  var payload = {
+    accion:    'asignar-domi',
+    pedidoId:  String(state.pedidoActivo.id).trim(),
+    domi:      domi.nombre,
+    estado:    nuevoEstado,
+    horaAsign: hora
+  };
+  if (nuevoEstado === 'En camino')                     payload.horaCamino  = hora;
+  if (nuevoEstado === 'Entregado' ||
+      nuevoEstado === 'Cancelado')                     payload.horaEntrega = hora;
+
+  for (var intento = 0; intento < 2; intento++) {
+    try {
+      var r = await fetch(SCRIPT_URL_DOMI, {
+        method:  'POST',
+        headers: { 'Content-Type':'text/plain' },
+        body:    JSON.stringify(payload),
+        signal:  AbortSignal.timeout(20000)
+      });
+      var d = await r.json();
+      console.log('[cambiarEstado]', nuevoEstado, '→', d);
+      if (d.ok !== false) return true;   /* éxito */
+    } catch(e) {
+      console.warn('[cambiarEstado] intento', intento + 1, e.message);
+      if (intento === 0) await new Promise(function(res){ setTimeout(res, 2000); });
     }
-    // Si es "Entregado" → usar campo horaEntrega
-    if(nuevoEstado === 'Entregado'){
-      payload.horaEntrega = horaActual;
-    }
-
-    var r = await fetch(SCRIPT_URL_DOMI, {
-      method:  'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body:    JSON.stringify(payload),
-      signal:  AbortSignal.timeout(15000)
-    });
-    var d = await r.json();
-    return d.ok !== false;
-
-  } catch(e) {
-    console.warn('[cambiarEstadoPedido]:', e.message);
-    return false;
   }
+  return false;
 }
 
-function marcarEncamino(){
+function marcarEncamino() {
   setStepLoading(true, 'Guardando…');
-  cambiarEstadoPedido('En camino').then(function(ok){
-    if(!ok){
+  cambiarEstadoPedido('En camino').then(function(ok) {
+    if (!ok) {
       setStepLoading(false, 'Ponerte en camino');
-      alert('No se pudo cambiar el estado. Verifica tu conexión.');
+      alert('No se pudo actualizar. Verifica tu conexión e intenta de nuevo.');
       return;
     }
     state.estadoPedido = 'En camino';
     var s2 = document.getElementById('tab_step2Time');
-    if(s2) s2.textContent = horaAhora();
+    if (s2) s2.textContent = new Date().toLocaleTimeString('es-CO',
+      { hour:'2-digit', minute:'2-digit', timeZone: TZ });
     renderStepper(1);
-
-    // Redibujar ruta si hay GPS y destino
-    if(TRK.lat && destLatGlobal){
+    if (TRK.lat && destLatGlobal)
       dibujarRutaOSRM(TRK.lat, TRK.lng, destLatGlobal, destLngGlobal);
-    }
-  }).catch(function(e){
+  }).catch(function(e) {
     setStepLoading(false, 'Ponerte en camino');
-    alert('Error de red: ' + e.message);
+    alert('Error: ' + e.message);
   });
 }
 
-function marcarEntregado(){
-  var horaReal = horaAhora(); // ← capturar AHORA antes de todo
-  setStepLoading(true,'Confirmando…');
-  cambiarEstadoPedido('Entregado').then(function(ok){
-    if(!ok){
-      setStepLoading(false,'Confirmar entrega');
-      showStepBtn('linear-gradient(135deg,#1a7a3a,#2a9d5c)','0 4px 20px rgba(42,157,92,.35)','check_circle','Confirmar entrega');
-      alert('No se pudo confirmar la entrega.'); return;
+function marcarEntregado() {
+  if (!state.pedidoActivo) return;
+
+  var horaReal  = new Date().toLocaleTimeString('es-CO',
+    { hour:'2-digit', minute:'2-digit', timeZone: TZ });
+  var pedidoId  = state.pedidoActivo.id;
+
+  idsProcesados.add(pedidoId);   /* bloquear poll ya */
+  setStepLoading(true, 'Confirmando…');
+
+  cambiarEstadoPedido('Entregado').then(function(ok) {
+    if (!ok) {
+      idsProcesados.delete(pedidoId);   /* revertir si falló */
+      setStepLoading(false, 'Confirmar entrega');
+      alert('No se pudo confirmar la entrega. Intenta de nuevo.');
+      return;
     }
-    state.estadoPedido='Entregado';
-    var s3=document.getElementById('tab_step3Time');
-    if(s3) s3.textContent = horaReal; // ← usar hora capturada
+
+    state.estadoPedido = 'Entregado';
+    var s3 = document.getElementById('tab_step3Time');
+    if (s3) s3.textContent = horaReal;
     renderStepper(2);
-    state.historial.unshift({
-      id:state.pedidoActivo.id, cliente:state.pedidoActivo.cliente,
-      direccion:state.pedidoActivo.direccion, total:state.pedidoActivo.total,
-      metodoPago:state.pedidoActivo.metodoPago,
-      hora: horaReal, // ← hora real
-      fecha:new Date().toLocaleDateString('es-CO',{timeZone:TZ}),
-      estado:'Entregado', periodo:'hoy'
-    });
+
+    if (state.pedidoActivo) {
+      state.historial.unshift({
+        id:         pedidoId,
+        cliente:    state.pedidoActivo.cliente,
+        telefono:   state.pedidoActivo.telefono,
+        direccion:  state.pedidoActivo.direccion,
+        total:      state.pedidoActivo.total,
+        metodoPago: state.pedidoActivo.metodoPago,
+        domicilio:  state.pedidoActivo.domicilio || '',
+        hora:       horaReal,
+        fecha:      new Date().toLocaleDateString('es-CO', { timeZone: TZ }),
+        estado:     'Entregado',
+        periodo:    'hoy'
+      });
+    }
     actualizarBadgesNav();
-    setTimeout(function(){
-      if(_tabRouteLayer){ _tabMap&&_tabMap.removeLayer(_tabRouteLayer);_tabRouteLayer=null; }
-      if(_tabRouteGlow) { _tabMap&&_tabMap.removeLayer(_tabRouteGlow); _tabRouteGlow=null;  }
-      if(_tabDestMarker&&_tabMap){_tabMap.removeLayer(_tabDestMarker);_tabDestMarker=null;}
-      if(_tabDomiMarker&&_tabMap){
-        _tabDomiMarker.setLatLng([TRK.lat||ANCLA_LAT,TRK.lng||ANCLA_LNG]);
-        _tabDomiMarker.setIcon(iconDomi(domi?domi.nombre:'WIL',TRK.activo));
+
+    setTimeout(function() {
+      if (_tabRouteLayer && _tabMap) { _tabMap.removeLayer(_tabRouteLayer); _tabRouteLayer = null; }
+      if (_tabRouteGlow  && _tabMap) { _tabMap.removeLayer(_tabRouteGlow);  _tabRouteGlow  = null; }
+      if (_tabDestMarker && _tabMap) { _tabMap.removeLayer(_tabDestMarker); _tabDestMarker = null; }
+      if (_tabDomiMarker && _tabMap) {
+        _tabDomiMarker.setLatLng([TRK.lat || ANCLA_LAT, TRK.lng || ANCLA_LNG]);
+        _tabDomiMarker.setIcon(iconDomi(domi ? domi.nombre : 'WIL', TRK.activo));
       }
-      clearInterval(_tabMapInterval); detenerNavegacion();
-      document.getElementById('mapEtaBadgeTab').style.display='none';
-      state.pedidoActivo=null; state.estadoPedido=null;
-      destLatGlobal=null; destLngGlobal=null;
-      actualizarBadgesNav(); detenerChatPoll();
-      document.getElementById('pedidoActivoPanel').style.display='none';
-      /* Mostrar botón Waze flotante */
-  var waze = document.getElementById('wazeFloatBtn');
-  if(waze) waze.style.display = 'flex';
-      document.getElementById('sinPedidoEnRuta').style.display='flex';
-      /* Ocultar botón Waze flotante */
-      document.getElementById('wazeFloatBtn').style.display='none';
-      setTimeout(function(){switchTab('historial');renderHistorial();},600);
-    },2500);
-  }).catch(function(e){setStepLoading(false,'Confirmar entrega');alert('Error: '+e.message);});
+      clearInterval(_tabMapInterval);
+      detenerNavegacion();
+      detenerChatPoll();
+
+      var etaBadge = document.getElementById('mapEtaBadgeTab');
+      if (etaBadge) etaBadge.style.display = 'none';
+      document.getElementById('wazeFloatBtn').style.display = 'none'; /* solo ocultar */
+
+      state.pedidoActivo = null;
+      state.estadoPedido = null;
+      destLatGlobal      = null;
+      destLngGlobal      = null;
+      actualizarBadgesNav();
+
+      document.getElementById('pedidoActivoPanel').style.display = 'none';
+      document.getElementById('sinPedidoEnRuta').style.display   = 'flex';
+      setTimeout(function() { switchTab('historial'); renderHistorial(); }, 500);
+    }, 2000);
+
+  }).catch(function(e) {
+    idsProcesados.delete(pedidoId);
+    setStepLoading(false, 'Confirmar entrega');
+    alert('Error: ' + e.message);
+  });
 }
+
 
 /* ═══════════════════ HISTORIAL ═══════════════════ */
 function renderHistorial() {
@@ -4055,6 +3976,58 @@ function _wwSetNotif(ok, denied) {
     row.className   = 'ww-perm-row denied';
     badge.className = 'ww-perm-badge denied';
     badge.textContent = '❌ Bloqueado';
+  }
+}
+
+async function cancelarPedidoActivo() {
+  if (!state.pedidoActivo) return;
+  if (!confirm('¿Cancelar este pedido?')) return;
+
+  var pedidoId = state.pedidoActivo.id;
+  var btn = document.getElementById('btnCancelarPed');
+  if (btn) { btn.disabled = true; btn.textContent = 'Cancelando…'; }
+
+  idsProcesados.add(pedidoId);   /* bloquear poll ya */
+
+  var ok = await cambiarEstadoPedido('Cancelado');
+
+  if (ok) {
+    var horaCancel = new Date().toLocaleTimeString('es-CO',
+      { hour:'2-digit', minute:'2-digit', timeZone: TZ });
+    state.historial.unshift({
+      id:         pedidoId,
+      cliente:    state.pedidoActivo.cliente,
+      telefono:   state.pedidoActivo.telefono,
+      direccion:  state.pedidoActivo.direccion,
+      total:      state.pedidoActivo.total,
+      metodoPago: state.pedidoActivo.metodoPago,
+      hora:       horaCancel,
+      fecha:      new Date().toLocaleDateString('es-CO', { timeZone: TZ }),
+      estado:     'Cancelado',
+      periodo:    'hoy'
+    });
+    if (_tabRouteLayer && _tabMap) { _tabMap.removeLayer(_tabRouteLayer); _tabRouteLayer = null; }
+    if (_tabRouteGlow  && _tabMap) { _tabMap.removeLayer(_tabRouteGlow);  _tabRouteGlow  = null; }
+    clearInterval(_tabMapInterval);
+    detenerNavegacion();
+    detenerChatPoll();
+    document.getElementById('wazeFloatBtn').style.display = 'none';
+    state.pedidoActivo = null;
+    state.estadoPedido = null;
+    destLatGlobal      = null;
+    destLngGlobal      = null;
+    document.getElementById('pedidoActivoPanel').style.display = 'none';
+    document.getElementById('sinPedidoEnRuta').style.display   = 'flex';
+    actualizarBadgesNav();
+    setTimeout(function() { switchTab('historial'); renderHistorial(); }, 500);
+  } else {
+    idsProcesados.delete(pedidoId);   /* revertir */
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-symbols-outlined" '
+        + 'style="font-size:15px;font-variation-settings:\'FILL\' 1">cancel</span> Cancelar pedido';
+    }
+    alert('No se pudo cancelar. Intenta de nuevo.');
   }
 }
 
