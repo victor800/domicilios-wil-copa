@@ -1165,49 +1165,6 @@ async function dibujarRutaOSRM(oriLat, oriLng, destLat, destLng) {
   }
 }
 
-async function cambiarEstadoPedido(nuevoEstado){
-  if(!state.pedidoActivo) return false;
-  try {
-    var horaActual = new Date().toLocaleTimeString('es-CO', {
-      hour:'2-digit', minute:'2-digit', timeZone: TZ
-    });
-
-    var payload = {
-      accion:    'asignar-domi',
-      pedidoId:  String(state.pedidoActivo.id).trim(),
-      domi:      domi.nombre,
-      estado:    nuevoEstado,
-      horaAsign: horaActual
-    };
-
-    if(nuevoEstado === 'En camino')  payload.horaCamino  = horaActual;
-    if(nuevoEstado === 'Entregado')  payload.horaEntrega = horaActual;
-
-    var r = await fetch(SCRIPT_URL_DOMI, {
-      method:  'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body:    JSON.stringify(payload),
-      signal:  AbortSignal.timeout(15000)
-    });
-    var d = await r.json();
-
-    // ← BUG CORREGIDO: verificar filasActualizadas además de ok
-    if(d.ok === false){
-      console.warn('[cambiarEstadoPedido] ok:false →', d.error);
-      return false;
-    }
-    if(d.filasActualizadas === 0){
-      console.warn('[cambiarEstadoPedido] filasActualizadas=0 para pedidoId:', payload.pedidoId,
-                   '— verificar que el ID existe en el sheet');
-      return false;
-    }
-    return true;
-
-  } catch(e) {
-    console.warn('[cambiarEstadoPedido] excepción:', e.message);
-    return false;
-  }
-}
 
 
 
@@ -1860,22 +1817,25 @@ async function fetchHistorialSheet() {
       var subtotalProds = 0;
       p._prods.forEach(function(pr) { subtotalProds += pr.vtotal || 0; });
  
-      items.push({
-        id:         p.id,
-        cliente:    p.cliente,
-        telefono:   p.telefono,
-        direccion:  p.direccion,
-        total:      p.total,
-        metodoPago: p.metodoPago,
-        hora:       p.horaEntrega || p.horaCamino || p.hora,
-        fecha:      p.fecha,
-        estado:     esEntregado ? 'Entregado' : 'Cancelado',
-        domicilio:  p.domicilio,
-        prods:      p._prods.length,
-        subtotal:   subtotalProds
-      });
+     var hoyStrLocal = new Date().toLocaleDateString('es-CO', { timeZone: TZ });
+var fechaPed = (p.horaEntrega || p.horaCamino || p.hora) ? p.fecha : '';
+
+items.push({
+  id:         p.id,
+  cliente:    p.cliente,
+  telefono:   p.telefono,
+  direccion:  p.direccion,
+  total:      p.total,
+  metodoPago: p.metodoPago,
+  hora:       p.horaEntrega || p.horaCamino || p.hora,
+  fecha:      p.fecha,
+  estado:     esEntregado ? 'Entregado' : 'Cancelado',
+  domicilio:  p.domicilio,   // ← CAMPO FALTABA
+  prods:      p._prods.length,
+  subtotal:   subtotalProds,
+  periodo:    (p.fecha === hoyStrLocal) ? 'hoy' : 'anterior'  // ← FALTABA
+});
     });
- 
     /* Más reciente primero — ordenar por fecha desc, luego hora desc */
     items.sort(function(a, b) {
       var fd = (b.fecha || '').localeCompare(a.fecha || '');
@@ -2730,7 +2690,11 @@ async function cambiarEstadoPedido(nuevoEstado) {
       });
       var d = await r.json();
       console.log('[cambiarEstado]', nuevoEstado, '→', d);
-      if (d.ok !== false) return true;   /* éxito */
+      // Éxito si ok=true, o si hay filasActualizadas>=1, o si no hay error explícito
+if (d.ok === true) return true;
+if (d.filasActualizadas >= 1) return true;
+if (d.ok === false && d.error) { console.warn('[cambiarEstado] error sheet:', d.error); continue; }
+return true; // sin error explícito = éxito
     } catch(e) {
       console.warn('[cambiarEstado] intento', intento + 1, e.message);
       if (intento === 0) await new Promise(function(res){ setTimeout(res, 2000); });
@@ -2740,6 +2704,9 @@ async function cambiarEstadoPedido(nuevoEstado) {
 }
 
 function marcarEncamino() {
+    console.log('[marcarEncamino] pedidoId:', state.pedidoActivo && state.pedidoActivo.id,
+              '| domi:', domi.nombre, '| estado: En camino');
+  setStepLoading(true, 'Guardando…');
   setStepLoading(true, 'Guardando…');
   cambiarEstadoPedido('En camino').then(function(ok) {
     if (!ok) {
@@ -2761,6 +2728,8 @@ function marcarEncamino() {
 }
 
 function marcarEntregado() {
+  console.log('[marcarEntregado] pedidoId:', state.pedidoActivo && state.pedidoActivo.id,
+              '| domi:', domi.nombre, '| estado: Entregado');
   if (!state.pedidoActivo) return;
 
   var horaReal  = new Date().toLocaleTimeString('es-CO',
@@ -3221,15 +3190,17 @@ function _normEst(s) {
 
 /* Convierte fila agrupada al formato de la app */
 function _cvtPed(p) {
+  var hoyStrCvt = new Date().toLocaleDateString('es-CO', { timeZone: TZ });
   return {
     ...p,
     estado:    p.estado,
     tipo:      'farmacia',
-    productos: (p._prods||[]).map(x=>x.nom).join(';'),
-    cantidad:  (p._prods||[]).map(x=>x.qty).join(';'),
+    productos: (p._prods||[]).map(function(x){ return x.nom; }).join(';'),
+    cantidad:  (p._prods||[]).map(function(x){ return x.qty; }).join(';'),
+    domicilio: p.domicilio || p.domicilioVal || '',    // ← asegurar que pase
+    periodo:   (p.fecha === hoyStrCvt) ? 'hoy' : 'anterior'  // ← para historial inline
   };
 }
-
 /* Parser CSV robusto */
 function _parsearCSV(text) {
   return text.trim().split('\n').filter(Boolean).slice(1).map(line => {
