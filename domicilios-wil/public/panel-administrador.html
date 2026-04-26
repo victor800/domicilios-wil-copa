@@ -126,6 +126,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .stag.proceso{background:var(--blue-l);color:var(--blue);}
 .stag.asignado{background:#ede9fe;color:#6d28d9;}
 .stag.entregado{background:var(--green-l);color:var(--green);}
+.stag.encamino{background:#ede9fe;color:#7c3aed;}
 
 .tbar{height:5px;border-radius:99px;background:var(--bg2);overflow:hidden;}
 .tbarf{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--teal),var(--teal-d));}
@@ -1050,7 +1051,8 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
   <div class="tab"     data-f="pendiente" onclick="filterPed('pendiente',this)">Pendientes</div>
   <div class="tab"     data-f="asignado"  onclick="filterPed('asignado',this)">Asignados</div>
   <div class="tab"     data-f="proceso"   onclick="filterPed('proceso',this)">En proceso</div>
-  <div class="tab"     data-f="entregado" onclick="filterPed('entregado',this)">Entregados</div>
+<div class="tab"     data-f="encamino"  onclick="filterPed('encamino',this)">En camino</div>
+<div class="tab"     data-f="entregado" onclick="filterPed('entregado',this)">Entregados</div>
 </div>
  
     <!-- Separador -->
@@ -2181,9 +2183,10 @@ function col(a, i) { return (a[i] || '').trim(); }
 
 function normEstado(s) {
   const v = s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  if (v.includes('entregad')) return 'entregado';
-  if (v.includes('asignad')) return 'asignado';        // ← NUEVO
-  if (v.includes('proceso') || v.includes('ruta') || v.includes('camino')) return 'proceso';
+  if (v.includes('entregad'))                               return 'entregado';
+  if (v.includes('asignad'))                                return 'asignado';
+  if (v.includes('camino'))                                 return 'encamino';   // ← NUEVO
+  if (v.includes('proceso') || v.includes('ruta'))          return 'proceso';
   return 'pendiente';
 }
 
@@ -4857,8 +4860,9 @@ function renderPedidosTable(filter) {
   const tipoSel = (document.getElementById('ped-tipo-filter')?.value || '').trim();
  
   let list = filter === 'pendiente' ? allPedidos.filter(p => p.estado === 'pendiente')
-         : filter === 'asignado'  ? allPedidos.filter(p => p.estado === 'asignado')   // ← NUEVO
+         : filter === 'asignado'  ? allPedidos.filter(p => p.estado === 'asignado')
          : filter === 'proceso'   ? allPedidos.filter(p => p.estado === 'proceso')
+         : filter === 'encamino'  ? allPedidos.filter(p => p.estado === 'encamino')  // ← NUEVO
          : filter === 'entregado' ? allPedidos.filter(p => p.estado === 'entregado')
          : allPedidos;
  
@@ -4906,10 +4910,11 @@ function renderPedidosTable(filter) {
     </td>
     <td>
       <span class="stag ${p.estado}">${
-        p.estado === 'entregado' ? 'Entregado ✓' :
-        p.estado === 'proceso'   ? 'En proceso'  :
-        p.estado === 'asignado'  ? '✦ Asignado'  :
-        'Pendiente'
+       p.estado === 'entregado' ? 'Entregado ✓' :
+p.estado === 'proceso'   ? 'En proceso'  :
+p.estado === 'encamino'  ? '🛵 En camino' :  // ← NUEVO
+p.estado === 'asignado'  ? '✦ Asignado'  :
+'Pendiente'
       }</span>
     </td>
     <td style="font-size:11px;color:var(--text2);">${p.comercio || '–'}</td>
