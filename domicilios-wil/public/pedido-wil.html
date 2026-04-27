@@ -1010,7 +1010,7 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 </main>
 
 <nav class="bnav">
-  <button class="bi" onclick="window.location.href='pedido-wil.html'"><span class="sym">home</span><span class="bi-lbl">Inicio</span></button>
+  <button class="bi" onclick="window.location.href='index.html'"><span class="sym">home</span><span class="bi-lbl">Inicio</span></button>
   <button class="bi active" id="nav-pedir" onclick="navTo('pedir')"><span class="sym f">shopping_bag</span><span class="bi-lbl">Pedir</span></button>
   <button class="bi" id="nav-rastrear" onclick="navTo('rastrear')"><span class="sym">search</span><span class="bi-lbl">Rastrear</span></button>
   <button class="bi" onclick="window.location.href='soporte.html'"><span class="sym">person</span><span class="bi-lbl">Soporte</span></button>
@@ -2094,7 +2094,6 @@ async function rastrearPedido(){
       (p.estado === 'Entregado') ? 'block' : 'none';
 
     cliActivarChat(p);
-    mostrarChatFab(p);
     window.scrollTo({ top: 0, behavior: 'smooth' });
     rtIniciarPolling();
   } catch(e) {
@@ -2262,7 +2261,8 @@ async function _rtPollCiclo() {
     }
 
   } catch(e){
-    console.warn('[poll]', e.message);
+    console.warn('[poll error — ciclo ignorado]', e.message);
+    /* No relanzar — el setInterval sigue corriendo */
   }
 }
 
@@ -2274,7 +2274,14 @@ function rtDetenerPolling(){
   clearInterval(_rtPollTimer);
 }
 
-
+function mostrarChatFab(p){
+  var fab = document.getElementById('chatFab');
+  if(fab && p && p.domiciliario) fab.style.display = 'block';
+  else if(fab) fab.style.display = 'none';
+}
+function cerrarChatModal(){}
+function abrirChatModal(){}
+function chatModalEnviar(){}
 
 
 async function verificarHorarioCliente() {
