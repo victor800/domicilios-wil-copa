@@ -546,31 +546,55 @@ body{min-height:100dvh;font-family:'Inter',sans-serif;background:#f8f9fa;color:#
 <div class="mt-4">
   <h3 class="font-head text-lg font-extrabold text-primary mb-3">Mis Entregas</h3>
  
-  <!-- FILTRO FECHA -->
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-    <div style="flex:1;display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid rgba(0,105,112,.2);border-radius:14px;padding:8px 13px;cursor:pointer" onclick="document.getElementById('histFechaInput').showPicker ? document.getElementById('histFechaInput').showPicker() : document.getElementById('histFechaInput').click()">
-      <span class="material-symbols-outlined" style="font-size:18px;color:#006970;font-variation-settings:'FILL' 1">calendar_month</span>
-      <span style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:13px;color:#191c1d" id="histFechaLabel">Hoy</span>
-      <input type="date" id="histFechaInput" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0" oninput="onHistFechaChange(this.value)">
-    </div>
-    <button onclick="onHistFechaChange('')" style="padding:8px 14px;background:rgba(0,105,112,.08);border:1.5px solid rgba(0,105,112,.15);border-radius:12px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:11px;color:#006970;cursor:pointer;white-space:nowrap">
-      Todas
+  <!-- FILTRO: select + calendario -->
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <select id="histSelectFiltro" onchange="onHistSelectChange(this.value)"
+      style="flex:1;padding:8px 12px;border:1.5px solid rgba(0,105,112,.22);border-radius:12px;
+      font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:12px;
+      color:#006970;background:#fff;cursor:pointer;outline:none;appearance:none;
+      -webkit-appearance:none;background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23006970%22 stroke-width=%222%22><polyline points=%226 9 12 15 18 9%22/></svg>');
+      background-repeat:no-repeat;background-position:right 10px center;background-size:16px;
+      padding-right:32px">
+      <option value="hoy">🗓 Hoy</option>
+      <option value="ayer">📅 Ayer</option>
+      <option value="5dias">🗂 Últimos 5 días</option>
+      <option value="mes">📆 Último mes</option>
+      <option value="todas">📋 Todas</option>
+    </select>
+    <button onclick="document.getElementById('histCalInput').showPicker ? document.getElementById('histCalInput').showPicker() : document.getElementById('histCalInput').click()"
+      title="Elegir fecha específica"
+      style="width:40px;height:40px;border-radius:12px;border:1.5px solid rgba(0,105,112,.22);
+      background:#fff;display:flex;align-items:center;justify-content:center;
+      cursor:pointer;flex-shrink:0;position:relative">
+      <span class="material-symbols-outlined" style="font-size:19px;color:#006970;font-variation-settings:'FILL' 1">calendar_month</span>
+      <input type="date" id="histCalInput" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none" oninput="onHistCalChange(this.value)">
     </button>
   </div>
  
+  <!-- Label fecha específica (visible solo cuando se elige desde calendario) -->
+  <div id="histFechaChip" style="display:none;margin-bottom:10px">
+    <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(0,105,112,.08);border:1px solid rgba(0,105,112,.2);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:800;color:#006970;font-family:'Plus Jakarta Sans',sans-serif">
+      <span class="material-symbols-outlined" style="font-size:13px">event</span>
+      <span id="histFechaChipTxt"></span>
+      <button onclick="limpiarFechaEspecifica()" style="background:none;border:none;cursor:pointer;display:flex;align-items:center;padding:0;color:#006970;margin-left:2px">
+        <span class="material-symbols-outlined" style="font-size:13px">close</span>
+      </button>
+    </span>
+  </div>
+ 
   <!-- STATS -->
-  <div style="display:flex;gap:8px;margin-bottom:14px">
-    <div style="flex:1;background:#fff;border-radius:16px;padding:11px;text-align:center;border:1px solid rgba(0,105,112,.1);box-shadow:0 1px 6px rgba(0,0,0,.05)">
-      <p class="font-head font-extrabold text-xl text-primary" id="histTotalEntregas">0</p>
-      <p style="font-size:9px;color:#6c7a7b;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-top:2px">Total</p>
+  <div style="display:flex;gap:7px;margin-bottom:12px">
+    <div style="flex:1;background:#fff;border-radius:14px;padding:9px 8px;text-align:center;border:1px solid rgba(0,105,112,.1);box-shadow:0 1px 6px rgba(0,0,0,.05)">
+      <p style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:900;font-size:18px;color:#006970;margin:0" id="histTotalEntregas">0</p>
+      <p style="font-size:9px;color:#6c7a7b;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:2px 0 0">Total</p>
     </div>
-    <div style="flex:1;background:#fff;border-radius:16px;padding:11px;text-align:center;border:1px solid rgba(42,157,92,.15);box-shadow:0 1px 6px rgba(0,0,0,.05)">
-      <p class="font-head font-extrabold text-xl" style="color:#2a9d5c" id="histEntHoy">0</p>
-      <p style="font-size:9px;color:#6c7a7b;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-top:2px">Hoy</p>
+    <div style="flex:1;background:#fff;border-radius:14px;padding:9px 8px;text-align:center;border:1px solid rgba(42,157,92,.15);box-shadow:0 1px 6px rgba(0,0,0,.05)">
+      <p style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:900;font-size:18px;color:#2a9d5c;margin:0" id="histEntHoy">0</p>
+      <p style="font-size:9px;color:#6c7a7b;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:2px 0 0">Hoy</p>
     </div>
-    <div style="flex:1;background:#fff;border-radius:16px;padding:11px;text-align:center;border:1px solid rgba(245,158,11,.15);box-shadow:0 1px 6px rgba(0,0,0,.05)">
-      <p class="font-head font-extrabold text-xl" style="color:#d97706" id="histGananciaDia">$0</p>
-      <p style="font-size:9px;color:#6c7a7b;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-top:2px">Domicilios hoy</p>
+    <div style="flex:1;background:#fff;border-radius:14px;padding:9px 8px;text-align:center;border:1px solid rgba(245,158,11,.15);box-shadow:0 1px 6px rgba(0,0,0,.05)">
+      <p style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:13px;color:#d97706;margin:0;line-height:1.25" id="histGananciaDia">$0</p>
+      <p style="font-size:9px;color:#6c7a7b;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:2px 0 0">Domicilios hoy</p>
     </div>
   </div>
  
@@ -910,6 +934,9 @@ var _tabRouteGlow   = null;
 var _ultimoConteoNotif = -1; // -1 = nunca notificado
 var _histFechaFiltro = ''; // '' = todas | 'YYYY-MM-DD' = día específico | 'HOY' = hoy
 var _histDrawersAbiertos = new Set(); // persiste entre re-renders
+var _histModo        = 'hoy';  // 'hoy'|'ayer'|'5dias'|'mes'|'todas'
+var _histFechaEsp    = '';     // 'YYYY-MM-DD' cuando viene del calendario
+var _histDrawersAbiertos = new Set();
 
 const SHEET_ID_DOMI   = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
 const SCRIPT_URL_DOMI = 'https://script.google.com/macros/s/AKfycbzr1YMVygPn28IburByI2FrnMlFcOf5XBi9HIeT2TZVRjFMXHGSuoCuwxwBTMdmRjw7uA/exec';
@@ -1307,9 +1334,9 @@ function actualizarBadgesNav(){
   if(cnt>0){nb.textContent=cnt>9?'9+':cnt;nb.style.display='flex';}else nb.style.display='none';
   var rb=document.getElementById('navRutaBadge');
   if(state.pedidoActivo){rb.textContent='1';rb.style.display='flex';}else rb.style.display='none';
-  var hb=document.getElementById('navHistBadge');
-     var entregadosTot=state.historial.filter(function(h){return h.estado==='Entregado';});
-     if(entregadosTot.length>0){hb.textContent=entregadosTot.length>99?'99+':entregadosTot.length;hb.style.display='flex';}else hb.style.display='none';
+ var hb=document.getElementById('navHistBadge');
+     var _entTot=state.historial.filter(function(h){return h.estado==='Entregado';});
+     if(_entTot.length>0){hb.textContent=_entTot.length>99?'99+':_entTot.length;hb.style.display='flex';}else hb.style.display='none';
 }
 
 /* Actualizar App Badge (ícono de la PWA instalada) */
@@ -1899,7 +1926,8 @@ items.push({
   domicilio:  p.domicilio,   // ← CAMPO FALTABA
   prods:      p._prods.length,
   subtotal:   subtotalProds,
-  periodo:    (p.fecha === hoyStrLocal) ? 'hoy' : 'anterior'  // ← FALTABA
+  periodo:    (p.fecha === hoyStrLocal) ? 'hoy' : 'anterior', // ← FALTABA
+  _prods: p._prods || []
 });
     });
     /* Más reciente primero — ordenar por fecha desc, luego hora desc */
@@ -2923,6 +2951,70 @@ function toggleDetalleHist(hid) {
   }
 }
 
+/* Convierte fecha es-CO "D/M/YYYY" o "DD/MM/YYYY" → "YYYY-MM-DD" */
+function _fechaAYMD(f) {
+  if (!f) return '';
+  var p = String(f).split('/');
+  if (p.length === 3 && p[2].length === 4)
+    return p[2] + '-' + p[1].padStart(2,'0') + '-' + p[0].padStart(2,'0');
+  return f; // ya viene en YYYY-MM-DD
+}
+ 
+/* Fecha hace N días en YYYY-MM-DD */
+function _haceNDias(n) {
+  var d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0,10);
+}
+ 
+function onHistSelectChange(val) {
+  _histModo     = val;
+  _histFechaEsp = '';
+  document.getElementById('histFechaChip').style.display = 'none';
+  document.getElementById('histCalInput').value = '';
+  renderHistorial();
+}
+ 
+function onHistCalChange(val) {
+  if (!val) return;
+  _histFechaEsp = val; // YYYY-MM-DD
+  _histModo     = '';
+  // Mostrar chip
+  var chip = document.getElementById('histFechaChip');
+  var txt  = document.getElementById('histFechaChipTxt');
+  if (chip) chip.style.display = 'block';
+  if (txt) {
+    var p = val.split('-');
+    txt.textContent = p[2] + '/' + p[1] + '/' + p[0];
+  }
+  renderHistorial();
+}
+ 
+function limpiarFechaEspecifica() {
+  _histFechaEsp = '';
+  _histModo     = 'hoy';
+  document.getElementById('histFechaChip').style.display = 'none';
+  document.getElementById('histCalInput').value = '';
+  document.getElementById('histSelectFiltro').value = 'hoy';
+  renderHistorial();
+}
+ 
+function toggleDetalleHist(hid) {
+  var drawer = document.getElementById('hdrw_' + hid);
+  var btn    = document.getElementById('hdbtn_' + hid);
+  if (!drawer) return;
+  var isOpen = drawer.classList.contains('open');
+  if (isOpen) {
+    drawer.classList.remove('open');
+    if (btn) { btn.querySelector('.vd-txt').textContent = 'Ver detalles'; btn.classList.remove('open'); }
+    _histDrawersAbiertos.delete(hid);
+  } else {
+    drawer.classList.add('open');
+    if (btn) { btn.querySelector('.vd-txt').textContent = 'Ocultar'; btn.classList.add('open'); }
+    _histDrawersAbiertos.add(hid);
+  }
+}
+
 
 /* ═══════════════════ HISTORIAL ═══════════════════ */
 function renderHistorial() {
@@ -2934,13 +3026,13 @@ function renderHistorial() {
   lista.innerHTML = '';
   if (loader) loader.style.display = 'none';
  
-  var hoyStr = new Date().toLocaleDateString('es-CO', { timeZone: TZ }); // "DD/MM/YYYY"
-  var hoyYMD = _fechaAYMD(hoyStr); // "YYYY-MM-DD"
+  var hoyStr = new Date().toLocaleDateString('es-CO', { timeZone: TZ });
+  var hoyYMD = _fechaAYMD(hoyStr);
  
   /* ── Stats siempre sobre TODOS los entregados ── */
   var todosEntregados = state.historial.filter(function(h) { return h.estado === 'Entregado'; });
-  var hoyEnt = todosEntregados.filter(function(h) { return _fechaAYMD(h.fecha) === hoyYMD; });
-  var ganHoy = 0;
+  var hoyEnt  = todosEntregados.filter(function(h) { return _fechaAYMD(h.fecha) === hoyYMD; });
+  var ganHoy  = 0;
   hoyEnt.forEach(function(h) { ganHoy += parseCOP(h.domicilio || '0'); });
  
   var elTotal = document.getElementById('histTotalEntregas');
@@ -2955,7 +3047,7 @@ function renderHistorial() {
   if (elStatH) elStatH.textContent = hoyEnt.length;
   if (elStatE) elStatE.textContent = todosEntregados.length;
  
-  /* Badge nav — solo entregados */
+  /* Badge nav */
   var hb = document.getElementById('navHistBadge');
   if (hb) {
     var n = todosEntregados.length;
@@ -2963,10 +3055,15 @@ function renderHistorial() {
     else hb.style.display = 'none';
   }
  
-  /* ── Filtrar según fecha elegida ── */
+  /* ── Aplicar filtro ── */
   var items = state.historial.filter(function(h) {
-    if (!_histFechaFiltro) return true; // todas
-    return _fechaAYMD(h.fecha) === _histFechaFiltro;
+    var fYMD = _fechaAYMD(h.fecha);
+    if (_histFechaEsp) return fYMD === _histFechaEsp;
+    if (_histModo === 'hoy')   return fYMD === hoyYMD;
+    if (_histModo === 'ayer')  return fYMD === _haceNDias(1);
+    if (_histModo === '5dias') return fYMD >= _haceNDias(4) && fYMD <= hoyYMD;
+    if (_histModo === 'mes')   return fYMD >= _haceNDias(29) && fYMD <= hoyYMD;
+    return true; // todas
   });
  
   if (!items.length) {
@@ -2989,129 +3086,151 @@ function renderHistorial() {
   };
  
   orden.forEach(function(fecha) {
-    var fechaYMD  = _fechaAYMD(fecha);
-    var esHoy     = fechaYMD === hoyYMD;
-    var labelF    = esHoy ? '🗓 Hoy — ' + fecha : '📅 ' + fecha;
-    var entGrupo  = grupos[fecha].filter(function(h) { return h.estado === 'Entregado'; });
-    var ganGrupo  = 0;
+    var fechaYMD = _fechaAYMD(fecha);
+    var esHoy    = fechaYMD === hoyYMD;
+    var labelF   = esHoy ? '🗓 Hoy — ' + fecha : '📅 ' + fecha;
+    var entGrupo = grupos[fecha].filter(function(h) { return h.estado === 'Entregado'; });
+    var ganGrupo = 0;
     entGrupo.forEach(function(h) { ganGrupo += parseCOP(h.domicilio || '0'); });
  
     /* Separador fecha */
     lista.insertAdjacentHTML('beforeend',
       '<div style="display:flex;align-items:center;gap:8px;margin:14px 0 10px">'
         + '<div style="flex:1;height:1px;background:#e7e8e9"></div>'
-        + '<div style="background:#f3f4f5;border-radius:20px;padding:4px 12px;display:flex;align-items:center;gap:6px;flex-shrink:0">'
+        + '<div style="background:#f3f4f5;border-radius:20px;padding:3px 11px;display:flex;align-items:center;gap:5px;flex-shrink:0">'
           + '<span style="font-size:10px;font-weight:800;color:#6c7a7b;font-family:\'Plus Jakarta Sans\',sans-serif">' + escHtml(labelF) + '</span>'
-          + (entGrupo.length > 0 ? '<span style="background:#2a9d5c;color:#fff;font-size:9px;font-weight:800;padding:1px 7px;border-radius:20px">' + entGrupo.length + ' ✓</span>' : '')
-          + (ganGrupo > 0 ? '<span style="background:#e8f5e9;color:#2a9d5c;font-size:9px;font-weight:800;padding:1px 7px;border-radius:20px">' + fmtCOP(ganGrupo) + '</span>' : '')
+          + (entGrupo.length > 0 ? '<span style="background:#2a9d5c;color:#fff;font-size:9px;font-weight:800;padding:1px 6px;border-radius:20px">' + entGrupo.length + ' ✓</span>' : '')
+          + (ganGrupo > 0 ? '<span style="background:#e8f5e9;color:#2a9d5c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:20px">' + fmtCOP(ganGrupo) + '</span>' : '')
         + '</div>'
         + '<div style="flex:1;height:1px;background:#e7e8e9"></div>'
       + '</div>'
     );
  
-    /* Cards */
     grupos[fecha].forEach(function(h) {
-      var cfg      = cfgEst[h.estado] || cfgEst['Entregado'];
-      var dir      = (h.direccion || '—').replace(/\s*\[.+?\]/, '').replace(/\s*\(Ref:[^)]+\)/, '').trim().substring(0, 55);
-      var esTrans  = (h.metodoPago || '').toLowerCase().includes('transfer');
-      var totalNum = parseCOP(h.total);
-      var domiNum  = parseCOP(h.domicilio || '0');
-      var telLimpio = (h.telefono || '').replace(/\D/g, '');
-      var cliente  = h.cliente || '—';
-      var hid      = 'h' + (h.id || '').replace(/[^a-z0-9]/gi, '') + '_' + fecha.replace(/\D/g,'');
+      var cfg       = cfgEst[h.estado] || cfgEst['Entregado'];
+      var dir       = (h.direccion || '—').replace(/\s*\[.+?\]/,'').replace(/\s*\(Ref:[^)]+\)/,'').trim().substring(0,50);
+      var esTrans   = (h.metodoPago || '').toLowerCase().includes('transfer');
+      var totalNum  = parseCOP(h.total);
+      var domiNum   = parseCOP(h.domicilio || '0');
+      var telLimpio = (h.telefono || '').replace(/\D/g,'');
+      var cliente   = h.cliente || '—';
+      var hid       = 'h' + (h.id || '').replace(/[^a-z0-9]/gi,'') + '_' + fecha.replace(/\D/g,'');
  
-      /* ¿Estaba el drawer abierto antes del re-render? */
       var estabaAbierto = _histDrawersAbiertos.has(hid);
       var drawerClass   = 'card-detail-drawer' + (estabaAbierto ? ' open' : '');
       var btnClass      = 'ver-detalle-btn' + (estabaAbierto ? ' open' : '');
       var btnTxt        = estabaAbierto ? 'Ocultar' : 'Ver detalles';
  
-      /* Contenido del drawer (detalles completos) */
+      /* ── Productos para el drawer ── */
+      var prodsHtml = '';
+      if (h._prods && h._prods.length) {
+        var filas = h._prods.map(function(pr) {
+          var nm = pr.nom || pr.nombre || '';
+          var qty = pr.qty || 1;
+          var vt  = pr.vtotal || (pr.vu * qty) || 0;
+          return '<div style="display:grid;grid-template-columns:1fr 32px 60px;gap:4px;padding:5px 0;border-bottom:1px solid #f0f4f5;align-items:start">'
+            + '<span style="font-size:11px;font-weight:700;color:#191c1d;line-height:1.3;word-break:break-word">' + escHtml(nm) + '</span>'
+            + '<span style="font-size:10px;font-weight:800;background:#e8f5e9;color:#2a9d5c;border-radius:20px;padding:1px 5px;text-align:center;white-space:nowrap;align-self:start;margin-top:1px">' + qty + '</span>'
+            + '<span style="font-size:11px;font-weight:800;color:#006970;text-align:right;white-space:nowrap;align-self:start;margin-top:1px">' + (vt > 0 ? fmtCOP(vt) : '') + '</span>'
+            + '</div>';
+        }).join('');
+        prodsHtml =
+          '<div style="background:#f0fff4;border-radius:12px;padding:9px 11px;margin-bottom:9px;border:1px solid rgba(42,157,92,.15)">'
+            + '<p style="font-size:9px;font-weight:800;text-transform:uppercase;color:#9eaaac;margin:0 0 6px;letter-spacing:.05em">💊 Productos</p>'
+            + '<div>'
+              + '<div style="display:grid;grid-template-columns:1fr 32px 60px;gap:4px;padding:0 0 4px;border-bottom:1px solid rgba(42,157,92,.2);margin-bottom:2px">'
+                + '<span style="font-size:9px;font-weight:800;color:#9eaaac;text-transform:uppercase">Producto</span>'
+                + '<span style="font-size:9px;font-weight:800;color:#9eaaac;text-transform:uppercase;text-align:center">Cant</span>'
+                + '<span style="font-size:9px;font-weight:800;color:#9eaaac;text-transform:uppercase;text-align:right">Precio</span>'
+              + '</div>'
+              + filas
+            + '</div>'
+          + '</div>';
+      }
+ 
+      /* ── Contenido del drawer ── */
       var detalleHtml =
-        /* Dirección completa */
-        '<div style="display:flex;align-items:flex-start;gap:7px;background:#f8f9fa;border-radius:12px;padding:9px 11px;margin-bottom:10px;border:1px solid rgba(76,86,175,.12)">'
-          + '<span class="material-symbols-outlined" style="font-size:14px;color:#4c56af;flex-shrink:0;margin-top:1px;font-variation-settings:\'FILL\' 1">location_on</span>'
-          + '<div><p style="font-size:9px;font-weight:800;text-transform:uppercase;color:#9eaaac;margin:0 0 2px">Dirección</p>'
-          + '<p style="font-size:12px;font-weight:700;color:#191c1d;line-height:1.4;word-break:break-word;margin:0">' + escHtml(h.direccion || '—') + '</p></div>'
+        /* Dirección */
+        '<div style="display:flex;align-items:flex-start;gap:6px;background:#f8f9fa;border-radius:10px;padding:8px 10px;margin-bottom:9px;border:1px solid rgba(76,86,175,.1)">'
+          + '<span class="material-symbols-outlined" style="font-size:13px;color:#4c56af;flex-shrink:0;margin-top:1px;font-variation-settings:\'FILL\' 1">location_on</span>'
+          + '<div><p style="font-size:9px;font-weight:800;text-transform:uppercase;color:#9eaaac;margin:0 0 1px">Dirección</p>'
+          + '<p style="font-size:11px;font-weight:700;color:#191c1d;line-height:1.4;word-break:break-word;margin:0">' + escHtml(h.direccion || '—') + '</p></div>'
         + '</div>'
+        /* Productos */
+        + prodsHtml
         /* Chips financieros */
-        + '<div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px">'
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px">'
           + (totalNum > 0
-            ? '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:12px;padding:7px 11px;flex:1;min-width:65px;text-align:center">'
-              + '<p style="font-size:9px;font-weight:700;color:#2a9d5c;text-transform:uppercase;margin:0 0 2px">Total</p>'
-              + '<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:15px;font-weight:900;color:#006970;margin:0">' + fmtCOP(totalNum) + '</p>'
+            ? '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:6px 9px;flex:1;min-width:60px;text-align:center">'
+              + '<p style="font-size:9px;font-weight:700;color:#2a9d5c;text-transform:uppercase;margin:0 0 1px">Total</p>'
+              + '<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:13px;font-weight:900;color:#006970;margin:0">' + fmtCOP(totalNum) + '</p>'
               + '</div>' : '')
           + (domiNum > 0
-            ? '<div style="background:#e8f5e9;border:1px solid #86efac;border-radius:12px;padding:7px 11px;flex:1;min-width:65px;text-align:center">'
-              + '<p style="font-size:9px;font-weight:700;color:#2a9d5c;text-transform:uppercase;margin:0 0 2px">🛵 Domicilio</p>'
-              + '<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:15px;font-weight:900;color:#2a9d5c;margin:0">' + fmtCOP(domiNum) + '</p>'
+            ? '<div style="background:#e8f5e9;border:1px solid #86efac;border-radius:10px;padding:6px 9px;flex:1;min-width:60px;text-align:center">'
+              + '<p style="font-size:9px;font-weight:700;color:#2a9d5c;text-transform:uppercase;margin:0 0 1px">🛵 Domi</p>'
+              + '<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:13px;font-weight:900;color:#2a9d5c;margin:0">' + fmtCOP(domiNum) + '</p>'
               + '</div>' : '')
-          + '<div style="background:#f3f4f5;border:1px solid #e7e8e9;border-radius:12px;padding:7px 11px;flex:1;min-width:65px;text-align:center">'
-            + '<p style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase;margin:0 0 2px">Pago</p>'
-            + '<p style="font-size:12px;font-weight:800;color:#191c1d;margin:0">' + (esTrans ? '🏦 Transf.' : '💵 Efectivo') + '</p>'
+          + '<div style="background:#f3f4f5;border:1px solid #e7e8e9;border-radius:10px;padding:6px 9px;flex:1;min-width:60px;text-align:center">'
+            + '<p style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase;margin:0 0 1px">Pago</p>'
+            + '<p style="font-size:11px;font-weight:800;color:#191c1d;margin:0">' + (esTrans ? '🏦 Transf.' : '💵 Efectivo') + '</p>'
           + '</div>'
-          + (h.prods > 0
-            ? '<div style="background:#f3f4f5;border:1px solid #e7e8e9;border-radius:12px;padding:7px 11px;flex:1;min-width:50px;text-align:center">'
-              + '<p style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase;margin:0 0 2px">Prods</p>'
-              + '<p style="font-size:14px;font-weight:900;color:#006970;margin:0">' + h.prods + '</p>'
-              + '</div>' : '')
         + '</div>'
-        /* Hora y fecha */
-        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
-          + '<span style="font-size:11px;font-weight:700;color:#6c7a7b">' + (h.hora || '—') + '</span>'
+        /* Hora */
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">'
+          + '<span style="font-size:10px;font-weight:700;color:#6c7a7b">' + (h.hora || '—') + '</span>'
           + '<span style="font-size:10px;color:#9eaaac">' + escHtml(h.fecha || '') + '</span>'
         + '</div>'
-        /* Acciones: llamar */
+        /* Llamar */
         + '<a href="tel:' + escHtml(h.telefono || '') + '"'
-          + ' style="display:flex;align-items:center;justify-content:center;gap:6px;background:#f3f4f5;border:1.5px solid #e7e8e9;border-radius:12px;padding:10px;text-decoration:none;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:12px;color:#3c494b;margin-bottom:8px">'
-          + '<span class="material-symbols-outlined" style="font-size:15px;font-variation-settings:\'FILL\' 1;color:#006970">call</span>'
-          + 'Llamar al cliente'
+          + ' style="display:flex;align-items:center;justify-content:center;gap:5px;background:#f3f4f5;border:1.5px solid #e7e8e9;border-radius:10px;padding:9px;text-decoration:none;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:11px;color:#3c494b;margin-bottom:7px">'
+          + '<span class="material-symbols-outlined" style="font-size:14px;font-variation-settings:\'FILL\' 1;color:#006970">call</span>'
+          + 'Llamar'
         + '</a>'
-        /* Cerrar detalles */
+        /* Cerrar */
         + '<button onclick="toggleDetalleHist(\'' + hid + '\')"'
-          + ' style="width:100%;padding:9px;background:transparent;border:1.5px dashed rgba(0,105,112,.25);border-radius:12px;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:11px;color:#006970;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px">'
-          + '<span class="material-symbols-outlined" style="font-size:13px">expand_less</span>'
-          + 'Cerrar detalles'
+          + ' style="width:100%;padding:8px;background:transparent;border:1.5px dashed rgba(0,105,112,.25);border-radius:10px;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:11px;color:#006970;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px">'
+          + '<span class="material-symbols-outlined" style="font-size:12px">expand_less</span>'
+          + 'Cerrar'
         + '</button>';
  
       lista.insertAdjacentHTML('beforeend',
-        '<div class="card-in" style="background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.06);border:1.5px solid ' + cfg.border + ';margin-bottom:10px">'
+        '<div class="card-in" style="background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.06);border:1.5px solid ' + cfg.border + ';margin-bottom:9px">'
  
-          /* ── RESUMEN siempre visible ── */
-          + '<div style="padding:12px 14px">'
-            /* Fila: cliente + hora + estado */
-            + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
-              + '<div style="width:36px;height:36px;border-radius:50%;background:' + cfg.color + ';display:flex;align-items:center;justify-content:center;flex-shrink:0">'
-                + '<span class="material-symbols-outlined" style="font-size:16px;color:#fff;font-variation-settings:\'FILL\' 1">' + cfg.icon + '</span>'
+          /* RESUMEN */
+          + '<div style="padding:11px 13px">'
+            /* Fila cliente */
+            + '<div style="display:flex;align-items:center;gap:7px;margin-bottom:9px">'
+              + '<div style="width:34px;height:34px;border-radius:50%;background:' + cfg.color + ';display:flex;align-items:center;justify-content:center;flex-shrink:0">'
+                + '<span class="material-symbols-outlined" style="font-size:15px;color:#fff;font-variation-settings:\'FILL\' 1">' + cfg.icon + '</span>'
               + '</div>'
               + '<div style="flex:1;min-width:0">'
-                + '<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:13px;color:#191c1d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0">' + escHtml(cliente) + '</p>'
-                + '<p style="font-size:10px;color:#6c7a7b;margin:1px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(dir) + '</p>'
+                + '<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:12px;color:#191c1d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0">' + escHtml(cliente) + '</p>'
+                + '<p style="font-size:10px;color:#6c7a7b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:1px 0 0">' + escHtml(dir) + '</p>'
               + '</div>'
-              + '<div style="text-align:right;flex-shrink:0">'
-                + '<span style="font-size:10px;font-weight:800;color:' + cfg.color + ';background:#fff;padding:3px 10px;border-radius:20px;font-family:\'Plus Jakarta Sans\',sans-serif;border:1.5px solid ' + cfg.border + '">' + cfg.emoji + ' ' + cfg.label + '</span>'
-                + (totalNum > 0 ? '<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:12px;font-weight:900;color:#006970;margin:4px 0 0">' + fmtCOP(totalNum) + '</p>' : '')
+              + '<div style="flex-shrink:0;text-align:right">'
+                + '<span style="font-size:9px;font-weight:800;color:' + cfg.color + ';background:#fff;padding:2px 8px;border-radius:20px;font-family:\'Plus Jakarta Sans\',sans-serif;border:1.5px solid ' + cfg.border + ';white-space:nowrap">' + cfg.emoji + ' ' + cfg.label + '</span>'
+                + (totalNum > 0 ? '<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:11px;font-weight:900;color:#006970;margin:3px 0 0">' + fmtCOP(totalNum) + '</p>' : '')
               + '</div>'
             + '</div>'
-            /* Fila: WhatsApp + Ver detalles */
-            + '<div style="display:flex;gap:8px;align-items:stretch">'
+            /* Botones: WhatsApp + Ver detalles */
+            + '<div style="display:flex;gap:7px">'
               + (telLimpio
                 ? '<a href="https://wa.me/57' + telLimpio + '" target="_blank"'
-                  + ' style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;background:#dcfce7;border:1.5px solid #86efac;border-radius:12px;padding:9px;text-decoration:none;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:11px;color:#166534">'
-                  + '<svg width="13" height="13" viewBox="0 0 24 24" fill="#16a34a"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.096.537 4.066 1.479 5.779L0 24l6.432-1.687A11.93 11.93 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.006-1.368l-.36-.214-3.716.975.992-3.625-.235-.373A9.818 9.818 0 1112 21.818z"/></svg>'
+                  + ' style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;background:#dcfce7;border:1.5px solid #86efac;border-radius:10px;padding:8px 6px;text-decoration:none;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:11px;color:#166534;white-space:nowrap">'
+                  + '<svg width="12" height="12" viewBox="0 0 24 24" fill="#16a34a"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.096.537 4.066 1.479 5.779L0 24l6.432-1.687A11.93 11.93 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.006-1.368l-.36-.214-3.716.975.992-3.625-.235-.373A9.818 9.818 0 1112 21.818z"/></svg>'
                   + 'WhatsApp'
                 + '</a>'
                 : '')
-              + '<button id="hdbtn_' + hid + '" class="' + btnClass + '" onclick="toggleDetalleHist(\'' + hid + '\')">'
-                + '<span class="vd-txt">' + btnTxt + '</span>'
-                + '<div class="vd-icon"><span class="material-symbols-outlined" style="font-size:14px;color:#006970">expand_more</span></div>'
+              + '<button id="hdbtn_' + hid + '" class="' + btnClass + '" onclick="toggleDetalleHist(\'' + hid + '\')" style="flex:1">'
+                + '<span class="vd-txt" style="font-size:11px">' + btnTxt + '</span>'
+                + '<div class="vd-icon"><span class="material-symbols-outlined" style="font-size:13px;color:#006970">expand_more</span></div>'
               + '</button>'
             + '</div>'
           + '</div>'
  
-          /* ── DRAWER detalles ── */
+          /* DRAWER */
           + '<div class="' + drawerClass + '" id="hdrw_' + hid + '">'
-            + '<div style="border-top:1px solid rgba(0,105,112,.1);padding:12px 14px 14px;background:rgba(0,105,112,.02)">'
+            + '<div style="border-top:1px solid rgba(0,105,112,.1);padding:10px 13px 12px;background:rgba(0,105,112,.02)">'
               + detalleHtml
             + '</div>'
           + '</div>'
