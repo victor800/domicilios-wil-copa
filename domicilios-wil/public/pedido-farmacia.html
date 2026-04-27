@@ -2425,36 +2425,61 @@ function nrm(s){
     .replace(/[^a-z0-9\s]/g,'');
 }
 
-function scr2(txt,q){
-  var t=nrm(txt), nq=nrm(q);
-  if(!t||!nq)return 0;
-  if(t===nq)return 100;
-  if(t.includes(nq))return 95;
+function scr2(txt, q) {
+  var t  = nrm(txt);
+  var nq = nrm(q);
+  if (!t || !nq) return 0;
 
-  var ws=nq.split(/\s+/).filter(Boolean);
-  // Cada palabra de la query busca coincidencia en el texto completo
-  var hits=ws.filter(function(w){ return t.includes(w); }).length;
-  if(hits===ws.length)return 90;
-  if(hits>0)return 70*(hits/ws.length);
+  // Coincidencia exacta total
+  if (t === nq) return 100;
 
-  // Coincidencia parcial: palabra query es prefijo de alguna palabra del texto
-  var tWords=t.split(/\s+/);
-  var prefixHits=ws.filter(function(w){
-    return tWords.some(function(tv){ return tv.startsWith(w)||w.startsWith(tv); });
-  }).length;
-  if(prefixHits>0)return 55*(prefixHits/ws.length);
+  // El texto contiene la query completa como substring
+  if (t.includes(nq)) return 95;
 
-  // Fuzzy por palabra individual
-  var best=0;
-  tWords.forEach(function(tv){
-    ws.forEach(function(w){
-      if(w.length<2)return;
-      var maxL=Math.max(tv.length,w.length,1);
-      var sim=1-lev(tv,w)/maxL;
-      if(sim>best)best=sim;
+  // La query contiene el texto (busqueda más corta que el nombre)
+  if (nq.includes(t)) return 85;
+
+  var tWords  = t.split(/\s+/).filter(Boolean);
+  var qWords  = nq.split(/\s+/).filter(Boolean);
+  var total   = qWords.length;
+  if (total === 0) return 0;
+
+  var exactHits   = 0; // palabra query está en texto
+  var prefixHits  = 0; // texto empieza por palabra query o viceversa
+  var fuzzyHits   = 0; // similitud ≥ 0.7
+
+  qWords.forEach(function(w) {
+    // coincidencia exacta de palabra
+    if (tWords.indexOf(w) !== -1) { exactHits++; return; }
+
+    // substring: el texto contiene la palabra
+    if (t.includes(w)) { exactHits++; return; }
+
+    // prefijo mutuo
+    var isPrefix = tWords.some(function(tv) {
+      return tv.startsWith(w) || w.startsWith(tv);
     });
+    if (isPrefix) { prefixHits++; return; }
+
+    // fuzzy letra a letra
+    var bestSim = 0;
+    tWords.forEach(function(tv) {
+      if (Math.abs(tv.length - w.length) > 4) return;
+      var sim = 1 - lev(tv, w) / Math.max(tv.length, w.length, 1);
+      if (sim > bestSim) bestSim = sim;
+    });
+    if (bestSim >= 0.65) fuzzyHits++;
   });
-  return best>0.55?best*45:0;
+
+  var hitScore = (exactHits * 3 + prefixHits * 2 + fuzzyHits * 1) / (total * 3);
+  if (hitScore === 0) return 0;
+
+  // Bonus si el primer token de la query aparece al inicio del texto
+  if (qWords.length > 0 && tWords.length > 0 && tWords[0].startsWith(qWords[0])) {
+    hitScore = Math.min(1, hitScore + 0.15);
+  }
+
+  return Math.round(hitScore * 90);
 }
 
 function lev(a,b){var m=a.length,n=b.length,d=[];for(var i=0;i<=m;i++)d[i]=[i];for(var j=0;j<=n;j++)d[0][j]=j;for(var i=1;i<=m;i++)for(var j=1;j<=n;j++)d[i][j]=a[i-1]===b[j-1]?d[i-1][j-1]:1+Math.min(d[i-1][j],d[i][j-1],d[i-1][j-1]);return d[m][n];}
@@ -2486,11 +2511,11 @@ function doSearch(q){
       return;
     }
     var pool = _searchAllData.length ? _searchAllData : allData;
-var sc=[];
-pool.forEach(function(it){
+    var sc=[];
+    pool.forEach(function(it){
+      if((it.stock !== undefined ? it.stock : 3) <= 0) return; // ocultar agotados
       var s=Math.max(scr2(it.desc,q), scr2(it.lab,q)*0.7);
-            if(s>=10) sc.push({it:it,s:s});
-
+      if(s>=8) sc.push({it:it,s:s});
     });
     sc.sort(function(a,b){return b.s-a.s;});
     if(!sc.length){
