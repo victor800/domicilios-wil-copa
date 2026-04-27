@@ -1700,20 +1700,80 @@ async function enviarPedido(tipo){
 
 /* ── RASTREADOR ── */
 var STEP_MAP={'Pendiente':0,'Confirmado':1,'En camino':2,'Entregado':3,'Cancelado':0};
-function rtActualizarStepper(estado){
-  var paso=STEP_MAP[estado]!==undefined?STEP_MAP[estado]:0;
-  var porcentajes=[8,36,68,97];
-  var lineEl=document.getElementById('rtStepLine');
-  lineEl.classList.remove('loading');lineEl.style.transition='none';lineEl.style.width='0%';
-  setTimeout(function(){lineEl.style.transition='width 1.4s cubic-bezier(.22,1,.36,1)';lineEl.style.width=porcentajes[paso]+'%';if(paso<3){setTimeout(function(){lineEl.classList.add('loading');},1500);}},80);
-  var STEP_LABELS=['Recibido','Confirmado','En camino','Entregado'];
-  var ESTADO_LABELS={'Pendiente':'Recibido','Confirmado':'Confirmado','En camino':'En camino','Entregado':'Entregado'};
-  for(var i=0;i<=3;i++){
-    var dot=document.getElementById('step'+i),lbl=document.getElementById('step'+i+'lbl'),iconEl=dot.querySelector('.sym');
-    var prevActiveLbl=dot.parentNode.querySelector('.rt-step-lbl-active');if(prevActiveLbl)prevActiveLbl.remove();
-    if(i<paso){dot.style.background='#65d000';dot.style.border='none';dot.style.boxShadow='0 2px 8px rgba(101,208,0,.35)';if(iconEl){iconEl.style.color='#fff';iconEl.style.fontVariationSettings="'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24";}lbl.style.color='#65d000';lbl.style.fontWeight='800';lbl.textContent=STEP_LABELS[i];}
-    else if(i===paso){dot.style.background='#fff';dot.style.border='2.5px solid #006970';dot.style.boxShadow='0 0 0 5px rgba(0,105,112,.12)';if(iconEl){iconEl.style.color='#006970';iconEl.style.fontVariationSettings="'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24";}lbl.style.color='#006970';lbl.style.fontWeight='900';lbl.textContent=ESTADO_LABELS[estado]||STEP_LABELS[i];var activeLbl=document.createElement('span');activeLbl.className='rt-step-lbl-active';activeLbl.textContent='● '+(ESTADO_LABELS[estado]||estado);dot.parentNode.appendChild(activeLbl);}
-    else{dot.style.background='#e7e8e9';dot.style.border='none';dot.style.boxShadow='';if(iconEl){iconEl.style.color='#9aa5ae';iconEl.style.fontVariationSettings="'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24";}lbl.style.color='#9aa5ae';lbl.style.fontWeight='700';lbl.textContent=STEP_LABELS[i];}
+
+function rtActualizarStepper(estado, horas) {
+  horas = horas || {};
+  var paso = STEP_MAP[estado] !== undefined ? STEP_MAP[estado] : 0;
+  var porcentajes = [8, 36, 68, 97];
+  var lineEl = document.getElementById('rtStepLine');
+  lineEl.classList.remove('loading'); lineEl.style.transition = 'none'; lineEl.style.width = '0%';
+  setTimeout(function(){
+    lineEl.style.transition = 'width 1.4s cubic-bezier(.22,1,.36,1)';
+    lineEl.style.width = porcentajes[paso] + '%';
+    if(paso < 3){ setTimeout(function(){ lineEl.classList.add('loading'); }, 1500); }
+  }, 80);
+
+  var STEP_LABELS = ['Recibido', 'Confirmado', 'En camino', 'Entregado'];
+  // Hora que se asigna a cada step (index → hora del pedido)
+  // step0=Recibido usa hora de creación (p.hora), step1=Confirmado usa horaEnProceso,
+  // step2=En camino usa horaEnCamino, step3=Entregado usa horaEntrego
+  var STEP_HORAS = [
+    horas.hora || '',          // Recibido
+    horas.horaEnProceso || '', // Confirmado
+    horas.horaEnCamino  || '', // En camino
+    horas.horaEntrego   || ''  // Entregado
+  ];
+
+  // Limpiar TODOS los chips de hora previos del DOM (fix bug duplicado)
+  document.querySelectorAll('.rt-step-hora-lbl, .rt-step-lbl-active').forEach(function(el){ el.remove(); });
+
+  for(var i = 0; i <= 3; i++){
+    var dot  = document.getElementById('step' + i);
+    var lbl  = document.getElementById('step' + i + 'lbl');
+    var iconEl = dot.querySelector('.sym');
+
+    if(i < paso){
+      // Paso completado
+      dot.style.background = '#65d000'; dot.style.border = 'none';
+      dot.style.boxShadow = '0 2px 8px rgba(101,208,0,.35)';
+      if(iconEl){ iconEl.style.color = '#fff'; iconEl.style.fontVariationSettings = "'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24"; }
+      lbl.style.color = '#65d000'; lbl.style.fontWeight = '800';
+      lbl.textContent = STEP_LABELS[i];
+      // Hora debajo del label en pasos completados
+      if(STEP_HORAS[i]){
+        var horaEl = document.createElement('span');
+        horaEl.className = 'rt-step-hora-lbl';
+        horaEl.textContent = STEP_HORAS[i];
+        horaEl.style.cssText = 'font-size:8px;color:#65d000;text-align:center;display:block;margin-top:1px;font-weight:600;opacity:.8;max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+        lbl.parentNode.appendChild(horaEl);
+      }
+    } else if(i === paso){
+      // Paso activo
+      dot.style.background = '#fff'; dot.style.border = '2.5px solid #006970';
+      dot.style.boxShadow = '0 0 0 5px rgba(0,105,112,.12)';
+      if(iconEl){ iconEl.style.color = '#006970'; iconEl.style.fontVariationSettings = "'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24"; }
+      lbl.style.color = '#006970'; lbl.style.fontWeight = '900';
+      lbl.textContent = STEP_LABELS[i];
+      // Chip "● Estado" solo en paso activo
+      var activeLbl = document.createElement('span');
+      activeLbl.className = 'rt-step-lbl-active';
+      activeLbl.textContent = '● ' + (estado === STEP_LABELS[i] ? estado : (estado || STEP_LABELS[i]));
+      lbl.parentNode.appendChild(activeLbl);
+      // Hora del paso activo debajo del chip
+      if(STEP_HORAS[i]){
+        var horaActEl = document.createElement('span');
+        horaActEl.className = 'rt-step-hora-lbl';
+        horaActEl.textContent = STEP_HORAS[i];
+        horaActEl.style.cssText = 'font-size:8px;color:#006970;text-align:center;display:block;margin-top:1px;font-weight:700;max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+        lbl.parentNode.appendChild(horaActEl);
+      }
+    } else {
+      // Paso futuro
+      dot.style.background = '#e7e8e9'; dot.style.border = 'none'; dot.style.boxShadow = '';
+      if(iconEl){ iconEl.style.color = '#9aa5ae'; iconEl.style.fontVariationSettings = "'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24"; }
+      lbl.style.color = '#9aa5ae'; lbl.style.fontWeight = '700';
+      lbl.textContent = STEP_LABELS[i];
+    }
   }
 }
 
@@ -2029,7 +2089,12 @@ async function rastrearPedido(){
     document.getElementById('estadoLabel').style.color = col;
     document.getElementById('ri-id-display').textContent = 'Pedido #' + id;
 
-    rtActualizarStepper(p.estado);
+    rtActualizarStepper(p.estado, {
+  hora: p.hora,
+  horaEnProceso: p.horaEnProceso,
+  horaEnCamino:  p.horaEnCamino,
+  horaEntrego:   p.horaEntrego
+});
 
     /* ── 6. Card del domi (elegante) ── */
     var dc = document.getElementById('domiCard');
@@ -2170,7 +2235,12 @@ async function _rtPollCiclo() {
       var elLbl = document.getElementById('estadoLabel');
       if(elLbl){ elLbl.textContent = ELABELS[nuevoEstado]||nuevoEstado; elLbl.style.color = col2; }
       /* Steps sin tocar scroll ni ver-más */
-      rtActualizarStepper(nuevoEstado);
+      rtActualizarStepper(nuevoEstado, {
+  hora: p.hora,
+  horaEnProceso: nuevaHoraProceso,
+  horaEnCamino:  nuevaHoraCamino,
+  horaEntrego:   nuevaHoraEntrega
+});
       mostrarToast('Estado: ' + nuevoEstado, 'update');
       var secCal = document.getElementById('seccionCalificar');
       if(secCal) secCal.style.display = (nuevoEstado==='Entregado') ? 'block' : 'none';
