@@ -4912,6 +4912,100 @@ document.addEventListener('click', function(e){
   if(wrap && !wrap.contains(e.target) && _wfOpen) wfToggleDD();
  });
 
+ var _origRenderHistorial = renderHistorial;
+renderHistorial = function() {
+  /* Recalcular hoyYMD con método robusto */
+  var hoyYMD = new Date().toLocaleDateString('sv-SE', { timeZone: TZ }); // formato YYYY-MM-DD nativo
+
+  /* Asegurar que todos los items tengan fecha en formato YYYY-MM-DD */
+  state.historial.forEach(function(h) {
+    if (!h._fechaYMD) {
+      /* Intentar convertir desde es-CO "D/M/YYYY" */
+      var f = String(h.fecha || '');
+      var p = f.split('/');
+      if (p.length === 3 && p[2].length === 4) {
+        h._fechaYMD = p[2] + '-' + p[1].padStart(2,'0') + '-' + p[0].padStart(2,'0');
+      } else {
+        h._fechaYMD = f; // ya viene YYYY-MM-DD
+      }
+    }
+  });
+
+  /* Llamar al original */
+  _origRenderHistorial();
+
+  /* 2. Recalcular stats SIEMPRE después del render */
+  var todosEntregados = state.historial.filter(function(h){ return h.estado === 'Entregado'; });
+  var hoyEnt = todosEntregados.filter(function(h){ return h._fechaYMD === hoyYMD; });
+
+  /* Ganancias domicilios hoy */
+  var ganHoy = 0;
+  hoyEnt.forEach(function(h){
+    var d = parseCOP(h.domicilio || h.costoDomicilio || '0');
+    ganHoy += d;
+  });
+
+  /* Actualizar todos los elementos de stats */
+  var ids = {
+    histTotalEntregas: todosEntregados.length,
+    histEntHoy:        hoyEnt.length,
+    histGananciaDia:   ganHoy > 0 ? fmtCOP(ganHoy) : '$0',
+    statHoy:           hoyEnt.length,
+    statEntregas:      todosEntregados.length
+  };
+  Object.keys(ids).forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.textContent = ids[id];
+  });
+
+  console.log('[Historial] hoy:', hoyYMD, '| entregados hoy:', hoyEnt.length, '| ganancia:', ganHoy);
+};
+
+/* 3. Parchear fetchHistorialSheet para asegurar que domicilio llega bien */
+var _origFetchHist = fetchHistorialSheet;
+fetchHistorialSheet = async function() {
+  await _origFetchHist();
+
+  /* Post-proceso: asegurar campo domicilio en cada item */
+  state.historial.forEach(function(h) {
+    /* Si domicilio está vacío, intentar inferir desde total - subtotal */
+    if (!h.domicilio || parseCOP(h.domicilio) === 0) {
+      var totalNum = parseCOP(h.total || '0');
+      var subNum   = h.subtotal || 0;
+      if (totalNum > 0 && subNum > 0 && totalNum > subNum) {
+        h.domicilio = String(Math.round(totalNum - subNum));
+      }
+    }
+    /* Normalizar fecha a _fechaYMD */
+    var f = String(h.fecha || '');
+    var p = f.split('/');
+    if (p.length === 3 && p[2].length === 4) {
+      h._fechaYMD = p[2] + '-' + p[1].padStart(2,'0') + '-' + p[0].padStart(2,'0');
+    } else {
+      h._fechaYMD = f;
+    }
+    /* Marcar periodo usando _fechaYMD */
+    var hoyYMD = new Date().toLocaleDateString('sv-SE', { timeZone: TZ });
+    h.periodo = (h._fechaYMD === hoyYMD) ? 'hoy' : 'anterior';
+  });
+
+  /* Re-renderizar si estamos en historial */
+  if (currentTab === 'historial') renderHistorial();
+  actualizarBadgesNav();
+};
+
+/* 4. También parchear marcarEntregado para actualizar stats inmediatamente */
+var _origMarcarEntregadoHist = marcarEntregado;
+marcarEntregado = function() {
+  _origMarcarEntregadoHist.apply(this, arguments);
+  /* Forzar refresh del historial 3s después para que el sheet ya tenga el dato */
+  setTimeout(function(){
+    fetchHistorialSheet();
+  }, 3000);
+};
+
+console.log('[PARCHE Historial RT v1.0] ✅ Stats en tiempo real con domicilio corregido');
+
 
 </script>
 </body>
