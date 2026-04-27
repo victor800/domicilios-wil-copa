@@ -2084,34 +2084,10 @@ async function rastrearPedido(){
     /* ── 8. Productos ── */
     rtRenderProductos(p.productos);
 
-    /* ── 9. Totales ── */
-    document.getElementById('rtPagoVal').textContent =
-      (p.metodoPago||'').toUpperCase().includes('TRANSFER') ? '🏦 Transferencia' : '💵 Efectivo';
 
     var totalNum = parseInt((p.total||'').replace(/[^\d]/g,'')) || 0;
     var domiNum  = parseInt((p.valorDomicilio||'').replace(/[^\d]/g,'')) || 0;
     var subtotal = totalNum - domiNum;
-
-    // Resumen de productos en card financiero
-    var cardHtml = '';
-    filasPedido.forEach(function(r){
-      var nombre = (r[6]||'').trim(); if(!nombre) return;
-      var cant  = (r[8]||'').trim();
-      var vt    = (r[10]||'').trim();
-      cardHtml += '<div style="display:flex;justify-content:space-between;align-items:flex-start;'
-        +'padding:7px 0;border-bottom:1px solid #f3f4f6">'
-        +'<div style="flex:1;min-width:0">'
-          +'<div style="font-size:12.5px;font-weight:700;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+cliEsc(nombre)+'</div>'
-          +(cant&&cant!=='1'?'<div style="font-size:10px;color:#9ca3af;font-weight:600;margin-top:1px">×'+cant+'</div>':'')
-        +'</div>'
-        +(vt?'<div style="font-size:12px;font-weight:800;color:#111827;flex-shrink:0;margin-left:10px">$'+cliEsc(vt)+' COP</div>':'')
-        +'</div>';
-    });
-    document.getElementById('rtResumenProductosCard').innerHTML = cardHtml || '<span style="font-size:12px;color:#9aa5ae">Sin detalle de productos</span>';
-    document.getElementById('rtSubtotalVal').textContent = subtotal > 0 ? '$'+subtotal.toLocaleString('es-CO')+' COP' : '—';
-    document.getElementById('rtDomiVal').textContent     = domiNum  > 0 ? '$'+domiNum.toLocaleString('es-CO')+' COP'  : '—';
-    document.getElementById('rtZonaLbl').textContent     = p.tipoServicio || 'Domicilio';
-    document.getElementById('rtTotalVal').textContent    = totalNum > 0  ? '$'+totalNum.toLocaleString('es-CO')+' COP'  : (p.total||'—');
 
     /* ── 10. Calificar / chat / FAB ── */
     document.getElementById('seccionCalificar').style.display =
@@ -2149,27 +2125,26 @@ async function _rtPollCiclo() {
   if (!p || !p.id) return;
   var SHEET_ID = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
 
+  function parseCsvLine(line){
+    var result=[], cur='', inQ=false;
+    for(var i=0;i<line.length;i++){
+      var c=line[i];
+      if(c==='"'){ if(inQ&&line[i+1]==='"'){cur+='"';i++;} else inQ=!inQ; }
+      else if(c===','&&!inQ){ result.push(cur.trim()); cur=''; }
+      else cur+=c;
+    }
+    result.push(cur.trim());
+    return result;
+  }
+
   try {
-    /* ── A. Re-leer estado del pedido ── */
+    /* ── A. Estado del pedido ── */
     var urlP = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
              + '/gviz/tq?tqx=out:csv&sheet=Pedidos&cachebust=' + Date.now();
     var resP = await fetch(urlP, { cache: 'no-store' });
     var txtP = await resP.text();
     var linesP = txtP.trim().split('\n');
 
-    function parseCsvLine(line){
-      var result=[], cur='', inQ=false;
-      for(var i=0;i<line.length;i++){
-        var c=line[i];
-        if(c==='"'){ if(inQ&&line[i+1]==='"'){cur+='"';i++;} else inQ=!inQ; }
-        else if(c===','&&!inQ){ result.push(cur.trim()); cur=''; }
-        else cur+=c;
-      }
-      result.push(cur.trim());
-      return result;
-    }
-
-    // Buscar fila principal del pedido (col A = ID)
     var f0 = null;
     for(var i = 1; i < linesP.length; i++){
       var cols = parseCsvLine(linesP[i]);
@@ -2177,13 +2152,13 @@ async function _rtPollCiclo() {
     }
     if(!f0) return;
 
-    var nuevoEstado    = f0[4]  || p.estado;
-    var nuevoDomi      = f0[15] || p.domiciliario;
+    var nuevoEstado      = f0[4]  || p.estado;
+    var nuevoDomi        = f0[15] || p.domiciliario;
     var nuevaHoraProceso = f0[16] || p.horaEnProceso;
     var nuevaHoraCamino  = f0[17] || p.horaEnCamino;
     var nuevaHoraEntrega = f0[18] || p.horaEntrego;
 
-    /* Si cambió el estado: actualizar stepper + dot ── */
+    /* ── Actualizar estado sin tocar "ver más" ── */
     if(nuevoEstado !== p.estado){
       p.estado = nuevoEstado;
       var COLS2 = {'Pendiente':'#f59e0b','Confirmado':'#3b82f6','En camino':'#8b5cf6','Entregado':'#16a34a','Cancelado':'#dc2626'};
@@ -2195,57 +2170,50 @@ async function _rtPollCiclo() {
       var ELABELS = {'Pendiente':'⏳ Recibido','Confirmado':'✅ Confirmado','En camino':'🛵 En camino','Entregado':'🏠 Entregado','Cancelado':'❌ Cancelado'};
       var elLbl = document.getElementById('estadoLabel');
       if(elLbl){ elLbl.textContent = ELABELS[nuevoEstado]||nuevoEstado; elLbl.style.color = col2; }
+      /* Steps sin tocar scroll ni ver-más */
       rtActualizarStepper(nuevoEstado);
-      mostrarToast('Estado actualizado: ' + nuevoEstado, 'update');
-      /* Mostrar calificar si entregado */
+      mostrarToast('Estado: ' + nuevoEstado, 'update');
       var secCal = document.getElementById('seccionCalificar');
       if(secCal) secCal.style.display = (nuevoEstado==='Entregado') ? 'block' : 'none';
     }
 
-    /* Actualizar horas en el grid si cambiaron */
     p.horaEnProceso = nuevaHoraProceso;
     p.horaEnCamino  = nuevaHoraCamino;
     p.horaEntrego   = nuevaHoraEntrega;
 
-    /* ── B. Leer hoja Domiciliarios para foto + GPS ── */
+    /* ── B. Hoja Domiciliarios ── */
     if(!nuevoDomi || !nuevoDomi.trim()) return;
     p.domiciliario = nuevoDomi;
 
     var urlD = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
-             + '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent(DOMIS_SHEET_NAME)
-             + '&cachebust=' + Date.now();
+             + '/gviz/tq?tqx=out:csv&sheet=Domiciliarios&cachebust=' + Date.now();
     var resD = await fetch(urlD, { cache: 'no-store' });
     var txtD = await resD.text();
     var linesD = txtD.trim().split('\n');
 
-    // Cabeceras esperadas:
-    // A=0 ID_DOMI  B=1 NOMBRE  C=2 CLAVE  D=3 TELEFONO  E=4 FOTO  F=5 ACTIVO  G=6 ACTIVIDAD(coords)
     var domiRow = null;
     var nombreDomiLower = nuevoDomi.replace(/\s*\([^)]+\)/,'').trim().toLowerCase();
     for(var j = 1; j < linesD.length; j++){
       var dcols = parseCsvLine(linesD[j]);
       var dnombre = (dcols[1]||'').trim().toLowerCase();
-      if(dnombre && nombreDomiLower.indexOf(dnombre) !== -1 || dnombre === nombreDomiLower){
+      if(dnombre && (dnombre === nombreDomiLower || nombreDomiLower.indexOf(dnombre) !== -1)){
         domiRow = dcols; break;
       }
     }
     if(!domiRow) return;
 
-    var dFoto      = (domiRow[4]||'').trim();  // columna E FOTO
-    var dActivo    = (domiRow[5]||'').trim();  // columna F ACTIVO
-    var dActividad = (domiRow[6]||'').trim();  // columna G ACTIVIDAD (lat,lng)
+    var dFoto      = (domiRow[4]||'').trim();
+    var dActividad = (domiRow[6]||'').trim(); /* G: "6.252900,-75.564600|10:40:38|±1m" */
 
-    /* Actualizar avatar con foto real */
+    /* Avatar con foto real */
     var avEl = document.getElementById('domiFotoWrap');
     var nombreDomiDisplay = nuevoDomi.replace(/\s*\([^)]+\)/,'').trim();
-    if(avEl && dFoto && dFoto.startsWith('http')){
-      if(!avEl.querySelector('img')){
-        avEl.innerHTML = '<img src="'+dFoto+'" style="width:100%;height:100%;object-fit:cover;object-position:center 20%" '
-          +'onerror="this.parentElement.textContent=\''+nombreDomiDisplay.charAt(0).toUpperCase()+'\'">';
-      }
+    if(avEl && dFoto && dFoto.startsWith('http') && !avEl.querySelector('img')){
+      avEl.innerHTML = '<img src="'+dFoto+'" style="width:100%;height:100%;object-fit:cover;object-position:center 20%" '
+        +'onerror="this.parentElement.textContent=\''+nombreDomiDisplay.charAt(0).toUpperCase()+'\'">';
     }
 
-    /* Actualizar card domi: nombre + estado */
+    /* Card domi nombre + estado */
     var dcNombre = document.getElementById('domiNombre');
     if(dcNombre) dcNombre.textContent = nombreDomiDisplay;
     var estadoTxtMap = {
@@ -2257,39 +2225,43 @@ async function _rtPollCiclo() {
     if(domiEstEl){
       domiEstEl.textContent = (estadoTxtMap[p.estado]||p.estado) + (horaClave ? '  ·  '+horaClave : '');
     }
-
-    /* Mostrar card domi si no estaba visible */
     var dc = document.getElementById('domiCard');
     if(dc && nombreDomiDisplay) dc.style.display = 'block';
 
-    /* ── C. Actualizar GPS en el mapa con coordenada de ACTIVIDAD ── */
+    /* ── C. GPS real desde columna Actividad ── */
+    /* Formato: "6.252900,-75.564600|10:40:38|±1m" */
     if(dActividad){
-      // Formato esperado: "6.34911,-75.50619" o "[6.34911,-75.50619]"
       var coordMatch = dActividad.match(/(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
       if(coordMatch){
         var dLat = parseFloat(coordMatch[1]);
         var dLng = parseFloat(coordMatch[2]);
         if(!isNaN(dLat) && !isNaN(dLng) && mapResult){
+          /* Mover marcador domi suavemente */
           if(domiMarkerResult){
             domiMarkerResult.setLatLng([dLat, dLng]);
           } else {
-            domiMarkerResult = L.marker([dLat,dLng],{
+            domiMarkerResult = L.marker([dLat, dLng],{
               icon: iconDomi(nombreDomiDisplay, true), zIndexOffset:1000
             }).addTo(mapResult);
           }
-          /* Re-trazar ruta desde nueva posición domi */
+          /* Re-trazar ruta real desde posición domi → destino */
           var dirRaw = p.direccion || '';
           var coordsDestM = dirRaw.match(/\[(-?\d+\.\d+),\s*(-?\d+\.\d+)\]/);
           if(coordsDestM){
             trazarRutaResult(dLat, dLng,
               parseFloat(coordsDestM[1]), parseFloat(coordsDestM[2]), p);
+            /* Recentrar mapa en ambos puntos */
+            var bounds = L.latLngBounds([[dLat,dLng],[parseFloat(coordsDestM[1]),parseFloat(coordsDestM[2])]]);
+            mapResult.fitBounds(bounds,{paddingTopLeft:[20,60],paddingBottomRight:[20,20],maxZoom:16});
+          } else {
+            /* Sin coords destino: centrar en domi */
+            mapResult.setView([dLat, dLng], 15);
           }
         }
       }
     }
 
   } catch(e){
-    // Silencioso — no rompe nada si falla un ciclo
     console.warn('[poll]', e.message);
   }
 }
