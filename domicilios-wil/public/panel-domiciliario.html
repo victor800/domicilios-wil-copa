@@ -4510,10 +4510,11 @@ async function tickGpsSheet() {
 
   _gpsUltimaPos = pos;
 
-  /* Actualizar TRK global para que el resto del código también lo sepa */
-  TRK.lat = pos.lat;
-  TRK.lng = pos.lng;
-  TRK.acc = pos.acc;
+  /* Actualizar TRK global — marcar activo para que iniciarUpdateMapaTab también funcione */
+  TRK.lat    = pos.lat;
+  TRK.lng    = pos.lng;
+  TRK.acc    = pos.acc;
+  TRK.activo = true;   /* ← FIX: sin esto iniciarUpdateMapaTab ignora la posición */
 
   /* Animar el marcador del domi en el mapa */
   if (_tabDomiMarker) {
@@ -4531,12 +4532,17 @@ async function tickGpsSheet() {
   if (tus) tus.textContent = pos.ts || horaAhora();
 
   /* Recalcular ruta OSRM si pasaron 30 s y hay destino */
+ /* Recalcular ruta OSRM si pasaron 30 s y hay destino */
+  console.log('[tickGps] destLatGlobal:', destLatGlobal, '| recalcEn:', Math.round((RECALC_CADA_MS-(Date.now()-_rutaRecalcTs))/1000)+'s');
   if (destLatGlobal) {
     var ahora = Date.now();
     if (ahora - _rutaRecalcTs > RECALC_CADA_MS) {
       _rutaRecalcTs = ahora;
+      console.log('[tickGps] → trazando ruta OSRM desde', pos.lat, pos.lng, '→', destLatGlobal, destLngGlobal);
       dibujarRutaOSRM(pos.lat, pos.lng, destLatGlobal, destLngGlobal);
     }
+  } else {
+    console.warn('[tickGps] destLatGlobal es null — la ruta no tiene destino aún');
   }
 
   /* También update el mapa de turn-by-turn si estaba activo */
@@ -4551,6 +4557,8 @@ async function tickGpsSheet() {
 /* ── 3. INICIAR / DETENER POLLING DEL SHEET ── */
 function iniciarGpsSheetPolling() {
   if (_gpsSheetTimer) return; // ya corriendo
+  _rutaRecalcTs = 0;          /* ← FIX: forzar recálculo inmediato en primer tick */
+  _gpsUltimaPos = null;       /* ← FIX: no cachear posición vieja al iniciar pedido */
   tickGpsSheet(); // primer tick inmediato
   _gpsSheetTimer = setInterval(tickGpsSheet, GPS_POLL_MS);
   console.log('[GPS Sheet] Polling iniciado cada', GPS_POLL_MS / 1000, 's');
