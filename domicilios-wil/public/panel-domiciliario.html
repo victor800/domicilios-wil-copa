@@ -1623,7 +1623,7 @@ async function fetchPedidos() {
             hora:        (cols[12]||'').trim(),
             fecha:       (cols[13]||'').trim(),
             total:       (cols[14]||'').trim(),
-            domiAsign:   (cols[15]||'').trim(),
+            domiAsign:   (cols[15]||'').trim(),  // col P = NOMBRE_DOMI
             horaTomo:    (cols[16]||'').trim(),
             horaCamino:  (cols[17]||'').trim(),
             horaEntrega: (cols[18]||'').trim(),
@@ -1661,7 +1661,6 @@ async function fetchPedidos() {
       p.estado = _normEst(p.estadoRaw);
       var est  = (p.estadoRaw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 
-      /* Ignorar entregados y cancelados */
       if (est.includes('entregad') || est.includes('cancelad')) return;
 
       var asgNorm  = _norm2(p.domiAsign || '');
@@ -1670,16 +1669,22 @@ async function fetchPedidos() {
         asgNorm.includes(nombreBase) || asgUpper.includes(idDomi)
       );
 
-      /* ▶ EN RUTA — siempre chequear ANTES de idsProcesados */
+      /* ── EN RUTA: proceso | camino | asignado ── */
       if (esMio && (p.estado === 'proceso' || p.estado === 'camino' || p.estado === 'asignado')) {
+        
+        /* 🔔 ASIGNADO NUEVO → notificar solo una vez */
+        if (p.estado === 'asignado' && !_idsAsignadosNotificados.has(id) && !idsProcesados.has(id)) {
+          _idsAsignadosNotificados.add(id);
+          var pedConv = _cvtPed(p);
+          _dispararNotifAsignado(pedConv);
+        }
+
         if (!enRuta) enRuta = _cvtPed(p);
         return;
       }
 
-      /* Ya procesado → no mostrar en pendientes */
       if (idsProcesados.has(id)) return;
 
-      /* Solo Pendiente sin asignar → visible para todos */
       if (p.estado === 'pendiente' && (!p.domiAsign || !p.domiAsign.trim())) {
         misPendientes.push(_cvtPed(p));
       }
@@ -1687,7 +1692,6 @@ async function fetchPedidos() {
 
     state.pedidos = misPendientes;
 
-    /* Activar pedido en ruta si apareció o cambió */
     if (enRuta) {
       if (!state.pedidoActivo || state.pedidoActivo.id !== enRuta.id) {
         state.pedidoActivo = enRuta;
@@ -1723,6 +1727,86 @@ async function fetchPedidos() {
     console.warn('[fetchPedidos]:', e.message);
   }
 }
+
+function _dispararNotifAsignado(p) {
+  var dirLimpia = (p.direccion||'')
+    .replace(/\s*\(Ref:[^)]+\)/g,'').replace(/\s*\[.+?\]/g,'').trim().substring(0,70);
+  var esTrans   = (p.metodoPago||'').toLowerCase().includes('transfer');
+
+  /* ── A. Banner visual ── */
+  _notifAsignado(p);
+
+  /* ── B. Android APK (JavascriptInterface) ── */
+  if (window.WilNativo && window.WilNativo.notificarAsignado) {
+    try {
+      WilNativo.notificarAsignado(
+        p.id || '',
+        '🎯 ¡Te asignaron un pedido!',
+        (p.cliente||'Cliente') + ' · ' + dirLimpia + '\n'
+          + (p.total||'') + ' · ' + (esTrans ? 'Transferencia' : 'Efectivo')
+      );
+    } catch(e) { console.warn('[WilNativo.notificarAsignado]:', e.message); }
+  }
+
+  /* ── C. Consola Android Studio (WebViewClient.onConsoleMessage) ── */
+  console.log('[WIL_NATIVE] tipo:asignado|id:' + p.id
+    + '|cliente:' + (p.cliente||'')
+    + '|dir:' + dirLimpia.substring(0,40)
+    + '|total:' + (p.total||'')
+    + '|domi:' + (p.domiAsign||domi.nombre||''));
+
+  /* ── D. SW — notificación cuando la app está cerrada ── */
+  if (Notification.permission === 'granted') {
+    var opts = {
+      body:               (p.cliente||'Cliente') + '\n' + dirLimpia
+                          + '\n' + (p.total||'') + ' · ' + (esTrans ? 'Transf.' : 'Efectivo'),
+      icon:               'icons/icon-192.png',
+      badge:              'icons/badge-72.png',
+      tag:                'wil-asignado-' + p.id,
+      requireInteraction: true,
+      vibrate:            [500,150,500,150,500,300,300,100,300,100,300,150,600],
+      silent:             false,
+      data:               { tipo: 'asignado', pedidoId: p.id }
+    };
+    var titulo = '🎯 ¡Pedido asignado a ti!';
+    if (window._wilSwReg) {
+      window._wilSwReg.showNotification(titulo, opts);
+    } else {
+      navigator.serviceWorker.ready.then(function(reg){
+        window._wilSwReg = reg;
+        reg.showNotification(titulo, opts);
+      }).catch(function(){});
+    }
+  }
+
+  /* ── E. Vibración extra ── */
+  if (navigator.vibrate)
+    navigator.vibrate([600,150,600,150,600,300,400,100,400,100,400,200,800]);
+
+  console.log('[WIL ASIGNADO] pedido', p.id, '→ domi:', p.domiAsign || domi.nombre);
+}
+
+/* 4 ▸ Chip "Asignado" en el stepper cuando el estado viene del sheet */
+var _activarPedidoEnRutaOrig = activarPedidoEnRuta;
+activarPedidoEnRuta = function(p) {
+  _activarPedidoEnRutaOrig(p);
+  /* Si el estado es asignado, el stepper ya está en paso 0 (correcto).
+     Solo ajustamos el chip de estado */
+  if (p && (p.estado === 'asignado' || (p.estadoRaw||'').toLowerCase().includes('asignad'))) {
+    var chip = document.getElementById('tabEstadoChip');
+    if (chip) {
+      chip.innerHTML = '<span class="material-symbols-outlined" '
+        + 'style="font-size:12px;font-variation-settings:\'FILL\' 1">assignment_ind</span> '
+        + 'Asignado';
+      chip.style.cssText = 'display:inline-flex;align-items:center;gap:5px;padding:4px 12px;'
+        + "border-radius:20px;font-size:10px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;"
+        + 'background:rgba(167,139,250,.3);color:#e9d5ff';
+    }
+  }
+};
+console.log('[WIL Parche Asignado v1.0] ✅ _normEst · fetchPedidos · banner · APK · SW');
+
+
 
 async function fetchHistorialSheet() {
   /* Mostrar loader solo si la lista está vacía */
@@ -3193,10 +3277,11 @@ function cerrarSesion(){
 
 /* Normaliza estado */
 function _normEst(s) {
-  const v = (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  if (v.includes('entregad'))               return 'entregado';
-  if (v.includes('camino'))                 return 'camino';
-  if (v.includes('proceso')||v.includes('ruta')) return 'proceso';
+  var v = (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if (v.includes('entregad'))                       return 'entregado';
+  if (v.includes('camino'))                         return 'camino';
+  if (v.includes('asignad'))                        return 'asignado'; // ← NUEVO
+  if (v.includes('proceso') || v.includes('ruta'))  return 'proceso';
   return 'pendiente';
 }
 
