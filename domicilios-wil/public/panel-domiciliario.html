@@ -4396,6 +4396,198 @@ cerrarSesion = function() {
 };
 
 
+
+/* ── CONFIG ── */
+var SHEET_ID_DOMIS = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU'; // mismo sheet
+var SHEET_DOMIS    = 'Domiciliarios'; // nombre exacto de la pestaña
+var GPS_POLL_MS    = 10000;           // cada 10 segundos
+var _gpsSheetTimer = null;
+var _gpsUltimaPos  = null;           // {lat, lng, ts} última posición del sheet
+var _rutaRecalcTs  = 0;              // cuándo recalculamos la ruta por última vez
+var RECALC_CADA_MS = 30000;          // recalcular ruta OSRM cada 30 s
+
+/* ── 1. LEER COORDENADAS DEL SHEET ──
+   Columna G (índice 6) tiene: "6.321009,-75.559229|23:53:52|±12m"
+   Columna A (índice 0) tiene el nombre del domi o su ID              */
+async function leerGpsSheet() {
+  try {
+    var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID_DOMIS
+            + '/gviz/tq?tqx=out:csv&sheet='
+            + encodeURIComponent(SHEET_DOMIS)
+            + '&cachebust=' + Date.now();
+
+    var r = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var text = await r.text();
+    if (!text || text.length < 10) return null;
+
+    /* Buscar la fila de ESTE domi por nombre o ID */
+    var filas = text.trim().split('\n').filter(Boolean);
+    var nombreBase = (domi.nombre || '').toLowerCase().split(' ')[0];
+    var idDomi     = (domi.id     || '').toUpperCase();
+
+    for (var i = 0; i < filas.length; i++) {
+      /* CSV simple: dividir por coma respetando comillas */
+      var cols = _splitCSVLine(filas[i]);
+      var colA = (cols[0] || '').replace(/^"|"$/g, '').trim();
+      var colG = (cols[6] || '').replace(/^"|"$/g, '').trim(); // columna G (índice 6)
+
+      /* Verificar que es la fila de este domi */
+      var colANorm = colA.toLowerCase();
+      if (!colANorm.includes(nombreBase) && !colA.toUpperCase().includes(idDomi)) continue;
+
+      /* Parsear "6.321009,-75.559229|23:53:52|±12m" */
+      if (!colG) continue;
+      var partes = colG.split('|');
+      var coords = (partes[0] || '').trim().split(',');
+      if (coords.length < 2) continue;
+
+      var lat = parseFloat(coords[0]);
+      var lng = parseFloat(coords[1]);
+      var ts  = (partes[1] || '').trim();
+      var acc = (partes[2] || '').trim().replace('±', '').replace('m', '');
+
+      /* Validar que estén en Colombia */
+      if (isNaN(lat) || isNaN(lng)) continue;
+      if (lat < 1 || lat > 13 || lng < -82 || lng > -66) continue;
+
+      return { lat: lat, lng: lng, ts: ts, acc: parseInt(acc) || 0 };
+    }
+    return null; // no encontró la fila
+  } catch(e) {
+    console.warn('[leerGpsSheet]', e.message);
+    return null;
+  }
+}
+
+/* CSV split simple respetando comillas */
+function _splitCSVLine(line) {
+  var cols = [], cur = '', inQ = false;
+  for (var i = 0; i < line.length; i++) {
+    var ch = line[i];
+    if (ch === '"') { inQ = !inQ; }
+    else if (ch === ',' && !inQ) { cols.push(cur); cur = ''; }
+    else { cur += ch; }
+  }
+  cols.push(cur);
+  return cols;
+}
+
+/* ── 2. ACTUALIZAR MAPA CON LA POSICIÓN DEL SHEET ── */
+async function tickGpsSheet() {
+  /* Solo correr si hay pedido activo y mapa inicializado */
+  if (!state.pedidoActivo || !_tabMap || !_tabMapInit) return;
+
+  var pos = await leerGpsSheet();
+  if (!pos) return;
+
+  /* Evitar mover el marcador si la posición no cambió */
+  if (_gpsUltimaPos
+      && Math.abs(pos.lat - _gpsUltimaPos.lat) < 0.000005
+      && Math.abs(pos.lng - _gpsUltimaPos.lng) < 0.000005) return;
+
+  _gpsUltimaPos = pos;
+
+  /* Actualizar TRK global para que el resto del código también lo sepa */
+  TRK.lat = pos.lat;
+  TRK.lng = pos.lng;
+  TRK.acc = pos.acc;
+
+  /* Animar el marcador del domi en el mapa */
+  if (_tabDomiMarker) {
+    _animarMarcador(_tabDomiMarker, pos.lat, pos.lng, 2000);
+    _tabDomiMarker.setIcon(iconDomi(domi ? domi.nombre : 'WIL', true));
+  }
+
+  /* Actualizar labels GPS en la UI */
+  var gpsDot  = document.getElementById('gpsDotTab');
+  var gpsLbl  = document.getElementById('gpsLabelTab');
+  if (gpsDot) { gpsDot.style.background = '#2a9d5c'; gpsDot.classList.add('trk-gps-live'); }
+  if (gpsLbl) gpsLbl.textContent = '· GPS ' + (pos.ts || 'activo');
+
+  var tus = document.getElementById('trkUltSync2');
+  if (tus) tus.textContent = pos.ts || horaAhora();
+
+  /* Recalcular ruta OSRM si pasaron 30 s y hay destino */
+  if (destLatGlobal) {
+    var ahora = Date.now();
+    if (ahora - _rutaRecalcTs > RECALC_CADA_MS) {
+      _rutaRecalcTs = ahora;
+      dibujarRutaOSRM(pos.lat, pos.lng, destLatGlobal, destLngGlobal);
+    }
+  }
+
+  /* También update el mapa de turn-by-turn si estaba activo */
+  if (_navActiva && _navPasos.length && destLatGlobal) {
+    var distAlDest = distHaversine(pos.lat, pos.lng, destLatGlobal, destLngGlobal);
+    if (distAlDest < 30) {
+      llegamosAlDestino();
+    }
+  }
+}
+
+/* ── 3. INICIAR / DETENER POLLING DEL SHEET ── */
+function iniciarGpsSheetPolling() {
+  if (_gpsSheetTimer) return; // ya corriendo
+  tickGpsSheet(); // primer tick inmediato
+  _gpsSheetTimer = setInterval(tickGpsSheet, GPS_POLL_MS);
+  console.log('[GPS Sheet] Polling iniciado cada', GPS_POLL_MS / 1000, 's');
+}
+
+function detenerGpsSheetPolling() {
+  if (_gpsSheetTimer) {
+    clearInterval(_gpsSheetTimer);
+    _gpsSheetTimer = null;
+  }
+  _gpsUltimaPos = null;
+  _rutaRecalcTs = 0;
+  console.log('[GPS Sheet] Polling detenido');
+}
+
+/* ── 4. HOOKEAR EN activarPedidoEnRuta y las funciones de finalización ── */
+
+/* Guardar referencia al activarPedidoEnRuta que ya existe */
+var _origActivarParche = activarPedidoEnRuta;
+activarPedidoEnRuta = function(p) {
+  _origActivarParche(p);
+  /* Arrancar GPS polling cuando se activa un pedido */
+  setTimeout(iniciarGpsSheetPolling, 500);
+};
+
+/* Hookear marcarEntregado para detener polling */
+var _origEntregadoParche = marcarEntregado;
+marcarEntregado = function() {
+  detenerGpsSheetPolling();
+  _origEntregadoParche();
+};
+
+/* Hookear cancelarPedidoActivo */
+var _origCancelarParche = cancelarPedidoActivo;
+cancelarPedidoActivo = function() {
+  detenerGpsSheetPolling();
+  _origCancelarParche();
+};
+
+/* Si al cargar ya había un pedido activo restaurado del storage → arrancar polling */
+setTimeout(function() {
+  if (state.pedidoActivo && !_gpsSheetTimer) {
+    iniciarGpsSheetPolling();
+  }
+}, 2500);
+
+/* Pausar cuando la app va al fondo, reanudar cuando vuelve */
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'visible') {
+    if (state.pedidoActivo && !_gpsSheetTimer) iniciarGpsSheetPolling();
+  } else {
+    detenerGpsSheetPolling();
+  }
+});
+
+console.log('[PARCHE GPS Sheet v1.0] ✅ Cargado — polling cada', GPS_POLL_MS / 1000, 's');
+
+
+
 window.WIL={
   nuevoPedido:function(p){state.pedidos.push(p);renderPedidos();},
   agregarHistorial:function(items){state.historial=state.historial.concat(items);renderHistorial();actualizarBadgesNav();},
