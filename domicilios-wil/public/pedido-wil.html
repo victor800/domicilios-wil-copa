@@ -936,15 +936,24 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
   </div>
 </div>
 
-        <div style="position:sticky;top:0;z-index:10;background:#fff;padding:10px 14px 0;border-bottom:1px solid #f0f3f6;border-radius:20px 20px 0 0">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <!-- ── HEADER ESTADO + STEPS ── -->
+        <div style="position:sticky;top:0;z-index:10;background:#fff;padding:10px 14px 12px;border-bottom:1px solid #f0f3f6;border-radius:20px 20px 0 0">
+          <!-- Fila estado + minimizar -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
             <div style="display:flex;align-items:center;gap:7px">
-              <div style="position:relative;width:9px;height:9px;flex-shrink:0"><span id="estadoPing" class="rt-ping"></span><span id="estadoPingBase" class="rt-ping-base"></span></div>
+              <div style="position:relative;width:9px;height:9px;flex-shrink:0">
+                <span id="estadoPing" class="rt-ping"></span>
+                <span id="estadoPingBase" class="rt-ping-base"></span>
+              </div>
               <span id="estadoLabel" class="rt-estado-lbl"></span>
             </div>
-            <button onclick="minimizarResult()" style="width:32px;height:32px;border-radius:50%;border:none;background:#f0f4f7;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,.08)"><span class="sym" style="font-size:18px;color:#7a8fa6">keyboard_arrow_down</span></button>
+            <button onclick="minimizarResult()" style="width:32px;height:32px;border-radius:50%;border:none;background:#f0f4f7;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,.08)">
+              <span class="sym" style="font-size:18px;color:#7a8fa6">keyboard_arrow_down</span>
+            </button>
           </div>
+          <!-- ID pedido -->
           <div id="ri-id-display" style="font-size:10px;color:#7a8fa6;font-weight:600;margin-bottom:10px"></div>
+          <!-- Steps separados -->
           <div style="position:relative">
             <div class="rt-steps">
               <div class="rt-steps-line-bg"></div>
@@ -1026,7 +1035,7 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 </main>
 
 <nav class="bnav">
-  <button class="bi" onclick="window.location.href='index.html'"><span class="sym">home</span><span class="bi-lbl">Inicio</span></button>
+  <button class="bi" onclick="window.location.href='pedido-wil.html'"><span class="sym">home</span><span class="bi-lbl">Inicio</span></button>
   <button class="bi active" id="nav-pedir" onclick="navTo('pedir')"><span class="sym f">shopping_bag</span><span class="bi-lbl">Pedir</span></button>
   <button class="bi" id="nav-rastrear" onclick="navTo('rastrear')"><span class="sym">search</span><span class="bi-lbl">Rastrear</span></button>
   <button class="bi" onclick="window.location.href='soporte.html'"><span class="sym">person</span><span class="bi-lbl">Soporte</span></button>
@@ -1863,7 +1872,7 @@ async function enviarCalificacion(){if(!state.califActual||!state.pedidoRastread
 function copiarId(){if(!state.idPedido)return;if(navigator.clipboard)navigator.clipboard.writeText(state.idPedido).then(function(){mostrarToast('Código copiado: '+state.idPedido,'content_copy');});else mostrarToast('Tu código: '+state.idPedido,'info');}
 function irARastrear(){navTo('rastrear');var inp=document.getElementById('rastrearInput');if(inp&&state.idPedido){inp.value=state.idPedido;rtAbrirPopup();setTimeout(rastrearPedido,200);}else rtAbrirPopup();}
 function formatCOP(n){return '$'+(n||0).toLocaleString('es-CO');}
-function resetAll(){state={comercioTiene:null,comercioNombre:'',presupuesto:0,productos:[],direccion:'',referencia:'',nombre:'',telefono:'',metodoPago:null,metodoPagoPaquete:null,coords:null,barrio:'',precioDomicilio:0,paqueteZona:'',paqueteZonaNombre:'',idPedido:null,califActual:0,pedidoRastreado:null,categoriaPreset:''};historial=['view-inicio'];clearInterval(cliPollTimer);clearInterval(_domiPollUbicTimer);}
+function resetAll(){state={comercioTiene:null,comercioNombre:'',presupuesto:0,productos:[],direccion:'',referencia:'',nombre:'',telefono:'',metodoPago:null,metodoPagoPaquete:null,coords:null,barrio:'',precioDomicilio:0,paqueteZona:'',paqueteZonaNombre:'',idPedido:null,califActual:0,pedidoRastreado:null,categoriaPreset:''};historial=['view-inicio'];clearInterval(cliPollTimer);clearInterval(_domiPollUbicTimer);rtDetenerPolling();}
 
 /* ── CHAT CLIENTE ── */
 var cliChatAbierto=false,cliMensajes=[],cliUnread=0,cliLastMsgId=0,cliPollTimer=null,cliPedidoId=null;
@@ -2010,11 +2019,16 @@ async function rastrearPedido(){
     state.pedidoRastreado = p;
 
     /* ── 4. Mostrar resultado ── */
+    /* ── 4. Mostrar resultado ── */
     rtCerrarPopup();
-    document.getElementById('rt-empty').style.display  = 'none';
-    document.getElementById('rt-result').style.display = 'flex';
+    mostrarToast('✅ Código #' + id + ' encontrado', 'check_circle');
+    setTimeout(function(){
+      document.getElementById('rt-empty').style.display  = 'none';
+      document.getElementById('rt-result').style.display = 'flex';
+      setTimeout(function(){ window._initMapResult(p); }, 100);
+    }, 900);
 
-    setTimeout(function(){ window._initMapResult(p); }, 100);
+    
 
     document.getElementById('rtValidatedRow').style.display = 'flex';
     document.getElementById('rtPartnerName').textContent = p.comercio || 'Domicilios WIL';
@@ -2131,7 +2145,7 @@ async function rastrearPedido(){
     cliActivarChat(p);
     mostrarChatFab(p);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-
+    rtIniciarPolling();
   } catch(e) {
     btn.innerHTML = '<span class="sym" style="font-size:22px">search</span>';
     btn.disabled  = false;
@@ -2147,6 +2161,174 @@ if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch
    📅 VERIFICACIÓN DE HORARIO — se ejecuta al cargar
 ═══════════════════════════════════════════════ */
 const SHEET_ID_WIL = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+
+/* ═══════════════════════════════════════════════
+   🔄 POLLING TIEMPO REAL — estado + domi + GPS
+   Lee hoja Pedidos (estado) y hoja Domiciliarios
+═══════════════════════════════════════════════ */
+var _rtPollTimer = null;
+var DOMIS_SHEET_NAME = 'Domiciliarios'; // ← nombre exacto de tu hoja
+
+async function _rtPollCiclo() {
+  var p = state.pedidoRastreado;
+  if (!p || !p.id) return;
+  var SHEET_ID = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+
+  try {
+    /* ── A. Re-leer estado del pedido ── */
+    var urlP = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
+             + '/gviz/tq?tqx=out:csv&sheet=Pedidos&cachebust=' + Date.now();
+    var resP = await fetch(urlP, { cache: 'no-store' });
+    var txtP = await resP.text();
+    var linesP = txtP.trim().split('\n');
+
+    function parseCsvLine(line){
+      var result=[], cur='', inQ=false;
+      for(var i=0;i<line.length;i++){
+        var c=line[i];
+        if(c==='"'){ if(inQ&&line[i+1]==='"'){cur+='"';i++;} else inQ=!inQ; }
+        else if(c===','&&!inQ){ result.push(cur.trim()); cur=''; }
+        else cur+=c;
+      }
+      result.push(cur.trim());
+      return result;
+    }
+
+    // Buscar fila principal del pedido (col A = ID)
+    var f0 = null;
+    for(var i = 1; i < linesP.length; i++){
+      var cols = parseCsvLine(linesP[i]);
+      if((cols[0]||'').trim() === p.id){ f0 = cols; break; }
+    }
+    if(!f0) return;
+
+    var nuevoEstado    = f0[4]  || p.estado;
+    var nuevoDomi      = f0[15] || p.domiciliario;
+    var nuevaHoraProceso = f0[16] || p.horaEnProceso;
+    var nuevaHoraCamino  = f0[17] || p.horaEnCamino;
+    var nuevaHoraEntrega = f0[18] || p.horaEntrego;
+
+    /* Si cambió el estado: actualizar stepper + dot ── */
+    if(nuevoEstado !== p.estado){
+      p.estado = nuevoEstado;
+      var COLS2 = {'Pendiente':'#f59e0b','Confirmado':'#3b82f6','En camino':'#8b5cf6','Entregado':'#16a34a','Cancelado':'#dc2626'};
+      var col2 = COLS2[nuevoEstado] || '#006970';
+      var pb2 = document.getElementById('estadoPingBase');
+      var pp2 = document.getElementById('estadoPing');
+      if(pb2) pb2.style.background = col2;
+      if(pp2){ pp2.style.background = col2; pp2.style.animation = (nuevoEstado==='En camino'||nuevoEstado==='Confirmado')?'pingDot 1.5s ease-in-out infinite':'none'; }
+      var ELABELS = {'Pendiente':'⏳ Recibido','Confirmado':'✅ Confirmado','En camino':'🛵 En camino','Entregado':'🏠 Entregado','Cancelado':'❌ Cancelado'};
+      var elLbl = document.getElementById('estadoLabel');
+      if(elLbl){ elLbl.textContent = ELABELS[nuevoEstado]||nuevoEstado; elLbl.style.color = col2; }
+      rtActualizarStepper(nuevoEstado);
+      mostrarToast('Estado actualizado: ' + nuevoEstado, 'update');
+      /* Mostrar calificar si entregado */
+      var secCal = document.getElementById('seccionCalificar');
+      if(secCal) secCal.style.display = (nuevoEstado==='Entregado') ? 'block' : 'none';
+    }
+
+    /* Actualizar horas en el grid si cambiaron */
+    p.horaEnProceso = nuevaHoraProceso;
+    p.horaEnCamino  = nuevaHoraCamino;
+    p.horaEntrego   = nuevaHoraEntrega;
+
+    /* ── B. Leer hoja Domiciliarios para foto + GPS ── */
+    if(!nuevoDomi || !nuevoDomi.trim()) return;
+    p.domiciliario = nuevoDomi;
+
+    var urlD = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
+             + '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent(DOMIS_SHEET_NAME)
+             + '&cachebust=' + Date.now();
+    var resD = await fetch(urlD, { cache: 'no-store' });
+    var txtD = await resD.text();
+    var linesD = txtD.trim().split('\n');
+
+    // Cabeceras esperadas:
+    // A=0 ID_DOMI  B=1 NOMBRE  C=2 CLAVE  D=3 TELEFONO  E=4 FOTO  F=5 ACTIVO  G=6 ACTIVIDAD(coords)
+    var domiRow = null;
+    var nombreDomiLower = nuevoDomi.replace(/\s*\([^)]+\)/,'').trim().toLowerCase();
+    for(var j = 1; j < linesD.length; j++){
+      var dcols = parseCsvLine(linesD[j]);
+      var dnombre = (dcols[1]||'').trim().toLowerCase();
+      if(dnombre && nombreDomiLower.indexOf(dnombre) !== -1 || dnombre === nombreDomiLower){
+        domiRow = dcols; break;
+      }
+    }
+    if(!domiRow) return;
+
+    var dFoto      = (domiRow[4]||'').trim();  // columna E FOTO
+    var dActivo    = (domiRow[5]||'').trim();  // columna F ACTIVO
+    var dActividad = (domiRow[6]||'').trim();  // columna G ACTIVIDAD (lat,lng)
+
+    /* Actualizar avatar con foto real */
+    var avEl = document.getElementById('domiFotoWrap');
+    var nombreDomiDisplay = nuevoDomi.replace(/\s*\([^)]+\)/,'').trim();
+    if(avEl && dFoto && dFoto.startsWith('http')){
+      if(!avEl.querySelector('img')){
+        avEl.innerHTML = '<img src="'+dFoto+'" style="width:100%;height:100%;object-fit:cover;object-position:center 20%" '
+          +'onerror="this.parentElement.textContent=\''+nombreDomiDisplay.charAt(0).toUpperCase()+'\'">';
+      }
+    }
+
+    /* Actualizar card domi: nombre + estado */
+    var dcNombre = document.getElementById('domiNombre');
+    if(dcNombre) dcNombre.textContent = nombreDomiDisplay;
+    var estadoTxtMap = {
+      'En camino':'En camino hacia ti 🛵','Confirmado':'Pedido confirmado ✅',
+      'Entregado':'Entregado 🏠','Pendiente':'Asignando…'
+    };
+    var horaClave = nuevaHoraCamino || nuevaHoraProceso || '';
+    var domiEstEl = document.getElementById('domiEstadoTxt');
+    if(domiEstEl){
+      domiEstEl.textContent = (estadoTxtMap[p.estado]||p.estado) + (horaClave ? '  ·  '+horaClave : '');
+    }
+
+    /* Mostrar card domi si no estaba visible */
+    var dc = document.getElementById('domiCard');
+    if(dc && nombreDomiDisplay) dc.style.display = 'block';
+
+    /* ── C. Actualizar GPS en el mapa con coordenada de ACTIVIDAD ── */
+    if(dActividad){
+      // Formato esperado: "6.34911,-75.50619" o "[6.34911,-75.50619]"
+      var coordMatch = dActividad.match(/(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
+      if(coordMatch){
+        var dLat = parseFloat(coordMatch[1]);
+        var dLng = parseFloat(coordMatch[2]);
+        if(!isNaN(dLat) && !isNaN(dLng) && mapResult){
+          if(domiMarkerResult){
+            domiMarkerResult.setLatLng([dLat, dLng]);
+          } else {
+            domiMarkerResult = L.marker([dLat,dLng],{
+              icon: iconDomi(nombreDomiDisplay, true), zIndexOffset:1000
+            }).addTo(mapResult);
+          }
+          /* Re-trazar ruta desde nueva posición domi */
+          var dirRaw = p.direccion || '';
+          var coordsDestM = dirRaw.match(/\[(-?\d+\.\d+),\s*(-?\d+\.\d+)\]/);
+          if(coordsDestM){
+            trazarRutaResult(dLat, dLng,
+              parseFloat(coordsDestM[1]), parseFloat(coordsDestM[2]), p);
+          }
+        }
+      }
+    }
+
+  } catch(e){
+    // Silencioso — no rompe nada si falla un ciclo
+    console.warn('[poll]', e.message);
+  }
+}
+
+function rtIniciarPolling(){
+  clearInterval(_rtPollTimer);
+  _rtPollTimer = setInterval(_rtPollCiclo, 5000);
+}
+function rtDetenerPolling(){
+  clearInterval(_rtPollTimer);
+}
+
+
+
 
 async function verificarHorarioCliente() {
   try {
