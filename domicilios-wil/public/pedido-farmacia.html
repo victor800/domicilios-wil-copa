@@ -2191,15 +2191,16 @@ function loadSheet(){
             .trim();
         };
  
-        var nombre = col(0); // A NOMBRE/DESCRIPCION
-        var lab    = col(1); // B LABORATORIO
-        var unidad = col(2); // C PRESENTACION
-        var precioV= _parsePrecioNP(col(3)); // D PRECIO_VENTA
-        var precioU= _parsePrecioNP(col(4)); // E PRECIO_UNIDAD
-        var imagen = col(5); // F IMAGEN ← NUEVO: ya no es string vacío
- 
+        var nombre = col(0);
+        var lab    = col(1);
+        var unidad = col(2);
+        var precioV= _parsePrecioNP(col(3));
+        var precioU= _parsePrecioNP(col(4));
+        var imagen = col(5);
+        var stock  = parseInt(col(6)) || 3; // F=Stock, default 3
+
         if(!nombre) return;
- 
+
         var key = nombre + '|||' + lab;
         var it = {
           desc:   nombre,
@@ -2207,9 +2208,24 @@ function loadSheet(){
           unidad: unidad,
           precio: precioV || precioU,
           pUnit:  precioU || precioV,
-          imagen: imagen,   // ← guarda la URL real
+          imagen: imagen,
+          stock:  stock,
           key:    key
         };
+
+        // Deduplicar: si ya existe con mismo nombre, preferir el que tiene imagen
+        var existing = cache[key];
+        if(existing){
+          if(!existing.imagen && imagen) {
+            // reemplazar por el que tiene foto
+            var idx = items.findIndex(function(x){ return x.key === key; });
+            if(idx >= 0) items[idx] = it;
+            cache[key] = it;
+          }
+          // si el existente ya tiene imagen, no reemplazar
+          return;
+        }
+
         items.push(it);
         cache[key] = it;
       });
@@ -2605,15 +2621,24 @@ function setSt(st){
 /* ══ CARRITO ══ */
 function addToCart(key,btn){
   var it=cache[key];if(!it)return;
+  var stockDisp = it.stock !== undefined ? it.stock : 3;
+  var enCarrito = cart[key] ? cart[key].qty : 0;
+  if(enCarrito >= stockDisp){
+    mostrarToastFarmacia('⚠️ Stock agotado para este producto');
+    return;
+  }
   var esNuevo=!cart[key];
   if(cart[key])cart[key].qty++;
-  else{cart[key]={it:it,qty:1};if(btn){btn.style.background='var(--green)';btn.innerHTML='<span class="sym symf" style="font-size:17px">check</span>';}}
-  if(btn){btn.style.transform='scale(1.3)';setTimeout(function(){btn.style.transform='';},180);}
-  updFAB();renderCart();
-  _toastCarrito(it.desc, esNuevo);
 }
 
 function sadd(key,desc,lab,precio,btn){
+  // Verificar stock
+  var stockDisp = cache[key] ? (cache[key].stock !== undefined ? cache[key].stock : 3) : 3;
+  var enCarrito = cart[key] ? cart[key].qty : 0;
+  if(enCarrito >= stockDisp){
+    mostrarToastFarmacia('⚠️ Stock agotado para este producto');
+    return;
+  }
   var esNuevo=!cart[key];
   if(cart[key])cart[key].qty++;
   else{cart[key]={it:{desc:desc,lab:lab,precio:precio,pUnit:0,unidad:'',key:key},qty:1};if(btn){btn.classList.add('on');btn.innerHTML='<span class="sym symf" style="font-size:16px">check</span>';}}
@@ -3158,7 +3183,10 @@ async function coEnviarPedido(){
   var domVal=modoEntrega==='reco'?0:(coDomicilio||CO_DEFAULT_PRECIO);
   var totalFinal=subtotal+domVal;
   var modoLabel=modoEntrega==='domi'?'DOMICILIO':'RECOGIDA_EN_TIENDA';
+  // Validar que el comercio esté bien definido
   var comercioLabel = tienda === 'central' ? 'Droguería Central' : 'Farma Expertos';
+  var hojaStock = tienda === 'central' ? 'STOCK_DROGUERIA_CENTRAL' : 'STOCK_DROGUERIA_EXPERTOS';
+  console.log('[Pedido] Comercio:', comercioLabel, '| Hoja:', hojaStock, '| Productos:', Object.keys(cart).length);
 
   var rows=[];
   items.forEach(function(c,i){
@@ -3193,6 +3221,8 @@ var imgTransf = (coPago === 'TRANSFERENCIA' && _comprobanteBase64)
     rows:rows,
     id:idPedido,
     sede:tienda,
+    hojaStock:hojaStock,
+    comercio:comercioLabel,
     nombre:nom,
     telefono:tel,
     total:totalFinal,
