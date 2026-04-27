@@ -1102,6 +1102,10 @@ var _histModo        = 'hoy';  // 'hoy'|'ayer'|'5dias'|'mes'|'todas'
 var _histFechaEsp    = '';     // 'YYYY-MM-DD' cuando viene del calendario
 var _histDrawersAbiertos = new Set();
 var _wfOpen = false;
+var SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 horas
+var WIL_SESSION_KEY = 'wil_domi';
+var WIL_SESSION_TS  = 'wil_domi_ts';
+
 
 
 const SHEET_ID_DOMI   = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
@@ -1126,6 +1130,178 @@ function renderFilaProducto(pr, i) {
     + '<div><div class="ticket-row-precio">' + (pr.precio || '—') + '</div>' + vuHtml + '</div>'
     + '</div>';
 }
+
+/* ── 1. Renovar timestamp cada vez que el domi está activo ── */
+function _renovarSesion() {
+  try {
+    localStorage.setItem(WIL_SESSION_TS, String(Date.now()));
+  } catch(e) {}
+}
+
+/* ── 2. Validar si la sesión sigue vigente (< 8 horas) ── */
+function _sesionVigente() {
+  try {
+    var ts = parseInt(localStorage.getItem(WIL_SESSION_TS) || '0');
+    if (!ts) {
+      // Primera vez con este parche → guardar timestamp ahora
+      _renovarSesion();
+      return true;
+    }
+    return (Date.now() - ts) < SESSION_TTL_MS;
+  } catch(e) { return true; }
+}
+
+/* ── 3. Renovar timestamp al arrancar ── */
+_renovarSesion();
+
+/* ── 4. Renovar timestamp en cualquier interacción ── */
+['click', 'touchstart', 'keydown'].forEach(function(ev) {
+  document.addEventListener(ev, _renovarSesion, { passive: true });
+});
+
+/* ── 5. Renovar cada 30 min mientras esté activo en RAM ── */
+setInterval(_renovarSesion, 30 * 60 * 1000);
+
+/* ── 6. Listener principal: cuando el app vuelve al frente ── */
+var _ultimoResume = 0;
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState !== 'visible') return;
+
+  var ahora = Date.now();
+  // Evitar disparos dobles en < 3 segundos
+  if (ahora - _ultimoResume < 3000) return;
+  _ultimoResume = ahora;
+
+  /* ── ¿Sesión expiró? → login ── */
+  if (!_sesionVigente()) {
+    console.log('[WIL] Sesión expirada (> 8h) → redirigir login');
+    window.location.replace('domi-login.html');
+    return;
+  }
+
+  /* ── Sesión OK → renovar y refrescar datos ── */
+  _renovarSesion();
+  console.log('[WIL] App volvió al frente → refrescando datos...');
+
+  // Refrescar pedidos e historial sin recargar página
+  fetchPedidos();
+  fetchHistorialSheet();
+
+  // Si el tracker estaba activo y se detuvo, reactivarlo
+  if (TRK.activo && TRK.watchId === null) {
+    console.log('[WIL] Reactivando tracker GPS tras resume...');
+    trkActivar();
+  }
+
+  // Actualizar mapa si hay pedido activo
+  if (state.pedidoActivo && _tabMap) {
+    setTimeout(function() {
+      _tabMap.invalidateSize({ animate: false });
+      if (TRK.lat && destLatGlobal) {
+        dibujarRutaOSRM(TRK.lat, TRK.lng, destLatGlobal, destLngGlobal);
+      }
+    }, 400);
+  }
+});
+
+/* ── 7. Para Android WebView: página.onresume nativo ── */
+window.addEventListener('pageshow', function(e) {
+  // persisted = true → viene del bfcache (back/forward cache del SO)
+  if (e.persisted) {
+    console.log('[WIL] pageshow persisted → forzando refresh');
+    if (!_sesionVigente()) {
+      window.location.replace('domi-login.html');
+      return;
+    }
+    _renovarSesion();
+    fetchPedidos();
+    fetchHistorialSheet();
+  }
+});
+
+/* ── 8. Guardar estado del pedido activo en localStorage
+        para sobrevivir a recargas forzadas del WebView ── */
+var WIL_PEDIDO_KEY = 'wil_pedido_activo';
+
+function _guardarPedidoActivo() {
+  try {
+    if (state.pedidoActivo) {
+      localStorage.setItem(WIL_PEDIDO_KEY, JSON.stringify({
+        pedido: state.pedidoActivo,
+        estadoPedido: state.estadoPedido,
+        destLat: destLatGlobal,
+        destLng: destLngGlobal,
+        ts: Date.now()
+      }));
+    } else {
+      localStorage.removeItem(WIL_PEDIDO_KEY);
+    }
+  } catch(e) {}
+}
+
+function _restaurarPedidoActivo() {
+  try {
+    var raw = localStorage.getItem(WIL_PEDIDO_KEY);
+    if (!raw) return;
+    var d = JSON.parse(raw);
+    // Solo restaurar si es reciente (< 8h)
+    if (!d || (Date.now() - (d.ts || 0)) > SESSION_TTL_MS) {
+      localStorage.removeItem(WIL_PEDIDO_KEY);
+      return;
+    }
+    if (d.pedido && !state.pedidoActivo) {
+      console.log('[WIL] Restaurando pedido activo desde storage:', d.pedido.id);
+      state.pedidoActivo = d.pedido;
+      state.estadoPedido = d.estadoPedido;
+      destLatGlobal = d.destLat;
+      destLngGlobal = d.destLng;
+      activarPedidoEnRuta(d.pedido);
+      actualizarBadgesNav();
+      // Restaurar step del stepper
+      var pasoMap = { 'En camino': 1, 'Entregado': 2, 'Cancelado': 2 };
+      var paso = pasoMap[d.estadoPedido] || 0;
+      renderStepper(paso);
+    }
+  } catch(e) {
+    console.warn('[WIL] Error restaurando pedido:', e.message);
+    localStorage.removeItem(WIL_PEDIDO_KEY);
+  }
+}
+
+/* ── 9. Hookear _guardarPedidoActivo en los puntos clave ── */
+var _origActivar = activarPedidoEnRuta;
+activarPedidoEnRuta = function(p) {
+  _origActivar(p);
+  setTimeout(_guardarPedidoActivo, 300);
+};
+
+var _origMarcarEncamino = marcarEncamino;
+marcarEncamino = function() {
+  _origMarcarEncamino();
+  setTimeout(_guardarPedidoActivo, 1000);
+};
+
+var _origMarcarEntregado = marcarEntregado;
+marcarEntregado = function() {
+  _origMarcarEntregado();
+  // Limpiar storage al entregar
+  setTimeout(function() {
+    localStorage.removeItem(WIL_PEDIDO_KEY);
+  }, 2500);
+};
+
+var _origCancelar = cancelarPedidoActivo;
+cancelarPedidoActivo = function() {
+  _origCancelar();
+  setTimeout(function() {
+    localStorage.removeItem(WIL_PEDIDO_KEY);
+  }, 1000);
+};
+
+/* ── 10. Al cargar: restaurar pedido activo si había uno ── */
+setTimeout(_restaurarPedidoActivo, 1500);
+
+console.log('[WIL Sesión 8h] ✅ Parche cargado — TTL:', SESSION_TTL_MS / 3600000, 'horas');
 
 
 function parseCOP(v){
@@ -4087,37 +4263,99 @@ try {
   }, 60 * 1000); /* revisa cada 1 min, pero solo dispara cada 5 */
 })();
 
-setTimeout(function () {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js', { scope: '/' })
-      .then(function (reg) {
-        window._wilSwReg = reg; /* referencia global para notif pendientes */
-        /* Enviar datos del domi al SW para polling en background */
-        navigator.serviceWorker.ready.then(function () {
-          if (navigator.serviceWorker.controller) {
-            navigator.serviceWorker.controller.postMessage({
-              type: 'GUARDAR_DOMI',
-              domi: domi,
-              notifIds: []  /* sin localStorage → siempre vacío */
-            });
-          }
-        });
-      })
-      .catch(function (e) { console.warn('[SW]', e); });
- 
-    /* Escuchar mensajes del SW (ej: clic en notif fuera de la app) */
-    navigator.serviceWorker.addEventListener('message', function (e) {
-      var msg = e.data || {};
-      if (msg.type === 'OPEN_PEDIDOS') switchTab('pedidos');
-      if (msg.type === 'BG_POLL_RESULT' && msg.asignadosCount > 0) fetchPedidos();
-    });
-  }
- 
-  /* Pedir permiso de notificación si no lo tiene */
+setTimeout(async function () {
+
   if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission();
+    try { await Notification.requestPermission(); } catch(e) {}
   }
+
+  if ('geolocation' in navigator) {
+    navigator.geolocation.getCurrentPosition(
+      function(pos) {
+        TRK.lat = pos.coords.latitude;
+        TRK.lng = pos.coords.longitude;
+        TRK.acc = Math.round(pos.coords.accuracy);
+        if (!TRK.activo) trkActivar();
+      },
+      function(err) { console.warn('[GPS]', err.message); },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }
+
+  if (!('serviceWorker' in navigator)) return;
+
+  try {
+    var reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+    window._wilSwReg = reg;
+    await navigator.serviceWorker.ready;
+
+    function _enviarDomiAlSW() {
+      if (navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'GUARDAR_DOMI', domi: domi, notifIds: []
+        });
+      }
+    }
+    _enviarDomiAlSW();
+
+    reg.addEventListener('updatefound', function() {
+      var nuevo = reg.installing;
+      nuevo.addEventListener('statechange', function() {
+        if (nuevo.state === 'activated') _enviarDomiAlSW();
+      });
+    });
+
+  } catch(e) { console.warn('[SW]', e.message); }
+
+  navigator.serviceWorker.addEventListener('message', function(e) {
+    var msg = e.data || {};
+    if (msg.type === 'BG_POLL_RESULT') {
+      fetchPedidos();
+      if (msg.asignadosCount > 0) fetchHistorialSheet();
+    }
+    if (msg.type === 'OPEN_PEDIDOS') switchTab('pedidos');
+    if (msg.type === 'OPEN_RUTA')    switchTab('ruta');
+  });
+
 }, 800);
+
+function _avisarVisibilidadAlSW(visible) {
+  if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({ type: 'APP_VISIBLE', visible: visible });
+  }
+}
+
+document.addEventListener('visibilitychange', function() {
+  var visible = document.visibilityState === 'visible';
+  _avisarVisibilidadAlSW(visible);
+  if (visible) {
+    fetchPedidos();
+    fetchHistorialSheet();
+    if (state.pedidoActivo && _tabMap) {
+      setTimeout(function() {
+        _tabMap.invalidateSize({ animate: false });
+        if (TRK.lat && destLatGlobal)
+          dibujarRutaOSRM(TRK.lat, TRK.lng, destLatGlobal, destLngGlobal);
+      }, 400);
+    }
+    if (TRK.activo && TRK.watchId === null) trkActivar();
+  }
+});
+
+window.addEventListener('pageshow', function(e) {
+  if (e.persisted) {
+    _avisarVisibilidadAlSW(true);
+    fetchPedidos();
+    fetchHistorialSheet();
+  }
+});
+
+var _origCerrarSesion = cerrarSesion;
+cerrarSesion = function() {
+  if (navigator.serviceWorker && navigator.serviceWorker.controller)
+    navigator.serviceWorker.controller.postMessage({ type: 'LOGOUT' });
+  _origCerrarSesion();
+};
 
 
 window.WIL={
