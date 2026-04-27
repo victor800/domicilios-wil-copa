@@ -1338,7 +1338,8 @@ function _renderProdEnScroll(scrollId,productos,colorOffset){
         '<div class="ocard-img" style="position:relative;">'+
           (hasImg
   ? '<img src="'+_escNP(p.imagen)+'" alt="'+_escNP(p.nombre)+'"'+
-    ' style="width:100%;height:145px;object-fit:contain;object-position:center;padding:6px;display:block;"'+
+    ' style="width:100%;height:145px;object-fit:contain;object-position:center;padding:6px;"'+
+
     ' onerror="this.style.display=\'none\';document.getElementById(\'icon_fb_'+addKey+'\').style.display=\'flex\'">'
    +'<span id="icon_fb_'+addKey+'" class="sym symf" style="font-size:80px;color:'+c1+';opacity:.85;display:none;align-items:center;justify-content:center;width:100%;height:100%">'+icon+'</span>'
   : '<span class="sym symf" style="font-size:80px;color:'+c1+';opacity:.85">'+icon+'</span>'
@@ -2234,17 +2235,44 @@ function loadSheet(){
         };
 
         var dk = nrm(nombre) + '|||' + nrm(lab);
-        if(seen[dk] !== undefined){
-          // Dedup: reemplazar solo si nuevo tiene foto y viejo no
-          var prev = items[seen[dk]];
-          var nFoto = imagen && imagen.startsWith('http');
-          var vFoto = prev.imagen && prev.imagen.startsWith('http');
-          if(nFoto && !vFoto){ items[seen[dk]] = it; cache[it.key] = it; }
-          return;
-        }
-        seen[dk] = items.length;
-        items.push(it);
-        cache[it.key] = it;
+if(seen[dk] !== undefined){
+  var prev = items[seen[dk]];
+  var nFoto = imagen && imagen.startsWith('http');
+  var vFoto = prev.imagen && prev.imagen.startsWith('http');
+  if(nFoto && !vFoto){ items[seen[dk]] = it; cache[it.key] = it; }
+  return;
+}
+seen[dk] = items.length;
+items.push(it);
+cache[it.key] = it;
+
+// DESPUÉS — agrega también dedup por nombre solo (sin lab):
+var dkFull = nrm(nombre) + '|||' + nrm(lab);
+var dkName = nrm(nombre);          // ← clave solo por nombre
+
+var nFoto = imagen && imagen.startsWith('http');
+
+// Revisar si ya existe por nombre+lab O solo por nombre
+var existIdx = seen[dkFull] !== undefined ? seen[dkFull]
+             : (seen[dkName] !== undefined ? seen[dkName] : -1);
+
+if(existIdx >= 0){
+  var prev = items[existIdx];
+  var vFoto = prev.imagen && prev.imagen.startsWith('http');
+  // Reemplazar SOLO si el nuevo tiene foto y el viejo no
+  if(nFoto && !vFoto){
+    items[existIdx] = it;
+    cache[it.key] = it;
+    // Actualizar ambas claves al nuevo key
+    seen[dkFull] = existIdx;
+    seen[dkName] = existIdx;
+  }
+  return;
+}
+seen[dkFull] = items.length;
+seen[dkName] = items.length;   // ← registrar también sin lab
+items.push(it);
+cache[it.key] = it;
       });
 
       if(!items.length) throw new Error('No products');
@@ -2565,7 +2593,8 @@ function renderResults(items,q){
         (hasImg
           ? '<img src="'+escFarmacia(img)+'"'+
             ' style="width:100%;height:130px;object-fit:contain;object-position:center;'+
-            'padding:6px;display:block;'+(agotado?'filter:grayscale(.45);opacity:.7;':'')+'"'+
+'padding:6px;'+(agotado?'filter:grayscale(.55);opacity:.65;':'')+'"'+
+
             ' onerror="this.style.display=\'none\';'+
             'var f=document.getElementById(\''+uid+'\');if(f)f.style.display=\'flex\'">'
           : '')+
@@ -3324,17 +3353,30 @@ var imgTransf = (coPago === 'TRANSFERENCIA' && _comprobanteBase64)
 function _coExito(idPedido, tel){
   // ── Restar stock en la hoja (best-effort) ──
   try {
-    var itemsToDebit = Object.values(cart).map(function(c){
-      return { key: c.it.key, qty: c.qty };
-    });
-    // Reemplaza esta URL con la URL de despliegue del Code.gs como Web App
-    var GAS_STOCK = 'https://script.google.com/macros/s/AKfycbzr1YMVygPn28IburByI2FrnMlFcOf5XBi9HIeT2TZVRjFMXHGSuoCuwxwBTMdmRjw7uA/exec';
-    fetch(GAS_STOCK, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ accion: 'rebajar-stock', drogueria: tienda, items: itemsToDebit })
-    }).catch(function(e){ console.warn('[rebajarStock]', e); });
-  } catch(e){ console.warn('[rebajarStock]', e); }
+  var itemsToDebit = Object.values(cart).map(function(c){
+    return {
+      key:   c.it.key,
+      desc:  c.it.desc,
+      lab:   c.it.lab || '',
+      qty:   c.qty
+    };
+  });
+
+  var GAS_STOCK = 'https://script.google.com/macros/s/AKfycbzr1YMVygPn28IburByI2FrnMlFcOf5XBi9HIeT2TZVRjFMXHGSuoCuwxwBTMdmRjw7uA/exec';
+
+  fetch(GAS_STOCK, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({
+      accion:    'rebajar-stock',
+      drogueria: tienda,
+      comercio:  tienda === 'central' ? 'Droguería Central' : 'Farma Expertos',
+      items:     itemsToDebit,
+      // Si qty vendida > 3 en una sola compra → marcar stock = 0
+      marcarAgotadoSi: 3
+    })
+  }).catch(function(e){ console.warn('[rebajarStock]', e); });
+} catch(e){ console.warn('[rebajarStock]', e); }
 
   // ── Resto igual que antes ──
   coStep = 3;
