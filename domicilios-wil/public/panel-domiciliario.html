@@ -4357,6 +4357,44 @@ cerrarSesion = function() {
   _origCerrarSesion();
 };
 
+function _avisarVisibilidadAlSW(visible) {
+  if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({ type: 'APP_VISIBLE', visible: visible });
+  }
+}
+
+document.addEventListener('visibilitychange', function() {
+  var visible = document.visibilityState === 'visible';
+  _avisarVisibilidadAlSW(visible);
+  if (visible) {
+    fetchPedidos();
+    fetchHistorialSheet();
+    if (state.pedidoActivo && _tabMap) {
+      setTimeout(function() {
+        _tabMap.invalidateSize({ animate: false });
+        if (TRK.lat && destLatGlobal)
+          dibujarRutaOSRM(TRK.lat, TRK.lng, destLatGlobal, destLngGlobal);
+      }, 400);
+    }
+    if (TRK.activo && TRK.watchId === null) trkActivar();
+  }
+});
+
+window.addEventListener('pageshow', function(e) {
+  if (e.persisted) {
+    _avisarVisibilidadAlSW(true);
+    fetchPedidos();
+    fetchHistorialSheet();
+  }
+});
+
+var _origCerrarSesion = cerrarSesion;
+cerrarSesion = function() {
+  if (navigator.serviceWorker && navigator.serviceWorker.controller)
+    navigator.serviceWorker.controller.postMessage({ type: 'LOGOUT' });
+  _origCerrarSesion();
+};
+
 
 window.WIL={
   nuevoPedido:function(p){state.pedidos.push(p);renderPedidos();},
