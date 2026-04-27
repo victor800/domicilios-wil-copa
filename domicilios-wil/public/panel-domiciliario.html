@@ -4996,6 +4996,32 @@ function _wwCerrar(omitido) {
   }, 380);
 }
 
+/* ═══ PARCHE — Bienvenida + Confirmar cierre sesión ═══ */
+
+/* 1. Saludo con nombre real (col B del sheet, ya en domi.nombre) */
+var _wwNombreReal = (domi && domi.nombre && domi.nombre.trim()
+  ? domi.nombre.trim().split(' ')[0]
+  : 'domiciliario');
+
+var _origCrearWW = _crearWelcomePopup;
+_crearWelcomePopup = function() {
+  _origCrearWW();
+  var titulo = document.querySelector('#wilWelcomeBox .ww-title');
+  if (titulo) titulo.textContent = '¡Hola, ' + _wwNombreReal + '!';
+};
+
+/* 2. Confirmación al cerrar sesión */
+var _origCerrarSesionConfirm = cerrarSesion;
+cerrarSesion = function() {
+  var ok = confirm(
+    '¿Cerrar sesión?\n\n'
+    + 'Saldrás como ' + (domi.nombre || 'domi') + '.\n'
+    + 'Deberás iniciar sesión nuevamente.'
+  );
+  if (!ok) return;
+  _origCerrarSesionConfirm();
+};
+
 /* ── INICIAR: mostrar popup al cargar si no se ha mostrado ── */
 (function iniciarWelcomeFlow() {
   // No mostrar si ya se mostró en esta sesión
