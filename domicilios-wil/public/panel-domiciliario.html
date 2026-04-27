@@ -5234,109 +5234,118 @@ marcarEntregado = function() {
 console.log('[PARCHE Historial RT v1.0] ✅ Stats en tiempo real con domicilio corregido');
 
 /* ============================================================
-   PARCHE: CORREGIR RECORTE DE FOTO EN PERFIL Y HEADER
+   PARCHE: CORREGIR FOTO DE PERFIL (sin caracteres extraños)
    ============================================================ */
 (function parcheFotoPerfil() {
-  // Esperar a que el DOM esté listo
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', aplicarParcheFoto);
+    document.addEventListener('DOMContentLoaded', aplicarParche);
   } else {
-    aplicarParcheFoto();
+    aplicarParche();
   }
 
-  function aplicarParcheFoto() {
-    // 1. CORREGIR ESTILOS DEL WRAPPER DE FOTO EN PERFIL
-    var perfilWrap = document.getElementById('perfilFotoWrap');
-    if (perfilWrap) {
-      // Asegurar que el contenedor use object-fit cover centrado
-      perfilWrap.style.cssText = [
-        'width: 100px',
-        'height: 100px',
-        'border-radius: 20px',
-        'overflow: hidden',
-        'border: 3px solid rgba(255,255,255,.4)',
-        'flex-shrink: 0',
-        'background: rgba(255,255,255,.2)',
-        'position: relative',
-        'display: flex',
-        'align-items: center',
-        'justify-content: center'
-      ].join(';');
-    }
-
-    // 2. CORREGIR LA FUNCIÓN renderPerfil() para que use object-position center
-    var renderPerfilOriginal = window.renderPerfil;
-    if (renderPerfilOriginal) {
-      window.renderPerfil = function() {
-        // Llamar función original
-        renderPerfilOriginal();
-
-        // Aplicar estilos correctos a la imagen de perfil
-        var fotoImg = document.querySelector('#perfilFotoWrap img');
-        if (fotoImg) {
-          fotoImg.style.cssText = [
-            'width: 100%',
-            'height: 100%',
-            'object-fit: cover',
-            'object-position: center 20%',  // ← clave: centra verticalmente sin cortar cabeza
-            'border-radius: 17px'
-          ].join(';');
+  function aplicarParche() {
+    // CORREGIR LA FUNCIÓN renderPerfil completamente
+    window.renderPerfil = function() {
+      var domiActual = window.domi || {};
+      var esAdminActual = window.esAdmin || false;
+      
+      // Actualizar texto básico
+      var nombreEl = document.getElementById('perfilNombre');
+      if (nombreEl) nombreEl.textContent = domiActual.nombre || '—';
+      
+      // Teléfono
+      var telNum = (domiActual.tel || domiActual.telefono || '').replace(/\D/g, '');
+      var telEl = document.getElementById('perfilTel');
+      if (telEl) {
+        telEl.innerHTML = (domiActual.tel || domiActual.telefono || '—') +
+          (telNum ? ' <a href="https://wa.me/57' + telNum + '" target="_blank" ' +
+          'style="display:inline-flex;align-items:center;justify-content:center;' +
+          'width:26px;height:26px;border-radius:50%;background:#25D366;margin-left:6px;' +
+          'vertical-align:middle;text-decoration:none">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="white">' +
+          '<path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/>' +
+          '<path d="M12 0C5.373 0 0 5.373 0 12c0 2.096.537 4.066 1.479 5.779L0 24l6.432-1.687A11.93 11.93 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.006-1.368l-.36-.214-3.716.975.992-3.625-.235-.373A9.818 9.818 0 1112 21.818z"/>' +
+          '</svg></a>' : '');
+      }
+      
+      // ID
+      var idEl = document.getElementById('perfilId');
+      if (idEl) idEl.textContent = domiActual.id || '—';
+      
+      // Estadísticas
+      var entregados = (window.state && window.state.historial) ? 
+        window.state.historial.filter(function(h) { return h.estado === 'Entregado'; }) : [];
+      var hoyEnt = entregados.filter(function(h) { return h.periodo === 'hoy'; });
+      
+      var statEntregasEl = document.getElementById('statEntregas');
+      if (statEntregasEl) statEntregasEl.textContent = entregados.length;
+      
+      var statHoyEl = document.getElementById('statHoy');
+      if (statHoyEl) statHoyEl.textContent = hoyEnt.length;
+      
+      var perfilEntregasEl = document.getElementById('perfilEntregas');
+      if (perfilEntregasEl) perfilEntregasEl.textContent = '· ' + entregados.length + ' entregas';
+      
+      var perfilCalifEl = document.getElementById('perfilCalif');
+      if (perfilCalifEl) perfilCalifEl.textContent = '—';
+      
+      var perfilRolEl = document.getElementById('perfilRol');
+      if (perfilRolEl) perfilRolEl.textContent = esAdminActual ? 'Administrador' : 'Domiciliario WIL';
+      
+      var adminBadge = document.getElementById('perfilAdminBadge');
+      if (adminBadge) {
+        if (esAdminActual) adminBadge.classList.remove('hidden');
+        else adminBadge.classList.add('hidden');
+      }
+      
+      // ⭐⭐⭐ FOTO DE PERFIL - VERSIÓN CORREGIDA (sin comillas ni < >) ⭐⭐⭐
+      var fotoWrap = document.getElementById('perfilFotoWrap');
+      if (fotoWrap) {
+        var fotoUrl = domiActual.foto || '';
+        var inicial = domiActual.nombre ? domiActual.nombre.charAt(0).toUpperCase() : '🛵';
+        
+        if (fotoUrl && fotoUrl.trim() !== '') {
+          var srcCompleta = fotoUrl.trim().startsWith('http') ? fotoUrl.trim() : 'icons/' + fotoUrl.trim();
+          // LIMPIAR: eliminar cualquier carácter HTML que pueda venir en la URL
+          srcCompleta = srcCompleta.replace(/[<>"']/g, '');
+          
+          // Crear imagen de forma segura (sin innerHTML que pueda tener comillas maliciosas)
+          fotoWrap.innerHTML = '';
+          var img = document.createElement('img');
+          img.src = srcCompleta;
+          img.alt = 'Foto de perfil';
+          img.style.cssText = 'width:100%;height:100%;object-fit:cover;object-position:center 20%;border-radius:17px';
+          img.onerror = function() {
+            // Si falla la imagen, mostrar inicial
+            fotoWrap.innerHTML = '<span style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:2rem;color:#fff;display:flex;align-items:center;justify-content:center;width:100%;height:100%">' + inicial + '</span>';
+          };
+          fotoWrap.appendChild(img);
+        } else {
+          fotoWrap.innerHTML = '<span style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:2rem;color:#fff;display:flex;align-items:center;justify-content:center;width:100%;height:100%">' + inicial + '</span>';
         }
-
-        // También corregir foto del header
-        var headerImg = document.getElementById('headerFotoImg');
-        if (headerImg && headerImg.src && !headerImg.src.includes('icon-192')) {
-          headerImg.style.cssText = [
-            'width: 100%',
-            'height: 100%',
-            'object-fit: cover',
-            'object-position: center 20%'
-          ].join(';');
+      }
+      
+      // Foto del header también
+      var headerImg = document.getElementById('headerFotoImg');
+      if (headerImg) {
+        var fotoHeader = domiActual.foto || '';
+        if (fotoHeader && fotoHeader.trim() !== '') {
+          var srcHeader = fotoHeader.trim().startsWith('http') ? fotoHeader.trim() : 'icons/' + fotoHeader.trim();
+          srcHeader = srcHeader.replace(/[<>"']/g, '');
+          headerImg.src = srcHeader;
+          headerImg.style.cssText = 'width:100%;height:100%;object-fit:cover;object-position:center 20%';
+          headerImg.onerror = function() { this.style.display = 'none'; };
+          headerImg.style.display = 'block';
+        } else {
+          headerImg.style.display = 'none';
         }
-      };
+      }
+    };
+    
+    // Ejecutar inmediatamente si ya existe el DOM
+    if (window.domi && window.renderPerfil) {
+      window.renderPerfil();
     }
-
-    // 3. Si la foto ya existe en el DOM, aplicarle estilos directamente
-    var fotoPerfilExistente = document.querySelector('#perfilFotoWrap img');
-    if (fotoPerfilExistente) {
-      fotoPerfilExistente.style.cssText = [
-        'width: 100%',
-        'height: 100%',
-        'object-fit: cover',
-        'object-position: center 20%',
-        'border-radius: 17px'
-      ].join(';');
-    }
-
-    var fotoHeaderExistente = document.getElementById('headerFotoImg');
-    if (fotoHeaderExistente && fotoHeaderExistente.src && !fotoHeaderExistente.src.includes('icon-192')) {
-      fotoHeaderExistente.style.cssText = [
-        'width: 100%',
-        'height: 100%',
-        'object-fit: cover',
-        'object-position: center 20%'
-      ].join(';');
-    }
-
-   
-    var observador = new MutationObserver(function(mutations) {
-      mutations.forEach(function(mutation) {
-        if (mutation.type === 'childList') {
-          var nuevaImg = document.querySelector('#perfilFotoWrap img');
-          if (nuevaImg && !nuevaImg._parcheado) {
-            nuevaImg._parcheado = true;
-            nuevaImg.style.cssText = [
-              'width: 100%',
-              'height: 100%',
-              'object-fit: cover',
-              'object-position: center 20%',
-              'border-radius: 17px'
-            ].join(';');
-          }
-        }
-      });
-    });
-    observador.observe(document.body, { childList: true, subtree: true });
   }
 })();
 
