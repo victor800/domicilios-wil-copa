@@ -485,203 +485,200 @@ body{min-height:100dvh;font-family:'Inter',sans-serif;background:#f8f9fa;color:#
       <p class="font-head font-bold text-on-surface text-lg">Sin pedido activo</p>
       <p class="text-sm text-on-var max-w-xs">Acepta un pedido en la pestaña Pedidos y la ruta aparecerá aquí automáticamente.</p>
     </div>
+<!-- Pedido activo -->
+<div id="pedidoActivoPanel" style="display:none">
 
-    <!-- Pedido activo -->
-    <div id="pedidoActivoPanel" style="display:none">
+  <!-- MAPA EMBEBIDO -->
+  <div style="border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,105,112,.18);margin-bottom:12px;position:relative;height:270px;background:#1a2a2a">
+    <div id="mapInTab" style="position:absolute;inset:0;width:100%;height:100%;z-index:1"></div>
+    <div id="gpsStripTab" style="position:absolute;top:12px;left:12px;z-index:50;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);border-radius:30px;padding:6px 12px 6px 9px;display:flex;align-items:center;gap:7px;box-shadow:0 3px 14px rgba(0,0,0,.18);cursor:pointer" onclick="abrirTrkDrawer()">
+      <div id="gpsDotTab" style="width:9px;height:9px;border-radius:50%;background:#bbc9cb;flex-shrink:0;transition:background .3s"></div>
+      <span style="font-size:11px;font-weight:800;color:#191c1d" id="gpsNombreDomiTab">GPS</span>
+      <span style="font-size:10px;color:#6c7a7b" id="gpsLabelTab">· sin GPS</span>
+    </div>
+    <div id="mapEtaBadgeTab" style="position:absolute;bottom:12px;left:12px;z-index:50;background:rgba(0,0,0,.72);backdrop-filter:blur(10px);color:#fff;border-radius:14px;padding:7px 12px;display:none;flex-direction:column;gap:1px;box-shadow:0 4px 16px rgba(0,0,0,.3)">
+      <span style="font-size:9px;font-weight:800;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.05em">ETA</span>
+      <span style="font-size:14px;font-weight:900;color:#fff;font-family:'Plus Jakarta Sans',sans-serif" id="mapEtaValTab">—</span>
+    </div>
+    <button onclick="centrarMapaEnDomi()" style="position:absolute;top:12px;right:12px;z-index:50;width:38px;height:38px;background:rgba(255,255,255,.96);border:none;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.15)">
+      <span class="material-symbols-outlined" style="font-size:18px;color:#006970;font-variation-settings:'FILL' 1">my_location</span>
+    </button>
+  </div>
 
-      <!-- MAPA EMBEBIDO -->
-      <div style="border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,105,112,.18);margin-bottom:12px;position:relative;height:270px;background:#1a2a2a">
-        <div id="mapInTab" style="position:absolute;inset:0;width:100%;height:100%;z-index:1"></div>
-        <!-- GPS badge -->
-        <div id="gpsStripTab" style="position:absolute;top:12px;left:12px;z-index:50;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);border-radius:30px;padding:6px 12px 6px 9px;display:flex;align-items:center;gap:7px;box-shadow:0 3px 14px rgba(0,0,0,.18);cursor:pointer" onclick="abrirTrkDrawer()">
-          <div id="gpsDotTab" style="width:9px;height:9px;border-radius:50%;background:#bbc9cb;flex-shrink:0;transition:background .3s"></div>
-          <span style="font-size:11px;font-weight:800;color:#191c1d" id="gpsNombreDomiTab">GPS</span>
-          <span style="font-size:10px;color:#6c7a7b" id="gpsLabelTab">· sin GPS</span>
-        </div>
-        <!-- ETA badge -->
-        <div id="mapEtaBadgeTab" style="position:absolute;bottom:12px;left:12px;z-index:50;background:rgba(0,0,0,.72);backdrop-filter:blur(10px);color:#fff;border-radius:14px;padding:7px 12px;display:none;flex-direction:column;gap:1px;box-shadow:0 4px 16px rgba(0,0,0,.3)">
-          <span style="font-size:9px;font-weight:800;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.05em">ETA</span>
-          <span style="font-size:14px;font-weight:900;color:#fff;font-family:'Plus Jakarta Sans',sans-serif" id="mapEtaValTab">—</span>
-        </div>
-        <!-- Botón centrar -->
-        <button onclick="centrarMapaEnDomi()" style="position:absolute;top:12px;right:12px;z-index:50;width:38px;height:38px;background:rgba(255,255,255,.96);border:none;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.15)">
-          <span class="material-symbols-outlined" style="font-size:18px;color:#006970;font-variation-settings:'FILL' 1">my_location</span>
-        </button>
+  <!-- CARD PRINCIPAL -->
+  <div style="background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 2px 16px rgba(0,105,112,.1);border:1px solid rgba(0,105,112,.08);margin-bottom:12px">
+
+    <!-- Header cliente -->
+    <div style="background:linear-gradient(135deg,#005a60,#007f8c,#00a3b4);padding:14px 16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span id="tabEstadoChip" class="estado-chip" style="background:rgba(255,255,255,.15);color:#fff">
+          <span class="material-symbols-outlined" style="font-size:12px;font-variation-settings:'FILL' 1">notifications_active</span>
+          Confirmado
+        </span>
+        <span style="color:rgba(255,255,255,.7);font-size:11px;font-weight:700" id="tabHoraAceptado">—</span>
       </div>
-
-      <!-- CARD INFO PEDIDO -->
-      <div style="background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 2px 16px rgba(0,105,112,.1);border:1px solid rgba(0,105,112,.08);margin-bottom:12px">
-
-        <!-- Header cliente -->
-        <div style="background:linear-gradient(135deg,#005a60,#007f8c,#00a3b4);padding:14px 16px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <span id="tabEstadoChip" class="estado-chip" style="background:rgba(255,255,255,.15);color:#fff">
-              <span class="material-symbols-outlined" style="font-size:12px;font-variation-settings:'FILL' 1">notifications_active</span>
-              Confirmado
-            </span>
-            <span style="color:rgba(255,255,255,.7);font-size:11px;font-weight:700" id="tabHoraAceptado">—</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <div id="tabAvatar" style="width:44px;height:44px;border-radius:14px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:20px;color:#fff;flex-shrink:0">?</div>
-            <div style="flex:1;min-width:0">
-                            <p style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:13px;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="tabCliente">—</p>
-
-              <p style="font-size:12px;color:rgba(255,255,255,.75);display:flex;align-items:center;gap:4px;margin-top:2px">
-                <span class="material-symbols-outlined" style="font-size:12px">phone</span>
-                <span id="tabTel">—</span>
-              </p>
-            </div>
-            <div style="display:flex;gap:7px;flex-shrink:0">
-              <a id="tabBtnWA" href="#" target="_blank" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;text-decoration:none">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.096.537 4.066 1.479 5.779L0 24l6.432-1.687A11.93 11.93 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.006-1.368l-.36-.214-3.716.975.992-3.625-.235-.373A9.818 9.818 0 1112 21.818z"/></svg>
-              </a>
-              <button onclick="abrirChatCliente()" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative">
-                <span class="material-symbols-outlined text-white" style="font-size:16px;font-variation-settings:'FILL' 1">forum</span>
-                <span id="tabChatBadge" style="position:absolute;top:-3px;right:-3px;min-width:16px;height:16px;background:#f97316;border-radius:99px;border:2px solid rgba(0,90,96,.9);color:#fff;font-size:9px;font-weight:800;display:none;align-items:center;justify-content:center;padding:0 3px">0</span>
-              </button>
-            </div>
-          </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div id="tabAvatar" style="width:44px;height:44px;border-radius:14px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:20px;color:#fff;flex-shrink:0">?</div>
+        <div style="flex:1;min-width:0">
+          <p style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:13px;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="tabCliente">—</p>
+          <p style="font-size:12px;color:rgba(255,255,255,.75);display:flex;align-items:center;gap:4px;margin-top:2px">
+            <span class="material-symbols-outlined" style="font-size:12px">phone</span>
+            <span id="tabTel">—</span>
+          </p>
         </div>
-
-        <!-- BOTONES ACCIÓN — siempre visibles -->
-        <div id="inlineStepBtns" style="padding:10px 14px 4px;display:flex;flex-direction:column;gap:8px">
-
-          <!-- Paso 1: en camino (ocupa todo el ancho) -->
-          <button id="btnEnCamino" onclick="marcarEncamino()"
-            style="width:100%;padding:13px;background:linear-gradient(135deg,#7c3aed,#8b5cf6);
-            color:#fff;border:none;border-radius:16px;font-family:'Plus Jakarta Sans',sans-serif;
-            font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;
-            justify-content:center;gap:8px;box-shadow:0 4px 18px rgba(124,58,237,.35)">
-            <span class="material-symbols-outlined text-white" style="font-size:17px;font-variation-settings:'FILL' 1">two_wheeler</span>
-            Ponerte en camino
+        <div style="display:flex;gap:7px;flex-shrink:0">
+          <a id="tabBtnWA" href="#" target="_blank" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;text-decoration:none">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.096.537 4.066 1.479 5.779L0 24l6.432-1.687A11.93 11.93 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.006-1.368l-.36-.214-3.716.975.992-3.625-.235-.373A9.818 9.818 0 1112 21.818z"/></svg>
+          </a>
+          <button onclick="abrirChatCliente()" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative">
+            <span class="material-symbols-outlined text-white" style="font-size:16px;font-variation-settings:'FILL' 1">forum</span>
+            <span id="tabChatBadge" style="position:absolute;top:-3px;right:-3px;min-width:16px;height:16px;background:#f97316;border-radius:99px;border:2px solid rgba(0,90,96,.9);color:#fff;font-size:9px;font-weight:800;display:none;align-items:center;justify-content:center;padding:0 3px">0</span>
           </button>
-
-          <!-- Paso 2: confirmar entrega + cancelar lado a lado -->
-          <div style="display:flex;gap:8px">
-            <button id="btnEntregado" onclick="marcarEntregado()"
-              style="flex:2;padding:12px 8px;background:linear-gradient(135deg,#1a7a3a,#2a9d5c);
-              color:#fff;border:none;border-radius:16px;font-family:'Plus Jakarta Sans',sans-serif;
-              font-weight:800;font-size:12px;cursor:pointer;display:none;align-items:center;
-              justify-content:center;gap:6px;box-shadow:0 4px 18px rgba(42,157,92,.35)">
-              <span class="material-symbols-outlined text-white" style="font-size:15px;font-variation-settings:'FILL' 1">check_circle</span>
-              Confirmar entrega
-            </button>
-            <button id="btnCancelarPed" onclick="cancelarPedidoActivo()"
-              style="flex:1;padding:12px 8px;background:rgba(186,26,26,.07);color:#ba1a1a;
-              border:1.5px solid rgba(186,26,26,.2);border-radius:14px;
-              font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:12px;cursor:pointer;
-              display:flex;align-items:center;justify-content:center;gap:5px">
-              <span class="material-symbols-outlined" style="font-size:14px;font-variation-settings:'FILL' 1">cancel</span>
-              Cancelar
-            </button>
-          </div>
         </div>
+      </div>
+    </div>
 
-        <!-- BOTÓN VER DETALLES -->
-        <button id="btnVerDetallesRuta" onclick="toggleDetallesRuta()">
-          <span class="material-symbols-outlined" style="font-size:15px">receipt_long</span>
-          <span id="btnVerDetallesTxt">Ver detalles del pedido</span>
-          <span class="material-symbols-outlined vdr-icon" style="font-size:16px">expand_more</span>
-        </button>
-        <!-- TODO LO DEMÁS COLAPSADO -->
-        <div id="rutaCardCollapsible">
-          <div style="border-top:1px solid rgba(0,105,112,.1);padding-bottom:4px">
+    <!-- DETALLES COLAPSABLES (inmediatamente debajo del nombre) -->
+    <button id="btnVerDetallesRuta" onclick="toggleDetallesRuta()">
+      <span class="material-symbols-outlined" style="font-size:15px">receipt_long</span>
+      <span id="btnVerDetallesTxt">Ver detalles del pedido</span>
+      <span class="material-symbols-outlined vdr-icon" style="font-size:16px">expand_more</span>
+    </button>
 
-            <!-- Ruta origen → destino -->
-            <div style="padding:10px 14px 0">
-              <div style="background:#f0fff4;border-radius:14px;padding:11px 13px;border:1px solid rgba(42,157,92,.15)">
-                <div style="display:flex;align-items:flex-start;gap:8px">
-                  <div style="display:flex;align-items:flex-start;gap:6px;flex:1;min-width:0">
-                    <span class="material-symbols-outlined" style="font-size:15px;color:#006970;flex-shrink:0;margin-top:2px;font-variation-settings:'FILL' 1">storefront</span>
-                    <div style="min-width:0">
-                      <p style="font-size:9px;font-weight:800;text-transform:uppercase;color:#9eaaac;letter-spacing:.04em">Recoge en</p>
-                      <p style="font-size:12px;font-weight:700;color:#191c1d;word-break:break-word;line-height:1.3" id="tabOrigen">—</p>
-                    </div>
-                  </div>
-                  <span class="material-symbols-outlined" style="font-size:18px;color:#bbc9cb;flex-shrink:0;margin-top:8px">arrow_forward</span>
-                  <div style="display:flex;align-items:flex-start;gap:6px;flex:1;min-width:0">
-                    <span class="material-symbols-outlined" style="font-size:15px;color:#4c56af;flex-shrink:0;margin-top:2px;font-variation-settings:'FILL' 1">location_on</span>
-                    <div style="min-width:0">
-                      <p style="font-size:9px;font-weight:800;text-transform:uppercase;color:#9eaaac;letter-spacing:.04em">Entrega en</p>
-                      <p style="font-size:12px;font-weight:700;color:#191c1d;word-break:break-word;line-height:1.3" id="tabDestino">—</p>
-                    </div>
-                  </div>
+    <div id="rutaCardCollapsible">
+      <div style="border-top:1px solid rgba(0,105,112,.1);padding-bottom:4px">
+
+        <!-- Ruta origen → destino -->
+        <div style="padding:10px 14px 0">
+          <div style="background:#f0fff4;border-radius:14px;padding:11px 13px;border:1px solid rgba(42,157,92,.15)">
+            <div style="display:flex;align-items:flex-start;gap:8px">
+              <div style="display:flex;align-items:flex-start;gap:6px;flex:1;min-width:0">
+                <span class="material-symbols-outlined" style="font-size:15px;color:#006970;flex-shrink:0;margin-top:2px;font-variation-settings:'FILL' 1">storefront</span>
+                <div style="min-width:0">
+                  <p style="font-size:9px;font-weight:800;text-transform:uppercase;color:#9eaaac;letter-spacing:.04em">Recoge en</p>
+                  <p style="font-size:12px;font-weight:700;color:#191c1d;word-break:break-word;line-height:1.3" id="tabOrigen">—</p>
+                </div>
+              </div>
+              <span class="material-symbols-outlined" style="font-size:18px;color:#bbc9cb;flex-shrink:0;margin-top:8px">arrow_forward</span>
+              <div style="display:flex;align-items:flex-start;gap:6px;flex:1;min-width:0">
+                <span class="material-symbols-outlined" style="font-size:15px;color:#4c56af;flex-shrink:0;margin-top:2px;font-variation-settings:'FILL' 1">location_on</span>
+                <div style="min-width:0">
+                  <p style="font-size:9px;font-weight:800;text-transform:uppercase;color:#9eaaac;letter-spacing:.04em">Entrega en</p>
+                  <p style="font-size:12px;font-weight:700;color:#191c1d;word-break:break-word;line-height:1.3" id="tabDestino">—</p>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
 
-            <!-- Totales -->
-            <div style="display:flex;gap:8px;padding:10px 14px 0">
-              <div style="flex:1;background:#f3f4f5;border-radius:12px;padding:9px;text-align:center">
-                <p style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase">Total</p>
-                <p style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:900;font-size:15px;color:#006970" id="tabTotal">—</p>
+        <!-- Totales -->
+        <div style="display:flex;gap:8px;padding:10px 14px 0">
+          <div style="flex:1;background:#f3f4f5;border-radius:12px;padding:9px;text-align:center">
+            <p style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase">Total</p>
+            <p style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:900;font-size:15px;color:#006970" id="tabTotal">—</p>
+          </div>
+          <div style="flex:1;background:#f3f4f5;border-radius:12px;padding:9px;text-align:center">
+            <p style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase">Pago</p>
+            <p style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:11px;color:#191c1d" id="tabPago">—</p>
+          </div>
+          <div style="flex:1;background:#f3f4f5;border-radius:12px;padding:9px;text-align:center">
+            <p style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase">ETA</p>
+            <p style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:11px;color:#006970" id="tabEta">—</p>
+          </div>
+        </div>
+
+        <!-- Productos -->
+        <div style="padding:10px 14px 0" id="tabProductosWrap">
+          <div style="background:#f0fff4;border-radius:14px;padding:10px 13px;border:1px solid rgba(42,157,92,.15)">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#9eaaac">💊 Productos del pedido</p>
+              <span style="font-size:9px;font-weight:800;background:#e8f5e9;color:#2a9d5c;padding:2px 8px;border-radius:20px" id="tabProdCount"></span>
+            </div>
+            <div id="tabProductosList" class="prod-list"></div>
+            <div id="tabResumenTotal" style="display:none;margin-top:10px;border-top:1px solid rgba(42,157,92,.2);padding-top:8px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                <span style="font-size:11px;color:#6c7a7b;font-weight:600">Subtotal productos</span>
+                <span style="font-size:11px;font-weight:800;color:#191c1d" id="tabSubtotal">—</span>
               </div>
-              <div style="flex:1;background:#f3f4f5;border-radius:12px;padding:9px;text-align:center">
-                <p style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase">Pago</p>
-                <p style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:11px;color:#191c1d" id="tabPago">—</p>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <span style="font-size:11px;color:#6c7a7b;font-weight:600">🛵 Domicilio</span>
+                <span style="font-size:11px;font-weight:800;color:#191c1d" id="tabCostoDomi">—</span>
               </div>
-              <div style="flex:1;background:#f3f4f5;border-radius:12px;padding:9px;text-align:center">
-                <p style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase">ETA</p>
-                <p style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:11px;color:#006970" id="tabEta">—</p>
+              <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,105,112,.08);border-radius:10px;padding:8px 10px">
+                <span style="font-size:13px;font-weight:800;color:#006970;font-family:'Plus Jakarta Sans',sans-serif">TOTAL</span>
+                <span style="font-size:16px;font-weight:900;color:#006970;font-family:'Plus Jakarta Sans',sans-serif" id="tabTotalProd">—</span>
               </div>
             </div>
-
-            <!-- Productos -->
-            <div style="padding:10px 14px 0" id="tabProductosWrap">
-              <div style="background:#f0fff4;border-radius:14px;padding:10px 13px;border:1px solid rgba(42,157,92,.15)">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                  <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#9eaaac">💊 Productos del pedido</p>
-                  <span style="font-size:9px;font-weight:800;background:#e8f5e9;color:#2a9d5c;padding:2px 8px;border-radius:20px" id="tabProdCount"></span>
-                </div>
-                <div id="tabProductosList" class="prod-list"></div>
-                <div id="tabResumenTotal" style="display:none;margin-top:10px;border-top:1px solid rgba(42,157,92,.2);padding-top:8px">
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-                    <span style="font-size:11px;color:#6c7a7b;font-weight:600">Subtotal productos</span>
-                    <span style="font-size:11px;font-weight:800;color:#191c1d" id="tabSubtotal">—</span>
-                  </div>
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-                    <span style="font-size:11px;color:#6c7a7b;font-weight:600">🛵 Domicilio</span>
-                    <span style="font-size:11px;font-weight:800;color:#191c1d" id="tabCostoDomi">—</span>
-                  </div>
-                  <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,105,112,.08);border-radius:10px;padding:8px 10px">
-                    <span style="font-size:13px;font-weight:800;color:#006970;font-family:'Plus Jakarta Sans',sans-serif">TOTAL</span>
-                    <span style="font-size:16px;font-weight:900;color:#006970;font-family:'Plus Jakarta Sans',sans-serif" id="tabTotalProd">—</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-</div>
-        </div><!-- /rutaCardCollapsible -->
-
-      </div><!-- /card info pedido -->
-
-      <!-- STEPPER FUERA DE LA CARD -->
-      <div class="step-track" id="tabStepper" style="background:#fff;border-radius:20px;padding:14px 20px 10px;box-shadow:0 2px 12px rgba(0,105,112,.08);border:1px solid rgba(0,105,112,.08);margin-bottom:12px">
-        <div style="display:flex;flex-direction:column;align-items:center">
-          <div id="tab_step1Icon" style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #2a9d5c;background:#2a9d5c;position:relative;z-index:2">
-            <span class="material-symbols-outlined" style="font-size:15px;color:#fff;font-variation-settings:'FILL' 1">check_circle</span>
           </div>
-          <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#2a9d5c;margin-top:4px;text-align:center">Aceptado</div>
-          <div style="font-size:8px;color:#9eaaac;text-align:center;margin-top:1px" id="tab_step1Time">—</div>
         </div>
-        <div id="tab_line1" class="step-line" style="background:linear-gradient(90deg,#006970,#2a9d5c)"></div>
-        <div style="display:flex;flex-direction:column;align-items:center">
-          <div id="tab_step2Icon" style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #e7e8e9;background:#f3f4f5;position:relative;z-index:2;transition:all .35s">
-            <span class="material-symbols-outlined" style="font-size:15px;color:#c4cdd0;font-variation-settings:'FILL' 1">two_wheeler</span>
-          </div>
-          <div id="tab_step2Label" style="font-size:9px;font-weight:800;text-transform:uppercase;color:#c4cdd0;margin-top:4px;text-align:center">En camino</div>
-          <div style="font-size:8px;color:#9eaaac;text-align:center;margin-top:1px" id="tab_step2Time">Pendiente</div>
-        </div>
-        <div id="tab_line2" class="step-line"></div>
-        <div style="display:flex;flex-direction:column;align-items:center">
-          <div id="tab_step3Icon" style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #e7e8e9;background:#f3f4f5;position:relative;z-index:2;transition:all .35s">
-            <span class="material-symbols-outlined" style="font-size:15px;color:#c4cdd0;font-variation-settings:'FILL' 1">home</span>
-          </div>
-          <div id="tab_step3Label" style="font-size:9px;font-weight:800;text-transform:uppercase;color:#c4cdd0;margin-top:4px;text-align:center">Entregado</div>
-          <div style="font-size:8px;color:#9eaaac;text-align:center;margin-top:1px" id="tab_step3Time"></div>
-        </div>
-      </div><!-- /stepper -->
 
+      </div>
+    </div><!-- /rutaCardCollapsible -->
+
+  </div><!-- /card principal -->
+
+  <!-- STEPPER -->
+  <div class="step-track" id="tabStepper" style="background:#fff;border-radius:20px;padding:14px 20px 10px;box-shadow:0 2px 12px rgba(0,105,112,.08);border:1px solid rgba(0,105,112,.08);margin-bottom:12px">
+    <div style="display:flex;flex-direction:column;align-items:center">
+      <div id="tab_step1Icon" style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #2a9d5c;background:#2a9d5c;position:relative;z-index:2">
+        <span class="material-symbols-outlined" style="font-size:15px;color:#fff;font-variation-settings:'FILL' 1">check_circle</span>
+      </div>
+      <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#2a9d5c;margin-top:4px;text-align:center">Aceptado</div>
+      <div style="font-size:8px;color:#9eaaac;text-align:center;margin-top:1px" id="tab_step1Time">—</div>
+    </div>
+    <div id="tab_line1" class="step-line" style="background:linear-gradient(90deg,#006970,#2a9d5c)"></div>
+    <div style="display:flex;flex-direction:column;align-items:center">
+      <div id="tab_step2Icon" style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #e7e8e9;background:#f3f4f5;position:relative;z-index:2;transition:all .35s">
+        <span class="material-symbols-outlined" style="font-size:15px;color:#c4cdd0;font-variation-settings:'FILL' 1">two_wheeler</span>
+      </div>
+      <div id="tab_step2Label" style="font-size:9px;font-weight:800;text-transform:uppercase;color:#c4cdd0;margin-top:4px;text-align:center">En camino</div>
+      <div style="font-size:8px;color:#9eaaac;text-align:center;margin-top:1px" id="tab_step2Time">Pendiente</div>
+    </div>
+    <div id="tab_line2" class="step-line"></div>
+    <div style="display:flex;flex-direction:column;align-items:center">
+      <div id="tab_step3Icon" style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #e7e8e9;background:#f3f4f5;position:relative;z-index:2;transition:all .35s">
+        <span class="material-symbols-outlined" style="font-size:15px;color:#c4cdd0;font-variation-settings:'FILL' 1">home</span>
+      </div>
+      <div id="tab_step3Label" style="font-size:9px;font-weight:800;text-transform:uppercase;color:#c4cdd0;margin-top:4px;text-align:center">Entregado</div>
+      <div style="font-size:8px;color:#9eaaac;text-align:center;margin-top:1px" id="tab_step3Time"></div>
+    </div>
+  </div>
+
+  <!-- BOTONES DE ACCIÓN -->
+  <div id="inlineStepBtns" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
+
+    <!-- Paso 1: En camino (ancho completo) -->
+    <button id="btnEnCamino" onclick="marcarEncamino()"
+      style="width:100%;padding:13px;background:linear-gradient(135deg,#7c3aed,#8b5cf6);
+      color:#fff;border:none;border-radius:16px;font-family:'Plus Jakarta Sans',sans-serif;
+      font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;
+      justify-content:center;gap:8px;box-shadow:0 4px 18px rgba(124,58,237,.35)">
+      <span class="material-symbols-outlined text-white" style="font-size:17px;font-variation-settings:'FILL' 1">two_wheeler</span>
+      Ponerte en camino
+    </button>
+
+    <!-- Paso 2: Confirmar entrega (izquierda) + Cancelar (derecha) -->
+    <div style="display:flex;gap:8px">
+      <button id="btnEntregado" onclick="marcarEntregado()"
+        style="flex:2;padding:12px 8px;background:linear-gradient(135deg,#1a7a3a,#2a9d5c);
+        color:#fff;border:none;border-radius:16px;font-family:'Plus Jakarta Sans',sans-serif;
+        font-weight:800;font-size:12px;cursor:pointer;display:none;align-items:center;
+        justify-content:center;gap:6px;box-shadow:0 4px 18px rgba(42,157,92,.35)">
+        <span class="material-symbols-outlined text-white" style="font-size:15px;font-variation-settings:'FILL' 1">check_circle</span>
+        Confirmar entrega
+      </button>
+      <button id="btnCancelarPed" onclick="cancelarPedidoActivo()"
+        style="flex:1;padding:12px 8px;background:rgba(186,26,26,.07);color:#ba1a1a;
+        border:1.5px solid rgba(186,26,26,.2);border-radius:14px;
+        font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:12px;cursor:pointer;
+        display:flex;align-items:center;justify-content:center;gap:5px">
+        <span class="material-symbols-outlined" style="font-size:14px;font-variation-settings:'FILL' 1">cancel</span>
+        Cancelar
+      </button>
+    </div>
+  </div>
+
+</div><!-- /pedidoActivoPanel -->
       
 
 <div id="tab-historial" class="tab-content">
