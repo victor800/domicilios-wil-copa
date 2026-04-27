@@ -2172,38 +2172,55 @@ function loadSheet(){
   var tab = SHEETS[tienda].tab;
   var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID_OFERTAS +
             '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent(tab) + '&cachebust=' + Date.now();
- 
+
   fetch(url, {cache:'no-store', signal:AbortSignal.timeout(15000)})
     .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
     .then(function(text){
       if(!text || text.trim().length < 5) throw new Error('Empty');
- 
-      var lines = text.trim().split('\n').slice(1).filter(Boolean);
+      var allLines = text.trim().split('\n').filter(Boolean);
+      if(allLines.length < 2) throw new Error('No data');
+
+      // ── Detectar columnas por encabezado ──
+      var hdr = _parseCsvLineNP(allLines[0]);
+      var IDX = { nombre:-1, lab:-1, unidad:-1, precio:-1, punit:-1, stock:-1, imagen:-1 };
+      hdr.forEach(function(h, i){
+        var hn = nrm(h);
+        if(hn.includes('descrip') || hn === 'nombre')            IDX.nombre = i;
+        else if(hn.includes('laborat'))                           IDX.lab    = i;
+        else if(hn.includes('unidad') || hn.includes('present')) IDX.unidad = i;
+        else if(hn.includes('precio') && hn.includes('unit'))    IDX.punit  = i;
+        else if(hn === 'precio')                                  IDX.precio = i;
+        else if(hn.includes('stock') || hn.includes('cant'))     IDX.stock  = i;
+        else if(hn.includes('imagen') || hn.includes('foto') || hn.includes('url')) IDX.imagen = i;
+      });
+      if(IDX.nombre < 0) IDX.nombre = 0;
+      if(IDX.lab    < 0) IDX.lab    = 1;
+      if(IDX.unidad < 0) IDX.unidad = 2;
+      if(IDX.precio < 0) IDX.precio = 3;
+      if(IDX.punit  < 0) IDX.punit  = 4;
+      if(IDX.stock  < 0) IDX.stock  = 5;  // col F = Stock (GAS)
+      if(IDX.imagen < 0) IDX.imagen = 6;  // col G si se agregó manualmente
+
+      var lines = allLines.slice(1).filter(Boolean);
       var items = [];
- 
+      var seen  = {};   // dedupKey → índice en items[]
+
       lines.forEach(function(line){
         var cols = _parseCsvLineNP(line);
-        var col  = function(i){
-          return (cols[i]||'')
-            .replace(/^"|"$/g,'')
-            .replace(/\r/g,'')
-            .replace(/[\u200B-\u200D\uFEFF]/g,'') // ← limpia chars invisibles
-            .trim();
+        var col = function(i){
+          return (cols[i]||'').replace(/^"|"$/g,'').replace(/\r/g,'')
+                              .replace(/[\u200B-\u200D\uFEFF]/g,'').trim();
         };
- 
-        var nombre = col(0);
-        var lab    = col(1);
-        var unidad = col(2);
-        var precioV= _parsePrecioNP(col(3));
-        var precioU= _parsePrecioNP(col(4));
-        var imagen = col(5);
-        var stock  = parseInt(col(6)) || 3;
 
+        var nombre  = col(IDX.nombre);
+        var lab     = col(IDX.lab);
+        var unidad  = col(IDX.unidad);
+        var precioV = _parsePrecioNP(col(IDX.precio));
+        var precioU = _parsePrecioNP(col(IDX.punit));
+        var stock   = parseInt(col(IDX.stock), 10);
+        var imagen  = col(IDX.imagen);
+        if(isNaN(stock)) stock = 3;
         if(!nombre) return;
-
-        // Clave de dedup: nombre normalizado + laboratorio
-        var keyNorm = nrm(nombre) + '|||' + nrm(lab);
-        var key     = nombre + '|||' + lab;
 
         var it = {
           desc:   nombre,
@@ -2213,94 +2230,47 @@ function loadSheet(){
           pUnit:  precioU || precioV,
           imagen: imagen,
           stock:  stock,
-          key:    key
+          key:    nombre + '|||' + lab
         };
 
-        // Deduplicar: si ya existe este producto, solo reemplazar si el nuevo tiene foto y el viejo no
-        var existing = cache[keyNorm];
-        if(existing){
-          var nuevoTieneFoto = imagen && imagen.startsWith('http');
-          var viejoTieneFoto = existing.imagen && existing.imagen.startsWith('http');
-          if(nuevoTieneFoto && !viejoTieneFoto){
-            // reemplazar por versión con foto
-            var idx = items.findIndex(function(x){ return x.key === existing.key; });
-            if(idx >= 0){ items[idx] = it; }
-            cache[keyNorm] = it;
-            cache[key] = it;
-          }
-          // si el viejo ya tiene foto o ambos no tienen → no duplicar
+        var dk = nrm(nombre) + '|||' + nrm(lab);
+        if(seen[dk] !== undefined){
+          // Dedup: reemplazar solo si nuevo tiene foto y viejo no
+          var prev = items[seen[dk]];
+          var nFoto = imagen && imagen.startsWith('http');
+          var vFoto = prev.imagen && prev.imagen.startsWith('http');
+          if(nFoto && !vFoto){ items[seen[dk]] = it; cache[it.key] = it; }
           return;
         }
-
-        cache[keyNorm] = it;
-        cache[key] = it;
+        seen[dk] = items.length;
         items.push(it);
-        // Deduplicar: si ya existe con mismo nombre, preferir el que tiene imagen
-        var existing = cache[key];
-        if(existing){
-          if(!existing.imagen && imagen) {
-            // reemplazar por el que tiene foto
-            var idx = items.findIndex(function(x){ return x.key === key; });
-            if(idx >= 0) items[idx] = it;
-            cache[key] = it;
-          }
-          // si el existente ya tiene imagen, no reemplazar
-          return;
-        }
-
-        items.push(it);
-        cache[key] = it;
+        cache[it.key] = it;
       });
- 
+
       if(!items.length) throw new Error('No products');
- 
+
+      // Fotos primero, luego sin foto
+      items.sort(function(a,b){
+        return (b.imagen&&b.imagen.startsWith('http')?1:0) -
+               (a.imagen&&a.imagen.startsWith('http')?1:0);
+      });
+
       allData = items;
       _rebuildSearchIndex();
 
- 
-      // Re-ejecutar búsqueda activa si la hay
       var _aq = document.getElementById('s-inp').value.trim();
       if(_aq && document.getElementById('v-search').style.display !== 'none') doSearch(_aq);
- 
-      document.getElementById('tienda-lbl').textContent =
-        SHEETS[tienda].nombre + ' · ' + items.length + ' productos';
- 
-      renderSheetCards(items.slice(0, 60).reverse());
- 
-      console.log('[loadSheet] OK →', items.length, 'productos');
+
       var conImg = items.filter(function(it){ return it.imagen && it.imagen.startsWith('http'); }).length;
-      console.log('[loadSheet] Con imagen:', conImg, 'de', items.length);
+      document.getElementById('tienda-lbl').textContent =
+        SHEETS[tienda].nombre + ' · ' + items.length + ' prods' + (conImg ? ' · ' + conImg + ' 📷' : '');
+
+      renderSheetCards(items.slice(0, 60));
     })
     .catch(function(e){
-      console.warn('[loadSheet] CSV falló:', e.message, '— intentando API...');
-      fetch('/api/wil?action=sheet-stock&tab=' + encodeURIComponent(tab))
-        .then(function(r){ if(!r.ok) throw new Error('API HTTP '+r.status); return r.json(); })
-        .then(function(j){
-          if(!j.ok) throw new Error(j.error||'Error API');
-          var sheetItems = j.productos.map(function(p){
-            return {
-              desc:   p.desc,
-              lab:    p.lab||'',
-              unidad: p.unidad||'',
-              precio: p.precio||0,
-              pUnit:  p.pUnit||0,
-              imagen: p.imagen||'',
-              key:    p.desc+'|||'+(p.lab||'')
-            };
-          });
-          allData = sheetItems;
-          var _aq2 = document.getElementById('s-inp').value.trim();
-          if(_aq2 && document.getElementById('v-search').style.display !== 'none') doSearch(_aq2);
-          document.getElementById('tienda-lbl').textContent =
-            SHEETS[tienda].nombre + ' · ' + sheetItems.length + ' productos';
-          renderSheetCards(sheetItems.slice(0,50).reverse());
-        })
-        .catch(function(e2){
-          console.warn('[loadSheet] API también falló:', e2.message);
-          document.getElementById('tienda-lbl').textContent =
-            'Catálogo local · ' + allData.length + ' productos';
-          document.getElementById('sheet-skeleton').style.display = 'none';
-        });
+      console.warn('[loadSheet]', e.message);
+      document.getElementById('tienda-lbl').textContent = 'Catálogo local · ' + allData.length + ' productos';
+      document.getElementById('sheet-skeleton').style.display = 'none';
     });
 }
 var ICON_MAP=['medication','pill','vaccines','healing','health_and_safety','ecg','monitor_heart','water_drop','science','face_6','child_care','wb_sunny','spa','thermostat','emergency'];
@@ -2425,61 +2395,37 @@ function nrm(s){
     .replace(/[^a-z0-9\s]/g,'');
 }
 
-function scr2(txt, q) {
+function scr2(txt, q){
   var t  = nrm(txt);
   var nq = nrm(q);
-  if (!t || !nq) return 0;
+  if(!t || !nq) return 0;
+  if(t === nq)       return 100;
+  if(t.includes(nq)) return 95;
+  if(nq.includes(t)) return 85;
 
-  // Coincidencia exacta total
-  if (t === nq) return 100;
+  var tWords = t.split(/\s+/).filter(Boolean);
+  var qWords = nq.split(/\s+/).filter(Boolean);
+  var meaningful = qWords.filter(function(w){ return w.length >= 3; });
+  if(!meaningful.length) return 0;
 
-  // El texto contiene la query completa como substring
-  if (t.includes(nq)) return 95;
-
-  // La query contiene el texto (busqueda más corta que el nombre)
-  if (nq.includes(t)) return 85;
-
-  var tWords  = t.split(/\s+/).filter(Boolean);
-  var qWords  = nq.split(/\s+/).filter(Boolean);
-  var total   = qWords.length;
-  if (total === 0) return 0;
-
-  var exactHits   = 0; // palabra query está en texto
-  var prefixHits  = 0; // texto empieza por palabra query o viceversa
-  var fuzzyHits   = 0; // similitud ≥ 0.7
-
-  qWords.forEach(function(w) {
-    // coincidencia exacta de palabra
-    if (tWords.indexOf(w) !== -1) { exactHits++; return; }
-
-    // substring: el texto contiene la palabra
-    if (t.includes(w)) { exactHits++; return; }
-
-    // prefijo mutuo
-    var isPrefix = tWords.some(function(tv) {
-      return tv.startsWith(w) || w.startsWith(tv);
+  var hits = 0;
+  meaningful.forEach(function(w){
+    if(t.includes(w)){ hits += 3; return; }
+    if(tWords.some(function(tv){ return tv.startsWith(w) || w.startsWith(tv); })){ hits += 2; return; }
+    var best = 0;
+    tWords.forEach(function(tv){
+      if(Math.abs(tv.length - w.length) > 4) return;
+      var s = 1 - lev(tv,w) / Math.max(tv.length, w.length, 1);
+      if(s > best) best = s;
     });
-    if (isPrefix) { prefixHits++; return; }
-
-    // fuzzy letra a letra
-    var bestSim = 0;
-    tWords.forEach(function(tv) {
-      if (Math.abs(tv.length - w.length) > 4) return;
-      var sim = 1 - lev(tv, w) / Math.max(tv.length, w.length, 1);
-      if (sim > bestSim) bestSim = sim;
-    });
-    if (bestSim >= 0.65) fuzzyHits++;
+    if(best >= 0.65) hits += 1;
   });
 
-  var hitScore = (exactHits * 3 + prefixHits * 2 + fuzzyHits * 1) / (total * 3);
-  if (hitScore === 0) return 0;
-
-  // Bonus si el primer token de la query aparece al inicio del texto
-  if (qWords.length > 0 && tWords.length > 0 && tWords[0].startsWith(qWords[0])) {
-    hitScore = Math.min(1, hitScore + 0.15);
-  }
-
-  return Math.round(hitScore * 90);
+  var score = (hits / (meaningful.length * 3)) * 90;
+  if(score < 8) return 0;
+  if(qWords[0] && tWords[0] && tWords[0].startsWith(qWords[0]))
+    score = Math.min(95, score + 12);
+  return Math.round(score);
 }
 
 function lev(a,b){var m=a.length,n=b.length,d=[];for(var i=0;i<=m;i++)d[i]=[i];for(var j=0;j<=n;j++)d[0][j]=j;for(var i=1;i<=m;i++)for(var j=1;j<=n;j++)d[i][j]=a[i-1]===b[j-1]?d[i-1][j-1]:1+Math.min(d[i-1][j],d[i][j-1],d[i-1][j-1]);return d[m][n];}
@@ -2502,29 +2448,35 @@ function _rebuildSearchIndex(){
 
 
 function doSearch(q){
-  if(!q){setSt('empty');return;}
+  if(!q){ setSt('empty'); return; }
   setSt('loading');
   setTimeout(function(){
     if(!allData.length){
       document.getElementById('nores-txt').textContent='Cargando inventario, intenta en segundos.';
-      setSt('nores');
-      return;
+      setSt('nores'); return;
     }
     var pool = _searchAllData.length ? _searchAllData : allData;
-    var sc=[];
+    var sc = [];
     pool.forEach(function(it){
-      if((it.stock !== undefined ? it.stock : 3) <= 0) return; // ocultar agotados
-      var s=Math.max(scr2(it.desc,q), scr2(it.lab,q)*0.7);
-      if(s>=8) sc.push({it:it,s:s});
+      var s = Math.max(scr2(it.desc, q), scr2(it.lab, q) * 0.7);
+      if(s >= 8) sc.push({it:it, s:s});
     });
-    sc.sort(function(a,b){return b.s-a.s;});
+    sc.sort(function(a,b){
+      // 1° mayor score, 2° con stock antes que agotado, 3° con foto antes
+      if(b.s !== a.s) return b.s - a.s;
+      var as = (a.it.stock !== undefined ? a.it.stock : 3) > 0 ? 1 : 0;
+      var bs = (b.it.stock !== undefined ? b.it.stock : 3) > 0 ? 1 : 0;
+      if(bs !== as) return bs - as;
+      var af = a.it.imagen && a.it.imagen.startsWith('http') ? 1 : 0;
+      var bf = b.it.imagen && b.it.imagen.startsWith('http') ? 1 : 0;
+      return bf - af;
+    });
     if(!sc.length){
       document.getElementById('nores-txt').textContent='No encontramos "'+q+'". Intenta con otro nombre.';
-      setSt('nores');
-      return;
+      setSt('nores'); return;
     }
-    renderResults(sc.slice(0,60).map(function(x){return x.it;}),q);
-  },55);
+    renderResults(sc.slice(0,60).map(function(x){ return x.it; }), q);
+  }, 55);
 }
 
 function copiarCodigoFarmacia(){
@@ -2552,15 +2504,25 @@ function mostrarToastFarmacia(msg){
   setTimeout(function(){t.remove();},2500);
 }
 
+function _agotadoOverlay(){
+  return '<div style="position:absolute;inset:0;background:rgba(220,38,38,.13);z-index:3;pointer-events:none;border-radius:inherit;"></div>'+
+    '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);'+
+    'background:rgba(220,38,38,.92);color:#fff;font-family:\'Manrope\',sans-serif;'+
+    'font-size:9.5px;font-weight:900;text-transform:uppercase;letter-spacing:.13em;'+
+    'padding:4px 13px;border-radius:99px;z-index:4;white-space:nowrap;'+
+    'box-shadow:0 2px 8px rgba(220,38,38,.45);">AGOTADO</div>';
+}
+
+
 function renderResults(items,q){
   setSt('results');
   document.getElementById('res-count').textContent=
     items.length+' resultado'+(items.length!==1?'s':'')+' para "'+q+'"';
- 
+
   var grid=document.getElementById('res-grid');
   grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%';
   grid.innerHTML='';
- 
+
   var GRADS=[
     ['#003f87','#1a56db'],['#064e3b','#059669'],['#4c1d95','#7c3aed'],
     ['#7c1d00','#dc2626'],['#1a3a3a','#0d9488'],['#1e1b4b','#4338ca'],
@@ -2572,75 +2534,84 @@ function renderResults(items,q){
     'monitor_heart','water_drop','science','face_6','child_care','wb_sunny',
     'spa','thermostat','emergency','biotech','favorite','local_pharmacy'
   ];
- 
+
   items.forEach(function(it,i){
     cache[it.key]=it;
-    var inCart=!!cart[it.key];
-    var precio=it.precio>0?it.precio:(it.pUnit>0?it.pUnit:0);
-    var gc=GRADS[i%GRADS.length];
-    var c1=gc[0];
-    var icon=ICONS[i%ICONS.length];
-    var uid='rs_'+i;
- 
-    /* ── URL imagen: acepta https://lh3.googleusercontent.com/d/... y cualquier https ── */
-    var img=(it.imagen||'').replace(/\r|\n|\t/g,'').trim();
-    var hasImg=img.length>8&&img.startsWith('http');
- 
+    var inCart  = !!cart[it.key];
+    var agotado = (it.stock !== undefined) ? it.stock <= 0 : false;
+    var precio  = it.precio>0 ? it.precio : (it.pUnit>0 ? it.pUnit : 0);
+    var gc      = GRADS[i%GRADS.length];
+    var c1      = agotado ? '#9ca3af' : gc[0];
+    var c1orig  = gc[0];
+    var icon    = ICONS[i%ICONS.length];
+    var uid     = 'rs_'+i;
+
+    var img = (it.imagen||'').replace(/\r|\n|\t/g,'').trim();
+    var hasImg = img.length>8 && img.startsWith('http');
+
     var card=document.createElement('article');
     card.style.cssText=
-      'background:#fff;border-radius:16px;border:1.5px solid #e5e7eb;'+
+      'background:#fff;border-radius:16px;border:1.5px solid '+(agotado?'#e5e7eb':'#e5e7eb')+';'+
       'box-shadow:0 2px 10px rgba(0,0,0,.06);display:flex;flex-direction:column;'+
       'overflow:hidden;animation:fadeUp .25s ease both;animation-delay:'+
-      Math.min(i*20,240)+'ms';
- 
+      Math.min(i*20,240)+'ms;'+(agotado?'opacity:.82':'');
+
     card.innerHTML=
-      /* zona imagen — fondo blanco para que la foto se vea limpia */
+      /* ── zona imagen ── */
       '<div style="height:130px;background:#fff;display:flex;align-items:center;'+
         'justify-content:center;flex-shrink:0;position:relative;overflow:hidden;'+
         'border-bottom:1px solid #f3f4f6;">'+
- 
-        /* imagen real: visible si URL, oculta si falla → muestra ícono */
+
         (hasImg
           ? '<img src="'+escFarmacia(img)+'"'+
             ' style="width:100%;height:130px;object-fit:contain;object-position:center;'+
-            'padding:6px;display:block;"'+
+            'padding:6px;display:block;'+(agotado?'filter:grayscale(.45);opacity:.7;':'')+'"'+
             ' onerror="this.style.display=\'none\';'+
             'var f=document.getElementById(\''+uid+'\');if(f)f.style.display=\'flex\'">'
           : '')+
- 
-        /* ícono fallback: visible SOLO si no hay URL */
+
         '<span id="'+uid+'" class="sym symf"'+
-          ' style="font-size:50px;color:'+c1+';'+
+          ' style="font-size:50px;color:'+c1orig+';opacity:'+(agotado?.35:1)+';'+
           'display:'+(hasImg?'none':'flex')+';'+
           'align-items:center;justify-content:center;'+
           'width:100%;height:130px;">'+icon+'</span>'+
- 
+
+        /* overlay rojo AGOTADO encima de la foto */
+        (agotado
+          ? '<div style="position:absolute;inset:0;background:rgba(220,38,38,.10);z-index:3;pointer-events:none;"></div>'+
+            '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);'+
+            'background:rgba(220,38,38,.90);color:#fff;font-family:\'Manrope\',sans-serif;'+
+            'font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.14em;'+
+            'padding:4px 13px;border-radius:99px;z-index:4;white-space:nowrap;'+
+            'box-shadow:0 2px 8px rgba(220,38,38,.4);">AGOTADO</div>'
+          : '')+
+
         /* badge laboratorio */
-        '<div style="position:absolute;top:7px;right:8px;background:'+c1+';color:#fff;'+
+        '<div style="position:absolute;top:7px;right:8px;background:'+(agotado?'#9ca3af':c1orig)+';color:#fff;'+
           'font-size:7.5px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;'+
           'padding:2px 7px;border-radius:99px;max-width:88px;overflow:hidden;'+
-          'text-overflow:ellipsis;white-space:nowrap;">'+
+          'text-overflow:ellipsis;white-space:nowrap;z-index:5;">'+
           escFarmacia(it.lab||'Genérico')+
         '</div>'+
- 
-        /* botón zoom → popup detalle */
+
+        /* botón zoom — siempre visible, incluso agotado */
         '<button onclick="abrirPopupSheet(\''+esc(it.key)+'\')"'+
           ' style="position:absolute;bottom:6px;right:8px;width:24px;height:24px;'+
-          'border-radius:50%;border:none;cursor:pointer;background:'+c1+';'+
+          'border-radius:50%;border:none;cursor:pointer;background:'+(agotado?'#9ca3af':c1orig)+';'+
           'display:flex;align-items:center;justify-content:center;'+
-          'box-shadow:0 2px 6px rgba(0,0,0,.22);">'+
+          'box-shadow:0 2px 6px rgba(0,0,0,.22);z-index:5;">'+
           '<span class="sym" style="font-size:13px;color:#fff">zoom_in</span>'+
         '</button>'+
       '</div>'+
- 
-      /* cuerpo */
+
+      /* ── cuerpo ── */
       '<div style="padding:8px 10px 10px;display:flex;flex-direction:column;gap:4px;flex:1">'+
         '<div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;'+
           'padding:2px 7px;border-radius:99px;width:fit-content;max-width:100%;overflow:hidden;'+
-          'text-overflow:ellipsis;white-space:nowrap;background:'+c1+'18;color:'+c1+'">'+
+          'text-overflow:ellipsis;white-space:nowrap;background:'+(agotado?'#f3f4f6':c1orig+'18')+';color:'+(agotado?'#9ca3af':c1orig)+'">'+
           hl(it.lab||'Genérico',q)+
         '</div>'+
-        '<div style="font-size:11.5px;font-weight:700;color:#111827;line-height:1.3;'+
+        '<div style="font-size:11.5px;font-weight:700;color:'+(agotado?'#9ca3af':'#111827')+';line-height:1.3;'+
           'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;'+
           'overflow:hidden;min-height:2.2em">'+
           hl(it.desc,q)+
@@ -2652,22 +2623,25 @@ function renderResults(items,q){
           : '')+
         '<div style="display:flex;align-items:flex-end;justify-content:space-between;'+
           'margin-top:auto;padding-top:4px">'+
-          '<div style="font-size:15px;font-weight:900;color:'+c1+';letter-spacing:-.02em">'+
-            (precio>0?fp(precio):'Consultar')+
+          '<div style="font-size:15px;font-weight:900;color:'+(agotado?'#9ca3af':c1orig)+';letter-spacing:-.02em">'+
+            (precio>0 ? fp(precio) : 'Consultar')+
           '</div>'+
-          (it.stock <= 0
-            ? '<div style="font-size:9px;font-weight:800;color:#dc2626;background:#fee2e2;padding:4px 9px;border-radius:8px;border:1px solid #fca5a5;align-self:flex-end">Agotado</div>'
+          (agotado
+            ? '<div style="font-size:8.5px;font-weight:800;color:#dc2626;background:#fee2e2;'+
+              'padding:4px 10px;border-radius:8px;border:1px solid #fca5a5;align-self:flex-end;'+
+              'display:flex;align-items:center;gap:3px;">'+
+              '<span class="sym symf" style="font-size:11px">remove_shopping_cart</span>Sin stock</div>'
             : '<button data-key="'+esc(it.key)+'" onclick="addToCart(\''+esc(it.key)+'\',this)"'+
-              ' style="background:'+(inCart?'#15803d':c1)+';width:30px;height:30px;'+
+              ' style="background:'+(inCart?'#15803d':c1orig)+';width:30px;height:30px;'+
               'border-radius:9px;border:none;cursor:pointer;display:flex;align-items:center;'+
-              'justify-content:center;color:#fff;flex-shrink:0;box-shadow:0 3px 8px '+c1+'44;'+
+              'justify-content:center;color:#fff;flex-shrink:0;box-shadow:0 3px 8px '+c1orig+'44;'+
               'transition:.12s">'+
               '<span class="sym symf" style="font-size:16px">'+(inCart?'check':'add')+'</span>'+
             '</button>'
           )+
         '</div>'+
       '</div>';
- 
+
     grid.appendChild(card);
   });
 }
@@ -3347,17 +3321,32 @@ var imgTransf = (coPago === 'TRANSFERENCIA' && _comprobanteBase64)
   }
 }
 
-function _coExito(idPedido,tel){
-  coStep=3;
-  document.getElementById('co-s2').style.display='none';
-  document.getElementById('co-s3').style.display='block';
-  document.getElementById('co-footer').style.display='none';
-  document.getElementById('co-pb3').style.background='var(--blue)';
-  document.getElementById('co-title').textContent='¡Pedido confirmado!';
-  document.getElementById('co-codigo').textContent=idPedido;
-  document.getElementById('co-exito-msg').textContent=
-    'Tu pedido fue registrado. Un domiciliario WIL te contactará al '+tel+' pronto.';
-  cart={};updFAB();renderCart();
+function _coExito(idPedido, tel){
+  // ── Restar stock en la hoja (best-effort) ──
+  try {
+    var itemsToDebit = Object.values(cart).map(function(c){
+      return { key: c.it.key, qty: c.qty };
+    });
+    // Reemplaza esta URL con la URL de despliegue del Code.gs como Web App
+    var GAS_STOCK = 'https://script.google.com/macros/s/AKfycbzr1YMVygPn28IburByI2FrnMlFcOf5XBi9HIeT2TZVRjFMXHGSuoCuwxwBTMdmRjw7uA/exec';
+    fetch(GAS_STOCK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ accion: 'rebajar-stock', drogueria: tienda, items: itemsToDebit })
+    }).catch(function(e){ console.warn('[rebajarStock]', e); });
+  } catch(e){ console.warn('[rebajarStock]', e); }
+
+  // ── Resto igual que antes ──
+  coStep = 3;
+  document.getElementById('co-s2').style.display = 'none';
+  document.getElementById('co-s3').style.display = 'block';
+  document.getElementById('co-footer').style.display = 'none';
+  document.getElementById('co-pb3').style.background = 'var(--blue)';
+  document.getElementById('co-title').textContent = '¡Pedido confirmado!';
+  document.getElementById('co-codigo').textContent = idPedido;
+  document.getElementById('co-exito-msg').textContent =
+    'Tu pedido fue registrado. Un domiciliario WIL te contactará al ' + tel + ' pronto.';
+  cart = {}; updFAB(); renderCart();
 }
 
 /* ══ UTILS ══ */
