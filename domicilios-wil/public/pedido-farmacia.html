@@ -2051,7 +2051,7 @@ function abrirCatSheet(query, nombre, icon, bg, color){
     var resultados = [];
     allData.forEach(function(it){
       var s = Math.max(scr2(it.desc, q), scr2(it.lab, q)*0.7);
-      if(s >= 12) resultados.push({it:it, s:s});
+      if(s >= 10) resultados.push({it:it, s:s});
     });
     resultados.sort(function(a,b){return b.s - a.s;});
     var items = resultados.slice(0,80).map(function(x){return x.it;});
@@ -2197,11 +2197,14 @@ function loadSheet(){
         var precioV= _parsePrecioNP(col(3));
         var precioU= _parsePrecioNP(col(4));
         var imagen = col(5);
-        var stock  = parseInt(col(6)) || 3; // F=Stock, default 3
+        var stock  = parseInt(col(6)) || 3;
 
         if(!nombre) return;
 
-        var key = nombre + '|||' + lab;
+        // Clave de dedup: nombre normalizado + laboratorio
+        var keyNorm = nrm(nombre) + '|||' + nrm(lab);
+        var key     = nombre + '|||' + lab;
+
         var it = {
           desc:   nombre,
           lab:    lab,
@@ -2213,6 +2216,25 @@ function loadSheet(){
           key:    key
         };
 
+        // Deduplicar: si ya existe este producto, solo reemplazar si el nuevo tiene foto y el viejo no
+        var existing = cache[keyNorm];
+        if(existing){
+          var nuevoTieneFoto = imagen && imagen.startsWith('http');
+          var viejoTieneFoto = existing.imagen && existing.imagen.startsWith('http');
+          if(nuevoTieneFoto && !viejoTieneFoto){
+            // reemplazar por versión con foto
+            var idx = items.findIndex(function(x){ return x.key === existing.key; });
+            if(idx >= 0){ items[idx] = it; }
+            cache[keyNorm] = it;
+            cache[key] = it;
+          }
+          // si el viejo ya tiene foto o ambos no tienen → no duplicar
+          return;
+        }
+
+        cache[keyNorm] = it;
+        cache[key] = it;
+        items.push(it);
         // Deduplicar: si ya existe con mismo nombre, preferir el que tiene imagen
         var existing = cache[key];
         if(existing){
@@ -2378,11 +2400,14 @@ function renderSheetCards(items){
                 (precio > 0 ? fp(precio) : 'Consultar') +
               '</div>' +
             '</div>' +
-            '<button class="ocard-add"' +
-              ' style="background:' + c1 + ';box-shadow:0 2px 8px ' + c1 + '44;"' +
-              ' onclick="addToCart(\'' + esc(it.key) + '\',null)">' +
-              '<span class="sym symf" style="font-size:13px">add</span>Agregar' +
-            '</button>' +
+            (it.stock <= 0
+              ? '<div style="font-size:9px;font-weight:800;color:#dc2626;background:#fee2e2;padding:4px 9px;border-radius:8px;border:1px solid #fca5a5;">Agotado</div>'
+              : '<button class="ocard-add"' +
+                ' style="background:' + c1 + ';box-shadow:0 2px 8px ' + c1 + '44;"' +
+                ' onclick="addToCart(\'' + esc(it.key) + '\',null)">' +
+                '<span class="sym symf" style="font-size:13px">add</span>Agregar' +
+              '</button>'
+            ) +
           '</div>' +
         '</div>' +
  
@@ -2403,20 +2428,33 @@ function nrm(s){
 function scr2(txt,q){
   var t=nrm(txt), nq=nrm(q);
   if(!t||!nq)return 0;
-  if(t.includes(nq))return 100;
+  if(t===nq)return 100;
+  if(t.includes(nq))return 95;
+
   var ws=nq.split(/\s+/).filter(Boolean);
-  var h=ws.filter(function(w){return t.includes(w);}).length;
-  if(h===ws.length)return 90;
-  if(h>0)return 65*(h/ws.length);
+  // Cada palabra de la query busca coincidencia en el texto completo
+  var hits=ws.filter(function(w){ return t.includes(w); }).length;
+  if(hits===ws.length)return 90;
+  if(hits>0)return 70*(hits/ws.length);
+
+  // Coincidencia parcial: palabra query es prefijo de alguna palabra del texto
+  var tWords=t.split(/\s+/);
+  var prefixHits=ws.filter(function(w){
+    return tWords.some(function(tv){ return tv.startsWith(w)||w.startsWith(tv); });
+  }).length;
+  if(prefixHits>0)return 55*(prefixHits/ws.length);
+
+  // Fuzzy por palabra individual
   var best=0;
-  t.split(/\s+/).forEach(function(tv){
+  tWords.forEach(function(tv){
     ws.forEach(function(w){
-      if(w.length<3)return;
-      var sim=1-lev(tv,w)/Math.max(tv.length,w.length,1);
+      if(w.length<2)return;
+      var maxL=Math.max(tv.length,w.length,1);
+      var sim=1-lev(tv,w)/maxL;
       if(sim>best)best=sim;
     });
   });
-  return best>0.6?best*50:0;
+  return best>0.55?best*45:0;
 }
 
 function lev(a,b){var m=a.length,n=b.length,d=[];for(var i=0;i<=m;i++)d[i]=[i];for(var j=0;j<=n;j++)d[0][j]=j;for(var i=1;i<=m;i++)for(var j=1;j<=n;j++)d[i][j]=a[i-1]===b[j-1]?d[i-1][j-1]:1+Math.min(d[i-1][j],d[i][j-1],d[i-1][j-1]);return d[m][n];}
@@ -2451,7 +2489,8 @@ function doSearch(q){
 var sc=[];
 pool.forEach(function(it){
       var s=Math.max(scr2(it.desc,q), scr2(it.lab,q)*0.7);
-      if(s>=15) sc.push({it:it,s:s});
+            if(s>=10) sc.push({it:it,s:s});
+
     });
     sc.sort(function(a,b){return b.s-a.s;});
     if(!sc.length){
@@ -2591,13 +2630,16 @@ function renderResults(items,q){
           '<div style="font-size:15px;font-weight:900;color:'+c1+';letter-spacing:-.02em">'+
             (precio>0?fp(precio):'Consultar')+
           '</div>'+
-          '<button data-key="'+esc(it.key)+'" onclick="addToCart(\''+esc(it.key)+'\',this)"'+
-            ' style="background:'+(inCart?'#15803d':c1)+';width:30px;height:30px;'+
-            'border-radius:9px;border:none;cursor:pointer;display:flex;align-items:center;'+
-            'justify-content:center;color:#fff;flex-shrink:0;box-shadow:0 3px 8px '+c1+'44;'+
-            'transition:.12s">'+
-            '<span class="sym symf" style="font-size:16px">'+(inCart?'check':'add')+'</span>'+
-          '</button>'+
+          (it.stock <= 0
+            ? '<div style="font-size:9px;font-weight:800;color:#dc2626;background:#fee2e2;padding:4px 9px;border-radius:8px;border:1px solid #fca5a5;align-self:flex-end">Agotado</div>'
+            : '<button data-key="'+esc(it.key)+'" onclick="addToCart(\''+esc(it.key)+'\',this)"'+
+              ' style="background:'+(inCart?'#15803d':c1)+';width:30px;height:30px;'+
+              'border-radius:9px;border:none;cursor:pointer;display:flex;align-items:center;'+
+              'justify-content:center;color:#fff;flex-shrink:0;box-shadow:0 3px 8px '+c1+'44;'+
+              'transition:.12s">'+
+              '<span class="sym symf" style="font-size:16px">'+(inCart?'check':'add')+'</span>'+
+            '</button>'
+          )+
         '</div>'+
       '</div>';
  
@@ -2623,13 +2665,24 @@ function addToCart(key,btn){
   var it=cache[key];if(!it)return;
   var stockDisp = it.stock !== undefined ? it.stock : 3;
   var enCarrito = cart[key] ? cart[key].qty : 0;
-  if(enCarrito >= stockDisp){
-    mostrarToastFarmacia('⚠️ Stock agotado para este producto');
+  if(stockDisp <= 0 || enCarrito >= stockDisp){
+    mostrarToastFarmacia('🚫 Producto agotado');
     return;
   }
   var esNuevo=!cart[key];
-  if(cart[key])cart[key].qty++;
+  if(cart[key]){
+    cart[key].qty++;
+  } else {
+    cart[key]={it:it,qty:1};
+    if(btn){btn.style.background='var(--green)';btn.innerHTML='<span class="sym symf" style="font-size:17px">check</span>';}
+  }
+  // Restar stock internamente
+  if(cache[key]) cache[key].stock = Math.max(0, (cache[key].stock||3) - 1);
+  if(btn){btn.style.transform='scale(1.3)';setTimeout(function(){btn.style.transform='';},180);}
+  updFAB();renderCart();
+  _toastCarrito(it.desc, esNuevo);
 }
+
 
 function sadd(key,desc,lab,precio,btn){
   // Verificar stock
