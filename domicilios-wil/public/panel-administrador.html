@@ -5864,6 +5864,346 @@ function imprimirProductos() {
   w.document.write(html); w.document.close();
 }
 
+/* ═══════════════════════════════════════════════
+   💸 PARCHE: VISOR DE TRANSFERENCIA
+   - Clic en "Transferencia" → modal con imagen
+   - Botón "✓ Verificada" → fondo verde en la fila
+═══════════════════════════════════════════════ */
+
+(function patchTransferencia() {
+
+  /* ── Inyectar estilos ── */
+  const style = document.createElement('style');
+  style.textContent = `
+    .transfer-link {
+      display:inline-flex;align-items:center;gap:4px;
+      background:rgba(37,99,235,.1);color:#1d4ed8;
+      border:1px solid rgba(37,99,235,.25);border-radius:7px;
+      padding:2px 9px;font-size:11px;font-weight:800;
+      cursor:pointer;transition:all .15s;white-space:nowrap;
+      text-decoration:none;
+    }
+    .transfer-link:hover { background:#1d4ed8;color:#fff;border-color:#1d4ed8; }
+    .transfer-link .tl-dot {
+      width:6px;height:6px;border-radius:50%;
+      background:#1d4ed8;animation:bk 1.5s infinite;
+      flex-shrink:0;
+    }
+    .transfer-link:hover .tl-dot { background:#fff; }
+
+    /* Fila verificada */
+    tr.ped-verificada td {
+      background:rgba(22,163,74,.08) !important;
+      transition:background .4s;
+    }
+    tr.ped-verificada td:first-child {
+      border-left:3px solid #16a34a !important;
+    }
+
+    /* Modal visor */
+    #modal-transfer-overlay {
+      position:fixed;inset:0;
+      background:rgba(4,18,20,.88);
+      backdrop-filter:blur(14px);
+      z-index:1000;
+      display:none;align-items:center;justify-content:center;
+      padding:16px;
+      animation:moFade .2s ease;
+    }
+    #modal-transfer-overlay.show { display:flex; }
+    #modal-transfer-box {
+      background:var(--white);border-radius:22px;
+      width:min(540px,100%);max-height:92vh;
+      overflow-y:auto;
+      box-shadow:0 40px 100px rgba(4,18,20,.5);
+      animation:invUp .3s cubic-bezier(.34,1.2,.64,1);
+      display:flex;flex-direction:column;
+    }
+    #modal-transfer-box::-webkit-scrollbar{width:3px;}
+    #modal-transfer-box::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px;}
+
+    .mt-hdr {
+      background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#1e40af 100%);
+      border-radius:22px 22px 0 0;
+      padding:20px 24px 18px;
+      display:flex;align-items:center;gap:12px;
+      position:relative;overflow:hidden;flex-shrink:0;
+    }
+    .mt-hdr::before {
+      content:'';position:absolute;top:-50px;right:-50px;
+      width:180px;height:180px;border-radius:50%;
+      background:radial-gradient(circle,rgba(37,99,235,.2) 0%,transparent 65%);
+      pointer-events:none;
+    }
+    .mt-hdr-ico {
+      width:42px;height:42px;border-radius:13px;
+      background:rgba(37,99,235,.25);border:1.5px solid rgba(37,99,235,.4);
+      display:flex;align-items:center;justify-content:center;
+      color:#93c5fd;font-size:20px;flex-shrink:0;position:relative;z-index:1;
+    }
+    .mt-hdr-close {
+      margin-left:auto;width:32px;height:32px;border-radius:9px;
+      background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.12);
+      cursor:pointer;display:flex;align-items:center;justify-content:center;
+      color:rgba(255,255,255,.6);font-size:16px;transition:all .15s;
+      position:relative;z-index:1;
+    }
+    .mt-hdr-close:hover { background:rgba(220,38,38,.38);color:#fff; }
+
+    .mt-img-wrap {
+      margin:20px 24px 0;border-radius:14px;overflow:hidden;
+      border:1.5px solid var(--border);background:var(--bg2);
+      display:flex;align-items:center;justify-content:center;
+      min-height:200px;position:relative;
+    }
+    .mt-img-wrap img {
+      width:100%;display:block;border-radius:14px;
+      object-fit:contain;max-height:52vh;
+    }
+    .mt-img-loading {
+      position:absolute;inset:0;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;gap:10px;
+      color:var(--text3);font-size:12px;font-weight:700;
+    }
+    .mt-spin {
+      width:28px;height:28px;border:3px solid var(--border2);
+      border-top-color:var(--blue);border-radius:50%;
+      animation:spin .8s linear infinite;
+    }
+
+    .mt-meta {
+      display:flex;gap:10px;flex-wrap:wrap;
+      padding:16px 24px 0;
+    }
+    .mt-chip {
+      display:inline-flex;align-items:center;gap:5px;
+      background:var(--bg2);border:1px solid var(--border);border-radius:8px;
+      padding:4px 11px;font-size:10px;font-weight:700;color:var(--text2);
+    }
+    .mt-chip .material-symbols-rounded { font-size:13px;color:var(--teal); }
+
+    .mt-footer {
+      padding:20px 24px 24px;
+      display:flex;gap:10px;flex-wrap:wrap;
+    }
+    .btn-verificar {
+      flex:2;min-width:160px;
+      background:linear-gradient(135deg,#16a34a,#15803d);
+      color:#fff;border:none;border-radius:12px;
+      padding:13px 20px;
+      font-family:'Plus Jakarta Sans',sans-serif;
+      font-size:13px;font-weight:800;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;gap:8px;
+      box-shadow:0 4px 16px rgba(22,163,74,.3);
+      transition:all .18s;
+    }
+    .btn-verificar:hover { transform:translateY(-1px);box-shadow:0 8px 24px rgba(22,163,74,.42); }
+    .btn-verificar .material-symbols-rounded { font-size:17px; }
+    .btn-mt-close {
+      flex:1;min-width:100px;
+      background:transparent;color:var(--text2);
+      border:1.5px solid var(--border);border-radius:12px;
+      padding:13px;font-family:'Plus Jakarta Sans',sans-serif;
+      font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;
+    }
+    .btn-mt-close:hover { background:var(--bg);border-color:var(--text3); }
+
+    .mt-already {
+      display:inline-flex;align-items:center;gap:6px;
+      background:var(--green-l);color:var(--green);
+      border:1.5px solid rgba(22,163,74,.25);border-radius:10px;
+      padding:8px 16px;font-size:12px;font-weight:800;
+      flex:2;justify-content:center;
+    }
+  `;
+  document.head.appendChild(style);
+
+  /* ── Crear modal en el DOM ── */
+  const overlay = document.createElement('div');
+  overlay.id = 'modal-transfer-overlay';
+  overlay.innerHTML = `
+    <div id="modal-transfer-box">
+      <div class="mt-hdr">
+        <div class="mt-hdr-ico">
+          <span class="material-symbols-rounded">receipt_long</span>
+        </div>
+        <div style="position:relative;z-index:1;">
+          <div style="font-size:15px;font-weight:800;color:#fff;">Comprobante de transferencia</div>
+          <div id="mt-hdr-sub" style="font-size:10px;color:rgba(255,255,255,.4);margin-top:2px;">–</div>
+        </div>
+        <button class="mt-hdr-close" onclick="closeMT()">
+          <span class="material-symbols-rounded" style="font-size:16px;">close</span>
+        </button>
+      </div>
+
+      <div class="mt-img-wrap" id="mt-img-wrap">
+        <div class="mt-img-loading" id="mt-img-loading">
+          <div class="mt-spin"></div>Cargando imagen…
+        </div>
+        <img id="mt-img" src="" alt="Comprobante"
+          style="display:none;"
+          onload="this.style.display='block';document.getElementById('mt-img-loading').style.display='none';"
+          onerror="document.getElementById('mt-img-loading').innerHTML='<span class=material-symbols-rounded style=font-size:32px;color:var(--red)>broken_image</span><span>No se pudo cargar la imagen</span>';">
+      </div>
+
+      <div class="mt-meta" id="mt-meta"></div>
+
+      <div class="mt-footer" id="mt-footer">
+        <button class="btn-mt-close" onclick="closeMT()">
+          <span style="display:flex;align-items:center;gap:6px;">
+            <span class="material-symbols-rounded" style="font-size:15px;">close</span>Cerrar
+          </span>
+        </button>
+        <button class="btn-verificar" id="btn-verificar-pago" onclick="verificarPago()">
+          <span class="material-symbols-rounded">verified</span>Marcar como verificada
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeMT(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMT(); });
+
+  /* ── Estado actual del modal ── */
+  let _currentPedId = null;
+  const _verificados = new Set(JSON.parse(localStorage.getItem('wil_tf_verificados') || '[]'));
+
+  /* ── Abrir modal ── */
+  window.openTransferModal = function(pedId, imgUrl, meta) {
+    _currentPedId = pedId;
+    document.getElementById('mt-hdr-sub').textContent = meta;
+    document.getElementById('mt-img-loading').style.display = 'flex';
+    document.getElementById('mt-img-loading').innerHTML =
+      '<div class="mt-spin"></div>Cargando imagen…';
+    const img = document.getElementById('mt-img');
+    img.style.display = 'none';
+    img.src = imgUrl + '?ts=' + Date.now(); // evitar caché
+
+    /* Meta chips */
+    const ped = allPedidos.find(p => p.id === pedId);
+    const chips = [];
+    if (ped?.cliente) chips.push(['person', ped.cliente]);
+    if (ped?.total)   chips.push(['payments', '$\u2009' + parsePrecio(ped.total).toLocaleString('es-CO')]);
+    if (ped?.hora)    chips.push(['schedule', ped.hora]);
+    if (ped?.id)      chips.push(['tag', 'Pedido #' + ped.id]);
+    document.getElementById('mt-meta').innerHTML = chips.map(([ico, txt]) =>
+      `<div class="mt-chip"><span class="material-symbols-rounded">${ico}</span>${txt}</div>`
+    ).join('');
+
+    /* Botón verificar — si ya está verificado, mostrar badge */
+    const footer = document.getElementById('mt-footer');
+    if (_verificados.has(pedId)) {
+      document.getElementById('btn-verificar-pago').style.display = 'none';
+      if (!document.getElementById('mt-ya-verificada')) {
+        const badge = document.createElement('div');
+        badge.id = 'mt-ya-verificada';
+        badge.className = 'mt-already';
+        badge.innerHTML = '<span class="material-symbols-rounded" style="font-size:17px;">check_circle</span>Transferencia verificada ✓';
+        footer.appendChild(badge);
+      }
+    } else {
+      document.getElementById('btn-verificar-pago').style.display = 'flex';
+      const badge = document.getElementById('mt-ya-verificada');
+      if (badge) badge.remove();
+    }
+
+    overlay.classList.add('show');
+    document.body.style.overflow = 'hidden';
+  };
+
+  /* ── Cerrar ── */
+  window.closeMT = function() {
+    overlay.classList.remove('show');
+    document.body.style.overflow = '';
+    _currentPedId = null;
+  };
+
+  /* ── Verificar pago ── */
+  window.verificarPago = function() {
+    if (!_currentPedId) return;
+    _verificados.add(_currentPedId);
+    try { localStorage.setItem('wil_tf_verificados', JSON.stringify([..._verificados])); } catch(e){}
+
+    /* Pintar la fila de verde */
+    const filas = document.querySelectorAll('#ped-tbody tr');
+    filas.forEach(tr => {
+      const primer = tr.querySelector('td');
+      if (primer && primer.textContent.trim() === _currentPedId) {
+        tr.classList.add('ped-verificada');
+      }
+    });
+
+    /* Cambiar botón a badge */
+    document.getElementById('btn-verificar-pago').style.display = 'none';
+    const footer = document.getElementById('mt-footer');
+    if (!document.getElementById('mt-ya-verificada')) {
+      const badge = document.createElement('div');
+      badge.id = 'mt-ya-verificada';
+      badge.className = 'mt-already';
+      badge.innerHTML = '<span class="material-symbols-rounded" style="font-size:17px;">check_circle</span>Transferencia verificada ✓';
+      footer.appendChild(badge);
+    }
+
+    showToast('s', '✓ Transferencia verificada', 'Pedido #' + _currentPedId + ' — fila marcada en verde');
+    VOZ.hablar('Transferencia verificada');
+
+    setTimeout(closeMT, 1200);
+  };
+
+  /* ── PARCHE EN renderPedidosTable: reemplaza la celda Método ──
+     Monkey-patch para que las URLs de imagen existan en el contexto
+     Esto se activa automáticamente al llamar renderPedidosTable ── */
+  const _origRender = window.renderPedidosTable.bind(window);
+
+  window.renderPedidosTable = function(filter) {
+    _origRender(filter);
+
+    /* Post-process: recorrer filas y agregar comportamiento */
+    document.querySelectorAll('#ped-tbody tr').forEach(tr => {
+      const tds = tr.querySelectorAll('td');
+      if (!tds.length) return;
+
+      const pedId = tds[0]?.textContent?.trim();
+      const ped   = allPedidos.find(p => p.id === pedId);
+      if (!ped) return;
+
+      /* ── Marcar verificadas que persisten ── */
+      if (_verificados.has(pedId)) tr.classList.add('ped-verificada');
+
+      /* ── Celda Método (índice 6) ── */
+      const metodoCell = tds[6];
+      if (!metodoCell) return;
+
+      const metodo  = (ped.metodo || '').trim();
+      const imgUrl  = (ped.imagen || '').trim();
+      const esTransf = /transfer/i.test(metodo);
+
+      if (esTransf && imgUrl && imgUrl.startsWith('http')) {
+        const meta = `${ped.cliente || ''} · ${ped.hora || ''} · #${ped.id}`;
+        metodoCell.innerHTML = `
+          <span class="transfer-link"
+            onclick="event.stopPropagation();openTransferModal('${pedId}','${imgUrl.replace(/'/g,"\\'")}','${meta.replace(/'/g,"\\'")}')">
+            <span class="tl-dot"></span>Transferencia
+          </span>`;
+      } else if (esTransf) {
+        /* Transferencia pero sin imagen */
+        metodoCell.innerHTML = `
+          <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;
+            color:var(--orange);font-weight:700;">
+            <span class="material-symbols-rounded" style="font-size:13px;">warning</span>
+            Transf. (sin img)
+          </span>`;
+      }
+    });
+  };
+
+  /* Re-render inmediato si hay pedidos cargados */
+  if (allPedidos.length) {
+    const tabActivo = document.querySelector('#ped-tabs .tab.on')?.dataset?.f || 'todos';
+    renderPedidosTable(tabActivo);
+  }
+
+})();
 
 
 
