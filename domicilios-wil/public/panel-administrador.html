@@ -4991,26 +4991,7 @@ async function renderActividad() {
   for (const u of ubicaciones) {
     const { id, nombre, lat, lng, ts, acc } = u;
 
-    /* Historial */
-    if (!_trackHistory[id]) _trackHistory[id] = [];
-    const hist   = _trackHistory[id];
-    const ultimo = hist[hist.length - 1];
-    if (!ultimo || Math.abs(ultimo[0]-lat) > 0.000015 || Math.abs(ultimo[1]-lng) > 0.000015) {
-      hist.push([lat, lng]);
-      if (hist.length > 200) hist.shift();
-    }
-
-    /* Polyline */
-    if (hist.length > 1) {
-      if (_trackLines[id]) {
-        _trackLines[id].setLatLngs(hist);
-      } else {
-        _trackLines[id] = L.polyline(hist, {
-          color: '#28B9C1', weight: 3, opacity: 0.7,
-          dashArray: '7 5', lineJoin: 'round', lineCap: 'round'
-        }).addTo(_map);
-      }
-    }
+   
 
     /* Info del domi */
     const domi = allDrivers.find(d => (d.id||'').toUpperCase() === id.toUpperCase())
@@ -5022,9 +5003,10 @@ async function renderActividad() {
       const domiF = allDrivers.find(d => (d.id||'').toUpperCase() === did.toUpperCase())
                  || { id: did, nombre: u.nombre, tel: '' };
       const pedF  = allPedidos.find(p => matchDomi(p, domiF) && p.estado === 'proceso');
-      const entregados = allPedidos.filter(p => matchDomi(p, domiF) && p.estado === 'entregado').length;
-      const enProceso  = allPedidos.filter(p => matchDomi(p, domiF) && p.estado === 'proceso').length;
+     const entregados = allPedidos.filter(p => matchDomi(p, domiF) && p.estado === 'entregado').length;
+      const enProceso  = allPedidos.filter(p => matchDomi(p, domiF) && (p.estado === 'proceso' || p.estado === 'encamino')).length;
       const pendientes = allPedidos.filter(p => matchDomi(p, domiF) && p.estado === 'pendiente').length;
+      // Si el último pedido pasó a entregado, enProceso ya queda en 0 automáticamente
       const libre      = enProceso === 0 && pendientes === 0;
       const statusColor= libre ? '#16a34a' : '#d97706';
       const statusBg   = libre ? '#dcfce7'  : '#fef3c7';
@@ -5057,6 +5039,7 @@ async function renderActividad() {
           ${pedidoActual ? `
             <div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:9px 11px;margin-bottom:8px;">
               <div style="font-size:9px;font-weight:800;color:#1d4ed8;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">📦 Pedido en curso</div>
+             <div style="font-size:10px;font-weight:800;color:#1d4ed8;font-family:'DM Mono',monospace;">Pedido #${pedidoActual.id}</div>
               <div style="font-size:12px;font-weight:700;color:#0c2225;">${pedidoActual.cliente||''}</div>
               <div style="font-size:10px;color:#64748b;margin-top:2px;">📍 ${pedidoActual.direccion||''}</div>
               <div style="font-size:10px;color:#64748b;margin-top:1px;">💰 ${fmtMoney(parsePrecio(pedidoActual.total))}</div>
@@ -5134,7 +5117,7 @@ function initMap() {
     attribution: '© OpenStreetMap', maxZoom: 19
   }).addTo(_map);
   // Zoom en esquina superior derecha para no tapar leyenda
-  L.control.zoom({ position: 'topright' }).addTo(_map);
+  L.control.zoom({ position: 'bottomright' }).addTo(_map);
 }
 
 /* ── initActividadTab ── */
