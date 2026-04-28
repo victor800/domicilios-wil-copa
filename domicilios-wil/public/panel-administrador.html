@@ -470,6 +470,8 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
   .tabs { flex-wrap: wrap; width: 100%; }
   .tab { font-size: 10px; padding: 5px 10px; }
   .sg { grid-template-columns: 1fr 1fr; gap: 10px; }
+  #pg-horario { display: block !important; padding: 14px !important; }
+#pg-horario .ofert-stats { grid-template-columns: 1fr 1fr 1fr !important; }
   .sc-val { font-size: 20px; }
   .pghdr h2 { font-size: 18px; }
   #tb-clk { display: none !important; }
@@ -1620,14 +1622,6 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
     </div>
   </div>
 </div>
-
-
-
-  <div class="pghdr">
-    <h2>Horario Especial 📅</h2>
-    <p>Controla cuándo el servicio de domicilios está disponible</p>
-  </div>
-
   <!-- Hero de estado -->
   <div class="hor-hero" id="horarioEstadoCard">
     <div class="hor-status-icon verde" id="hor-icon">✓</div>
@@ -3353,10 +3347,13 @@ function sp(id, el) {
   const pg = document.getElementById('pg-' + id);
   if (pg) {
     if (id === 'actividad') {
-      initActividadTab();
-    } else {
-      pg.classList.add('on');
-      if (id === 'productos') {
+    initActividadTab();
+} else if (id === 'horario') {
+    pg.classList.add('on');
+    fetchHorario().catch(e => console.warn('[horario]:', e));
+} else {
+    pg.classList.add('on');
+    if (id === 'productos') {
   loadProductosFromSheet().then(() => { renderProductos(); updateBadges(); });
 }
 if (id === 'contable') {   // ← bloque nuevo
