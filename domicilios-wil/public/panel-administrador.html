@@ -3237,8 +3237,8 @@ function sp(id, el) {
     if (id === 'productos') {
   loadProductosFromSheet().then(() => { renderProductos(); updateBadges(); });
 }
-if (id === 'contable') {   // ← bloque nuevo
-  renderContable();
+if (id === 'contable') {
+  Promise.all([loadBases(), loadMultas()]).then(() => renderContable());
 }
     }
   }
@@ -3311,7 +3311,7 @@ async function doRefresh(showToasts=true) {
 
 async function manualRefresh() { await doRefresh(true); }
 
-// ════ MODAL SELECTOR DE DROGUERÍA ════
+
 function publicarCarrusel() {
   const activas = ofertas.filter(o => o.estado === 'activa');
   if (!activas.length) {
@@ -6389,14 +6389,89 @@ function initContable() {
     ov.addEventListener('click', e => { if (e.target === ov) ov.classList.remove('show'); });
   });
  
-  const LS_BASES  = 'wil_cont_bases_v1';
-  const LS_MULTAS = 'wil_cont_multas_v1';
-  let _bases  = JSON.parse(localStorage.getItem(LS_BASES)  || '[]');
-  let _multas = JSON.parse(localStorage.getItem(LS_MULTAS) || '[]');
+  let _bases  = [];
+  let _multas = [];
   let _periodo = 'hoy';
- 
-  function saveBases()  { try { localStorage.setItem(LS_BASES,  JSON.stringify(_bases));  } catch(e){} }
-  function saveMultas() { try { localStorage.setItem(LS_MULTAS, JSON.stringify(_multas)); } catch(e){} }
+
+  async function loadBases() {
+    try {
+      const text = await fetchSheetCSV('Bases', 10000);
+      const lines = parseCSVText(text);
+      _bases = lines.map(c => ({
+        domi:  col(c, 0),
+        monto: parsePrecio(col(c, 1)),
+        nota:  col(c, 2),
+        fecha: col(c, 3)
+      })).filter(b => b.domi && b.monto);
+    } catch(e) { console.warn('[loadBases]:', e.message); _bases = []; }
+  }
+
+  async function loadMultas() {
+    try {
+      const text = await fetchSheetCSV('Multas', 10000);
+      const lines = parseCSVText(text);
+      _multas = lines.map(c => ({
+        domi:  col(c, 0),
+        monto: parsePrecio(col(c, 1)),
+        tipo:  col(c, 2) || 'multa',
+        nota:  col(c, 3),
+        fecha: col(c, 4)
+      })).filter(m => m.domi && m.monto);
+    } catch(e) { console.warn('[loadMultas]:', e.message); _multas = []; }
+  }
+
+  async function saveBases(item) {
+    try {
+      await fetch(SHEET_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          accion: 'crear-base',
+          domi:   item.domi,
+          monto:  item.monto,
+          nota:   item.nota,
+          fecha:  item.fecha
+        })
+      });
+    } catch(e) { console.warn('[saveBases]:', e.message); }
+  }
+
+  async function saveMultas(item) {
+    try {
+      await fetch(SHEET_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          accion: 'crear-multa',
+          domi:   item.domi,
+          monto:  item.monto,
+          tipo:   item.tipo,
+          nota:   item.nota,
+          fecha:  item.fecha
+        })
+      });
+    } catch(e) { console.warn('[saveMultas]:', e.message); }
+  }
+
+  async function deleteBaseSheet(item) {
+    try {
+      await fetch(SHEET_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ accion: 'eliminar-base', domi: item.domi, fecha: item.fecha })
+      });
+    } catch(e) { console.warn('[deleteBaseSheet]:', e.message); }
+  }
+
+  async function deleteMultaSheet(item) {
+    try {
+      await fetch(SHEET_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ accion: 'eliminar-multa', domi: item.domi, fecha: item.fecha })
+      });
+    } catch(e) { console.warn('[deleteMultaSheet]:', e.message); }
+  }
  
   function parseDate(s) {
     if (!s) return null;
@@ -6514,28 +6589,55 @@ function initContable() {
   window.openBaseModal  = function() { poblarSelectCont('base-domi-select'); document.getElementById('base-monto').value=''; document.getElementById('base-nota').value=''; document.getElementById('modal-base-overlay').classList.add('show'); };
   window.openMultaModal = function() { poblarSelectCont('multa-domi-select'); document.getElementById('multa-monto').value=''; document.getElementById('multa-nota').value=''; document.getElementById('multa-tipo-sel').value='multa'; document.getElementById('modal-multa-overlay').classList.add('show'); };
  
-  window.saveBase = function() {
-    const domi=document.getElementById('base-domi-select').value, monto=parsePrecio(document.getElementById('base-monto').value), nota=document.getElementById('base-nota').value.trim();
-    if (!domi) { showToast('w','Falta domiciliario',''); return; }
+ window.saveBase = async function() {
+    const domi  = document.getElementById('base-domi-select').value;
+    const monto = parsePrecio(document.getElementById('base-monto').value);
+    const nota  = document.getElementById('base-nota').value.trim();
+    if (!domi)  { showToast('w','Falta domiciliario',''); return; }
     if (!monto) { showToast('w','Falta monto',''); return; }
-    _bases.push({domi,monto,nota,fecha:new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})});
-    saveBases(); renderBases(); renderContable();
+    const item = { domi, monto, nota, fecha: new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) };
+    _bases.push(item);
+    renderBases(); renderContable();
     document.getElementById('modal-base-overlay').classList.remove('show');
-    showToast('s',`Base dada a ${domi}`,fmtMoney(monto)+(nota?' · '+nota:''));
+    showToast('s', `Base dada a ${domi}`, fmtMoney(monto) + (nota ? ' · ' + nota : ''));
+    await saveBases(item);
+    await loadBases(); renderBases(); renderContable();
   };
  
-  window.saveMulta = function() {
-    const domi=document.getElementById('multa-domi-select').value, monto=parsePrecio(document.getElementById('multa-monto').value), nota=document.getElementById('multa-nota').value.trim(), tipo=document.getElementById('multa-tipo-sel').value;
-    if (!domi) { showToast('w','Falta domiciliario',''); return; }
+  window.saveMulta = async function() {
+    const domi  = document.getElementById('multa-domi-select').value;
+    const monto = parsePrecio(document.getElementById('multa-monto').value);
+    const nota  = document.getElementById('multa-nota').value.trim();
+    const tipo  = document.getElementById('multa-tipo-sel').value;
+    if (!domi)  { showToast('w','Falta domiciliario',''); return; }
     if (!monto) { showToast('w','Falta monto',''); return; }
-    _multas.push({domi,monto,nota,tipo,fecha:new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})});
-    saveMultas(); renderMultas(); renderContable();
+    const item = { domi, monto, nota, tipo, fecha: new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) };
+    _multas.push(item);
+    renderMultas(); renderContable();
     document.getElementById('modal-multa-overlay').classList.remove('show');
-    showToast('i',`Registrado para ${domi}`,fmtMoney(monto));
+    showToast('i', `Registrado para ${domi}`, fmtMoney(monto));
+    await saveMultas(item);
+    await loadMultas(); renderMultas(); renderContable();
   };
  
-  window.deleteBase  = function(idx) { if (!confirm('¿Eliminar esta base?')) return; _bases.splice(idx,1); saveBases(); renderBases(); renderContable(); showToast('i','Base eliminada',''); };
-  window.deleteMulta = function(idx) { if (!confirm('¿Eliminar este registro?')) return; _multas.splice(idx,1); saveMultas(); renderMultas(); renderContable(); showToast('i','Registro eliminado',''); };
+ window.deleteBase  = async function(idx) {
+    if (!confirm('¿Eliminar esta base?')) return;
+    const item = _bases[idx];
+    _bases.splice(idx, 1);
+    renderBases(); renderContable();
+    showToast('i','Base eliminada','');
+    await deleteBaseSheet(item);
+    await loadBases(); renderBases(); renderContable();
+  };
+  window.deleteMulta = async function(idx) {
+    if (!confirm('¿Eliminar este registro?')) return;
+    const item = _multas[idx];
+    _multas.splice(idx, 1);
+    renderMultas(); renderContable();
+    showToast('i','Registro eliminado','');
+    await deleteMultaSheet(item);
+    await loadMultas(); renderMultas(); renderContable();
+  };
  
   window.setCPeriodo = function(p, btn) {
     _periodo = p;
