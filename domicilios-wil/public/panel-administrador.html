@@ -2249,16 +2249,27 @@ function toggleAlerta() {
 /* ── MÉTODO 1: gviz CSV directo ── */
 async function fetchSheetCSV(sheetName, timeout = 18000) {
   const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}&cachebust=${Date.now()}`;
-  const r = await fetch(url, { 
-    signal: AbortSignal.timeout(timeout), 
-    cache: 'no-store',
-    mode: 'cors',
-    credentials: 'omit'
-  });
-  if (!r.ok) throw new Error('HTTP ' + r.status);
-  const text = await r.text();
-  if (!text || text.trim().length < 5) throw new Error('Empty response');
-  return text;
+  
+  // ✅ PARCHE iOS: AbortSignal.timeout no existe en Safari — usar AbortController manual
+  let controller, timer;
+  try {
+    controller = new AbortController();
+    timer = setTimeout(() => controller.abort(), timeout);
+    const r = await fetch(url, {
+      signal: controller.signal,
+      cache: 'no-store',
+      mode: 'cors',
+      credentials: 'omit'
+    });
+    clearTimeout(timer);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const text = await r.text();
+    if (!text || text.trim().length < 5) throw new Error('Empty response');
+    return text;
+  } catch(e) {
+    clearTimeout(timer);
+    throw e;
+  }
 }
 
 /* ── MÉTODO 2: Apps Script como proxy ── */
@@ -4521,38 +4532,71 @@ function filterProductos(f, btn) {
   document.getElementById('greet-date').textContent='Hoy es '+n.toLocaleDateString('es-CO',{weekday:'long',year:'numeric',month:'long',day:'numeric'})+' · Sistema en línea';
   document.getElementById('sess-start').textContent=n.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
 
-
-
   setSyncState('syncing','Conectando…');
- showToast('i','Iniciando panel','Cargando datos del sheet…');
+  showToast('i','Iniciando panel','Cargando datos del sheet…');
 
-  // En móvil dar tiempo al navegador para establecer conexión
-  if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) {
-    await new Promise(r => setTimeout(r, 1500));
+  // ✅ PARCHE MÓVIL: esperar a que la red esté lista
+  // En iOS/Android el SW puede estar iniciando — dar margen extra
+  const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (isMobile) {
+    await new Promise(r => setTimeout(r, 2000));
   }
 
-  // ✅ Cargar pedidos y domis SIEMPRE del sheet
-  const [okD, okP] = await Promise.all([loadDrivers(), loadPedidos()]);
+  // ✅ PARCHE: reintentar hasta 3 veces con backoff si falla
+  async function cargarConReintentos(fn, nombre, intentos = 3) {
+    for (let i = 0; i < intentos; i++) {
+      try {
+        const ok = await fn();
+        if (ok) return true;
+      } catch(e) {
+        console.warn(`[boot] ${nombre} intento ${i+1} falló:`, e.message);
+      }
+      if (i < intentos - 1) await new Promise(r => setTimeout(r, 1500 * (i + 1)));
+    }
+    return false;
+  }
+
+  const okD = await cargarConReintentos(loadDrivers, 'Domis');
+  const okP = await cargarConReintentos(loadPedidos, 'Pedidos');
+
   loadProductos();
-  await loadOfertasFromSheet();
-  await fetchHorario();
-  ALERTA_PENDIENTES.init();
+
+  // Ofertas y productos en paralelo, sin bloquear si fallan
+  try { await loadOfertasFromSheet(); } catch(e) { console.warn('[boot] ofertas:', e.message); }
+  try { await loadProductosFromSheet(); } catch(e) { console.warn('[boot] productos:', e.message); }
+  try { await fetchHorario(); } catch(e) { console.warn('[boot] horario:', e.message); }
+
+  // ✅ PARCHE: renderAll SIEMPRE, aunque no haya datos — evita pantalla vacía
   renderAll();
+
+  ALERTA_PENDIENTES.init();
 
   if (okD || okP || allPedidos.length > 0 || allDrivers.length > 0) {
     setSyncState('ok', n.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}));
     showToast('s','✓ Panel listo',`${allDrivers.length} domis · ${allPedidos.length} pedidos · ${ofertas.length} ofertas`);
-    // 🔊 Bienvenida por voz
-    const pendV    = allPedidos.filter(p => p.estado === 'pendiente').length;
-    const oferV    = ofertas.filter(o => o.estado === 'activa').length;
-    const prodV    = productos.filter(p => p.estado === 'activo').length;
-    const domisV   = allDrivers.filter(d => d.activo).length;
+    const pendV  = allPedidos.filter(p => p.estado === 'pendiente').length;
+    const oferV  = ofertas.filter(o => o.estado === 'activa').length;
+    const prodV  = productos.filter(p => p.estado === 'activo').length;
+    const domisV = allDrivers.filter(d => d.activo).length;
     VOZ.bienvenida('Hernán', pendV, oferV, prodV, domisV);
   } else {
     setSyncState('err','Sin datos');
-    showToast('e','Sin datos del sheet',
-      'Asegúrate de que el sheet sea público: Archivo → Compartir → Cualquiera con el enlace → Lector');
-    setLastErr('Sheet no responde o no es público. Verifica permisos.');
+    // ✅ PARCHE: en móvil, reintentar automáticamente una vez más tras 5s
+    showToast('w','Reintentando…','Conexión lenta — intentando de nuevo');
+    setTimeout(async () => {
+      const ok2D = await cargarConReintentos(loadDrivers,  'Domis-retry', 2);
+      const ok2P = await cargarConReintentos(loadPedidos,  'Pedidos-retry', 2);
+      if (ok2D || ok2P) {
+        renderAll();
+        setSyncState('ok', new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}));
+        showToast('s','✓ Panel listo', `${allDrivers.length} domis · ${allPedidos.length} pedidos`);
+      } else {
+        setSyncState('err','Sin datos');
+        showToast('e','Sin datos del sheet',
+          'Asegúrate de que el sheet sea público: Archivo → Compartir → Cualquiera con el enlace → Lector');
+        setLastErr('Sheet no responde. Verifica permisos de lectura pública.');
+      }
+    }, 5000);
   }
 })();
 
