@@ -3238,7 +3238,8 @@ function sp(id, el) {
   loadProductosFromSheet().then(() => { renderProductos(); updateBadges(); });
 }
 if (id === 'contable') {
-  Promise.all([loadBases(), loadMultas()]).then(() => renderContable());
+  Promise.all([loadDrivers(), loadPedidos(), loadBases(), loadMultas()])
+    .then(() => { renderAll(); renderContable(); });
 }
     }
   }
@@ -6175,12 +6176,8 @@ function initContable() {
             <div style="font-size:11px;color:rgba(255,255,255,.35);">Verificadas en panel</div>
           </div>
         </div>
-        <div style="padding:16px 18px;">
-          <div style="font-size:32px;font-weight:800;color:var(--blue);" id="cont-tf-n">–</div>
-          <div style="font-size:12px;color:var(--text3);margin-top:2px;">pedidos</div>
-          <div style="height:1px;background:var(--border);margin:12px 0;"></div>
-          <div style="font-size:11px;color:var(--text2);font-weight:700;">Total recibido</div>
-          <div style="font-size:20px;font-weight:800;color:var(--blue);font-family:'DM Mono',monospace;" id="cont-tf-$">–</div>
+        <div style="padding:14px 16px;" id="cont-tf-detail">
+          <div class="empty-state" style="padding:16px;"><p>Cargando…</p></div>
         </div>
       </div>
       <div style="background:var(--white);border:1.5px solid var(--border);border-radius:16px;overflow:hidden;">
@@ -6375,6 +6372,10 @@ function initContable() {
             <div class="om-label"><span class="material-symbols-rounded">notes</span>Nota (opcional)</div>
             <input class="om-input" id="${tipo}-nota" type="text" placeholder="${esMulma ? 'Descripción de la multa…' : 'Ej: Base mañana del 27 abr'}">
           </div>
+          <div class="om-field">
+            <div class="om-label"><span class="material-symbols-rounded">calendar_today</span>Fecha</div>
+            <input class="om-input" id="${tipo}-fecha" type="date" value="${new Date().toISOString().slice(0,10)}">
+          </div>
           <div class="cont-modal-footer">
             <button class="om-btn-cancel" onclick="document.getElementById('modal-${tipo}-overlay').classList.remove('show')">
               <span class="material-symbols-rounded" style="font-size:15px;">close</span>Cancelar
@@ -6393,7 +6394,7 @@ function initContable() {
   let _multas = [];
   let _periodo = 'hoy';
 
-  async function loadBases() {
+    window.loadBases = async function() {
     try {
       const text = await fetchSheetCSV('Bases', 10000);
       const lines = parseCSVText(text);
@@ -6406,7 +6407,7 @@ function initContable() {
     } catch(e) { console.warn('[loadBases]:', e.message); _bases = []; }
   }
 
-  async function loadMultas() {
+    window.loadMultas = async function() {
     try {
       const text = await fetchSheetCSV('Multas', 10000);
       const lines = parseCSVText(text);
@@ -6516,13 +6517,84 @@ function initContable() {
       { acc:'var(--blue)', ico:'inventory_2',  bg:'var(--blue-l)',   c:'var(--blue)',    lbl:'Valor productos',  val:fmtMoney(totalProductos), sub:'Subtotal sin envío' },
       { acc:'var(--orange)',ico:'trending_up', bg:'var(--orange-l)', c:'var(--orange)',  lbl:'Prom. por pedido', val:peds.length ? fmtMoney(Math.round(totalFacturado/peds.length)) : '—', sub:'Ticket promedio' },
     ].map(k => `<div class="kpi-card"><div class="kpi-acc" style="background:${k.acc};"></div><div class="kpi-ico" style="background:${k.bg};color:${k.c};"><span class="material-symbols-rounded" style="font-size:18px;">${k.ico}</span></div><div class="kpi-lbl">${k.lbl}</div><div class="kpi-val" style="color:${k.c};">${k.val}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
-    const verificados = new Set(JSON.parse(localStorage.getItem('wil_tf_verificados') || '[]'));
+   const verificados = new Set(JSON.parse(localStorage.getItem('wil_tf_verificados') || '[]'));
     const tfPeds  = peds.filter(p => /transfer/i.test(p.metodo||''));
     const efPeds  = peds.filter(p => /efecti/i.test(p.metodo||''));
     const tfVerif = tfPeds.filter(p => verificados.has(p.id));
+    const tfTotal$ = tfPeds.reduce((s,p)=>s+parsePrecio(p.total),0);
+    const tfVerif$ = tfVerif.reduce((s,p)=>s+parsePrecio(p.total),0);
+    const tfPend   = tfPeds.filter(p => !verificados.has(p.id));
+    const tfPend$  = tfPend.reduce((s,p)=>s+parsePrecio(p.total),0);
     const setTxt  = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
-    setTxt('cont-tf-n',  tfVerif.length);
-    setTxt('cont-tf-$',  fmtMoney(tfVerif.reduce((s,p)=>s+parsePrecio(p.total),0)));
+
+    // ── Card Transferencias — detalle rico ──
+    const tfCard = document.getElementById('cont-tf-detail');
+    if (tfCard) {
+      tfCard.innerHTML = tfPeds.length ? `
+        <!-- KPIs fila -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;">
+          <div style="background:#dbeafe;border-radius:10px;padding:10px;text-align:center;">
+            <div style="font-size:20px;font-weight:800;color:#1d4ed8;">${tfPeds.length}</div>
+            <div style="font-size:8px;color:#1e40af;font-weight:700;text-transform:uppercase;margin-top:2px;">Total</div>
+          </div>
+          <div style="background:#dcfce7;border-radius:10px;padding:10px;text-align:center;">
+            <div style="font-size:20px;font-weight:800;color:#16a34a;">${tfVerif.length}</div>
+            <div style="font-size:8px;color:#166534;font-weight:700;text-transform:uppercase;margin-top:2px;">Verificadas</div>
+          </div>
+          <div style="background:#fef3c7;border-radius:10px;padding:10px;text-align:center;">
+            <div style="font-size:20px;font-weight:800;color:#d97706;">${tfPend.length}</div>
+            <div style="font-size:8px;color:#92400e;font-weight:700;text-transform:uppercase;margin-top:2px;">Pendientes</div>
+          </div>
+        </div>
+        <!-- Totales -->
+        <div style="background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:12px;padding:12px 14px;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px dashed rgba(255,255,255,.1);">
+            <span style="font-size:10px;color:rgba(255,255,255,.5);">Total recibido</span>
+            <span style="font-size:13px;font-weight:800;color:#93c5fd;font-family:'DM Mono',monospace;">${fmtMoney(tfTotal$)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px dashed rgba(255,255,255,.1);">
+            <span style="font-size:10px;color:rgba(255,255,255,.5);">✓ Verificado</span>
+            <span style="font-size:13px;font-weight:800;color:#4ade80;font-family:'DM Mono',monospace;">${fmtMoney(tfVerif$)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">
+            <span style="font-size:10px;color:rgba(255,255,255,.5);">⏳ Sin verificar</span>
+            <span style="font-size:13px;font-weight:800;color:#fcd34d;font-family:'DM Mono',monospace;">${fmtMoney(tfPend$)}</span>
+          </div>
+        </div>
+        <!-- Lista de pedidos transferencia -->
+        <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;">
+          ${tfPeds.slice(0,12).map(p => {
+            const ver = verificados.has(p.id);
+            const imgUrl = (p.imagen||'').trim();
+            const tieneImg = imgUrl.startsWith('http');
+            return `<div style="display:flex;align-items:center;gap:8px;background:${ver?'rgba(22,163,74,.07)':'var(--bg)'};border:1.5px solid ${ver?'rgba(22,163,74,.2)':'var(--border)'};border-radius:10px;padding:8px 10px;transition:all .15s;"
+              onmouseover="this.style.borderColor='#93c5fd'" onmouseout="this.style.borderColor='${ver?'rgba(22,163,74,.2)':'var(--border)'}'">
+              <!-- Estado pill -->
+              <div style="width:8px;height:8px;border-radius:50%;background:${ver?'#16a34a':'#d97706'};flex-shrink:0;box-shadow:0 0 6px ${ver?'rgba(22,163,74,.5)':'rgba(217,119,6,.5)'};"></div>
+              <!-- Info -->
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:11px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.cliente||'–'}</div>
+                <div style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:1px;">#${p.id} · ${p.hora||''} ${p.fecha||''}</div>
+              </div>
+              <!-- Monto -->
+              <div style="font-size:12px;font-weight:800;color:${ver?'var(--green)':'var(--blue)'};font-family:'DM Mono',monospace;flex-shrink:0;">${fmtMoney(parsePrecio(p.total))}</div>
+              <!-- Botón comprobante -->
+              ${tieneImg ? `<button onclick="openTransferModal('${p.id}','${imgUrl.replace(/'/g,"\\'")}','${(p.cliente||'')} · ${p.hora||''} · #${p.id}')"
+                style="width:26px;height:26px;border-radius:7px;background:${ver?'rgba(22,163,74,.15)':'var(--blue-l)'};border:1px solid ${ver?'rgba(22,163,74,.3)':'rgba(37,99,235,.25)'};cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;"
+                title="Ver comprobante"
+                onmouseover="this.style.background='#1d4ed8';this.style.color='#fff'"
+                onmouseout="this.style.background='${ver?'rgba(22,163,74,.15)':'var(--blue-l)'}';this.style.color=''">
+                <span class="material-symbols-rounded" style="font-size:13px;color:var(--blue);">receipt_long</span>
+              </button>` : `<div style="width:26px;height:26px;border-radius:7px;background:var(--bg2);border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Sin comprobante">
+                <span class="material-symbols-rounded" style="font-size:13px;color:var(--text3);">image_not_supported</span>
+              </div>`}
+            </div>`;
+          }).join('')}
+          ${tfPeds.length > 12 ? `<div style="text-align:center;font-size:10px;color:var(--text3);padding:6px;">+${tfPeds.length-12} más — ver en Pedidos</div>` : ''}
+        </div>
+      ` : `<div class="empty-state" style="padding:20px;"><div style="font-size:28px;opacity:.2;margin-bottom:6px;">💳</div><p>Sin transferencias en este período</p></div>`;
+    }
+
     setTxt('cont-ef-n',  efPeds.length);
     setTxt('cont-ef-$',  fmtMoney(efPeds.reduce((s,p)=>s+parsePrecio(p.total),0)));
     setTxt('cont-domi-prom',  promDiario || 0);
@@ -6595,7 +6667,8 @@ function initContable() {
     const nota  = document.getElementById('base-nota').value.trim();
     if (!domi)  { showToast('w','Falta domiciliario',''); return; }
     if (!monto) { showToast('w','Falta monto',''); return; }
-    const item = { domi, monto, nota, fecha: new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) };
+    const fechaCampo = document.getElementById('base-fecha').value;
+    const item = { domi, monto, nota, fecha: fechaCampo || new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) };
     _bases.push(item);
     renderBases(); renderContable();
     document.getElementById('modal-base-overlay').classList.remove('show');
@@ -6611,7 +6684,8 @@ function initContable() {
     const tipo  = document.getElementById('multa-tipo-sel').value;
     if (!domi)  { showToast('w','Falta domiciliario',''); return; }
     if (!monto) { showToast('w','Falta monto',''); return; }
-    const item = { domi, monto, nota, tipo, fecha: new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) };
+    const fechaCampo = document.getElementById('multa-fecha').value;
+    const item = { domi, monto, nota, tipo, fecha: fechaCampo || new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) };
     _multas.push(item);
     renderMultas(); renderContable();
     document.getElementById('modal-multa-overlay').classList.remove('show');
