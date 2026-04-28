@@ -4568,8 +4568,9 @@ function filterProductos(f, btn) {
 
   // ✅ PARCHE: renderAll SIEMPRE, aunque no haya datos — evita pantalla vacía
   renderAll();
-
-  ALERTA_PENDIENTES.init();
+     try { patchTransferencia(); } catch(e) { console.warn('[patchTransferencia]:', e.message); }
+     try { initContable();       } catch(e) { console.warn('[initContable]:',       e.message); }
+     ALERTA_PENDIENTES.init();
 
   if (okD || okP || allPedidos.length > 0 || allDrivers.length > 0) {
     setSyncState('ok', n.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}));
@@ -5943,15 +5944,16 @@ function imprimirProductos() {
   w.document.write(html); w.document.close();
 }
 
+
 /* ═══════════════════════════════════════════════
-   💸 PARCHE: VISOR DE TRANSFERENCIA
-   - Clic en "Transferencia" → modal con imagen
-   - Botón "✓ Verificada" → fondo verde en la fila
+   💸 MÓDULO: VISOR DE TRANSFERENCIA
+   Llamar desde boot: patchTransferencia()
 ═══════════════════════════════════════════════ */
-
-(function patchTransferencia() {
-
-  /* ── Inyectar estilos ── */
+function patchTransferencia() {
+ 
+  /* Evitar doble inicialización */
+  if (document.getElementById('modal-transfer-overlay')) return;
+ 
   const style = document.createElement('style');
   style.textContent = `
     .transfer-link {
@@ -5969,8 +5971,6 @@ function imprimirProductos() {
       flex-shrink:0;
     }
     .transfer-link:hover .tl-dot { background:#fff; }
-
-    /* Fila verificada */
     tr.ped-verificada td {
       background:rgba(22,163,74,.08) !important;
       transition:background .4s;
@@ -5978,8 +5978,6 @@ function imprimirProductos() {
     tr.ped-verificada td:first-child {
       border-left:3px solid #16a34a !important;
     }
-
-    /* Modal visor */
     #modal-transfer-overlay {
       position:fixed;inset:0;
       background:rgba(4,18,20,.88);
@@ -5990,8 +5988,7 @@ function imprimirProductos() {
       animation:moFade .2s ease;
     }
     #modal-transfer-overlay.show { display:flex; }
-
-   #modal-transfer-box {
+    #modal-transfer-box {
       background:var(--white);border-radius:22px;
       width:min(860px,96vw);max-height:96vh;
       overflow-y:auto;
@@ -5999,10 +5996,8 @@ function imprimirProductos() {
       animation:invUp .3s cubic-bezier(.34,1.2,.64,1);
       display:flex;flex-direction:column;
     }
-
     #modal-transfer-box::-webkit-scrollbar{width:3px;}
     #modal-transfer-box::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px;}
-
     .mt-hdr {
       background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#1e40af 100%);
       border-radius:22px 22px 0 0;
@@ -6030,7 +6025,6 @@ function imprimirProductos() {
       position:relative;z-index:1;
     }
     .mt-hdr-close:hover { background:rgba(220,38,38,.38);color:#fff; }
-
     .mt-img-wrap {
       margin:20px 24px 0;border-radius:14px;overflow:hidden;
       border:1.5px solid var(--border);background:var(--bg2);
@@ -6051,7 +6045,6 @@ function imprimirProductos() {
       border-top-color:var(--blue);border-radius:50%;
       animation:spin .8s linear infinite;
     }
-
     .mt-meta {
       display:flex;gap:10px;flex-wrap:wrap;
       padding:16px 24px 0;
@@ -6062,7 +6055,6 @@ function imprimirProductos() {
       padding:4px 11px;font-size:10px;font-weight:700;color:var(--text2);
     }
     .mt-chip .material-symbols-rounded { font-size:13px;color:var(--teal); }
-
     .mt-footer {
       padding:20px 24px 24px;
       display:flex;gap:10px;flex-wrap:wrap;
@@ -6088,7 +6080,6 @@ function imprimirProductos() {
       font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;
     }
     .btn-mt-close:hover { background:var(--bg);border-color:var(--text3); }
-
     .mt-already {
       display:inline-flex;align-items:center;gap:6px;
       background:var(--green-l);color:var(--green);
@@ -6098,8 +6089,7 @@ function imprimirProductos() {
     }
   `;
   document.head.appendChild(style);
-
-  /* ── Crear modal en el DOM ── */
+ 
   const overlay = document.createElement('div');
   overlay.id = 'modal-transfer-overlay';
   overlay.innerHTML = `
@@ -6116,7 +6106,6 @@ function imprimirProductos() {
           <span class="material-symbols-rounded" style="font-size:16px;">close</span>
         </button>
       </div>
-
       <div class="mt-img-wrap" id="mt-img-wrap">
         <div class="mt-img-loading" id="mt-img-loading">
           <div class="mt-spin"></div>Cargando imagen…
@@ -6124,11 +6113,9 @@ function imprimirProductos() {
         <img id="mt-img" src="" alt="Comprobante"
           style="display:none;"
           onload="this.style.display='block';document.getElementById('mt-img-loading').style.display='none';"
-          onerror="document.getElementById('mt-img-loading').innerHTML='<span class=material-symbols-rounded style=font-size:32px;color:var(--red)>broken_image</span><span>No se pudo cargar la imagen</span>';">
+          onerror="document.getElementById('mt-img-loading').innerHTML='<span class=material-symbols-rounded style=font-size:32px;color:var(--red)>broken_image</span><span>No se pudo cargar</span>';">
       </div>
-
       <div class="mt-meta" id="mt-meta"></div>
-
       <div class="mt-footer" id="mt-footer">
         <button class="btn-mt-close" onclick="closeMT()">
           <span style="display:flex;align-items:center;gap:6px;">
@@ -6144,23 +6131,19 @@ function imprimirProductos() {
   document.body.appendChild(overlay);
   overlay.addEventListener('click', e => { if (e.target === overlay) closeMT(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMT(); });
-
-  /* ── Estado actual del modal ── */
+ 
   let _currentPedId = null;
   const _verificados = new Set(JSON.parse(localStorage.getItem('wil_tf_verificados') || '[]'));
-
-  /* ── Abrir modal ── */
+ 
   window.openTransferModal = function(pedId, imgUrl, meta) {
     _currentPedId = pedId;
     document.getElementById('mt-hdr-sub').textContent = meta;
     document.getElementById('mt-img-loading').style.display = 'flex';
-    document.getElementById('mt-img-loading').innerHTML =
-      '<div class="mt-spin"></div>Cargando imagen…';
+    document.getElementById('mt-img-loading').innerHTML = '<div class="mt-spin"></div>Cargando imagen…';
     const img = document.getElementById('mt-img');
     img.style.display = 'none';
-    img.src = imgUrl + '?ts=' + Date.now(); // evitar caché
-
-    /* Meta chips */
+    img.src = imgUrl + '?ts=' + Date.now();
+ 
     const ped = allPedidos.find(p => p.id === pedId);
     const chips = [];
     if (ped?.cliente) chips.push(['person', ped.cliente]);
@@ -6170,15 +6153,13 @@ function imprimirProductos() {
     document.getElementById('mt-meta').innerHTML = chips.map(([ico, txt]) =>
       `<div class="mt-chip"><span class="material-symbols-rounded">${ico}</span>${txt}</div>`
     ).join('');
-
-    /* Botón verificar — si ya está verificado, mostrar badge */
+ 
     const footer = document.getElementById('mt-footer');
     if (_verificados.has(pedId)) {
       document.getElementById('btn-verificar-pago').style.display = 'none';
       if (!document.getElementById('mt-ya-verificada')) {
         const badge = document.createElement('div');
-        badge.id = 'mt-ya-verificada';
-        badge.className = 'mt-already';
+        badge.id = 'mt-ya-verificada'; badge.className = 'mt-already';
         badge.innerHTML = '<span class="material-symbols-rounded" style="font-size:17px;">check_circle</span>Transferencia verificada ✓';
         footer.appendChild(badge);
       }
@@ -6187,78 +6168,55 @@ function imprimirProductos() {
       const badge = document.getElementById('mt-ya-verificada');
       if (badge) badge.remove();
     }
-
+ 
     overlay.classList.add('show');
     document.body.style.overflow = 'hidden';
   };
-
-  /* ── Cerrar ── */
+ 
   window.closeMT = function() {
     overlay.classList.remove('show');
     document.body.style.overflow = '';
     _currentPedId = null;
   };
-
-  /* ── Verificar pago ── */
+ 
   window.verificarPago = function() {
     if (!_currentPedId) return;
     _verificados.add(_currentPedId);
     try { localStorage.setItem('wil_tf_verificados', JSON.stringify([..._verificados])); } catch(e){}
-
-    /* Pintar la fila de verde */
-    const filas = document.querySelectorAll('#ped-tbody tr');
-    filas.forEach(tr => {
+    document.querySelectorAll('#ped-tbody tr').forEach(tr => {
       const primer = tr.querySelector('td');
-      if (primer && primer.textContent.trim() === _currentPedId) {
+      if (primer && primer.textContent.trim() === _currentPedId)
         tr.classList.add('ped-verificada');
-      }
     });
-
-    /* Cambiar botón a badge */
     document.getElementById('btn-verificar-pago').style.display = 'none';
     const footer = document.getElementById('mt-footer');
     if (!document.getElementById('mt-ya-verificada')) {
       const badge = document.createElement('div');
-      badge.id = 'mt-ya-verificada';
-      badge.className = 'mt-already';
+      badge.id = 'mt-ya-verificada'; badge.className = 'mt-already';
       badge.innerHTML = '<span class="material-symbols-rounded" style="font-size:17px;">check_circle</span>Transferencia verificada ✓';
       footer.appendChild(badge);
     }
-
     showToast('s', '✓ Transferencia verificada', 'Pedido #' + _currentPedId + ' — fila marcada en verde');
     VOZ.hablar('Transferencia verificada');
-
     setTimeout(closeMT, 1200);
   };
-
-  /* ── renderPedidosTable: reemplaza la celda Método ──
-     Monkey-patch para que las URLs de imagen existan en el contexto
-     Esto se activa automáticamente al llamar renderPedidosTable ── */
+ 
+  /* ── Monkey-patch renderPedidosTable para marcar transferencias ── */
   const _origRender = window.renderPedidosTable.bind(window);
-
   window.renderPedidosTable = function(filter) {
     _origRender(filter);
-
-    /* Post-process: recorrer filas y agregar comportamiento */
     document.querySelectorAll('#ped-tbody tr').forEach(tr => {
       const tds = tr.querySelectorAll('td');
       if (!tds.length) return;
-
       const pedId = tds[0]?.textContent?.trim();
       const ped   = allPedidos.find(p => p.id === pedId);
       if (!ped) return;
-
-      /* ── Marcar verificadas que persisten ── */
       if (_verificados.has(pedId)) tr.classList.add('ped-verificada');
-
-      /* ── Celda Método (índice 6) ── */
       const metodoCell = tds[6];
       if (!metodoCell) return;
-
-      const metodo  = (ped.metodo || '').trim();
-      const imgUrl  = (ped.imagen || '').trim();
+      const metodo   = (ped.metodo || '').trim();
+      const imgUrl   = (ped.imagen || '').trim();
       const esTransf = /transfer/i.test(metodo);
-
       if (esTransf && imgUrl && imgUrl.startsWith('http')) {
         const meta = `${ped.cliente || ''} · ${ped.hora || ''} · #${ped.id}`;
         metodoCell.innerHTML = `
@@ -6267,75 +6225,57 @@ function imprimirProductos() {
             <span class="tl-dot"></span>Transferencia
           </span>`;
       } else if (esTransf) {
-        /* Transferencia pero sin imagen */
         metodoCell.innerHTML = `
-          <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;
-            color:var(--orange);font-weight:700;">
-            <span class="material-symbols-rounded" style="font-size:13px;">warning</span>
-            Transf. (sin img)
+          <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--orange);font-weight:700;">
+            <span class="material-symbols-rounded" style="font-size:13px;">warning</span>Transf. (sin img)
           </span>`;
       }
     });
   };
-
-  /* Re-render inmediato si hay pedidos cargados */
-  if (allPedidos.length) {
-    const tabActivo = document.querySelector('#ped-tabs .tab.on')?.dataset?.f || 'todos';
-    renderPedidosTable(tabActivo);
-  }
-
-})();
-
+ 
+  /* ── ✅ ELIMINADO el re-render automático que causaba el crash en móvil ── */
+  /* El re-render lo hará el boot después de cargar allPedidos */
+}
+ 
+ 
 /* ═══════════════════════════════════════════════
-   💰 MÓDULO CONTABLE — DOMICILIOS WIL
+   💰 MÓDULO: CONTABLE
+   Llamar desde boot: initContable()
 ═══════════════════════════════════════════════ */
-
-(function initContable() {
-
-  /* ── 1. Inyectar HTML de la pestaña ── */
+function initContable() {
+ 
+  /* Evitar doble inicialización */
+  if (document.getElementById('pg-contable')) return;
+ 
   const pg = document.createElement('div');
   pg.className = 'pg';
   pg.id = 'pg-contable';
   pg.innerHTML = `
     <div class="pghdr">
-      <h2>Contabilidad 💼</h2>
+     
       <p>Control financiero de domicilios, domiciliarios y pagos</p>
     </div>
-
-    <!-- FILTRO DE PERÍODO -->
     <div style="background:var(--white);border:1.5px solid var(--border);border-radius:16px;
-                padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;
-                gap:10px;flex-wrap:wrap;">
+                padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <span class="material-symbols-rounded" style="color:var(--teal);font-size:18px;">date_range</span>
       <div class="tabs" id="cont-tabs">
-        <div class="tab on"  data-p="hoy"    onclick="setCPeriodo('hoy',this)">Hoy</div>
-        <div class="tab"     data-p="ayer"   onclick="setCPeriodo('ayer',this)">Ayer</div>
-        <div class="tab"     data-p="5"      onclick="setCPeriodo('5',this)">5 días</div>
-        <div class="tab"     data-p="15"     onclick="setCPeriodo('15',this)">15 días</div>
-        <div class="tab"     data-p="30"     onclick="setCPeriodo('30',this)">1 mes</div>
+        <div class="tab on"  data-p="hoy"  onclick="setCPeriodo('hoy',this)">Hoy</div>
+        <div class="tab"     data-p="ayer" onclick="setCPeriodo('ayer',this)">Ayer</div>
+        <div class="tab"     data-p="5"    onclick="setCPeriodo('5',this)">5 días</div>
+        <div class="tab"     data-p="15"   onclick="setCPeriodo('15',this)">15 días</div>
+        <div class="tab"     data-p="30"   onclick="setCPeriodo('30',this)">1 mes</div>
       </div>
       <div style="margin-left:auto;font-size:11px;color:var(--text3);font-weight:700;" id="cont-periodo-lbl">–</div>
     </div>
-
-    <!-- KPIs PRINCIPALES -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;" id="cont-kpis">
-      <!-- se renderizan -->
-    </div>
-
-    <!-- FILA 2: Transferencias + Efectivo + Domis diarios -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;" id="cont-kpis"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px;">
-
-      <!-- Transferencias verificadas -->
       <div style="background:var(--white);border:1.5px solid var(--border);border-radius:16px;overflow:hidden;">
-        <div style="background:linear-gradient(135deg,#0f172a,#1e40af);padding:14px 18px;
-                    display:flex;align-items:center;gap:10px;">
-          <div style="width:36px;height:36px;border-radius:10px;background:rgba(37,99,235,.3);
-                      display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <div style="background:linear-gradient(135deg,#0f172a,#1e40af);padding:14px 18px;display:flex;align-items:center;gap:10px;">
+          <div style="width:36px;height:36px;border-radius:10px;background:rgba(37,99,235,.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
             <span class="material-symbols-rounded" style="color:#93c5fd;font-size:18px;">verified</span>
           </div>
           <div>
-            <div style="font-size:10px;font-weight:800;color:rgba(255,255,255,.5);
-                        text-transform:uppercase;letter-spacing:.1em;">Transferencias</div>
+            <div style="font-size:10px;font-weight:800;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.1em;">Transferencias</div>
             <div style="font-size:11px;color:rgba(255,255,255,.35);">Verificadas en panel</div>
           </div>
         </div>
@@ -6344,22 +6284,16 @@ function imprimirProductos() {
           <div style="font-size:12px;color:var(--text3);margin-top:2px;">pedidos</div>
           <div style="height:1px;background:var(--border);margin:12px 0;"></div>
           <div style="font-size:11px;color:var(--text2);font-weight:700;">Total recibido</div>
-          <div style="font-size:20px;font-weight:800;color:var(--blue);
-                      font-family:'DM Mono',monospace;" id="cont-tf-$">–</div>
+          <div style="font-size:20px;font-weight:800;color:var(--blue);font-family:'DM Mono',monospace;" id="cont-tf-$">–</div>
         </div>
       </div>
-
-      <!-- Efectivo -->
       <div style="background:var(--white);border:1.5px solid var(--border);border-radius:16px;overflow:hidden;">
-        <div style="background:linear-gradient(135deg,#052e16,#166534);padding:14px 18px;
-                    display:flex;align-items:center;gap:10px;">
-          <div style="width:36px;height:36px;border-radius:10px;background:rgba(22,163,74,.3);
-                      display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <div style="background:linear-gradient(135deg,#052e16,#166534);padding:14px 18px;display:flex;align-items:center;gap:10px;">
+          <div style="width:36px;height:36px;border-radius:10px;background:rgba(22,163,74,.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
             <span class="material-symbols-rounded" style="color:#86efac;font-size:18px;">payments</span>
           </div>
           <div>
-            <div style="font-size:10px;font-weight:800;color:rgba(255,255,255,.5);
-                        text-transform:uppercase;letter-spacing:.1em;">Efectivo</div>
+            <div style="font-size:10px;font-weight:800;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.1em;">Efectivo</div>
             <div style="font-size:11px;color:rgba(255,255,255,.35);">Pagos en caja</div>
           </div>
         </div>
@@ -6368,22 +6302,16 @@ function imprimirProductos() {
           <div style="font-size:12px;color:var(--text3);margin-top:2px;">pedidos</div>
           <div style="height:1px;background:var(--border);margin:12px 0;"></div>
           <div style="font-size:11px;color:var(--text2);font-weight:700;">Total esperado</div>
-          <div style="font-size:20px;font-weight:800;color:var(--green);
-                      font-family:'DM Mono',monospace;" id="cont-ef-$">–</div>
+          <div style="font-size:20px;font-weight:800;color:var(--green);font-family:'DM Mono',monospace;" id="cont-ef-$">–</div>
         </div>
       </div>
-
-      <!-- Domicilios diarios -->
       <div style="background:var(--white);border:1.5px solid var(--border);border-radius:16px;overflow:hidden;">
-        <div style="background:linear-gradient(135deg,#0c2225,#0d3540);padding:14px 18px;
-                    display:flex;align-items:center;gap:10px;">
-          <div style="width:36px;height:36px;border-radius:10px;background:rgba(40,185,193,.25);
-                      display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <div style="background:linear-gradient(135deg,#0c2225,#0d3540);padding:14px 18px;display:flex;align-items:center;gap:10px;">
+          <div style="width:36px;height:36px;border-radius:10px;background:rgba(40,185,193,.25);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
             <span class="material-symbols-rounded" style="color:var(--teal);font-size:18px;">delivery_dining</span>
           </div>
           <div>
-            <div style="font-size:10px;font-weight:800;color:rgba(255,255,255,.5);
-                        text-transform:uppercase;letter-spacing:.1em;">Domicilios</div>
+            <div style="font-size:10px;font-weight:800;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.1em;">Domicilios</div>
             <div style="font-size:11px;color:rgba(255,255,255,.35);">Promedio diario</div>
           </div>
         </div>
@@ -6392,37 +6320,22 @@ function imprimirProductos() {
           <div style="font-size:12px;color:var(--text3);margin-top:2px;">por día</div>
           <div style="height:1px;background:var(--border);margin:12px 0;"></div>
           <div style="font-size:11px;color:var(--text2);font-weight:700;">Valor promedio</div>
-          <div style="font-size:20px;font-weight:800;color:var(--teal);
-                      font-family:'DM Mono',monospace;" id="cont-domi-avg$">–</div>
+          <div style="font-size:20px;font-weight:800;color:var(--teal);font-family:'DM Mono',monospace;" id="cont-domi-avg$">–</div>
         </div>
       </div>
-
     </div>
-
-    <!-- GRÁFICOS -->
     <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin-bottom:20px;">
-
-      <!-- Barras por domiciliario -->
       <div class="pn">
-        <div class="pn-t">
-          <span class="material-symbols-rounded ico">bar_chart</span>
-          Ingresos por domiciliario
-        </div>
+        <div class="pn-t"><span class="material-symbols-rounded ico">bar_chart</span>Ingresos por domiciliario</div>
         <div id="cont-chart-domi" style="display:flex;align-items:flex-end;gap:8px;height:140px;"></div>
         <div id="cont-chart-domi-labels" style="display:flex;gap:8px;margin-top:8px;"></div>
       </div>
-
-      <!-- Dona método de pago -->
       <div class="pn" style="display:flex;flex-direction:column;">
-        <div class="pn-t">
-          <span class="material-symbols-rounded ico">donut_large</span>
-          Métodos de pago
-        </div>
+        <div class="pn-t"><span class="material-symbols-rounded ico">donut_large</span>Métodos de pago</div>
         <div style="flex:1;display:flex;align-items:center;justify-content:center;">
           <div style="position:relative;width:120px;height:120px;flex-shrink:0;">
             <svg id="cont-donut" viewBox="0 0 120 120" style="transform:rotate(-90deg);width:120px;height:120px;"></svg>
-            <div style="position:absolute;inset:0;display:flex;flex-direction:column;
-                        align-items:center;justify-content:center;pointer-events:none;">
+            <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;">
               <div style="font-size:18px;font-weight:800;color:var(--text);" id="cont-donut-total">–</div>
               <div style="font-size:9px;color:var(--text3);font-weight:700;">pedidos</div>
             </div>
@@ -6430,92 +6343,54 @@ function imprimirProductos() {
           <div id="cont-donut-legend" style="margin-left:16px;display:flex;flex-direction:column;gap:7px;"></div>
         </div>
       </div>
-
     </div>
-
-    <!-- BASES + MULTAS + PICO Y PLACA -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
-
-      <!-- BASES -->
       <div class="pn">
         <div class="pn-t">
-          <span class="material-symbols-rounded ico">account_balance_wallet</span>
-          Bases para compras
-          <button onclick="openBaseModal()"
-            style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;
-                   background:var(--teal);color:#fff;border:none;border-radius:9px;
-                   padding:6px 14px;font-family:'Plus Jakarta Sans',sans-serif;
-                   font-size:11px;font-weight:800;cursor:pointer;">
+          <span class="material-symbols-rounded ico">account_balance_wallet</span>Bases para compras
+          <button onclick="openBaseModal()" style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;background:var(--teal);color:#fff;border:none;border-radius:9px;padding:6px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer;">
             <span class="material-symbols-rounded" style="font-size:14px;">add</span>Dar base
           </button>
         </div>
         <div id="cont-bases-list">
-          <div class="empty-state"><div class="ico" style="font-size:28px;opacity:.2;">💵</div>
-            <p>Sin bases registradas</p></div>
+          <div class="empty-state"><div class="ico" style="font-size:28px;opacity:.2;">💵</div><p>Sin bases registradas</p></div>
         </div>
       </div>
-
-      <!-- MULTAS + PICO Y PLACA -->
       <div class="pn">
         <div class="pn-t">
-          <span class="material-symbols-rounded ico">gavel</span>
-          Multas y Pico & Placa
-          <button onclick="openMultaModal()"
-            style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;
-                   background:var(--red);color:#fff;border:none;border-radius:9px;
-                   padding:6px 14px;font-family:'Plus Jakarta Sans',sans-serif;
-                   font-size:11px;font-weight:800;cursor:pointer;">
+          <span class="material-symbols-rounded ico">gavel</span>Multas y Pico & Placa
+          <button onclick="openMultaModal()" style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;background:var(--red);color:#fff;border:none;border-radius:9px;padding:6px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer;">
             <span class="material-symbols-rounded" style="font-size:14px;">add</span>Registrar
           </button>
         </div>
         <div id="cont-multas-list">
-          <div class="empty-state"><div class="ico" style="font-size:28px;opacity:.2;">⚖️</div>
-            <p>Sin multas ni restricciones</p></div>
+          <div class="empty-state"><div class="ico" style="font-size:28px;opacity:.2;">⚖️</div><p>Sin multas ni restricciones</p></div>
         </div>
       </div>
-
     </div>
-
-    <!-- TABLA RESUMEN POR DOMI -->
     <div class="pn" style="padding:0;overflow:hidden;margin-bottom:20px;">
-      <div style="padding:16px 20px;border-bottom:1px solid var(--border);
-                  display:flex;align-items:center;gap:8px;">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;">
         <span class="material-symbols-rounded" style="color:var(--teal);font-size:17px;">table_chart</span>
         <span style="font-size:13px;font-weight:800;color:var(--text);">Resumen por domiciliario</span>
-        <button onclick="exportarContableExcel()"
-          style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;
-                 background:var(--green-l);color:var(--green);border:1.5px solid rgba(22,163,74,.25);
-                 border-radius:9px;padding:6px 14px;font-family:'Plus Jakarta Sans',sans-serif;
-                 font-size:11px;font-weight:800;cursor:pointer;">
+        <button onclick="exportarContableExcel()" style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;background:var(--green-l);color:var(--green);border:1.5px solid rgba(22,163,74,.25);border-radius:9px;padding:6px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer;">
           <span class="material-symbols-rounded" style="font-size:14px;">table_view</span>Excel
         </button>
       </div>
       <div style="overflow-x:auto;padding:8px;">
         <table class="dstbl" id="cont-domi-tbl">
-          <thead>
-            <tr>
-              <th>Domiciliario</th>
-              <th>Entregas</th>
-              <th>Efectivo</th>
-              <th>Transferencia</th>
-              <th>Total facturado</th>
-              <th>Base dada</th>
-              <th>Multas</th>
-              <th>Balance</th>
-            </tr>
-          </thead>
+          <thead><tr>
+            <th>Domiciliario</th><th>Entregas</th><th>Efectivo</th><th>Transferencia</th>
+            <th>Total facturado</th><th>Base dada</th><th>Multas</th><th>Balance</th>
+          </tr></thead>
           <tbody id="cont-domi-tbody">
-            <tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text3);">
-              Selecciona un período</td></tr>
+            <tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text3);">Selecciona un período</td></tr>
           </tbody>
         </table>
       </div>
     </div>
-
   `;
   document.querySelector('main.main').appendChild(pg);
-
-  /* ── 2. Inyectar estilos ── */
+ 
   const style = document.createElement('style');
   style.textContent = `
     #pg-contable .kpi-card {
@@ -6529,45 +6404,23 @@ function imprimirProductos() {
     #pg-contable .kpi-lbl { font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px; }
     #pg-contable .kpi-val { font-size:24px;font-weight:800;line-height:1; }
     #pg-contable .kpi-sub { font-size:10px;color:var(--text3);margin-top:5px; }
-
-    .base-item,.multa-item {
-      display:flex;align-items:center;gap:10px;
-      padding:10px 12px;background:var(--bg);
-      border:1.5px solid var(--border);border-radius:12px;
-      margin-bottom:8px;transition:border-color .15s;
-    }
+    .base-item,.multa-item { display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border:1.5px solid var(--border);border-radius:12px;margin-bottom:8px;transition:border-color .15s; }
     .base-item:hover,.multa-item:hover { border-color:var(--border2); }
     .base-ico { width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
     .base-name { font-size:12px;font-weight:800;color:var(--text); }
     .base-meta { font-size:10px;color:var(--text2);margin-top:2px; }
     .base-monto { font-size:14px;font-weight:800;font-family:'DM Mono',monospace;margin-left:auto;flex-shrink:0; }
-    .base-del { width:26px;height:26px;border-radius:7px;background:var(--red-l);border:1px solid rgba(220,38,38,.2);
-                cursor:pointer;display:flex;align-items:center;justify-content:center;
-                color:var(--red);font-size:13px;transition:all .15s;flex-shrink:0; }
+    .base-del { width:26px;height:26px;border-radius:7px;background:var(--red-l);border:1px solid rgba(220,38,38,.2);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--red);font-size:13px;transition:all .15s;flex-shrink:0; }
     .base-del:hover { background:var(--red);color:#fff; }
-
-    /* Modal base/multa */
-    #modal-base-overlay,#modal-multa-overlay {
-      position:fixed;inset:0;background:rgba(4,18,20,.82);
-      backdrop-filter:blur(12px);z-index:300;
-      display:none;align-items:center;justify-content:center;padding:16px;
-    }
+    #modal-base-overlay,#modal-multa-overlay { position:fixed;inset:0;background:rgba(4,18,20,.82);backdrop-filter:blur(12px);z-index:300;display:none;align-items:center;justify-content:center;padding:16px; }
     #modal-base-overlay.show,#modal-multa-overlay.show { display:flex; }
-    .cont-modal {
-      background:var(--white);border-radius:20px;width:min(460px,100%);
-      overflow:hidden;box-shadow:0 32px 80px rgba(4,18,20,.4);
-      animation:invUp .3s cubic-bezier(.34,1.2,.64,1);
-    }
-    .cont-modal-hdr {
-      padding:20px 22px 18px;border-bottom:1px solid var(--border);
-      display:flex;align-items:center;gap:12px;
-    }
+    .cont-modal { background:var(--white);border-radius:20px;width:min(460px,100%);overflow:hidden;box-shadow:0 32px 80px rgba(4,18,20,.4);animation:invUp .3s cubic-bezier(.34,1.2,.64,1); }
+    .cont-modal-hdr { padding:20px 22px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px; }
     .cont-modal-body { padding:20px 22px 24px; }
     .cont-modal-footer { display:flex;gap:10px;margin-top:20px;padding-top:16px;border-top:1.5px solid var(--border); }
   `;
   document.head.appendChild(style);
-
-  /* ── 3. Modales base/multa ── */
+ 
   ['base','multa'].forEach(tipo => {
     const ov = document.createElement('div');
     ov.id = `modal-${tipo}-overlay`;
@@ -6575,36 +6428,21 @@ function imprimirProductos() {
     ov.innerHTML = `
       <div class="cont-modal">
         <div class="cont-modal-hdr" style="background:${esMulma ? 'linear-gradient(135deg,#1a0000,#3d1515)' : 'linear-gradient(135deg,#0c2225,#0d3540)'};">
-          <div style="width:38px;height:38px;border-radius:11px;
-                      background:rgba(${esMulma?'220,38,38':'40,185,193'},.25);
-                      border:1.5px solid rgba(${esMulma?'220,38,38':'40,185,193'},.4);
-                      display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <span class="material-symbols-rounded" style="color:${esMulma?'#fca5a5':'var(--teal)'};font-size:18px;">
-              ${esMulma ? 'gavel' : 'account_balance_wallet'}
-            </span>
+          <div style="width:38px;height:38px;border-radius:11px;background:rgba(${esMulma?'220,38,38':'40,185,193'},.25);border:1.5px solid rgba(${esMulma?'220,38,38':'40,185,193'},.4);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <span class="material-symbols-rounded" style="color:${esMulma?'#fca5a5':'var(--teal)'};font-size:18px;">${esMulma ? 'gavel' : 'account_balance_wallet'}</span>
           </div>
           <div>
-            <div style="font-size:14px;font-weight:800;color:#fff;">
-              ${esMulma ? 'Registrar multa / Pico & Placa' : 'Dar base a domiciliario'}
-            </div>
-            <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px;">
-              ${esMulma ? 'El monto se descontará del balance del domi' : 'Dinero para compra de pedidos (debe devolver)'}
-            </div>
+            <div style="font-size:14px;font-weight:800;color:#fff;">${esMulma ? 'Registrar multa / Pico & Placa' : 'Dar base a domiciliario'}</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px;">${esMulma ? 'El monto se descontará del balance del domi' : 'Dinero para compra de pedidos (debe devolver)'}</div>
           </div>
-          <button onclick="document.getElementById('modal-${tipo}-overlay').classList.remove('show')"
-            style="margin-left:auto;width:30px;height:30px;border-radius:8px;
-                   background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.12);
-                   cursor:pointer;display:flex;align-items:center;justify-content:center;
-                   color:rgba(255,255,255,.6);font-size:15px;">
+          <button onclick="document.getElementById('modal-${tipo}-overlay').classList.remove('show')" style="margin-left:auto;width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.12);cursor:pointer;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.6);font-size:15px;">
             <span class="material-symbols-rounded" style="font-size:15px;">close</span>
           </button>
         </div>
         <div class="cont-modal-body">
           <div class="om-field">
             <div class="om-label"><span class="material-symbols-rounded">delivery_dining</span>Domiciliario *</div>
-            <select class="om-select" id="${tipo}-domi-select">
-              <option value="">— Selecciona —</option>
-            </select>
+            <select class="om-select" id="${tipo}-domi-select"><option value="">— Selecciona —</option></select>
           </div>
           <div class="om-field">
             <div class="om-label"><span class="material-symbols-rounded">sell</span>Monto *</div>
@@ -6630,10 +6468,8 @@ function imprimirProductos() {
             <button class="om-btn-cancel" onclick="document.getElementById('modal-${tipo}-overlay').classList.remove('show')">
               <span class="material-symbols-rounded" style="font-size:15px;">close</span>Cancelar
             </button>
-            <button class="om-btn-save" onclick="save${tipo.charAt(0).toUpperCase()+tipo.slice(1)}()"
-              style="background:${esMulma ? 'var(--red)' : 'var(--teal)'};">
-              <span class="material-symbols-rounded">${esMulma ? 'gavel' : 'savings'}</span>
-              ${esMulma ? 'Registrar' : 'Dar base'}
+            <button class="om-btn-save" onclick="save${tipo.charAt(0).toUpperCase()+tipo.slice(1)}()" style="background:${esMulma ? 'var(--red)' : 'var(--teal)'};">
+              <span class="material-symbols-rounded">${esMulma ? 'gavel' : 'savings'}</span>${esMulma ? 'Registrar' : 'Dar base'}
             </button>
           </div>
         </div>
@@ -6641,32 +6477,27 @@ function imprimirProductos() {
     document.body.appendChild(ov);
     ov.addEventListener('click', e => { if (e.target === ov) ov.classList.remove('show'); });
   });
-
-  /* ── 4. Estado persistente ── */
+ 
   const LS_BASES  = 'wil_cont_bases_v1';
   const LS_MULTAS = 'wil_cont_multas_v1';
   let _bases  = JSON.parse(localStorage.getItem(LS_BASES)  || '[]');
   let _multas = JSON.parse(localStorage.getItem(LS_MULTAS) || '[]');
   let _periodo = 'hoy';
-
+ 
   function saveBases()  { try { localStorage.setItem(LS_BASES,  JSON.stringify(_bases));  } catch(e){} }
   function saveMultas() { try { localStorage.setItem(LS_MULTAS, JSON.stringify(_multas)); } catch(e){} }
-
-  /* ── 5. Helpers de fecha ── */
+ 
   function parseDate(s) {
     if (!s) return null;
-    // Formatos: "27 abr 2026", "27/04/2026", "2026-04-27"
     const meses = {ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,oct:9,nov:10,dic:11};
     let m;
-    if (m = s.match(/^(\d{1,2})\s+([a-z]{3})\s+(\d{4})/i)) {
+    if (m = s.match(/^(\d{1,2})\s+([a-z]{3})\s+(\d{4})/i))
       return new Date(parseInt(m[3]), meses[m[2].toLowerCase()] ?? 0, parseInt(m[1]));
-    }
-    if (m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)) {
+    if (m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/))
       return new Date(parseInt(m[3]), parseInt(m[1])-1, parseInt(m[2]));
-    }
     return new Date(s);
   }
-
+ 
   function enPeriodo(pedido) {
     const ahora = new Date();
     const hoy   = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
@@ -6678,308 +6509,135 @@ function imprimirProductos() {
       const ayer = new Date(hoy); ayer.setDate(ayer.getDate() - 1);
       return fdia.getTime() === ayer.getTime();
     }
-    const dias = parseInt(_periodo);
-    const desde = new Date(hoy); desde.setDate(desde.getDate() - dias + 1);
+    const desde = new Date(hoy); desde.setDate(desde.getDate() - parseInt(_periodo) + 1);
     return fdia >= desde && fdia <= hoy;
   }
-
-  /* ── 6. Renderizado principal ── */
+ 
   function renderContable() {
     const peds = allPedidos.filter(p => p.estado === 'entregado' && enPeriodo(p));
-
-    // ── KPIs ──
     const totalFacturado = peds.reduce((s,p) => s + parsePrecio(p.total), 0);
     const totalEnvio     = peds.reduce((s,p) => s + parsePrecio(p.costoEnvio), 0);
     const totalProductos = totalFacturado - totalEnvio;
-    const diasPeriodo    = _periodo === 'hoy' ? 1 : _periodo === 'ayer' ? 1 : parseInt(_periodo);
+    const diasPeriodo    = _periodo === 'hoy' || _periodo === 'ayer' ? 1 : parseInt(_periodo);
     const promDiario     = Math.round(peds.length / diasPeriodo);
-
-    // Label período
     const lbl = {hoy:'Hoy',ayer:'Ayer','5':'Últimos 5 días','15':'Últimos 15 días','30':'Último mes'}[_periodo];
     const el = document.getElementById('cont-periodo-lbl');
     if (el) el.textContent = `${lbl} · ${peds.length} entrega${peds.length!==1?'s':''}`;
-
-    // KPIs
     const kgrid = document.getElementById('cont-kpis');
     if (kgrid) kgrid.innerHTML = [
-      { acc:'#28B9C1', ico:'payments',         bg:'var(--teal-m)',   c:'var(--teal-d)',   lbl:'Total facturado',  val:fmtMoney(totalFacturado), sub:`${peds.length} pedidos entregados` },
-      { acc:'var(--green)',ico:'local_shipping',bg:'var(--green-l)',  c:'var(--green)',    lbl:'Cobros domicilio', val:fmtMoney(totalEnvio),     sub:'Costo de envío acumulado' },
-      { acc:'var(--blue)', ico:'inventory_2',   bg:'var(--blue-l)',   c:'var(--blue)',     lbl:'Valor productos',  val:fmtMoney(totalProductos), sub:'Subtotal sin envío' },
-      { acc:'var(--orange)',ico:'trending_up',  bg:'var(--orange-l)', c:'var(--orange)',   lbl:'Prom. por pedido', val:peds.length ? fmtMoney(Math.round(totalFacturado/peds.length)) : '—', sub:'Ticket promedio' },
-    ].map(k => `
-      <div class="kpi-card">
-        <div class="kpi-acc" style="background:${k.acc};"></div>
-        <div class="kpi-ico" style="background:${k.bg};color:${k.c};">
-          <span class="material-symbols-rounded" style="font-size:18px;">${k.ico}</span>
-        </div>
-        <div class="kpi-lbl">${k.lbl}</div>
-        <div class="kpi-val" style="color:${k.c};">${k.val}</div>
-        <div class="kpi-sub">${k.sub}</div>
-      </div>`).join('');
-
-    // ── Transferencias / Efectivo ──
+      { acc:'#28B9C1', ico:'payments',        bg:'var(--teal-m)',   c:'var(--teal-d)',  lbl:'Total facturado',  val:fmtMoney(totalFacturado), sub:`${peds.length} pedidos entregados` },
+      { acc:'var(--green)',ico:'local_shipping',bg:'var(--green-l)', c:'var(--green)',   lbl:'Cobros domicilio', val:fmtMoney(totalEnvio),     sub:'Costo de envío acumulado' },
+      { acc:'var(--blue)', ico:'inventory_2',  bg:'var(--blue-l)',   c:'var(--blue)',    lbl:'Valor productos',  val:fmtMoney(totalProductos), sub:'Subtotal sin envío' },
+      { acc:'var(--orange)',ico:'trending_up', bg:'var(--orange-l)', c:'var(--orange)',  lbl:'Prom. por pedido', val:peds.length ? fmtMoney(Math.round(totalFacturado/peds.length)) : '—', sub:'Ticket promedio' },
+    ].map(k => `<div class="kpi-card"><div class="kpi-acc" style="background:${k.acc};"></div><div class="kpi-ico" style="background:${k.bg};color:${k.c};"><span class="material-symbols-rounded" style="font-size:18px;">${k.ico}</span></div><div class="kpi-lbl">${k.lbl}</div><div class="kpi-val" style="color:${k.c};">${k.val}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
     const verificados = new Set(JSON.parse(localStorage.getItem('wil_tf_verificados') || '[]'));
-    const tfPeds = peds.filter(p => /transfer/i.test(p.metodo||''));
-    const efPeds = peds.filter(p => /efecti/i.test(p.metodo||''));
+    const tfPeds  = peds.filter(p => /transfer/i.test(p.metodo||''));
+    const efPeds  = peds.filter(p => /efecti/i.test(p.metodo||''));
     const tfVerif = tfPeds.filter(p => verificados.has(p.id));
-
-    const setTxt = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
-    setTxt('cont-tf-n', tfVerif.length);
-    setTxt('cont-tf-$', fmtMoney(tfVerif.reduce((s,p)=>s+parsePrecio(p.total),0)));
-    setTxt('cont-ef-n', efPeds.length);
-    setTxt('cont-ef-$', fmtMoney(efPeds.reduce((s,p)=>s+parsePrecio(p.total),0)));
-    setTxt('cont-domi-prom', promDiario || 0);
-    setTxt('cont-domi-avg$', peds.length ? fmtMoney(Math.round(totalEnvio/peds.length)) : '—');
-
-    // ── Gráfico barras por domi ──
+    const setTxt  = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
+    setTxt('cont-tf-n',  tfVerif.length);
+    setTxt('cont-tf-$',  fmtMoney(tfVerif.reduce((s,p)=>s+parsePrecio(p.total),0)));
+    setTxt('cont-ef-n',  efPeds.length);
+    setTxt('cont-ef-$',  fmtMoney(efPeds.reduce((s,p)=>s+parsePrecio(p.total),0)));
+    setTxt('cont-domi-prom',  promDiario || 0);
+    setTxt('cont-domi-avg$',  peds.length ? fmtMoney(Math.round(totalEnvio/peds.length)) : '—');
     const domiMap = {};
-    peds.forEach(p => {
-      const k = p.domi || 'Sin asignar';
-      if (!domiMap[k]) domiMap[k] = { n:0, total:0 };
-      domiMap[k].n++; domiMap[k].total += parsePrecio(p.total);
-    });
+    peds.forEach(p => { const k=p.domi||'Sin asignar'; if(!domiMap[k]) domiMap[k]={n:0,total:0}; domiMap[k].n++; domiMap[k].total+=parsePrecio(p.total); });
     const domiArr = Object.entries(domiMap).sort((a,b)=>b[1].total-a[1].total).slice(0,8);
-    const maxT = domiArr[0]?.[1]?.total || 1;
-
+    const maxT    = domiArr[0]?.[1]?.total || 1;
     const chartEl = document.getElementById('cont-chart-domi');
     const chartLb = document.getElementById('cont-chart-domi-labels');
-    if (chartEl) {
-      chartEl.innerHTML = domiArr.map(([nombre,d],i) => `
-        <div style="flex:1;display:flex;flex-direction:column;align-items:center;cursor:default;"
-             title="${nombre}: ${fmtMoney(d.total)} (${d.n} entregas)">
-          <div style="font-size:9px;font-weight:800;color:var(--teal-d);margin-bottom:4px;">${d.n}</div>
-          <div style="width:calc(100% - 4px);border-radius:5px 5px 0 0;
-                      background:${i===0?'var(--teal)':'var(--teal-m)'};
-                      height:${Math.round((d.total/maxT)*100)}%;
-                      transition:background .2s;min-height:4px;"
-               onmouseover="this.style.background='var(--teal)'"
-               onmouseout="this.style.background='${i===0?'var(--teal)':'var(--teal-m)'}'">
-          </div>
-        </div>`).join('') || '<div style="color:var(--text3);font-size:12px;padding:20px;">Sin datos</div>';
-    }
-    if (chartLb) {
-      chartLb.innerHTML = domiArr.map(([nombre]) => `
-        <div style="flex:1;font-size:9px;color:var(--text3);font-weight:700;text-align:center;
-                    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-          ${nombre.split(' ')[0]}
-        </div>`).join('');
-    }
-
-    // ── Donut métodos de pago ──
+    if (chartEl) chartEl.innerHTML = domiArr.map(([nombre,d],i) => `<div style="flex:1;display:flex;flex-direction:column;align-items:center;" title="${nombre}: ${fmtMoney(d.total)}"><div style="font-size:9px;font-weight:800;color:var(--teal-d);margin-bottom:4px;">${d.n}</div><div style="width:calc(100% - 4px);border-radius:5px 5px 0 0;background:${i===0?'var(--teal)':'var(--teal-m)'};height:${Math.round((d.total/maxT)*100)}%;min-height:4px;"></div></div>`).join('') || '<div style="color:var(--text3);font-size:12px;padding:20px;">Sin datos</div>';
+    if (chartLb) chartLb.innerHTML = domiArr.map(([nombre]) => `<div style="flex:1;font-size:9px;color:var(--text3);font-weight:700;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${nombre.split(' ')[0]}</div>`).join('');
     const metodos = {};
-    peds.forEach(p => {
-      const k = /transfer/i.test(p.metodo||'') ? 'Transferencia'
-              : /efecti/i.test(p.metodo||'')   ? 'Efectivo'
-              : (p.metodo || 'Otro');
-      metodos[k] = (metodos[k]||0) + 1;
-    });
+    peds.forEach(p => { const k=/transfer/i.test(p.metodo||'')?'Transferencia':/efecti/i.test(p.metodo||'')?'Efectivo':(p.metodo||'Otro'); metodos[k]=(metodos[k]||0)+1; });
     const COLORES = ['#28B9C1','#16a34a','#2563eb','#d97706','#7c3aed','#dc2626'];
-    const metArr = Object.entries(metodos);
-    const total  = metArr.reduce((s,[,n])=>s+n,0);
-    const setTotalDonut = document.getElementById('cont-donut-total');
-    if (setTotalDonut) setTotalDonut.textContent = total || 0;
-
+    const metArr  = Object.entries(metodos);
+    const total   = metArr.reduce((s,[,n])=>s+n,0);
+    setTxt('cont-donut-total', total || 0);
     const donutSvg = document.getElementById('cont-donut');
     if (donutSvg && metArr.length) {
-      const R=54, cx=60, cy=60, circum=2*Math.PI*R;
-      let offset = 0;
-      donutSvg.innerHTML = metArr.map(([,n],i) => {
-        const pct = n/total, dash = pct*circum, gap = circum - dash;
-        const el2 = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none"
-          stroke="${COLORES[i%COLORES.length]}" stroke-width="18"
-          stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}"
-          stroke-dashoffset="${(-offset*circum).toFixed(2)}"
-          style="transition:stroke-dasharray .4s;"/>`;
-        offset += pct; return el2;
-      }).join('');
-    } else if (donutSvg) {
-      donutSvg.innerHTML = `<circle cx="60" cy="60" r="54" fill="none" stroke="var(--border)" stroke-width="18"/>`;
-    }
-
+      const R=54,cx=60,cy=60,circum=2*Math.PI*R; let offset=0;
+      donutSvg.innerHTML = metArr.map(([,n],i) => { const pct=n/total,dash=pct*circum,gap=circum-dash; const s=`<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="${COLORES[i%COLORES.length]}" stroke-width="18" stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}" stroke-dashoffset="${(-offset*circum).toFixed(2)}" style="transition:stroke-dasharray .4s;"/>`; offset+=pct; return s; }).join('');
+    } else if (donutSvg) { donutSvg.innerHTML=`<circle cx="60" cy="60" r="54" fill="none" stroke="var(--border)" stroke-width="18"/>`; }
     const legend = document.getElementById('cont-donut-legend');
-    if (legend) {
-      legend.innerHTML = metArr.map(([k,n],i) => `
-        <div style="display:flex;align-items:center;gap:7px;">
-          <div style="width:10px;height:10px;border-radius:3px;
-                      background:${COLORES[i%COLORES.length]};flex-shrink:0;"></div>
-          <div>
-            <div style="font-size:11px;font-weight:700;color:var(--text);">${k}</div>
-            <div style="font-size:9px;color:var(--text3);">${n} · ${Math.round(n/total*100)}%</div>
-          </div>
-        </div>`).join('');
-    }
-
-    // ── Bases + Multas ──
+    if (legend) legend.innerHTML = metArr.map(([k,n],i) => `<div style="display:flex;align-items:center;gap:7px;"><div style="width:10px;height:10px;border-radius:3px;background:${COLORES[i%COLORES.length]};flex-shrink:0;"></div><div><div style="font-size:11px;font-weight:700;color:var(--text);">${k}</div><div style="font-size:9px;color:var(--text3);">${n} · ${Math.round(n/total*100)}%</div></div></div>`).join('');
     renderBases(); renderMultas();
-
-    // ── Tabla resumen ──
     const tbody = document.getElementById('cont-domi-tbody');
     if (!tbody) return;
-    if (!domiArr.length) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text3);">
-        Sin entregas en este período</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = domiArr.map(([nombre, d]) => {
-      const tfD  = peds.filter(p => (p.domi||'') === nombre && /transfer/i.test(p.metodo||''));
-      const efD  = peds.filter(p => (p.domi||'') === nombre && /efecti/i.test(p.metodo||''));
-      const tfTotal = tfD.reduce((s,p)=>s+parsePrecio(p.total),0);
-      const efTotal = efD.reduce((s,p)=>s+parsePrecio(p.total),0);
-      const basesDomi   = _bases.filter(b  => b.domi === nombre).reduce((s,b)=>s+b.monto,0);
-      const multasDomi  = _multas.filter(m => m.domi === nombre).reduce((s,m)=>s+m.monto,0);
-      const balance     = efTotal - basesDomi - multasDomi;
-      const balColor    = balance >= 0 ? 'var(--green)' : 'var(--red)';
-      return `<tr>
-        <td><b>${nombre}</b></td>
-        <td style="font-weight:800;color:var(--teal);">${d.n}</td>
-        <td style="font-family:'DM Mono',monospace;color:var(--green);">${fmtMoney(efTotal)}</td>
-        <td style="font-family:'DM Mono',monospace;color:var(--blue);">${fmtMoney(tfTotal)}</td>
-        <td style="font-family:'DM Mono',monospace;font-weight:800;">${fmtMoney(d.total)}</td>
-        <td style="font-family:'DM Mono',monospace;color:var(--orange);">${basesDomi > 0 ? fmtMoney(basesDomi) : '—'}</td>
-        <td style="font-family:'DM Mono',monospace;color:var(--red);">${multasDomi > 0 ? fmtMoney(multasDomi) : '—'}</td>
-        <td style="font-family:'DM Mono',monospace;font-weight:800;color:${balColor};">
-          ${fmtMoney(Math.abs(balance))} ${balance < 0 ? '⚠' : '✓'}
-        </td>
-      </tr>`;
+    if (!domiArr.length) { tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text3);">Sin entregas en este período</td></tr>`; return; }
+    tbody.innerHTML = domiArr.map(([nombre,d]) => {
+      const tfD=peds.filter(p=>(p.domi||'')===nombre&&/transfer/i.test(p.metodo||''));
+      const efD=peds.filter(p=>(p.domi||'')===nombre&&/efecti/i.test(p.metodo||''));
+      const tfTotal=tfD.reduce((s,p)=>s+parsePrecio(p.total),0);
+      const efTotal=efD.reduce((s,p)=>s+parsePrecio(p.total),0);
+      const basesDomi  =_bases.filter(b=>b.domi===nombre).reduce((s,b)=>s+b.monto,0);
+      const multasDomi =_multas.filter(m=>m.domi===nombre).reduce((s,m)=>s+m.monto,0);
+      const balance    =efTotal-basesDomi-multasDomi;
+      return `<tr><td><b>${nombre}</b></td><td style="font-weight:800;color:var(--teal);">${d.n}</td><td style="font-family:'DM Mono',monospace;color:var(--green);">${fmtMoney(efTotal)}</td><td style="font-family:'DM Mono',monospace;color:var(--blue);">${fmtMoney(tfTotal)}</td><td style="font-family:'DM Mono',monospace;font-weight:800;">${fmtMoney(d.total)}</td><td style="font-family:'DM Mono',monospace;color:var(--orange);">${basesDomi>0?fmtMoney(basesDomi):'—'}</td><td style="font-family:'DM Mono',monospace;color:var(--red);">${multasDomi>0?fmtMoney(multasDomi):'—'}</td><td style="font-family:'DM Mono',monospace;font-weight:800;color:${balance>=0?'var(--green)':'var(--red)'};">${fmtMoney(Math.abs(balance))} ${balance<0?'⚠':'✓'}</td></tr>`;
     }).join('');
   }
   window.renderContable = renderContable;
-
-  /* ── 7. Bases ── */
+ 
   function renderBases() {
-    const el = document.getElementById('cont-bases-list');
-    if (!el) return;
+    const el = document.getElementById('cont-bases-list'); if (!el) return;
     const filtered = _bases.slice().reverse();
-    if (!filtered.length) {
-      el.innerHTML = `<div class="empty-state"><div class="ico" style="font-size:28px;opacity:.2;">💵</div>
-        <p>Sin bases registradas</p></div>`; return;
-    }
-    el.innerHTML = filtered.map((b, ri) => {
-      const i = _bases.length - 1 - ri;
-      return `<div class="base-item">
-        <div class="base-ico" style="background:var(--orange-l);color:var(--orange);">
-          <span class="material-symbols-rounded" style="font-size:17px;">account_balance_wallet</span>
-        </div>
-        <div style="flex:1;">
-          <div class="base-name">${b.domi}</div>
-          <div class="base-meta">${b.nota || 'Sin nota'} · ${b.fecha}</div>
-        </div>
-        <div class="base-monto" style="color:var(--orange);">${fmtMoney(b.monto)}</div>
-        <button class="base-del" onclick="deleteBase(${i})" title="Eliminar">
-          <span class="material-symbols-rounded" style="font-size:13px;">delete</span>
-        </button>
-      </div>`;
-    }).join('');
+    if (!filtered.length) { el.innerHTML=`<div class="empty-state"><div class="ico" style="font-size:28px;opacity:.2;">💵</div><p>Sin bases registradas</p></div>`; return; }
+    el.innerHTML = filtered.map((b,ri) => { const i=_bases.length-1-ri; return `<div class="base-item"><div class="base-ico" style="background:var(--orange-l);color:var(--orange);"><span class="material-symbols-rounded" style="font-size:17px;">account_balance_wallet</span></div><div style="flex:1;"><div class="base-name">${b.domi}</div><div class="base-meta">${b.nota||'Sin nota'} · ${b.fecha}</div></div><div class="base-monto" style="color:var(--orange);">${fmtMoney(b.monto)}</div><button class="base-del" onclick="deleteBase(${i})" title="Eliminar"><span class="material-symbols-rounded" style="font-size:13px;">delete</span></button></div>`; }).join('');
   }
-
-  window.openBaseModal = function() {
-    poblarSelectCont('base-domi-select');
-    document.getElementById('base-monto').value = '';
-    document.getElementById('base-nota').value  = '';
-    document.getElementById('modal-base-overlay').classList.add('show');
-  };
-
-  window.saveBase = function() {
-    const domi  = document.getElementById('base-domi-select').value;
-    const monto = parsePrecio(document.getElementById('base-monto').value);
-    const nota  = document.getElementById('base-nota').value.trim();
-    if (!domi)  { showToast('w','Falta domiciliario','Selecciona un domi'); return; }
-    if (!monto) { showToast('w','Falta monto','Ingresa el valor de la base'); return; }
-    _bases.push({ domi, monto, nota, fecha: new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) });
-    saveBases(); renderBases(); renderContable();
-    document.getElementById('modal-base-overlay').classList.remove('show');
-    showToast('s', `Base dada a ${domi}`, fmtMoney(monto) + (nota ? ' · ' + nota : ''));
-  };
-
-  window.deleteBase = function(idx) {
-    if (!confirm('¿Eliminar esta base?')) return;
-    _bases.splice(idx, 1); saveBases(); renderBases(); renderContable();
-    showToast('i','Base eliminada','');
-  };
-
-  /* ── 8. Multas ── */
+ 
   function renderMultas() {
-    const el = document.getElementById('cont-multas-list');
-    if (!el) return;
+    const el = document.getElementById('cont-multas-list'); if (!el) return;
     const filtered = _multas.slice().reverse();
-    if (!filtered.length) {
-      el.innerHTML = `<div class="empty-state"><div class="ico" style="font-size:28px;opacity:.2;">⚖️</div>
-        <p>Sin multas ni restricciones</p></div>`; return;
-    }
-    const iconos = { multa:'gavel', pyp:'traffic', otro:'info' };
-    const labels = { multa:'Multa', pyp:'Pico & Placa', otro:'Descuento' };
-    el.innerHTML = filtered.map((m, ri) => {
-      const i = _multas.length - 1 - ri;
-      const ico = iconos[m.tipo] || 'gavel';
-      const lbl = labels[m.tipo] || 'Multa';
-      return `<div class="multa-item">
-        <div class="base-ico" style="background:var(--red-l);color:var(--red);">
-          <span class="material-symbols-rounded" style="font-size:17px;">${ico}</span>
-        </div>
-        <div style="flex:1;">
-          <div class="base-name">${m.domi}
-            <span style="font-size:9px;font-weight:800;padding:1px 7px;border-radius:99px;
-                         background:var(--red-l);color:var(--red);margin-left:6px;">${lbl}</span>
-          </div>
-          <div class="base-meta">${m.nota || 'Sin nota'} · ${m.fecha}</div>
-        </div>
-        <div class="base-monto" style="color:var(--red);">-${fmtMoney(m.monto)}</div>
-        <button class="base-del" onclick="deleteMulta(${i})" title="Eliminar">
-          <span class="material-symbols-rounded" style="font-size:13px;">delete</span>
-        </button>
-      </div>`;
-    }).join('');
+    if (!filtered.length) { el.innerHTML=`<div class="empty-state"><div class="ico" style="font-size:28px;opacity:.2;">⚖️</div><p>Sin multas ni restricciones</p></div>`; return; }
+    const iconos={multa:'gavel',pyp:'traffic',otro:'info'}, labels={multa:'Multa',pyp:'Pico & Placa',otro:'Descuento'};
+    el.innerHTML = filtered.map((m,ri) => { const i=_multas.length-1-ri; const ico=iconos[m.tipo]||'gavel', lbl=labels[m.tipo]||'Multa'; return `<div class="multa-item"><div class="base-ico" style="background:var(--red-l);color:var(--red);"><span class="material-symbols-rounded" style="font-size:17px;">${ico}</span></div><div style="flex:1;"><div class="base-name">${m.domi} <span style="font-size:9px;font-weight:800;padding:1px 7px;border-radius:99px;background:var(--red-l);color:var(--red);">${lbl}</span></div><div class="base-meta">${m.nota||'Sin nota'} · ${m.fecha}</div></div><div class="base-monto" style="color:var(--red);">-${fmtMoney(m.monto)}</div><button class="base-del" onclick="deleteMulta(${i})"><span class="material-symbols-rounded" style="font-size:13px;">delete</span></button></div>`; }).join('');
   }
-
-  window.openMultaModal = function() {
-    poblarSelectCont('multa-domi-select');
-    document.getElementById('multa-monto').value = '';
-    document.getElementById('multa-nota').value  = '';
-    document.getElementById('multa-tipo-sel').value = 'multa';
-    document.getElementById('modal-multa-overlay').classList.add('show');
-  };
-
-  window.saveMulta = function() {
-    const domi  = document.getElementById('multa-domi-select').value;
-    const monto = parsePrecio(document.getElementById('multa-monto').value);
-    const nota  = document.getElementById('multa-nota').value.trim();
-    const tipo  = document.getElementById('multa-tipo-sel').value;
-    if (!domi)  { showToast('w','Falta domiciliario','Selecciona un domi'); return; }
-    if (!monto) { showToast('w','Falta monto','Ingresa el valor'); return; }
-    _multas.push({ domi, monto, nota, tipo, fecha: new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) });
-    saveMultas(); renderMultas(); renderContable();
-    document.getElementById('modal-multa-overlay').classList.remove('show');
-    showToast('i', `Registrado para ${domi}`, fmtMoney(monto));
-  };
-
-  window.deleteMulta = function(idx) {
-    if (!confirm('¿Eliminar este registro?')) return;
-    _multas.splice(idx, 1); saveMultas(); renderMultas(); renderContable();
-    showToast('i','Registro eliminado','');
-  };
-
-  /* ── 9. Helpers ── */
+ 
   function poblarSelectCont(selId) {
-    const sel = document.getElementById(selId);
-    if (!sel) return;
+    const sel = document.getElementById(selId); if (!sel) return;
     sel.innerHTML = '<option value="">— Selecciona —</option>' +
       allDrivers.map(d => `<option value="${d.nombre}">${d.activo?'🟢':'⚫'} ${d.nombre}</option>`).join('');
   }
-
+ 
+  window.openBaseModal  = function() { poblarSelectCont('base-domi-select'); document.getElementById('base-monto').value=''; document.getElementById('base-nota').value=''; document.getElementById('modal-base-overlay').classList.add('show'); };
+  window.openMultaModal = function() { poblarSelectCont('multa-domi-select'); document.getElementById('multa-monto').value=''; document.getElementById('multa-nota').value=''; document.getElementById('multa-tipo-sel').value='multa'; document.getElementById('modal-multa-overlay').classList.add('show'); };
+ 
+  window.saveBase = function() {
+    const domi=document.getElementById('base-domi-select').value, monto=parsePrecio(document.getElementById('base-monto').value), nota=document.getElementById('base-nota').value.trim();
+    if (!domi) { showToast('w','Falta domiciliario',''); return; }
+    if (!monto) { showToast('w','Falta monto',''); return; }
+    _bases.push({domi,monto,nota,fecha:new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})});
+    saveBases(); renderBases(); renderContable();
+    document.getElementById('modal-base-overlay').classList.remove('show');
+    showToast('s',`Base dada a ${domi}`,fmtMoney(monto)+(nota?' · '+nota:''));
+  };
+ 
+  window.saveMulta = function() {
+    const domi=document.getElementById('multa-domi-select').value, monto=parsePrecio(document.getElementById('multa-monto').value), nota=document.getElementById('multa-nota').value.trim(), tipo=document.getElementById('multa-tipo-sel').value;
+    if (!domi) { showToast('w','Falta domiciliario',''); return; }
+    if (!monto) { showToast('w','Falta monto',''); return; }
+    _multas.push({domi,monto,nota,tipo,fecha:new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})});
+    saveMultas(); renderMultas(); renderContable();
+    document.getElementById('modal-multa-overlay').classList.remove('show');
+    showToast('i',`Registrado para ${domi}`,fmtMoney(monto));
+  };
+ 
+  window.deleteBase  = function(idx) { if (!confirm('¿Eliminar esta base?')) return; _bases.splice(idx,1); saveBases(); renderBases(); renderContable(); showToast('i','Base eliminada',''); };
+  window.deleteMulta = function(idx) { if (!confirm('¿Eliminar este registro?')) return; _multas.splice(idx,1); saveMultas(); renderMultas(); renderContable(); showToast('i','Registro eliminado',''); };
+ 
   window.setCPeriodo = function(p, btn) {
     _periodo = p;
     document.querySelectorAll('#cont-tabs .tab').forEach(t => t.classList.remove('on'));
     if (btn) btn.classList.add('on');
     renderContable();
   };
-
+ 
   window.exportarContableExcel = function() {
     const peds = allPedidos.filter(p => p.estado === 'entregado' && enPeriodo(p));
     if (!peds.length) { showToast('w','Sin datos','No hay entregas en este período'); return; }
     const rows = [['Pedido','Cliente','Domiciliario','Método','Subtotal','Domicilio','Total','Fecha','Hora']];
-    peds.forEach(p => rows.push([p.id,p.cliente||'',p.domi||'',p.metodo||'',
-      calcSubtotal(p),parsePrecio(p.costoEnvio),parsePrecio(p.total),p.fecha||'',p.hora||'']));
+    peds.forEach(p => rows.push([p.id,p.cliente||'',p.domi||'',p.metodo||'',calcSubtotal(p),parsePrecio(p.costoEnvio),parsePrecio(p.total),p.fecha||'',p.hora||'']));
     const csv = rows.map(r => r.map(c => '"'+String(c||'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
     const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
     const a = document.createElement('a');
@@ -6988,8 +6646,9 @@ function imprimirProductos() {
     a.click(); URL.revokeObjectURL(a.href);
     showToast('s','Excel exportado',peds.length+' registros');
   };
-
-})();
+  } 
+   
+  
 
 
 </script>
