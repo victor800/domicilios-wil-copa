@@ -3254,6 +3254,11 @@ if (id === 'contable') {
       console.warn('[contable load]:', e);
       if (typeof renderContable === 'function') renderContable();
     });
+    if (typeof loadCierresCaja === 'function') {
+  loadCierresCaja().then(() => {
+    if (typeof renderCierresCaja === 'function') renderCierresCaja();
+  });
+}
 }
     }
   }
@@ -6217,6 +6222,25 @@ function initContable() {
   pg.className = 'pg';
   pg.id = 'pg-contable';
   pg.innerHTML = `
+
+  <!-- HISTORIAL CIERRES DE CAJA -->
+    <div class="pn" style="margin-bottom:20px;">
+      <div class="pn-t">
+        <span class="material-symbols-rounded ico">point_of_sale</span>
+        Cierres de Caja
+        <span style="font-size:10px;color:var(--text3);font-weight:600;margin-left:4px;">2 turnos por día</span>
+        <button onclick="abrirCierreCaja()"
+          style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;
+                 background:linear-gradient(135deg,#0c2225,#0d3540);color:var(--teal);
+                 border:none;border-radius:9px;padding:6px 14px;
+                 font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer;">
+          <span class="material-symbols-rounded" style="font-size:14px;">add</span>Registrar cierre
+        </button>
+      </div>
+      <div id="cont-cierres-list">
+        <div class="empty-state"><div class="ico" style="font-size:28px;opacity:.2;">🏦</div><p>Sin cierres registrados hoy</p></div>
+      </div>
+    </div>
     <div class="pghdr">
      
       <p>Control financiero de domicilios, domiciliarios y pagos</p>
@@ -6231,6 +6255,23 @@ function initContable() {
         <div class="tab"     data-p="15"   onclick="setCPeriodo('15',this)">15 días</div>
         <div class="tab"     data-p="30"   onclick="setCPeriodo('30',this)">1 mes</div>
       </div>
+
+      <!-- separador -->
+      <div style="width:1px;height:22px;background:var(--border);flex-shrink:0;margin:0 4px;"></div>
+      <button onclick="abrirCierreCaja()"
+        style="display:inline-flex;align-items:center;gap:6px;
+               background:linear-gradient(135deg,#0c2225,#0d3540);
+               color:var(--teal);border:none;border-radius:8px;
+               padding:6px 14px;font-family:'Plus Jakarta Sans',sans-serif;
+               font-size:11px;font-weight:800;cursor:pointer;
+               box-shadow:0 2px 10px rgba(40,185,193,.2);
+               transition:all .18s;"
+        onmouseover="this.style.background='var(--teal)';this.style.color='#071e22'"
+        onmouseout="this.style.background='linear-gradient(135deg,#0c2225,#0d3540)';this.style.color='var(--teal)'">
+        <span class="material-symbols-rounded" style="font-size:14px;">point_of_sale</span>
+        Cierre de Caja
+      </button>
+
       <div style="margin-left:auto;font-size:11px;color:var(--text3);font-weight:700;" id="cont-periodo-lbl">–</div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;" id="cont-kpis"></div>
@@ -6394,6 +6435,31 @@ function initContable() {
       #pg-contable [style*="grid-template-columns:1fr 1fr"] {
         grid-template-columns: 1fr !important;
       }
+        .cierre-item {
+      background:var(--bg);border:1.5px solid var(--border);border-radius:12px;
+      padding:14px 16px;margin-bottom:10px;transition:border-color .15s;
+    }
+    .cierre-item:hover { border-color:var(--border2); }
+    .cierre-turno-badge {
+      font-size:9px;font-weight:800;padding:3px 10px;border-radius:99px;
+      text-transform:uppercase;letter-spacing:.08em;
+    }
+    .cierre-turno-1 { background:#ede9fe;color:#6d28d9; }
+    .cierre-turno-2 { background:#0d3540;color:var(--teal); }
+    #modal-caja-overlay {
+      position:fixed;inset:0;background:rgba(4,18,20,.88);
+      backdrop-filter:blur(14px);z-index:400;
+      display:none;align-items:center;justify-content:center;padding:16px;
+    }
+    #modal-caja-overlay.show { display:flex; }
+    .caja-modal {
+      background:var(--white);border-radius:22px;width:min(560px,100%);
+      max-height:92vh;overflow-y:auto;
+      box-shadow:0 40px 100px rgba(4,18,20,.5);
+      animation:invUp .3s cubic-bezier(.34,1.2,.64,1);
+    }
+    .caja-modal::-webkit-scrollbar { width:3px; }
+    .caja-modal::-webkit-scrollbar-thumb { background:var(--border2);border-radius:99px; }
     }
   `;
   document.head.appendChild(style);
@@ -6458,6 +6524,165 @@ function initContable() {
       </div>`;
     document.body.appendChild(ov);
     ov.addEventListener('click', e => { if (e.target === ov) ov.classList.remove('show'); });
+
+    /* ── Modal cierre de caja ── */
+  const cajaOv = document.createElement('div');
+  cajaOv.id = 'modal-caja-overlay';
+  cajaOv.innerHTML = `
+    <div class="caja-modal">
+      <!-- Header -->
+      <div style="background:linear-gradient(135deg,#071e22 0%,#0d3540 60%,#0f5460 100%);
+                  border-radius:22px 22px 0 0;padding:22px 24px 18px;
+                  display:flex;align-items:center;gap:12px;position:relative;overflow:hidden;">
+        <div style="position:absolute;top:-40px;right:-40px;width:160px;height:160px;border-radius:50%;
+                    background:radial-gradient(circle,rgba(40,185,193,.18) 0%,transparent 65%);pointer-events:none;"></div>
+        <div style="width:42px;height:42px;border-radius:13px;background:rgba(40,185,193,.2);
+                    border:1.5px solid rgba(40,185,193,.3);display:flex;align-items:center;
+                    justify-content:center;color:var(--teal);font-size:20px;flex-shrink:0;position:relative;z-index:1;">
+          <span class="material-symbols-rounded">point_of_sale</span>
+        </div>
+        <div style="position:relative;z-index:1;">
+          <div style="font-size:15px;font-weight:800;color:#fff;">Cierre de Caja</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:2px;">Registro de turno y entrega al siguiente</div>
+        </div>
+        <button onclick="document.getElementById('modal-caja-overlay').classList.remove('show')"
+                style="margin-left:auto;width:32px;height:32px;border-radius:9px;
+                       background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.12);
+                       cursor:pointer;display:flex;align-items:center;justify-content:center;
+                       color:rgba(255,255,255,.6);font-size:16px;position:relative;z-index:1;
+                       transition:all .15s;"
+                onmouseover="this.style.background='rgba(220,38,38,.35)';this.style.color='#fff'"
+                onmouseout="this.style.background='rgba(255,255,255,.07)';this.style.color='rgba(255,255,255,.6)'">
+          <span class="material-symbols-rounded" style="font-size:16px;">close</span>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div style="padding:24px;">
+
+        <!-- Turno + fecha + hora -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:18px;">
+          <div class="om-field" style="margin-bottom:0;">
+            <div class="om-label"><span class="material-symbols-rounded">schedule</span>Turno</div>
+            <select class="om-select" id="caja-turno">
+              <option value="1">☀️ Turno 1 — Mañana</option>
+              <option value="2">🌙 Turno 2 — Tarde/Noche</option>
+            </select>
+          </div>
+          <div class="om-field" style="margin-bottom:0;">
+            <div class="om-label"><span class="material-symbols-rounded">calendar_today</span>Fecha</div>
+            <input class="om-input" id="caja-fecha" type="date">
+          </div>
+          <div class="om-field" style="margin-bottom:0;">
+            <div class="om-label"><span class="material-symbols-rounded">access_time</span>Hora cierre</div>
+            <input class="om-input" id="caja-hora" type="time">
+          </div>
+        </div>
+
+        <!-- Responsable entrega y recibe -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px;">
+          <div class="om-field" style="margin-bottom:0;">
+            <div class="om-label"><span class="material-symbols-rounded">person</span>Entrega (turno actual)</div>
+            <select class="om-select" id="caja-entrega">
+              <option value="">— Selecciona —</option>
+            </select>
+          </div>
+          <div class="om-field" style="margin-bottom:0;">
+            <div class="om-label"><span class="material-symbols-rounded">person_add</span>Recibe (siguiente turno)</div>
+            <select class="om-select" id="caja-recibe">
+              <option value="">— Selecciona —</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Resumen automático del turno -->
+        <div id="caja-resumen-auto" style="background:linear-gradient(135deg,#071e22,#0d3540);
+             border-radius:14px;padding:16px 18px;margin-bottom:18px;">
+          <div style="font-size:9px;font-weight:800;color:rgba(255,255,255,.4);text-transform:uppercase;
+                      letter-spacing:.1em;margin-bottom:12px;display:flex;align-items:center;gap:6px;">
+            <span class="material-symbols-rounded" style="font-size:14px;color:var(--teal);">auto_awesome</span>
+            Resumen automático del turno
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;" id="caja-stats-grid">
+            <!-- se llena dinámicamente -->
+          </div>
+        </div>
+
+        <!-- Montos de caja -->
+        <div style="background:var(--bg2);border-radius:14px;padding:16px 18px;margin-bottom:18px;
+                    border:1.5px solid var(--border);">
+          <div style="font-size:10px;font-weight:800;color:var(--text2);text-transform:uppercase;
+                      letter-spacing:.1em;margin-bottom:14px;">
+            Conteo físico de caja
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="om-field" style="margin-bottom:0;">
+              <div class="om-label"><span class="material-symbols-rounded">payments</span>Efectivo en caja</div>
+              <div class="om-price-wrap">
+                <span class="currency">$</span>
+                <input class="om-input" id="caja-efectivo" type="text" placeholder="0" inputmode="numeric"
+                       oninput="calcDiferenciaCaja()">
+              </div>
+            </div>
+            <div class="om-field" style="margin-bottom:0;">
+              <div class="om-label"><span class="material-symbols-rounded">account_balance</span>Bases entregadas hoy</div>
+              <div class="om-price-wrap">
+                <span class="currency">$</span>
+                <input class="om-input" id="caja-bases" type="text" placeholder="0" inputmode="numeric"
+                       oninput="calcDiferenciaCaja()">
+              </div>
+            </div>
+          </div>
+
+          <!-- Diferencia automática -->
+          <div id="caja-diferencia-box" style="margin-top:12px;padding:12px 14px;border-radius:11px;
+               background:var(--bg);border:1.5px solid var(--border);display:flex;
+               align-items:center;justify-content:space-between;gap:12px;">
+            <div>
+              <div style="font-size:9px;font-weight:800;color:var(--text3);text-transform:uppercase;
+                          letter-spacing:.08em;margin-bottom:3px;">Diferencia (esperado vs físico)</div>
+              <div style="font-size:10px;color:var(--text2);" id="caja-dif-detalle">Ingresa los montos para calcular</div>
+            </div>
+            <div style="font-size:22px;font-weight:800;font-family:'DM Mono',monospace;"
+                 id="caja-dif-valor">—</div>
+          </div>
+        </div>
+
+        <!-- Novedades -->
+        <div class="om-field" style="margin-bottom:18px;">
+          <div class="om-label"><span class="material-symbols-rounded">edit_note</span>Novedades del turno</div>
+          <textarea class="om-textarea" id="caja-novedades" rows="3"
+            placeholder="Pedidos con problema, clientes especiales, faltantes, averías…"
+            style="min-height:70px;"></textarea>
+        </div>
+
+        <!-- Footer -->
+        <div style="display:flex;gap:10px;padding-top:16px;border-top:1.5px solid var(--border);">
+          <button onclick="document.getElementById('modal-caja-overlay').classList.remove('show')"
+            style="flex:1;background:transparent;color:var(--text2);border:1.5px solid var(--border);
+                   border-radius:11px;padding:12px;font-family:'Plus Jakarta Sans',sans-serif;
+                   font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;"
+            onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='transparent'">
+            Cancelar
+          </button>
+          <button onclick="guardarCierreCaja()"
+            style="flex:2;background:linear-gradient(135deg,var(--teal),var(--teal-d));color:#071e22;
+                   border:none;border-radius:11px;padding:12px;font-family:'Plus Jakarta Sans',sans-serif;
+                   font-size:13px;font-weight:800;cursor:pointer;
+                   box-shadow:0 4px 16px rgba(40,185,193,.3);transition:all .18s;
+                   display:flex;align-items:center;justify-content:center;gap:8px;"
+            id="btn-guardar-caja"
+            onmouseover="this.style.transform='translateY(-1px)'"
+            onmouseout="this.style.transform=''">
+            <span class="material-symbols-rounded" style="font-size:17px;">check_circle</span>
+            Registrar cierre
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(cajaOv);
+  cajaOv.addEventListener('click', e => { if (e.target === cajaOv) cajaOv.classList.remove('show'); });
   });
  
   let _bases  = [];
@@ -6902,6 +7127,322 @@ window.deleteMulta = async function(idx) {
     renderMultas(); renderContable();
   } catch(e) { console.warn('[deleteMulta]:', e.message); }
 };
+
+/* ════ CIERRE DE CAJA ════ */
+
+  function calcResumenTurno() {
+    // Tomar pedidos del período actual ya filtrados
+    const hoy   = new Date();
+    const fecha = document.getElementById('caja-fecha')?.value;
+    const turno = document.getElementById('caja-turno')?.value;
+
+    // Turno 1: 06:00–14:00 | Turno 2: 14:00–23:59
+    const horaIni = turno === '1' ? 0  : 14;
+    const horaFin = turno === '1' ? 14 : 24;
+
+    const pedsT = allPedidos.filter(p => {
+      if (!p.hora) return true; // sin hora → incluir
+      const h = parseInt((p.hora || '0').split(':')[0]);
+      return h >= horaIni && h < horaFin;
+    });
+
+    const ent   = pedsT.filter(p => p.estado === 'entregado').length;
+    const pend  = pedsT.filter(p => p.estado === 'pendiente').length;
+    const proc  = pedsT.filter(p => p.estado === 'proceso' || p.estado === 'encamino').length;
+    const totalEf = pedsT.filter(p => /efecti/i.test(p.metodo||''))
+                         .reduce((s,p) => s + parsePrecio(p.total), 0);
+    const totalTf = pedsT.filter(p => /transfer/i.test(p.metodo||''))
+                         .reduce((s,p) => s + parsePrecio(p.total), 0);
+    const totalT  = totalEf + totalTf;
+
+    const grid = document.getElementById('caja-stats-grid');
+    if (grid) grid.innerHTML = [
+      { lbl:'Entregados', val: ent,           c:'#4ade80', ico:'check_circle' },
+      { lbl:'Efectivo',   val: fmtMoney(totalEf), c:'#86efac', ico:'payments' },
+      { lbl:'Transf.',    val: fmtMoney(totalTf), c:'#93c5fd', ico:'account_balance' },
+      { lbl:'Total caja', val: fmtMoney(totalT),  c:  'var(--teal)', ico:'point_of_sale' },
+    ].map(k => `
+      <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:10px;text-align:center;
+                  border:1px solid rgba(255,255,255,.08);">
+        <span class="material-symbols-rounded" style="font-size:14px;color:${k.c};display:block;margin-bottom:4px;">${k.ico}</span>
+        <div style="font-size:13px;font-weight:800;color:${k.c};font-family:'DM Mono',monospace;">${k.val}</div>
+        <div style="font-size:8px;color:rgba(255,255,255,.4);margin-top:3px;text-transform:uppercase;letter-spacing:.06em;">${k.lbl}</div>
+      </div>`).join('');
+
+    // Prellenar efectivo esperado
+    const efInput = document.getElementById('caja-efectivo');
+    if (efInput && !efInput.value) efInput.value = String(Math.round(totalEf));
+
+    // Prellenar bases
+    const basesHoy = (window._basesData || []).reduce((s,b) => s + b.monto, 0);
+    const bInput   = document.getElementById('caja-bases');
+    if (bInput && !bInput.value) bInput.value = String(Math.round(basesHoy));
+
+    calcDiferenciaCaja();
+    return { ent, pend, proc, totalEf, totalTf, totalT };
+  }
+
+  window.calcDiferenciaCaja = function() {
+    const ef       = parsePrecio(document.getElementById('caja-efectivo')?.value || '0');
+    const bases    = parsePrecio(document.getElementById('caja-bases')?.value    || '0');
+    const esperado = ef; // efectivo esperado es el que calculamos del turno
+    const fisico   = ef - bases; // lo que queda después de bases
+
+    const diferencia = fisico;
+    const difEl    = document.getElementById('caja-dif-valor');
+    const detEl    = document.getElementById('caja-diferencia-box');
+    const detTxt   = document.getElementById('caja-dif-detalle');
+
+    if (!difEl) return;
+
+    const esOk = Math.abs(diferencia) < 500;
+    difEl.textContent  = fmtMoney(Math.abs(diferencia));
+    difEl.style.color  = esOk ? 'var(--green)' : diferencia < 0 ? 'var(--red)' : 'var(--orange)';
+    if (detEl) {
+      detEl.style.borderColor = esOk ? 'rgba(22,163,74,.3)' : diferencia < 0 ? 'rgba(220,38,38,.3)' : 'rgba(217,119,6,.3)';
+      detEl.style.background  = esOk ? 'rgba(22,163,74,.06)' : diferencia < 0 ? 'rgba(220,38,38,.06)' : 'rgba(217,119,6,.06)';
+    }
+    if (detTxt) {
+      detTxt.textContent = esOk
+        ? '✓ Cuadre exacto — caja ok'
+        : diferencia < 0
+          ? `⚠ Faltante de ${fmtMoney(Math.abs(diferencia))}`
+          : `↑ Sobrante de ${fmtMoney(diferencia)}`;
+    }
+  };
+
+  window.abrirCierreCaja = function() {
+    // Prellenar fecha y hora actuales
+    const ahora = new Date();
+    const fEl = document.getElementById('caja-fecha');
+    const hEl = document.getElementById('caja-hora');
+    if (fEl) fEl.value = ahora.toISOString().slice(0,10);
+    if (hEl) hEl.value = ahora.toTimeString().slice(0,5);
+
+    // Auto-seleccionar turno según hora actual
+    const turnoEl = document.getElementById('caja-turno');
+    if (turnoEl) turnoEl.value = ahora.getHours() < 14 ? '1' : '2';
+
+    // Poblar selects de personal con domiciliarios
+    ['caja-entrega','caja-recibe'].forEach(selId => {
+      const sel = document.getElementById(selId);
+      if (!sel) return;
+      sel.innerHTML = '<option value="">— Selecciona —</option>' +
+        allDrivers.map(d =>
+          `<option value="${d.nombre}">${d.activo ? '🟢' : '⚫'} ${d.nombre}</option>`
+        ).join('');
+    });
+
+    // Limpiar campos
+    ['caja-efectivo','caja-bases','caja-novedades'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+
+    // Calcular resumen automático
+    setTimeout(calcResumenTurno, 100);
+
+    document.getElementById('modal-caja-overlay').classList.add('show');
+  };
+
+  // Re-calcular cuando cambia el turno
+  document.getElementById('caja-turno')?.addEventListener('change', () => {
+    setTimeout(calcResumenTurno, 50);
+  });
+
+  window.guardarCierreCaja = async function() {
+    const turno    = document.getElementById('caja-turno')?.value;
+    const fecha    = document.getElementById('caja-fecha')?.value;
+    const hora     = document.getElementById('caja-hora')?.value;
+    const entrega  = document.getElementById('caja-entrega')?.value?.trim();
+    const recibe   = document.getElementById('caja-recibe')?.value?.trim();
+    const efectivo = parsePrecio(document.getElementById('caja-efectivo')?.value || '0');
+    const bases    = parsePrecio(document.getElementById('caja-bases')?.value    || '0');
+    const novedades= (document.getElementById('caja-novedades')?.value || '').trim();
+
+    if (!entrega) { showToast('w','Falta quién entrega','Selecciona el responsable del turno'); return; }
+    if (!recibe)  { showToast('w','Falta quién recibe', 'Selecciona quién recibe el turno');   return; }
+
+    const btn = document.getElementById('btn-guardar-caja');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-rounded" style="animation:spin .8s linear infinite;font-size:17px;">progress_activity</span> Guardando…'; }
+
+    // Calcular resumen del turno
+    const resumen  = calcResumenTurno();
+    const diferencia = efectivo - bases;
+    const esOk     = Math.abs(diferencia) < 500;
+
+    const cierre = {
+      id:         'CAJA-' + Date.now(),
+      turno,
+      fecha,
+      hora,
+      entrega,
+      recibe,
+      efectivo,
+      bases,
+      diferencia,
+      novedades,
+      pedidos:    resumen?.ent     || 0,
+      totalEf:    resumen?.totalEf || 0,
+      totalTf:    resumen?.totalTf || 0,
+      totalT:     resumen?.totalT  || 0,
+      estado:     esOk ? 'ok' : diferencia < 0 ? 'faltante' : 'sobrante',
+      ts:         new Date().toLocaleString('es-CO', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })
+    };
+
+    // Guardar en memoria y sheet
+    window._cierresData = window._cierresData || [];
+    window._cierresData.unshift(cierre);
+    renderCierresCaja();
+    document.getElementById('modal-caja-overlay').classList.remove('show');
+    showToast('i', `Guardando cierre turno ${turno}…`, `${entrega} → ${recibe}`);
+
+    try {
+      await fetch(SHEET_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          accion:     'crear-cierre-caja',
+          turno, fecha, hora,
+          entrega, recibe,
+          efectivo, bases, diferencia,
+          pedidos:    cierre.pedidos,
+          totalEf:    cierre.totalEf,
+          totalTf:    cierre.totalTf,
+          totalT:     cierre.totalT,
+          estado:     cierre.estado,
+          novedades,
+          ts:         cierre.ts
+        })
+      });
+      await loadCierresCaja();
+      renderCierresCaja();
+      showToast('s',
+        `✓ Cierre turno ${turno} registrado`,
+        `${entrega} entregó a ${recibe} · ${esOk ? 'Caja OK ✓' : diferencia < 0 ? '⚠ Faltante' : '↑ Sobrante'}`
+      );
+      VOZ.hablar(`Cierre de caja turno ${turno} registrado. ${esOk ? 'Caja cuadrada.' : 'Revisar diferencia.'}`);
+    } catch(e) {
+      showToast('e', 'Error al guardar cierre', e.message.substring(0, 60));
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:17px;">check_circle</span>Registrar cierre';
+      }
+    }
+  };
+
+  async function loadCierresCaja() {
+    try {
+      const text  = await fetchSheetCSV('CierreCaja', 10000);
+      const lines = parseCSVText(text);
+      window._cierresData = lines.map(c => ({
+        id:        col(c, 0),
+        turno:     col(c, 1),
+        fecha:     col(c, 2),
+        hora:      col(c, 3),
+        entrega:   col(c, 4),
+        recibe:    col(c, 5),
+        efectivo:  parsePrecio(col(c, 6)),
+        bases:     parsePrecio(col(c, 7)),
+        diferencia:parsePrecio(col(c, 8)),
+        pedidos:   parseInt(col(c, 9)) || 0,
+        totalEf:   parsePrecio(col(c, 10)),
+        totalTf:   parsePrecio(col(c, 11)),
+        totalT:    parsePrecio(col(c, 12)),
+        estado:    col(c, 13) || 'ok',
+        novedades: col(c, 14),
+        ts:        col(c, 15)
+      })).filter(x => x.id).reverse(); // más recientes primero
+    } catch(e) {
+      console.warn('[loadCierresCaja]:', e.message);
+      window._cierresData = window._cierresData || [];
+    }
+  }
+
+  function renderCierresCaja() {
+    const el = document.getElementById('cont-cierres-list');
+    if (!el) return;
+    const cierres = (window._cierresData || []).slice(0, 20);
+    if (!cierres.length) {
+      el.innerHTML = `<div class="empty-state"><div class="ico" style="font-size:28px;opacity:.2;">🏦</div><p>Sin cierres registrados</p></div>`;
+      return;
+    }
+    const estadoConf = {
+      ok:       { color:'var(--green)',  bg:'var(--green-l)',   icon:'check_circle',  lbl:'Cuadre OK'  },
+      faltante: { color:'var(--red)',    bg:'var(--red-l)',     icon:'warning',        lbl:'Faltante'   },
+      sobrante: { color:'var(--orange)', bg:'var(--orange-l)', icon:'arrow_upward',   lbl:'Sobrante'   },
+    };
+    el.innerHTML = cierres.map(c => {
+      const sc = estadoConf[c.estado] || estadoConf.ok;
+      const turnoLabel = c.turno === '1' ? '☀️ Turno 1 — Mañana' : '🌙 Turno 2 — Tarde';
+      return `
+        <div class="cierre-item">
+          <!-- Cabecera -->
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+            <span class="cierre-turno-badge ${c.turno === '1' ? 'cierre-turno-1' : 'cierre-turno-2'}">
+              ${turnoLabel}
+            </span>
+            <span style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;">
+              ${c.fecha} · ${c.hora}
+            </span>
+            <span style="margin-left:auto;font-size:9px;font-weight:800;padding:3px 10px;border-radius:99px;
+                         background:${sc.bg};color:${sc.color};display:flex;align-items:center;gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:11px;">${sc.icon}</span>${sc.lbl}
+            </span>
+          </div>
+
+          <!-- Entrega → Recibe -->
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;
+                      background:var(--bg2);border-radius:10px;padding:9px 12px;">
+            <div style="flex:1;text-align:center;">
+              <div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase;margin-bottom:2px;">Entrega</div>
+              <div style="font-size:12px;font-weight:800;color:var(--text);">${c.entrega}</div>
+            </div>
+            <span class="material-symbols-rounded" style="color:var(--teal);font-size:20px;">arrow_forward</span>
+            <div style="flex:1;text-align:center;">
+              <div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase;margin-bottom:2px;">Recibe</div>
+              <div style="font-size:12px;font-weight:800;color:var(--text);">${c.recibe}</div>
+            </div>
+          </div>
+
+          <!-- KPIs del cierre -->
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:${c.novedades ? '12px' : '0'};">
+            <div style="background:var(--bg);border-radius:9px;padding:9px;text-align:center;">
+              <div style="font-size:15px;font-weight:800;color:var(--teal);">${c.pedidos}</div>
+              <div style="font-size:8px;color:var(--text3);margin-top:2px;">Pedidos</div>
+            </div>
+            <div style="background:var(--bg);border-radius:9px;padding:9px;text-align:center;">
+              <div style="font-size:11px;font-weight:800;color:var(--green);font-family:'DM Mono',monospace;">${fmtMoney(c.totalEf)}</div>
+              <div style="font-size:8px;color:var(--text3);margin-top:2px;">Efectivo</div>
+            </div>
+            <div style="background:var(--bg);border-radius:9px;padding:9px;text-align:center;">
+              <div style="font-size:11px;font-weight:800;color:var(--blue);font-family:'DM Mono',monospace;">${fmtMoney(c.totalTf)}</div>
+              <div style="font-size:8px;color:var(--text3);margin-top:2px;">Transferencia</div>
+            </div>
+            <div style="background:${sc.bg};border-radius:9px;padding:9px;text-align:center;
+                        border:1px solid ${sc.bg};">
+              <div style="font-size:11px;font-weight:800;color:${sc.color};font-family:'DM Mono',monospace;">
+                ${c.diferencia >= 0 ? '' : '-'}${fmtMoney(Math.abs(c.diferencia))}
+              </div>
+              <div style="font-size:8px;color:${sc.color};margin-top:2px;">Diferencia</div>
+            </div>
+          </div>
+
+          <!-- Novedades -->
+          ${c.novedades ? `
+            <div style="margin-top:0;background:var(--orange-l);border:1px solid rgba(217,119,6,.2);
+                        border-radius:9px;padding:8px 12px;display:flex;align-items:flex-start;gap:7px;">
+              <span class="material-symbols-rounded" style="font-size:14px;color:var(--orange);flex-shrink:0;margin-top:1px;">edit_note</span>
+              <span style="font-size:11px;color:var(--text2);line-height:1.5;">${c.novedades}</span>
+            </div>` : ''}
+        </div>`;
+    }).join('');
+  }
+
+  // Cargar cierres al iniciar
+  loadCierresCaja().then(() => renderCierresCaja());
+
  
   window.setCPeriodo = function(p, btn) {
     _periodo = p;
