@@ -5018,13 +5018,85 @@ async function renderActividad() {
     const ped  = allPedidos.find(p => matchDomi(p, domi) && p.estado === 'proceso');
     const icono = crearIconoMoto(nombre, ts);
 
+   const buildPopup = (did, dlat, dlng, dts, dacc) => {
+      const domiF = allDrivers.find(d => (d.id||'').toUpperCase() === did.toUpperCase())
+                 || { id: did, nombre: u.nombre, tel: '' };
+      const pedF  = allPedidos.find(p => matchDomi(p, domiF) && p.estado === 'proceso');
+      const entregados = allPedidos.filter(p => matchDomi(p, domiF) && p.estado === 'entregado').length;
+      const enProceso  = allPedidos.filter(p => matchDomi(p, domiF) && p.estado === 'proceso').length;
+      const pendientes = allPedidos.filter(p => matchDomi(p, domiF) && p.estado === 'pendiente').length;
+      const libre      = enProceso === 0 && pendientes === 0;
+      const statusColor= libre ? '#16a34a' : '#d97706';
+      const statusBg   = libre ? '#dcfce7'  : '#fef3c7';
+      const statusLabel= libre ? '🟢 Libre — disponible' : `🟡 Ocupado (${enProceso} en ruta)`;
+      const pedidoActual = allPedidos.find(p => matchDomi(p, domiF) && p.estado === 'proceso');
+      return `
+        <div style="font-family:'Plus Jakarta Sans',sans-serif;min-width:220px;max-width:260px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <div style="font-size:14px;font-weight:800;color:#0c2225;">${domiF.nombre}</div>
+            <span style="font-size:8px;font-weight:800;padding:2px 8px;border-radius:99px;
+                         background:${statusBg};color:${statusColor};white-space:nowrap;">
+              ${statusLabel}
+            </span>
+          </div>
+          <div style="font-size:10px;color:#7da0a4;margin-bottom:10px;">${domiF.id||''} · ${domiF.tel||''}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;">
+            <div style="background:#dcfce7;border-radius:8px;padding:6px;text-align:center;">
+              <div style="font-size:15px;font-weight:800;color:#16a34a;">${entregados}</div>
+              <div style="font-size:8px;color:#166534;font-weight:700;">Entregados</div>
+            </div>
+            <div style="background:#dbeafe;border-radius:8px;padding:6px;text-align:center;">
+              <div style="font-size:15px;font-weight:800;color:#2563eb;">${enProceso}</div>
+              <div style="font-size:8px;color:#1e40af;font-weight:700;">En ruta</div>
+            </div>
+            <div style="background:#fef3c7;border-radius:8px;padding:6px;text-align:center;">
+              <div style="font-size:15px;font-weight:800;color:#d97706;">${pendientes}</div>
+              <div style="font-size:8px;color:#92400e;font-weight:700;">Pendientes</div>
+            </div>
+          </div>
+          ${pedidoActual ? `
+            <div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:9px 11px;margin-bottom:8px;">
+              <div style="font-size:9px;font-weight:800;color:#1d4ed8;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">📦 Pedido en curso</div>
+              <div style="font-size:12px;font-weight:700;color:#0c2225;">${pedidoActual.cliente||''}</div>
+              <div style="font-size:10px;color:#64748b;margin-top:2px;">📍 ${pedidoActual.direccion||''}</div>
+              <div style="font-size:10px;color:#64748b;margin-top:1px;">💰 ${fmtMoney(parsePrecio(pedidoActual.total))}</div>
+            </div>` : libre ? `
+            <div style="background:#dcfce7;border-radius:10px;padding:9px 11px;margin-bottom:8px;
+                        display:flex;align-items:center;gap:7px;">
+              <span style="font-size:18px;">✅</span>
+              <div style="font-size:11px;font-weight:700;color:#15803d;">Disponible para asignación</div>
+            </div>` : ''}
+          <div style="font-size:9px;color:#94a3b8;font-family:monospace;border-top:1px solid #f1f5f9;padding-top:6px;">
+            ${dts ? `⏱ ${dts}` : ''} ${dacc ? `· ±${dacc}` : ''}<br>
+            ${dlat.toFixed(5)}, ${dlng.toFixed(5)}
+          </div>
+          ${libre ? `
+            <button onclick="sp('deliveries',document.querySelector('.ni[onclick*=deliveries]'));abrirAsignacion('${(allPedidos.find(p=>p.estado==='pendiente')?.id)||''}')"
+              style="width:100%;margin-top:8px;background:#28B9C1;color:#071e22;border:none;
+                     border-radius:9px;padding:8px;font-family:'Plus Jakarta Sans',sans-serif;
+                     font-size:11px;font-weight:800;cursor:pointer;">
+              Asignar pedido →
+            </button>` : ''}
+        </div>`;
+    };
+
     if (_driMarkers[id]) {
       _driMarkers[id].setLatLng([lat, lng]).setIcon(icono);
-      _driMarkers[id].setPopupContent(_popupDomi(domi, lat, lng, ts, acc, ped));
+      // Actualizar popup si ya está abierto
+      if (_driMarkers[id].isPopupOpen()) {
+        _driMarkers[id].setPopupContent(buildPopup(id, lat, lng, ts, acc));
+      }
     } else {
       _driMarkers[id] = L.marker([lat, lng], { icon: icono, zIndexOffset: 1000 })
-        .addTo(_map)
-        .bindPopup(_popupDomi(domi, lat, lng, ts, acc, ped), { maxWidth: 260 });
+        .addTo(_map);
+      // Al click: leer datos frescos del sheet antes de abrir popup
+      _driMarkers[id].on('click', async function() {
+        showToast('i', '🔄 Actualizando…', 'Leyendo sheet en tiempo real');
+        await Promise.all([loadDrivers(), loadPedidos()]);
+        const freshContent = buildPopup(id, this.getLatLng().lat, this.getLatLng().lng, ts, acc);
+        this.bindPopup(freshContent, { maxWidth: 280 }).openPopup();
+        updateBadges();
+      });
     }
   }
 
@@ -5057,10 +5129,12 @@ function centrarMapa() {
 /* ── Init mapa ── */
 function initMap() {
   if (_map) return;
-  _map = L.map('act-map', { zoomControl: true }).setView(MAP_CENTER, 14);
+  _map = L.map('act-map', { zoomControl: false }).setView(MAP_CENTER, 14);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap', maxZoom: 19
   }).addTo(_map);
+  // Zoom en esquina superior derecha para no tapar leyenda
+  L.control.zoom({ position: 'topright' }).addTo(_map);
 }
 
 /* ── initActividadTab ── */
@@ -5088,7 +5162,8 @@ function initActividadTab() {
       await Promise.all([loadDrivers(), loadPedidos()]);
       await renderActividad();
       updateBadges();
-    }, 10000);
+   }, 5000);
+
   }
 
   if (!window.L) {
