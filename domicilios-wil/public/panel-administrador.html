@@ -2071,7 +2071,7 @@ const ALERTA_PENDIENTES = {
   }
 };
 
-ALERTA_PENDIENTES.init();
+
 
 
 
@@ -4496,13 +4496,15 @@ function filterProductos(f, btn) {
 
 
   setSyncState('syncing','Conectando…');
-  showToast('i','Iniciando panel','Cargando datos del sheet…');
+  showToast('i','Iniciando panel','Cargando dat…');
 
   // ✅ Cargar pedidos y domis SIEMPRE del sheet
   const [okD, okP] = await Promise.all([loadDrivers(), loadPedidos()]);
   loadProductos();
   await loadOfertasFromSheet();
   await fetchHorario();
+  ALERTA_PENDIENTES.init();
+
   renderAll();
 
   if (okD || okP || allPedidos.length > 0 || allDrivers.length > 0) {
@@ -6213,704 +6215,1183 @@ function imprimirProductos() {
 ═══════════════════════════════════════════════ */
 
 (function initContable() {
-
-  /* ── 1. Inyectar HTML de la pestaña ── */
+ 
+  /* ──────────────────────────────────────────────────────────
+     1. ESTADO EN RAM  (nunca localStorage para datos)
+  ────────────────────────────────────────────────────────── */
+  let _bases    = [];
+  let _sancs    = [];
+  let _pyp      = [];
+  let _perms    = [];
+  let _cierres  = [];
+  let _periodo  = 'hoy';
+  let _turno    = 'todos';
+  let _loading  = false;
+ 
+  /* ──────────────────────────────────────────────────────────
+     2. HELPERS FECHA
+  ────────────────────────────────────────────────────────── */
+  const MESES = {ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,oct:9,nov:10,dic:11};
+  function _pf(s) {
+    if (!s) return null;
+    s = s.trim();
+    let m;
+    if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/))) return new Date(+m[3],+m[2]-1,+m[1]);
+    if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/)))       return new Date(+m[1],+m[2]-1,+m[3]);
+    if ((m = s.match(/^(\d{1,2})\s+([a-z]{3})\s+(\d{4})/i))) return new Date(+m[3],MESES[m[2].toLowerCase()]??0,+m[1]);
+    if ((m = s.match(/^(\d{1,2})\s+([a-z]{3})/i))) { const n=new Date(); return new Date(n.getFullYear(),MESES[m[2].toLowerCase()]??0,+m[1]); }
+    return null;
+  }
+  function _diaStr(d) {
+    return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+  }
+  function _diaLabel(d) {
+    return d.toLocaleDateString('es-CO',{weekday:'short',day:'numeric',month:'short'});
+  }
+  function _enPeriodo(fechaStr) {
+    const ahora=new Date(), hoy=new Date(ahora.getFullYear(),ahora.getMonth(),ahora.getDate());
+    const f=_pf(fechaStr); if (!f||isNaN(f)) return false;
+    const fd=new Date(f.getFullYear(),f.getMonth(),f.getDate());
+    if (_periodo==='hoy')  return fd.getTime()===hoy.getTime();
+    if (_periodo==='ayer') { const a=new Date(hoy); a.setDate(a.getDate()-1); return fd.getTime()===a.getTime(); }
+    const desde=new Date(hoy); desde.setDate(desde.getDate()-parseInt(_periodo)+1);
+    return fd>=desde && fd<=hoy;
+  }
+  function _enPeriodoPed(p) { return _enPeriodo(p.fecha); }
+  function _getDias() {
+    const ahora=new Date(), hoy=new Date(ahora.getFullYear(),ahora.getMonth(),ahora.getDate());
+    const n = _periodo==='hoy'?1:_periodo==='ayer'?1:parseInt(_periodo);
+    const dias=[];
+    for(let i=n-1;i>=0;i--){ const d=new Date(hoy); d.setDate(d.getDate()-i); dias.push(d); }
+    return dias;
+  }
+ 
+  /* ──────────────────────────────────────────────────────────
+     3. CARGA DESDE SHEETS
+  ────────────────────────────────────────────────────────── */
+  async function loadContData() {
+    _loading = true;
+    const results = await Promise.allSettled([
+      fetchSheetCSV('Cont_Bases',    12000),
+      fetchSheetCSV('Cont_Sanciones',12000),
+      fetchSheetCSV('Cont_PicoPlaca',12000),
+      fetchSheetCSV('Cont_Permisos', 12000),
+      fetchSheetCSV('Cont_CierreCaja',12000)
+    ]);
+ 
+    const [rB,rS,rP,rPe,rC] = results;
+ 
+    if (rB.status==='fulfilled')
+      _bases = parseCSVText(rB.value).map(c=>({
+        id:col(c,0), fecha:col(c,1), hora:col(c,2),
+        domi:col(c,3), monto:parsePrecio(col(c,4)),
+        nota:col(c,5), turno:col(c,6)||'mañana'
+      })).filter(x=>x.id);
+ 
+    if (rS.status==='fulfilled')
+      _sancs = parseCSVText(rS.value).map(c=>({
+        id:col(c,0), fecha:col(c,1), hora:col(c,2),
+        domi:col(c,3), tipo:col(c,4), monto:parsePrecio(col(c,5)),
+        nota:col(c,6), turno:col(c,7)||'mañana'
+      })).filter(x=>x.id);
+ 
+    if (rP.status==='fulfilled')
+      _pyp = parseCSVText(rP.value).map(c=>({
+        id:col(c,0), fecha:col(c,1),
+        domi:col(c,2), placa:col(c,3),
+        turnoRest:col(c,4), nota:col(c,5)
+      })).filter(x=>x.id);
+ 
+    if (rPe.status==='fulfilled')
+      _perms = parseCSVText(rPe.value).map(c=>({
+        id:col(c,0), fechaIni:col(c,1), fechaFin:col(c,2),
+        domi:col(c,3), tipo:col(c,4),
+        nota:col(c,5), estado:col(c,6)||'activo'
+      })).filter(x=>x.id);
+ 
+    if (rC.status==='fulfilled')
+      _cierres = parseCSVText(rC.value).map(c=>({
+        id:col(c,0), fecha:col(c,1), turno:col(c,2),
+        totalEfectivo:parsePrecio(col(c,3)),
+        totalTransf:parsePrecio(col(c,4)),
+        totalGeneral:parsePrecio(col(c,5)),
+        basesDadas:parsePrecio(col(c,6)),
+        sanciones:parsePrecio(col(c,7)),
+        nDomicilios:parseInt(col(c,8))||0,
+        obs:col(c,9), admin:col(c,10)
+      })).filter(x=>x.id);
+ 
+    _loading = false;
+  }
+ 
+  async function _post(payload) {
+    const res = await fetch(SHEET_SCRIPT_URL,{
+      method:'POST', headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify(payload)
+    });
+    return res.json();
+  }
+ 
+  /* ──────────────────────────────────────────────────────────
+     4. HTML DE LA PESTAÑA
+  ────────────────────────────────────────────────────────── */
   const pg = document.createElement('div');
   pg.className = 'pg';
   pg.id = 'pg-contable';
   pg.innerHTML = `
     <div class="pghdr">
       <h2>Contabilidad 💼</h2>
-      <p>Control financiero de domicilios, domiciliarios y pagos</p>
+      <p>Control financiero de domicilios, domiciliarios y pagos — en tiempo real desde el sheet</p>
     </div>
-
-    <!-- FILTRO DE PERÍODO -->
-    <div style="background:var(--white);border:1.5px solid var(--border);border-radius:16px;
-                padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;
-                gap:10px;flex-wrap:wrap;">
-      <span class="material-symbols-rounded" style="color:var(--teal);font-size:18px;">date_range</span>
-      <div class="tabs" id="cont-tabs">
-        <div class="tab on"  data-p="hoy"    onclick="setCPeriodo('hoy',this)">Hoy</div>
-        <div class="tab"     data-p="ayer"   onclick="setCPeriodo('ayer',this)">Ayer</div>
-        <div class="tab"     data-p="5"      onclick="setCPeriodo('5',this)">5 días</div>
-        <div class="tab"     data-p="15"     onclick="setCPeriodo('15',this)">15 días</div>
-        <div class="tab"     data-p="30"     onclick="setCPeriodo('30',this)">1 mes</div>
-      </div>
-      <div style="margin-left:auto;font-size:11px;color:var(--text3);font-weight:700;" id="cont-periodo-lbl">–</div>
-    </div>
-
-    <!-- KPIs PRINCIPALES -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;" id="cont-kpis">
-      <!-- se renderizan -->
-    </div>
-
-    <!-- FILA 2: Transferencias + Efectivo + Domis diarios -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px;">
-
-      <!-- Transferencias verificadas -->
-      <div style="background:var(--white);border:1.5px solid var(--border);border-radius:16px;overflow:hidden;">
-        <div style="background:linear-gradient(135deg,#0f172a,#1e40af);padding:14px 18px;
-                    display:flex;align-items:center;gap:10px;">
-          <div style="width:36px;height:36px;border-radius:10px;background:rgba(37,99,235,.3);
-                      display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <span class="material-symbols-rounded" style="color:#93c5fd;font-size:18px;">verified</span>
-          </div>
-          <div>
-            <div style="font-size:10px;font-weight:800;color:rgba(255,255,255,.5);
-                        text-transform:uppercase;letter-spacing:.1em;">Transferencias</div>
-            <div style="font-size:11px;color:rgba(255,255,255,.35);">Verificadas en panel</div>
-          </div>
-        </div>
-        <div style="padding:16px 18px;">
-          <div style="font-size:32px;font-weight:800;color:var(--blue);" id="cont-tf-n">–</div>
-          <div style="font-size:12px;color:var(--text3);margin-top:2px;">pedidos</div>
-          <div style="height:1px;background:var(--border);margin:12px 0;"></div>
-          <div style="font-size:11px;color:var(--text2);font-weight:700;">Total recibido</div>
-          <div style="font-size:20px;font-weight:800;color:var(--blue);
-                      font-family:'DM Mono',monospace;" id="cont-tf-$">–</div>
+ 
+    <!-- ── BARRA DE FILTROS ── -->
+    <div class="c2-topbar">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="material-symbols-rounded" style="color:var(--teal);font-size:18px;">date_range</span>
+        <div class="tabs" id="cont-tabs">
+          <div class="tab on" data-p="hoy"  onclick="setCPeriodo('hoy',this)">Hoy</div>
+          <div class="tab" data-p="ayer"    onclick="setCPeriodo('ayer',this)">Ayer</div>
+          <div class="tab" data-p="5"       onclick="setCPeriodo('5',this)">5 días</div>
+          <div class="tab" data-p="15"      onclick="setCPeriodo('15',this)">15 días</div>
+          <div class="tab" data-p="30"      onclick="setCPeriodo('30',this)">1 mes</div>
         </div>
       </div>
-
-      <!-- Efectivo -->
-      <div style="background:var(--white);border:1.5px solid var(--border);border-radius:16px;overflow:hidden;">
-        <div style="background:linear-gradient(135deg,#052e16,#166534);padding:14px 18px;
-                    display:flex;align-items:center;gap:10px;">
-          <div style="width:36px;height:36px;border-radius:10px;background:rgba(22,163,74,.3);
-                      display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <span class="material-symbols-rounded" style="color:#86efac;font-size:18px;">payments</span>
-          </div>
-          <div>
-            <div style="font-size:10px;font-weight:800;color:rgba(255,255,255,.5);
-                        text-transform:uppercase;letter-spacing:.1em;">Efectivo</div>
-            <div style="font-size:11px;color:rgba(255,255,255,.35);">Pagos en caja</div>
-          </div>
-        </div>
-        <div style="padding:16px 18px;">
-          <div style="font-size:32px;font-weight:800;color:var(--green);" id="cont-ef-n">–</div>
-          <div style="font-size:12px;color:var(--text3);margin-top:2px;">pedidos</div>
-          <div style="height:1px;background:var(--border);margin:12px 0;"></div>
-          <div style="font-size:11px;color:var(--text2);font-weight:700;">Total esperado</div>
-          <div style="font-size:20px;font-weight:800;color:var(--green);
-                      font-family:'DM Mono',monospace;" id="cont-ef-$">–</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="material-symbols-rounded" style="color:var(--teal);font-size:16px;">schedule</span>
+        <div class="tabs" id="cont-turno-tabs">
+          <div class="tab on" onclick="setCTurno('todos',this)">Todos</div>
+          <div class="tab"    onclick="setCTurno('mañana',this)">🌅 Mañana</div>
+          <div class="tab"    onclick="setCTurno('tarde',this)">🌆 Tarde</div>
         </div>
       </div>
-
-      <!-- Domicilios diarios -->
-      <div style="background:var(--white);border:1.5px solid var(--border);border-radius:16px;overflow:hidden;">
-        <div style="background:linear-gradient(135deg,#0c2225,#0d3540);padding:14px 18px;
-                    display:flex;align-items:center;gap:10px;">
-          <div style="width:36px;height:36px;border-radius:10px;background:rgba(40,185,193,.25);
-                      display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <span class="material-symbols-rounded" style="color:var(--teal);font-size:18px;">delivery_dining</span>
-          </div>
-          <div>
-            <div style="font-size:10px;font-weight:800;color:rgba(255,255,255,.5);
-                        text-transform:uppercase;letter-spacing:.1em;">Domicilios</div>
-            <div style="font-size:11px;color:rgba(255,255,255,.35);">Promedio diario</div>
-          </div>
-        </div>
-        <div style="padding:16px 18px;">
-          <div style="font-size:32px;font-weight:800;color:var(--teal);" id="cont-domi-prom">–</div>
-          <div style="font-size:12px;color:var(--text3);margin-top:2px;">por día</div>
-          <div style="height:1px;background:var(--border);margin:12px 0;"></div>
-          <div style="font-size:11px;color:var(--text2);font-weight:700;">Valor promedio</div>
-          <div style="font-size:20px;font-weight:800;color:var(--teal);
-                      font-family:'DM Mono',monospace;" id="cont-domi-avg$">–</div>
-        </div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:10px;">
+        <span id="cont-periodo-lbl" style="font-size:11px;color:var(--text3);font-weight:700;">–</span>
+        <button onclick="recargarContable()" style="display:flex;align-items:center;gap:5px;background:var(--teal-l);color:var(--teal-d);border:1.5px solid var(--border2);border-radius:9px;padding:6px 12px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer;transition:all .15s;" onmouseover="this.style.background='var(--teal)';this.style.color='#fff'" onmouseout="this.style.background='var(--teal-l)';this.style.color='var(--teal-d)'">
+          <span class="material-symbols-rounded" style="font-size:14px;">refresh</span>Actualizar
+        </button>
       </div>
-
     </div>
-
-    <!-- GRÁFICOS -->
+ 
+    <!-- ── KPIs ── -->
+    <div id="cont-kpis" class="c2-kpi-grid"></div>
+ 
+    <!-- ── GRÁFICA DE INGRESOS DIARIOS ── -->
+    <div class="pn c2-card" style="margin-bottom:20px;">
+      <div class="pn-t">
+        <span class="material-symbols-rounded ico">bar_chart</span>
+        Ingresos diarios — entregados
+        <span id="cont-chart-lbl" style="margin-left:auto;font-size:10px;color:var(--text3);font-weight:700;"></span>
+      </div>
+      <div id="cont-chart-diario" style="overflow-x:auto;padding-bottom:6px;"></div>
+    </div>
+ 
+    <!-- ── FILA: GRÁFICA DOMIS + DONUT MÉTODOS ── -->
     <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin-bottom:20px;">
-
-      <!-- Barras por domiciliario -->
-      <div class="pn">
+      <div class="pn c2-card">
         <div class="pn-t">
-          <span class="material-symbols-rounded ico">bar_chart</span>
+          <span class="material-symbols-rounded ico">people</span>
           Ingresos por domiciliario
         </div>
-        <div id="cont-chart-domi" style="display:flex;align-items:flex-end;gap:8px;height:140px;"></div>
-        <div id="cont-chart-domi-labels" style="display:flex;gap:8px;margin-top:8px;"></div>
+        <div id="cont-chart-domis" style="display:flex;flex-direction:column;gap:7px;"></div>
       </div>
-
-      <!-- Dona método de pago -->
-      <div class="pn" style="display:flex;flex-direction:column;">
+      <div class="pn c2-card" style="display:flex;flex-direction:column;">
         <div class="pn-t">
           <span class="material-symbols-rounded ico">donut_large</span>
           Métodos de pago
         </div>
-        <div style="flex:1;display:flex;align-items:center;justify-content:center;">
-          <div style="position:relative;width:120px;height:120px;flex-shrink:0;">
-            <svg id="cont-donut" viewBox="0 0 120 120" style="transform:rotate(-90deg);width:120px;height:120px;"></svg>
-            <div style="position:absolute;inset:0;display:flex;flex-direction:column;
-                        align-items:center;justify-content:center;pointer-events:none;">
-              <div style="font-size:18px;font-weight:800;color:var(--text);" id="cont-donut-total">–</div>
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:16px;">
+          <div style="position:relative;width:110px;height:110px;flex-shrink:0;">
+            <svg id="cont-donut" viewBox="0 0 120 120" style="transform:rotate(-90deg);width:110px;height:110px;"></svg>
+            <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;">
+              <div id="cont-donut-total" style="font-size:18px;font-weight:800;color:var(--text);">–</div>
               <div style="font-size:9px;color:var(--text3);font-weight:700;">pedidos</div>
             </div>
           </div>
-          <div id="cont-donut-legend" style="margin-left:16px;display:flex;flex-direction:column;gap:7px;"></div>
+          <div id="cont-donut-legend" style="display:flex;flex-direction:column;gap:8px;"></div>
         </div>
       </div>
-
     </div>
-
-    <!-- BASES + MULTAS + PICO Y PLACA -->
+ 
+    <!-- ── TURNO: COMPARATIVA MAÑANA vs TARDE ── -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
-
-      <!-- BASES -->
-      <div class="pn">
+      <div class="pn c2-card" id="cont-turno-manana">
+        <div class="pn-t" style="margin-bottom:14px;">
+          <span style="font-size:18px;">🌅</span>
+          <span style="font-size:13px;font-weight:800;">Turno Mañana</span>
+        </div>
+        <div id="cont-turno-m-body"></div>
+      </div>
+      <div class="pn c2-card" id="cont-turno-tarde">
+        <div class="pn-t" style="margin-bottom:14px;">
+          <span style="font-size:18px;">🌆</span>
+          <span style="font-size:13px;font-weight:800;">Turno Tarde</span>
+        </div>
+        <div id="cont-turno-t-body"></div>
+      </div>
+    </div>
+ 
+    <!-- ── SECCIÓN: BASES + SANCIONES ── -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+ 
+      <!-- BASES DE DINERO -->
+      <div class="pn c2-card">
         <div class="pn-t">
           <span class="material-symbols-rounded ico">account_balance_wallet</span>
           Bases para compras
-          <button onclick="openBaseModal()"
-            style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;
-                   background:var(--teal);color:#fff;border:none;border-radius:9px;
-                   padding:6px 14px;font-family:'Plus Jakarta Sans',sans-serif;
-                   font-size:11px;font-weight:800;cursor:pointer;">
+          <button onclick="openCModal('base')" class="c2-btn-add" style="background:var(--teal);">
             <span class="material-symbols-rounded" style="font-size:14px;">add</span>Dar base
           </button>
         </div>
-        <div id="cont-bases-list">
-          <div class="empty-state"><div class="ico" style="font-size:28px;opacity:.2;">💵</div>
-            <p>Sin bases registradas</p></div>
-        </div>
+        <div id="cont-bases-list"><div class="c2-empty">💵<p>Sin bases registradas</p></div></div>
       </div>
-
-      <!-- MULTAS + PICO Y PLACA -->
-      <div class="pn">
+ 
+      <!-- SANCIONES -->
+      <div class="pn c2-card">
         <div class="pn-t">
-          <span class="material-symbols-rounded ico">gavel</span>
-          Multas y Pico & Placa
-          <button onclick="openMultaModal()"
-            style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;
-                   background:var(--red);color:#fff;border:none;border-radius:9px;
-                   padding:6px 14px;font-family:'Plus Jakarta Sans',sans-serif;
-                   font-size:11px;font-weight:800;cursor:pointer;">
+          <span class="material-symbols-rounded ico">warning_amber</span>
+          Sanciones
+          <button onclick="openCModal('sancion')" class="c2-btn-add" style="background:var(--orange);">
             <span class="material-symbols-rounded" style="font-size:14px;">add</span>Registrar
           </button>
         </div>
-        <div id="cont-multas-list">
-          <div class="empty-state"><div class="ico" style="font-size:28px;opacity:.2;">⚖️</div>
-            <p>Sin multas ni restricciones</p></div>
-        </div>
+        <div id="cont-sancs-list"><div class="c2-empty">⚠️<p>Sin sanciones registradas</p></div></div>
       </div>
-
+ 
     </div>
-
-    <!-- TABLA RESUMEN POR DOMI -->
+ 
+    <!-- ── SECCIÓN: PICO & PLACA + PERMISOS ── -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+ 
+      <!-- PICO Y PLACA -->
+      <div class="pn c2-card">
+        <div class="pn-t">
+          <span class="material-symbols-rounded ico">traffic</span>
+          Pico & Placa
+          <button onclick="openCModal('pyp')" class="c2-btn-add" style="background:#6d28d9;">
+            <span class="material-symbols-rounded" style="font-size:14px;">add</span>Registrar
+          </button>
+        </div>
+        <div id="cont-pyp-list"><div class="c2-empty">🚦<p>Sin registros de Pico & Placa</p></div></div>
+      </div>
+ 
+      <!-- PERMISOS / INCAPACIDADES -->
+      <div class="pn c2-card">
+        <div class="pn-t">
+          <span class="material-symbols-rounded ico">event_busy</span>
+          Permisos / Incapacidades
+          <button onclick="openCModal('permiso')" class="c2-btn-add" style="background:#0369a1;">
+            <span class="material-symbols-rounded" style="font-size:14px;">add</span>Registrar
+          </button>
+        </div>
+        <div id="cont-perms-list"><div class="c2-empty">📋<p>Sin permisos ni incapacidades</p></div></div>
+      </div>
+ 
+    </div>
+ 
+    <!-- ── TABLA RESUMEN POR DOMICILIARIO ── -->
     <div class="pn" style="padding:0;overflow:hidden;margin-bottom:20px;">
-      <div style="padding:16px 20px;border-bottom:1px solid var(--border);
-                  display:flex;align-items:center;gap:8px;">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;">
         <span class="material-symbols-rounded" style="color:var(--teal);font-size:17px;">table_chart</span>
         <span style="font-size:13px;font-weight:800;color:var(--text);">Resumen por domiciliario</span>
-        <button onclick="exportarContableExcel()"
-          style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;
-                 background:var(--green-l);color:var(--green);border:1.5px solid rgba(22,163,74,.25);
-                 border-radius:9px;padding:6px 14px;font-family:'Plus Jakarta Sans',sans-serif;
-                 font-size:11px;font-weight:800;cursor:pointer;">
+        <button onclick="exportarContableExcel()" style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;background:var(--green-l);color:var(--green);border:1.5px solid rgba(22,163,74,.25);border-radius:9px;padding:6px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer;">
           <span class="material-symbols-rounded" style="font-size:14px;">table_view</span>Excel
         </button>
       </div>
       <div style="overflow-x:auto;padding:8px;">
         <table class="dstbl" id="cont-domi-tbl">
-          <thead>
-            <tr>
-              <th>Domiciliario</th>
-              <th>Entregas</th>
-              <th>Efectivo</th>
-              <th>Transferencia</th>
-              <th>Total facturado</th>
-              <th>Base dada</th>
-              <th>Multas</th>
-              <th>Balance</th>
-            </tr>
-          </thead>
+          <thead><tr>
+            <th>Domiciliario</th><th>Entregas</th>
+            <th>Efectivo</th><th>Transferencia</th><th>Total facturado</th>
+            <th>Env. cobrado</th><th>Base dada</th><th>Sanciones</th>
+            <th>P&P días</th><th>Balance</th>
+          </tr></thead>
           <tbody id="cont-domi-tbody">
-            <tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text3);">
-              Selecciona un período</td></tr>
+            <tr><td colspan="10" style="text-align:center;padding:28px;color:var(--text3);">Selecciona un período</td></tr>
           </tbody>
         </table>
       </div>
     </div>
-
+ 
+    <!-- ── CIERRE DE CAJA ── -->
+    <div class="pn" style="overflow:hidden;padding:0;margin-bottom:24px;">
+      <div style="background:linear-gradient(135deg,#071e22 0%,#0d3540 100%);padding:18px 22px;display:flex;align-items:center;gap:14px;">
+        <div style="width:44px;height:44px;border-radius:13px;background:rgba(40,185,193,.25);border:1.5px solid rgba(40,185,193,.35);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <span class="material-symbols-rounded" style="color:var(--teal);font-size:22px;">point_of_sale</span>
+        </div>
+        <div>
+          <div style="font-size:15px;font-weight:800;color:#fff;">Cierre de Caja</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:2px;">Registro de turno al finalizar — Mañana / Tarde</div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:8px;">
+          <button onclick="abrirCierreCaja('mañana')" style="display:inline-flex;align-items:center;gap:6px;background:rgba(251,191,36,.2);color:#fbbf24;border:1.5px solid rgba(251,191,36,.35);border-radius:11px;padding:9px 16px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer;transition:all .15s;" onmouseover="this.style.background='rgba(251,191,36,.35)'" onmouseout="this.style.background='rgba(251,191,36,.2)'">
+            <span class="material-symbols-rounded" style="font-size:16px;">wb_sunny</span>Cerrar Mañana
+          </button>
+          <button onclick="abrirCierreCaja('tarde')" style="display:inline-flex;align-items:center;gap:6px;background:rgba(167,139,250,.2);color:#a78bfa;border:1.5px solid rgba(167,139,250,.35);border-radius:11px;padding:9px 16px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer;transition:all .15s;" onmouseover="this.style.background='rgba(167,139,250,.35)'" onmouseout="this.style.background='rgba(167,139,250,.2)'">
+            <span class="material-symbols-rounded" style="font-size:16px;">nights_stay</span>Cerrar Tarde
+          </button>
+        </div>
+      </div>
+      <div style="padding:16px 20px;">
+        <div id="cont-cierres-list">
+          <div class="c2-empty" style="padding:24px 0;">📋<p>Sin cierres registrados</p></div>
+        </div>
+      </div>
+    </div>
   `;
   document.querySelector('main.main').appendChild(pg);
-
-  /* ── 2. Inyectar estilos ── */
+ 
+  /* ──────────────────────────────────────────────────────────
+     5. ESTILOS
+  ────────────────────────────────────────────────────────── */
   const style = document.createElement('style');
   style.textContent = `
-    #pg-contable .kpi-card {
-      background:var(--white);border:1.5px solid var(--border);
-      border-radius:16px;padding:18px;position:relative;overflow:hidden;
+    .c2-topbar {
+      background:var(--white);border:1.5px solid var(--border);border-radius:16px;
+      padding:13px 18px;margin-bottom:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    }
+    .c2-kpi-grid {
+      display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;
+    }
+    @media(max-width:900px){ .c2-kpi-grid{ grid-template-columns:repeat(2,1fr); } }
+    @media(max-width:480px){ .c2-kpi-grid{ grid-template-columns:1fr; } }
+ 
+    .c2-kpi {
+      background:var(--white);border:1.5px solid var(--border);border-radius:16px;
+      padding:18px;position:relative;overflow:hidden;
       transition:transform .2s,box-shadow .2s;
     }
-    #pg-contable .kpi-card:hover { transform:translateY(-2px);box-shadow:0 8px 24px rgba(40,185,193,.09); }
-    #pg-contable .kpi-acc { position:absolute;top:0;left:0;right:0;height:3px;border-radius:16px 16px 0 0; }
-    #pg-contable .kpi-ico { width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:12px; }
-    #pg-contable .kpi-lbl { font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px; }
-    #pg-contable .kpi-val { font-size:24px;font-weight:800;line-height:1; }
-    #pg-contable .kpi-sub { font-size:10px;color:var(--text3);margin-top:5px; }
-
-    .base-item,.multa-item {
-      display:flex;align-items:center;gap:10px;
-      padding:10px 12px;background:var(--bg);
-      border:1.5px solid var(--border);border-radius:12px;
+    .c2-kpi:hover { transform:translateY(-2px);box-shadow:0 8px 24px rgba(40,185,193,.09); }
+    .c2-kpi-acc { position:absolute;top:0;left:0;right:0;height:3px;border-radius:16px 16px 0 0; }
+    .c2-kpi-ico { width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:10px; }
+    .c2-kpi-lbl { font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px; }
+    .c2-kpi-val { font-size:22px;font-weight:800;line-height:1;font-family:'DM Mono',monospace; }
+    .c2-kpi-sub { font-size:10px;color:var(--text3);margin-top:5px; }
+    .c2-kpi-diff { font-size:10px;font-weight:800;margin-top:4px; }
+ 
+    .c2-card { transition:box-shadow .2s; }
+ 
+    .c2-btn-add {
+      margin-left:auto;display:inline-flex;align-items:center;gap:5px;
+      color:#fff;border:none;border-radius:9px;padding:6px 14px;
+      font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer;
+      transition:opacity .15s;
+    }
+    .c2-btn-add:hover { opacity:.85; }
+ 
+    .c2-empty { text-align:center;padding:28px 16px;color:var(--text3);font-size:22px; }
+    .c2-empty p { font-size:12px;margin-top:6px;color:var(--text3); }
+ 
+    /* items */
+    .c2-item {
+      display:flex;align-items:center;gap:10px;padding:10px 12px;
+      background:var(--bg);border:1.5px solid var(--border);border-radius:12px;
       margin-bottom:8px;transition:border-color .15s;
     }
-    .base-item:hover,.multa-item:hover { border-color:var(--border2); }
-    .base-ico { width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
-    .base-name { font-size:12px;font-weight:800;color:var(--text); }
-    .base-meta { font-size:10px;color:var(--text2);margin-top:2px; }
-    .base-monto { font-size:14px;font-weight:800;font-family:'DM Mono',monospace;margin-left:auto;flex-shrink:0; }
-    .base-del { width:26px;height:26px;border-radius:7px;background:var(--red-l);border:1px solid rgba(220,38,38,.2);
-                cursor:pointer;display:flex;align-items:center;justify-content:center;
-                color:var(--red);font-size:13px;transition:all .15s;flex-shrink:0; }
-    .base-del:hover { background:var(--red);color:#fff; }
-
-    /* Modal base/multa */
-    #modal-base-overlay,#modal-multa-overlay {
-      position:fixed;inset:0;background:rgba(4,18,20,.82);
-      backdrop-filter:blur(12px);z-index:300;
-      display:none;align-items:center;justify-content:center;padding:16px;
+    .c2-item:hover { border-color:var(--border2); }
+    .c2-item-ico { width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+    .c2-item-name { font-size:12px;font-weight:800;color:var(--text); }
+    .c2-item-meta { font-size:10px;color:var(--text2);margin-top:2px; }
+    .c2-item-val  { font-size:14px;font-weight:800;font-family:'DM Mono',monospace;margin-left:auto;flex-shrink:0; }
+    .c2-item-del  { width:26px;height:26px;border-radius:7px;background:var(--red-l);border:1px solid rgba(220,38,38,.2);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--red);font-size:13px;transition:all .15s;flex-shrink:0; }
+    .c2-item-del:hover { background:var(--red);color:#fff; }
+ 
+    /* cierre card */
+    .c2-cierre {
+      display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;
+      background:var(--bg);border:1.5px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:10px;
+      transition:border-color .15s;
     }
-    #modal-base-overlay.show,#modal-multa-overlay.show { display:flex; }
-    .cont-modal {
-      background:var(--white);border-radius:20px;width:min(460px,100%);
+    .c2-cierre:hover { border-color:var(--border2); }
+    .c2-cierre.manana { border-left:4px solid #fbbf24; }
+    .c2-cierre.tarde  { border-left:4px solid #a78bfa; }
+ 
+    /* SVG bar chart */
+    .c2-bar-chart-wrap { min-height:200px; }
+    .c2-bar-group { display:flex;flex-direction:column;gap:6px; }
+    .c2-hbar-row { display:grid;grid-template-columns:100px 1fr 90px;gap:8px;align-items:center; }
+    .c2-hbar-name { font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+    .c2-hbar-track { height:18px;background:var(--bg2);border-radius:99px;overflow:hidden; }
+    .c2-hbar-fill  { height:100%;border-radius:99px;transition:width .6s cubic-bezier(.34,1.2,.64,1); }
+    .c2-hbar-val   { font-size:10px;font-weight:800;font-family:'DM Mono',monospace;color:var(--text2);text-align:right; }
+ 
+    /* turno resumen */
+    .c2-turno-stat { display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border); }
+    .c2-turno-stat:last-child { border-bottom:none; }
+    .c2-turno-lbl { font-size:11px;color:var(--text2); }
+    .c2-turno-val { font-size:13px;font-weight:800;font-family:'DM Mono',monospace; }
+ 
+    /* modal contable genérico */
+    .c2-modal-ov {
+      position:fixed;inset:0;background:rgba(4,18,20,.82);backdrop-filter:blur(12px);
+      z-index:400;display:none;align-items:center;justify-content:center;padding:16px;
+    }
+    .c2-modal-ov.show { display:flex; }
+    .c2-modal-box {
+      background:var(--white);border-radius:20px;width:min(480px,100%);
       overflow:hidden;box-shadow:0 32px 80px rgba(4,18,20,.4);
       animation:invUp .3s cubic-bezier(.34,1.2,.64,1);
     }
-    .cont-modal-hdr {
-      padding:20px 22px 18px;border-bottom:1px solid var(--border);
-      display:flex;align-items:center;gap:12px;
-    }
-    .cont-modal-body { padding:20px 22px 24px; }
-    .cont-modal-footer { display:flex;gap:10px;margin-top:20px;padding-top:16px;border-top:1.5px solid var(--border); }
+    .c2-modal-hdr { padding:20px 22px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px; }
+    .c2-modal-body { padding:20px 22px 24px;max-height:80vh;overflow-y:auto; }
+    .c2-modal-footer { display:flex;gap:10px;margin-top:18px;padding-top:16px;border-top:1.5px solid var(--border); }
   `;
   document.head.appendChild(style);
-
-  /* ── 3. Modales base/multa ── */
-  ['base','multa'].forEach(tipo => {
+ 
+  /* ──────────────────────────────────────────────────────────
+     6. MODALES GENÉRICOS
+  ────────────────────────────────────────────────────────── */
+  const MODAL_CFG = {
+    base: {
+      titulo:'Dar base a domiciliario', sub:'Dinero para compra de pedidos (debe devolver)',
+      ico:'account_balance_wallet', color:'var(--teal)', grad:'linear-gradient(135deg,#0c2225,#0d3540)',
+      campos: `
+        <div class="om-field">
+          <div class="om-label"><span class="material-symbols-rounded">delivery_dining</span>Domiciliario *</div>
+          <select class="om-select" id="c2-f-domi"></select>
+        </div>
+        <div class="om-row">
+          <div class="om-field" style="margin-bottom:0">
+            <div class="om-label"><span class="material-symbols-rounded">sell</span>Monto *</div>
+            <div class="om-price-wrap"><span class="currency">$</span><input class="om-input" id="c2-f-monto" type="text" placeholder="50.000" inputmode="numeric"></div>
+          </div>
+          <div class="om-field" style="margin-bottom:0">
+            <div class="om-label"><span class="material-symbols-rounded">schedule</span>Turno</div>
+            <select class="om-select" id="c2-f-turno">
+              <option value="mañana">🌅 Mañana</option><option value="tarde">🌆 Tarde</option>
+            </select>
+          </div>
+        </div>
+        <div class="om-field"><div class="om-label"><span class="material-symbols-rounded">notes</span>Nota (opcional)</div><input class="om-input" id="c2-f-nota" type="text" placeholder="Ej: base del 27 abr mañana"></div>`,
+      accion:'crear-cont-base', btnLabel:'Dar base'
+    },
+    sancion: {
+      titulo:'Registrar sanción', sub:'Tardanza, incumplimiento u otro descuento',
+      ico:'warning_amber', color:'var(--orange)', grad:'linear-gradient(135deg,#1a0e00,#3d2a00)',
+      campos: `
+        <div class="om-field">
+          <div class="om-label"><span class="material-symbols-rounded">delivery_dining</span>Domiciliario *</div>
+          <select class="om-select" id="c2-f-domi"></select>
+        </div>
+        <div class="om-field">
+          <div class="om-label"><span class="material-symbols-rounded">category</span>Tipo de sanción *</div>
+          <select class="om-select" id="c2-f-tipo">
+            <option value="tardanza">⏰ Tardanza</option>
+            <option value="incumplimiento">❌ Incumplimiento de ruta</option>
+            <option value="pedido_fallido">📦 Pedido no entregado</option>
+            <option value="comportamiento">⚠️ Comportamiento inadecuado</option>
+            <option value="otro">📌 Otro descuento</option>
+          </select>
+        </div>
+        <div class="om-row">
+          <div class="om-field" style="margin-bottom:0">
+            <div class="om-label"><span class="material-symbols-rounded">sell</span>Monto</div>
+            <div class="om-price-wrap"><span class="currency">$</span><input class="om-input" id="c2-f-monto" type="text" placeholder="10.000" inputmode="numeric"></div>
+          </div>
+          <div class="om-field" style="margin-bottom:0">
+            <div class="om-label"><span class="material-symbols-rounded">schedule</span>Turno</div>
+            <select class="om-select" id="c2-f-turno">
+              <option value="mañana">🌅 Mañana</option><option value="tarde">🌆 Tarde</option>
+            </select>
+          </div>
+        </div>
+        <div class="om-field"><div class="om-label"><span class="material-symbols-rounded">notes</span>Descripción *</div><textarea class="om-textarea" id="c2-f-nota" placeholder="Describe la situación en detalle…" rows="3"></textarea></div>`,
+      accion:'crear-cont-sancion', btnLabel:'Registrar sanción'
+    },
+    pyp: {
+      titulo:'Registrar Pico & Placa', sub:'Restricción de circulación por placa',
+      ico:'traffic', color:'#7c3aed', grad:'linear-gradient(135deg,#1e1b4b,#312e81)',
+      campos: `
+        <div class="om-field">
+          <div class="om-label"><span class="material-symbols-rounded">delivery_dining</span>Domiciliario *</div>
+          <select class="om-select" id="c2-f-domi"></select>
+        </div>
+        <div class="om-row">
+          <div class="om-field" style="margin-bottom:0">
+            <div class="om-label"><span class="material-symbols-rounded">directions_bike</span>Placa / Moto</div>
+            <input class="om-input" id="c2-f-placa" type="text" placeholder="EJM-123">
+          </div>
+          <div class="om-field" style="margin-bottom:0">
+            <div class="om-label"><span class="material-symbols-rounded">schedule</span>Turno restringido</div>
+            <select class="om-select" id="c2-f-turnoRest">
+              <option value="mañana">🌅 Mañana</option>
+              <option value="tarde">🌆 Tarde</option>
+              <option value="todo el día">🔒 Todo el día</option>
+            </select>
+          </div>
+        </div>
+        <div class="om-field"><div class="om-label"><span class="material-symbols-rounded">notes</span>Observación</div><input class="om-input" id="c2-f-nota" type="text" placeholder="Ej: restricción por último dígito"></div>`,
+      accion:'crear-cont-pyp', btnLabel:'Registrar P&P'
+    },
+    permiso: {
+      titulo:'Registrar permiso / incapacidad', sub:'Ausencias programadas o médicas del domiciliario',
+      ico:'event_busy', color:'#0369a1', grad:'linear-gradient(135deg,#0c1a2e,#0e3460)',
+      campos: `
+        <div class="om-field">
+          <div class="om-label"><span class="material-symbols-rounded">delivery_dining</span>Domiciliario *</div>
+          <select class="om-select" id="c2-f-domi"></select>
+        </div>
+        <div class="om-field">
+          <div class="om-label"><span class="material-symbols-rounded">category</span>Tipo *</div>
+          <select class="om-select" id="c2-f-tipo">
+            <option value="permiso">📋 Permiso personal</option>
+            <option value="incapacidad">🏥 Incapacidad médica</option>
+            <option value="vacaciones">🏖️ Vacaciones</option>
+            <option value="calamidad">💔 Calamidad doméstica</option>
+            <option value="ausencia">⚠️ Ausencia injustificada</option>
+          </select>
+        </div>
+        <div class="om-row">
+          <div class="om-field" style="margin-bottom:0">
+            <div class="om-label"><span class="material-symbols-rounded">event</span>Fecha inicio *</div>
+            <input type="date" class="om-input" id="c2-f-fechaIni">
+          </div>
+          <div class="om-field" style="margin-bottom:0">
+            <div class="om-label"><span class="material-symbols-rounded">event</span>Fecha fin *</div>
+            <input type="date" class="om-input" id="c2-f-fechaFin">
+          </div>
+        </div>
+        <div class="om-field"><div class="om-label"><span class="material-symbols-rounded">notes</span>Observación</div><textarea class="om-textarea" id="c2-f-nota" placeholder="Detalle del permiso o diagnóstico…" rows="2"></textarea></div>`,
+      accion:'crear-cont-permiso', btnLabel:'Registrar'
+    }
+  };
+ 
+  // Crear contenedor modal único reutilizable
+  const modalOv = document.createElement('div');
+  modalOv.id = 'c2-modal-ov';
+  modalOv.className = 'c2-modal-ov';
+  modalOv.innerHTML = `<div class="c2-modal-box"><div id="c2-modal-inner"></div></div>`;
+  document.body.appendChild(modalOv);
+  modalOv.addEventListener('click', e => { if(e.target===modalOv) closeCModal(); });
+ 
+  let _modalTipo = null;
+ 
+  window.openCModal = function(tipo) {
+    _modalTipo = tipo;
+    const cfg = MODAL_CFG[tipo]; if (!cfg) return;
+    document.getElementById('c2-modal-inner').innerHTML = `
+      <div class="c2-modal-hdr" style="background:${cfg.grad};">
+        <div style="width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <span class="material-symbols-rounded" style="color:#fff;font-size:20px;">${cfg.ico}</span>
+        </div>
+        <div>
+          <div style="font-size:14px;font-weight:800;color:#fff;">${cfg.titulo}</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:2px;">${cfg.sub}</div>
+        </div>
+        <button onclick="closeCModal()" style="margin-left:auto;width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.15);cursor:pointer;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.7);">
+          <span class="material-symbols-rounded" style="font-size:15px;">close</span>
+        </button>
+      </div>
+      <div class="c2-modal-body">
+        ${cfg.campos}
+        <div class="c2-modal-footer">
+          <button class="om-btn-cancel" onclick="closeCModal()"><span class="material-symbols-rounded" style="font-size:15px;">close</span>Cancelar</button>
+          <button class="om-btn-save" id="c2-btn-save" onclick="saveCModalData()" style="background:${cfg.color};">
+            <span class="material-symbols-rounded">${cfg.ico}</span>${cfg.btnLabel}
+          </button>
+        </div>
+      </div>`;
+    // Poblar select de domis
+    const sel = document.getElementById('c2-f-domi');
+    if (sel) {
+      sel.innerHTML = '<option value="">— Selecciona —</option>' +
+        allDrivers.map(d=>`<option value="${d.nombre}">${d.activo?'🟢':'⚫'} ${d.nombre}</option>`).join('');
+    }
+    // Fecha hoy para permisos
+    if (tipo==='permiso') {
+      const hoy = new Date().toISOString().slice(0,10);
+      const fi = document.getElementById('c2-f-fechaIni');
+      const ff = document.getElementById('c2-f-fechaFin');
+      if(fi) fi.value = hoy; if(ff) ff.value = hoy;
+    }
+    modalOv.classList.add('show');
+  };
+ 
+  window.closeCModal = function() {
+    modalOv.classList.remove('show'); _modalTipo = null;
+  };
+ 
+  window.saveCModalData = async function() {
+    const tipo = _modalTipo; if (!tipo) return;
+    const cfg  = MODAL_CFG[tipo];
+    const btn  = document.getElementById('c2-btn-save');
+    const domi = document.getElementById('c2-f-domi')?.value;
+    if (!domi) { showToast('w','Falta domiciliario','Selecciona un domi'); return; }
+ 
+    const ts   = new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+    const hoy  = new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'/');
+    const hora = new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+    const id   = tipo.toUpperCase().slice(0,3)+'-'+Date.now();
+ 
+    let payload = { accion: cfg.accion, id, fecha:hoy, hora, domi };
+ 
+    if (tipo==='base') {
+      const monto = parsePrecio(document.getElementById('c2-f-monto')?.value);
+      if (!monto) { showToast('w','Falta monto','Ingresa el valor'); return; }
+      payload = {...payload, monto, nota: document.getElementById('c2-f-nota')?.value||'', turno: document.getElementById('c2-f-turno')?.value||'mañana'};
+    } else if (tipo==='sancion') {
+      const tipo2 = document.getElementById('c2-f-tipo')?.value;
+      const nota  = document.getElementById('c2-f-nota')?.value?.trim();
+      if (!nota) { showToast('w','Falta descripción','Describe la sanción'); return; }
+      payload = {...payload, tipo:tipo2, monto:parsePrecio(document.getElementById('c2-f-monto')?.value)||0, nota, turno:document.getElementById('c2-f-turno')?.value||'mañana'};
+    } else if (tipo==='pyp') {
+      payload = {...payload, placa:document.getElementById('c2-f-placa')?.value||'', turnoRest:document.getElementById('c2-f-turnoRest')?.value||'mañana', nota:document.getElementById('c2-f-nota')?.value||''};
+    } else if (tipo==='permiso') {
+      const fechaIni = document.getElementById('c2-f-fechaIni')?.value;
+      const fechaFin = document.getElementById('c2-f-fechaFin')?.value;
+      if (!fechaIni||!fechaFin) { showToast('w','Faltan fechas','Ingresa fecha inicio y fin'); return; }
+      payload = {...payload, fechaIni, fechaFin, tipo2:document.getElementById('c2-f-tipo')?.value||'permiso', nota:document.getElementById('c2-f-nota')?.value||'', estado:'activo'};
+    }
+ 
+    btn.disabled=true; btn.innerHTML='<span class="material-symbols-rounded" style="animation:spin .8s linear infinite">progress_activity</span> Guardando…';
+    try {
+      const json = await _post(payload);
+      if (json.ok!==false) {
+        showToast('s','Registrado',`${domi}`);
+        closeCModal();
+        await loadContData();
+        renderContable();
+      } else { showToast('e','Error',json.error||'Sin respuesta'); }
+    } catch(e) { showToast('e','Error de red',e.message.substring(0,60)); }
+    finally {
+      btn.disabled=false; btn.innerHTML=`<span class="material-symbols-rounded">${cfg.ico}</span>${cfg.btnLabel}`;
+    }
+  };
+ 
+  async function _eliminarCItem(accion, id, msg) {
+    if (!confirm(msg)) return;
+    try {
+      const json = await _post({ accion, id });
+      if (json.ok!==false) {
+        showToast('i','Eliminado','');
+        await loadContData(); renderContable();
+      } else { showToast('e','Error',json.error||''); }
+    } catch(e) { showToast('e','Error',e.message.substring(0,50)); }
+  }
+ 
+  /* ──────────────────────────────────────────────────────────
+     7. CIERRE DE CAJA
+  ────────────────────────────────────────────────────────── */
+  window.abrirCierreCaja = function(turno) {
+    const peds  = allPedidos.filter(p => p.estado==='entregado' && _enPeriodoPed(p) && (_turno==='todos'||p.turno===turno));
+    const hoy   = new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'/');
+    const hora  = new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+ 
+    const efPeds = peds.filter(p=>/efecti/i.test(p.metodo||''));
+    const tfPeds = peds.filter(p=>/transfer/i.test(p.metodo||''));
+    const totalEf = efPeds.reduce((s,p)=>s+parsePrecio(p.total),0);
+    const totalTf = tfPeds.reduce((s,p)=>s+parsePrecio(p.total),0);
+    const totalG  = peds.reduce((s,p)=>s+parsePrecio(p.total),0);
+    const basesDadas = _bases.filter(b=>b.turno===turno && _enPeriodoCont(b.fecha)).reduce((s,b)=>s+b.monto,0);
+    const sanciones  = _sancs.filter(s2=>s2.turno===turno && _enPeriodoCont(s2.fecha)).reduce((s,s2)=>s+s2.monto,0);
+    const domis  = [...new Set(peds.map(p=>p.domi).filter(Boolean))];
+    const emoji  = turno==='mañana'?'🌅':'🌆';
+ 
+    const ex = document.getElementById('c2-cierre-modal');
+    if (ex) ex.remove();
     const ov = document.createElement('div');
-    ov.id = `modal-${tipo}-overlay`;
-    const esMulma = tipo === 'multa';
+    ov.id = 'c2-cierre-modal';
+    ov.className = 'c2-modal-ov';
     ov.innerHTML = `
-      <div class="cont-modal">
-        <div class="cont-modal-hdr" style="background:${esMulma ? 'linear-gradient(135deg,#1a0000,#3d1515)' : 'linear-gradient(135deg,#0c2225,#0d3540)'};">
-          <div style="width:38px;height:38px;border-radius:11px;
-                      background:rgba(${esMulma?'220,38,38':'40,185,193'},.25);
-                      border:1.5px solid rgba(${esMulma?'220,38,38':'40,185,193'},.4);
-                      display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <span class="material-symbols-rounded" style="color:${esMulma?'#fca5a5':'var(--teal)'};font-size:18px;">
-              ${esMulma ? 'gavel' : 'account_balance_wallet'}
-            </span>
-          </div>
+      <div class="c2-modal-box" style="width:min(540px,100%);">
+        <div class="c2-modal-hdr" style="background:${turno==='mañana'?'linear-gradient(135deg,#1a1200,#3d3000)':'linear-gradient(135deg,#1e1b4b,#312e81)'};">
+          <div style="font-size:28px;">${emoji}</div>
           <div>
-            <div style="font-size:14px;font-weight:800;color:#fff;">
-              ${esMulma ? 'Registrar multa / Pico & Placa' : 'Dar base a domiciliario'}
-            </div>
-            <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px;">
-              ${esMulma ? 'El monto se descontará del balance del domi' : 'Dinero para compra de pedidos (debe devolver)'}
-            </div>
+            <div style="font-size:15px;font-weight:800;color:#fff;">Cierre de turno ${turno} — ${hoy} ${hora}</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:2px;">${peds.length} domicilios entregados · ${domis.length} domiciliarios activos</div>
           </div>
-          <button onclick="document.getElementById('modal-${tipo}-overlay').classList.remove('show')"
-            style="margin-left:auto;width:30px;height:30px;border-radius:8px;
-                   background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.12);
-                   cursor:pointer;display:flex;align-items:center;justify-content:center;
-                   color:rgba(255,255,255,.6);font-size:15px;">
+          <button onclick="document.getElementById('c2-cierre-modal').remove()" style="margin-left:auto;width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.15);cursor:pointer;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.7);">
             <span class="material-symbols-rounded" style="font-size:15px;">close</span>
           </button>
         </div>
-        <div class="cont-modal-body">
-          <div class="om-field">
-            <div class="om-label"><span class="material-symbols-rounded">delivery_dining</span>Domiciliario *</div>
-            <select class="om-select" id="${tipo}-domi-select">
-              <option value="">— Selecciona —</option>
-            </select>
-          </div>
-          <div class="om-field">
-            <div class="om-label"><span class="material-symbols-rounded">sell</span>Monto *</div>
-            <div class="om-price-wrap">
-              <span class="currency">$</span>
-              <input class="om-input" id="${tipo}-monto" type="text" placeholder="50.000" inputmode="numeric">
+        <div class="c2-modal-body">
+          <!-- Resumen automático -->
+          <div style="background:var(--bg);border:1.5px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;">
+            <div style="font-size:9px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px;">Resumen calculado automáticamente</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
+              <div style="text-align:center;background:var(--green-l);border-radius:10px;padding:12px;">
+                <div style="font-size:16px;font-weight:800;color:var(--green);font-family:'DM Mono',monospace;">${fmtMoney(totalEf)}</div>
+                <div style="font-size:9px;color:var(--text3);margin-top:3px;">Efectivo</div>
+              </div>
+              <div style="text-align:center;background:var(--blue-l);border-radius:10px;padding:12px;">
+                <div style="font-size:16px;font-weight:800;color:var(--blue);font-family:'DM Mono',monospace;">${fmtMoney(totalTf)}</div>
+                <div style="font-size:9px;color:var(--text3);margin-top:3px;">Transferencias</div>
+              </div>
+              <div style="text-align:center;background:var(--teal-m);border-radius:10px;padding:12px;">
+                <div style="font-size:18px;font-weight:800;color:var(--teal-d);font-family:'DM Mono',monospace;">${fmtMoney(totalG)}</div>
+                <div style="font-size:9px;color:var(--text3);margin-top:3px;">Total general</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <div style="flex:1;background:var(--orange-l);border-radius:10px;padding:10px;text-align:center;">
+                <div style="font-size:13px;font-weight:800;color:var(--orange);font-family:'DM Mono',monospace;">${basesDadas>0?fmtMoney(basesDadas):'—'}</div>
+                <div style="font-size:9px;color:var(--text3);margin-top:2px;">Bases dadas</div>
+              </div>
+              <div style="flex:1;background:var(--red-l);border-radius:10px;padding:10px;text-align:center;">
+                <div style="font-size:13px;font-weight:800;color:var(--red);font-family:'DM Mono',monospace;">${sanciones>0?fmtMoney(sanciones):'—'}</div>
+                <div style="font-size:9px;color:var(--text3);margin-top:2px;">Sanciones</div>
+              </div>
+              <div style="flex:1;background:var(--teal-l);border-radius:10px;padding:10px;text-align:center;">
+                <div style="font-size:13px;font-weight:800;color:var(--teal-d);">${peds.length}</div>
+                <div style="font-size:9px;color:var(--text3);margin-top:2px;">Domicilios</div>
+              </div>
             </div>
           </div>
-          ${esMulma ? `
+          <!-- Observaciones -->
           <div class="om-field">
-            <div class="om-label"><span class="material-symbols-rounded">category</span>Tipo</div>
-            <select class="om-select" id="multa-tipo-sel">
-              <option value="multa">⚖️ Multa</option>
-              <option value="pyp">🚦 Pico y Placa</option>
-              <option value="otro">📌 Otro descuento</option>
-            </select>
-          </div>` : ''}
-          <div class="om-field">
-            <div class="om-label"><span class="material-symbols-rounded">notes</span>Nota (opcional)</div>
-            <input class="om-input" id="${tipo}-nota" type="text" placeholder="${esMulma ? 'Descripción de la multa…' : 'Ej: Base mañana del 27 abr'}">
+            <div class="om-label"><span class="material-symbols-rounded">notes</span>Observaciones del turno</div>
+            <textarea class="om-textarea" id="c2-cierre-obs" placeholder="Novedades, incidentes, observaciones del turno…" rows="3"></textarea>
           </div>
-          <div class="cont-modal-footer">
-            <button class="om-btn-cancel" onclick="document.getElementById('modal-${tipo}-overlay').classList.remove('show')">
+          <div class="om-field">
+            <div class="om-label"><span class="material-symbols-rounded">badge</span>Administrador que cierra</div>
+            <input class="om-input" id="c2-cierre-admin" type="text" placeholder="Nombre del admin" value="Hernán Munera">
+          </div>
+          <div class="c2-modal-footer">
+            <button class="om-btn-cancel" onclick="document.getElementById('c2-cierre-modal').remove()">
               <span class="material-symbols-rounded" style="font-size:15px;">close</span>Cancelar
             </button>
-            <button class="om-btn-save" onclick="save${tipo.charAt(0).toUpperCase()+tipo.slice(1)}()"
-              style="background:${esMulma ? 'var(--red)' : 'var(--teal)'};">
-              <span class="material-symbols-rounded">${esMulma ? 'gavel' : 'savings'}</span>
-              ${esMulma ? 'Registrar' : 'Dar base'}
+            <button class="om-btn-save" id="c2-btn-cierre" onclick="confirmarCierreCaja('${turno}',${totalEf},${totalTf},${totalG},${basesDadas},${sanciones},${peds.length})"
+              style="background:${turno==='mañana'?'#d97706':'#7c3aed'};">
+              <span class="material-symbols-rounded">lock</span>Cerrar turno ${turno}
             </button>
           </div>
         </div>
       </div>`;
     document.body.appendChild(ov);
-    ov.addEventListener('click', e => { if (e.target === ov) ov.classList.remove('show'); });
-  });
-
-  /* ── 4. Estado persistente ── */
-  const LS_BASES  = 'wil_cont_bases_v1';
-  const LS_MULTAS = 'wil_cont_multas_v1';
-  let _bases  = JSON.parse(localStorage.getItem(LS_BASES)  || '[]');
-  let _multas = JSON.parse(localStorage.getItem(LS_MULTAS) || '[]');
-  let _periodo = 'hoy';
-
-  function saveBases()  { try { localStorage.setItem(LS_BASES,  JSON.stringify(_bases));  } catch(e){} }
-  function saveMultas() { try { localStorage.setItem(LS_MULTAS, JSON.stringify(_multas)); } catch(e){} }
-
-  /* ── 5. Helpers de fecha ── */
-  function parseDate(s) {
-    if (!s) return null;
-    // Formatos: "27 abr 2026", "27/04/2026", "2026-04-27"
-    const meses = {ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,oct:9,nov:10,dic:11};
-    let m;
-    if (m = s.match(/^(\d{1,2})\s+([a-z]{3})\s+(\d{4})/i)) {
-      return new Date(parseInt(m[3]), meses[m[2].toLowerCase()] ?? 0, parseInt(m[1]));
-    }
-    if (m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)) {
-      return new Date(parseInt(m[3]), parseInt(m[1])-1, parseInt(m[2]));
-    }
-    return new Date(s);
-  }
-
-  function enPeriodo(pedido) {
-    const ahora = new Date();
-    const hoy   = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
-    const fped  = parseDate(pedido.fecha);
-    if (!fped || isNaN(fped)) return true;
-    const fdia  = new Date(fped.getFullYear(), fped.getMonth(), fped.getDate());
-    if (_periodo === 'hoy')  return fdia.getTime() === hoy.getTime();
-    if (_periodo === 'ayer') {
-      const ayer = new Date(hoy); ayer.setDate(ayer.getDate() - 1);
-      return fdia.getTime() === ayer.getTime();
-    }
-    const dias = parseInt(_periodo);
-    const desde = new Date(hoy); desde.setDate(desde.getDate() - dias + 1);
-    return fdia >= desde && fdia <= hoy;
-  }
-
-  /* ── 6. Renderizado principal ── */
+    ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+  };
+ 
+  window.confirmarCierreCaja = async function(turno,ef,tf,total,bases,sancs,nDomis) {
+    const obs   = document.getElementById('c2-cierre-obs')?.value?.trim()||'';
+    const admin = document.getElementById('c2-cierre-admin')?.value?.trim()||'Admin';
+    const btn   = document.getElementById('c2-btn-cierre');
+    const hoy   = new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'/');
+    const hora  = new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+ 
+    btn.disabled=true; btn.innerHTML='<span class="material-symbols-rounded" style="animation:spin .8s linear infinite">progress_activity</span> Cerrando…';
+    try {
+      const json = await _post({
+        accion:'crear-cont-cierre', id:'CC-'+Date.now(),
+        fecha:hoy, hora, turno,
+        totalEfectivo:ef, totalTransf:tf, totalGeneral:total,
+        basesDadas:bases, sanciones:sancs, nDomicilios:nDomis,
+        obs, admin
+      });
+      if (json.ok!==false) {
+        document.getElementById('c2-cierre-modal')?.remove();
+        showToast('s',`✓ Turno ${turno} cerrado`,`Total: ${fmtMoney(total)} · ${nDomis} domicilios`);
+        VOZ.hablar(`Turno ${turno} cerrado. Total ${Math.round(total/1000)} mil pesos.`);
+        await loadContData(); renderContable();
+      } else { showToast('e','Error al cerrar',json.error||''); }
+    } catch(e) { showToast('e','Error de red',e.message.substring(0,60)); }
+    finally { btn.disabled=false; }
+  };
+ 
+  /* ──────────────────────────────────────────────────────────
+     8. RENDER PRINCIPAL
+  ────────────────────────────────────────────────────────── */
   function renderContable() {
-    const peds = allPedidos.filter(p => p.estado === 'entregado' && enPeriodo(p));
-
-    // ── KPIs ──
-    const totalFacturado = peds.reduce((s,p) => s + parsePrecio(p.total), 0);
-    const totalEnvio     = peds.reduce((s,p) => s + parsePrecio(p.costoEnvio), 0);
-    const totalProductos = totalFacturado - totalEnvio;
-    const diasPeriodo    = _periodo === 'hoy' ? 1 : _periodo === 'ayer' ? 1 : parseInt(_periodo);
-    const promDiario     = Math.round(peds.length / diasPeriodo);
-
-    // Label período
-    const lbl = {hoy:'Hoy',ayer:'Ayer','5':'Últimos 5 días','15':'Últimos 15 días','30':'Último mes'}[_periodo];
-    const el = document.getElementById('cont-periodo-lbl');
+    const peds = allPedidos.filter(p=>p.estado==='entregado' && _enPeriodoPed(p));
+ 
+    _renderKPIs(peds);
+    _renderChartDiario(peds);
+    _renderChartDomis(peds);
+    _renderDonut(peds);
+    _renderTurnos(peds);
+    _renderBases();
+    _renderSanciones();
+    _renderPyP();
+    _renderPermisos();
+    _renderTabla(peds);
+    _renderCierres();
+ 
+    // label período
+    const dias = _periodo==='hoy'?1:_periodo==='ayer'?1:parseInt(_periodo);
+    const lbl  = {hoy:'Hoy',ayer:'Ayer','5':'Últimos 5 días','15':'Últimos 15 días','30':'Último mes'}[_periodo];
+    const el   = document.getElementById('cont-periodo-lbl');
     if (el) el.textContent = `${lbl} · ${peds.length} entrega${peds.length!==1?'s':''}`;
-
-    // KPIs
-    const kgrid = document.getElementById('cont-kpis');
-    if (kgrid) kgrid.innerHTML = [
-      { acc:'#28B9C1', ico:'payments',         bg:'var(--teal-m)',   c:'var(--teal-d)',   lbl:'Total facturado',  val:fmtMoney(totalFacturado), sub:`${peds.length} pedidos entregados` },
-      { acc:'var(--green)',ico:'local_shipping',bg:'var(--green-l)',  c:'var(--green)',    lbl:'Cobros domicilio', val:fmtMoney(totalEnvio),     sub:'Costo de envío acumulado' },
-      { acc:'var(--blue)', ico:'inventory_2',   bg:'var(--blue-l)',   c:'var(--blue)',     lbl:'Valor productos',  val:fmtMoney(totalProductos), sub:'Subtotal sin envío' },
-      { acc:'var(--orange)',ico:'trending_up',  bg:'var(--orange-l)', c:'var(--orange)',   lbl:'Prom. por pedido', val:peds.length ? fmtMoney(Math.round(totalFacturado/peds.length)) : '—', sub:'Ticket promedio' },
-    ].map(k => `
-      <div class="kpi-card">
-        <div class="kpi-acc" style="background:${k.acc};"></div>
-        <div class="kpi-ico" style="background:${k.bg};color:${k.c};">
+  }
+  window.renderContable = renderContable;
+ 
+  /* ── KPIs ── */
+  function _renderKPIs(peds) {
+    const totalF = peds.reduce((s,p)=>s+parsePrecio(p.total),0);
+    const totalE = peds.reduce((s,p)=>s+parsePrecio(p.costoEnvio),0);
+    const totalP = totalF - totalE;
+    const efPeds = peds.filter(p=>/efecti/i.test(p.metodo||''));
+    const tfPeds = peds.filter(p=>/transfer/i.test(p.metodo||''));
+    const totalBases = _bases.filter(b=>_enPeriodoCont(b.fecha)).reduce((s,b)=>s+b.monto,0);
+    const totalSancs = _sancs.filter(s2=>_enPeriodoCont(s2.fecha)).reduce((s,s2)=>s+s2.monto,0);
+    const g = document.getElementById('cont-kpis'); if(!g) return;
+    g.innerHTML = [
+      {acc:'#28B9C1', ico:'payments',         bg:'var(--teal-m)',   c:'var(--teal-d)',   lbl:'Total facturado',  val:fmtMoney(totalF), sub:`${peds.length} pedidos · Ticket: ${peds.length?fmtMoney(Math.round(totalF/peds.length)):'—'}`},
+      {acc:'var(--green)',ico:'local_shipping',bg:'var(--green-l)',  c:'var(--green)',    lbl:'Cobros domicilio', val:fmtMoney(totalE), sub:`Ef: ${fmtMoney(efPeds.reduce((s,p)=>s+parsePrecio(p.total),0))}`},
+      {acc:'var(--blue)', ico:'account_balance',bg:'var(--blue-l)',  c:'var(--blue)',     lbl:'Transferencias',   val:fmtMoney(tfPeds.reduce((s,p)=>s+parsePrecio(p.total),0)), sub:`${tfPeds.length} pedidos verificados`},
+      {acc:'var(--orange)',ico:'account_balance_wallet',bg:'var(--orange-l)',c:'var(--orange)',lbl:'Bases dadas',   val:fmtMoney(totalBases), sub:`Sanciones: ${fmtMoney(totalSancs)}`},
+    ].map(k=>`
+      <div class="c2-kpi">
+        <div class="c2-kpi-acc" style="background:${k.acc};"></div>
+        <div class="c2-kpi-ico" style="background:${k.bg};color:${k.c};">
           <span class="material-symbols-rounded" style="font-size:18px;">${k.ico}</span>
         </div>
-        <div class="kpi-lbl">${k.lbl}</div>
-        <div class="kpi-val" style="color:${k.c};">${k.val}</div>
-        <div class="kpi-sub">${k.sub}</div>
+        <div class="c2-kpi-lbl">${k.lbl}</div>
+        <div class="c2-kpi-val" style="color:${k.c};">${k.val}</div>
+        <div class="c2-kpi-sub">${k.sub}</div>
       </div>`).join('');
-
-    // ── Transferencias / Efectivo ──
-    const verificados = new Set(JSON.parse(localStorage.getItem('wil_tf_verificados') || '[]'));
-    const tfPeds = peds.filter(p => /transfer/i.test(p.metodo||''));
-    const efPeds = peds.filter(p => /efecti/i.test(p.metodo||''));
-    const tfVerif = tfPeds.filter(p => verificados.has(p.id));
-
-    const setTxt = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
-    setTxt('cont-tf-n', tfVerif.length);
-    setTxt('cont-tf-$', fmtMoney(tfVerif.reduce((s,p)=>s+parsePrecio(p.total),0)));
-    setTxt('cont-ef-n', efPeds.length);
-    setTxt('cont-ef-$', fmtMoney(efPeds.reduce((s,p)=>s+parsePrecio(p.total),0)));
-    setTxt('cont-domi-prom', promDiario || 0);
-    setTxt('cont-domi-avg$', peds.length ? fmtMoney(Math.round(totalEnvio/peds.length)) : '—');
-
-    // ── Gráfico barras por domi ──
-    const domiMap = {};
-    peds.forEach(p => {
-      const k = p.domi || 'Sin asignar';
-      if (!domiMap[k]) domiMap[k] = { n:0, total:0 };
-      domiMap[k].n++; domiMap[k].total += parsePrecio(p.total);
+  }
+ 
+  /* ── Gráfica de ingresos diarios (barras SVG) ── */
+  function _renderChartDiario(peds) {
+    const el = document.getElementById('cont-chart-diario'); if(!el) return;
+    const lbl = document.getElementById('cont-chart-lbl');
+    const dias = _getDias();
+    if (!dias.length||dias.length===1) { el.innerHTML='<div style="color:var(--text3);font-size:12px;padding:20px 0;">Selecciona un período de más de 1 día para ver la gráfica diaria.</div>'; return; }
+ 
+    const datos = dias.map(d=>{
+      const ds = _diaStr(d);
+      const dp = peds.filter(p=> {
+        const fp=_pf(p.fecha); if(!fp) return false;
+        return fp.getDate()===d.getDate()&&fp.getMonth()===d.getMonth()&&fp.getFullYear()===d.getFullYear();
+      });
+      return { d, ds, label:_diaLabel(d), total:dp.reduce((s,p)=>s+parsePrecio(p.total),0), n:dp.length };
     });
-    const domiArr = Object.entries(domiMap).sort((a,b)=>b[1].total-a[1].total).slice(0,8);
-    const maxT = domiArr[0]?.[1]?.total || 1;
-
-    const chartEl = document.getElementById('cont-chart-domi');
-    const chartLb = document.getElementById('cont-chart-domi-labels');
-    if (chartEl) {
-      chartEl.innerHTML = domiArr.map(([nombre,d],i) => `
-        <div style="flex:1;display:flex;flex-direction:column;align-items:center;cursor:default;"
-             title="${nombre}: ${fmtMoney(d.total)} (${d.n} entregas)">
-          <div style="font-size:9px;font-weight:800;color:var(--teal-d);margin-bottom:4px;">${d.n}</div>
-          <div style="width:calc(100% - 4px);border-radius:5px 5px 0 0;
-                      background:${i===0?'var(--teal)':'var(--teal-m)'};
-                      height:${Math.round((d.total/maxT)*100)}%;
-                      transition:background .2s;min-height:4px;"
-               onmouseover="this.style.background='var(--teal)'"
-               onmouseout="this.style.background='${i===0?'var(--teal)':'var(--teal-m)'}'">
-          </div>
-        </div>`).join('') || '<div style="color:var(--text3);font-size:12px;padding:20px;">Sin datos</div>';
-    }
-    if (chartLb) {
-      chartLb.innerHTML = domiArr.map(([nombre]) => `
-        <div style="flex:1;font-size:9px;color:var(--text3);font-weight:700;text-align:center;
-                    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-          ${nombre.split(' ')[0]}
-        </div>`).join('');
-    }
-
-    // ── Donut métodos de pago ──
+ 
+    const maxVal = Math.max(...datos.map(d=>d.total), 1);
+    const W = Math.max(datos.length * 52, 400);
+    const H = 160;
+    const barW = 34;
+    const gap = 52;
+ 
+    let svg = `<svg viewBox="0 0 ${W} ${H+50}" style="width:${W}px;height:${H+50}px;display:block;">`;
+    // Grid lines
+    [0.25,0.5,0.75,1].forEach(p=>{
+      const y = H - (H*p);
+      svg += `<line x1="0" y1="${y}" x2="${W}" y2="${y}" stroke="var(--border)" stroke-width="1" stroke-dasharray="4 3"/>`;
+      svg += `<text x="2" y="${y-3}" font-size="8" fill="var(--text3)" font-family="DM Mono,monospace">${fmtMoney(maxVal*p).replace('$\u2009','').replace(/\./g,'')}</text>`;
+    });
+ 
+    datos.forEach((d,i)=>{
+      const x = i*gap + (gap-barW)/2 + 20;
+      const barH = Math.max((d.total/maxVal)*H, d.total>0?4:0);
+      const y = H - barH;
+      const isToday = d.d.toDateString()===new Date().toDateString();
+      const color = isToday ? '#28B9C1' : '#a5d8dd';
+      svg += `<rect x="${x}" y="${y}" width="${barW}" height="${barH}" rx="5" fill="${color}" style="transition:all .3s">
+        <title>${d.label} — ${fmtMoney(d.total)} (${d.n} entregas)</title>
+      </rect>`;
+      if (d.n>0) svg += `<text x="${x+barW/2}" y="${y-5}" text-anchor="middle" font-size="9" fill="var(--teal-d)" font-weight="800" font-family="Plus Jakarta Sans,sans-serif">${d.n}</text>`;
+      // Label fecha
+      const parts = d.label.split(' ');
+      svg += `<text x="${x+barW/2}" y="${H+14}" text-anchor="middle" font-size="9" fill="var(--text2)" font-weight="${isToday?800:600}" font-family="Plus Jakarta Sans,sans-serif">${parts[1]||''} ${parts[2]||''}</text>`;
+      svg += `<text x="${x+barW/2}" y="${H+26}" text-anchor="middle" font-size="8" fill="var(--text3)" font-family="Plus Jakarta Sans,sans-serif">${parts[0]||''}</text>`;
+    });
+ 
+    svg += `</svg>`;
+    el.innerHTML = `<div style="overflow-x:auto;padding:8px 0;">${svg}</div>`;
+    const totalDias = datos.reduce((s,d)=>s+d.total,0);
+    if (lbl) lbl.textContent = `Total: ${fmtMoney(totalDias)}`;
+  }
+ 
+  /* ── Gráfica horizontal por domi ── */
+  function _renderChartDomis(peds) {
+    const el = document.getElementById('cont-chart-domis'); if(!el) return;
+    const dm = {};
+    peds.forEach(p=>{ const k=p.domi||'Sin asignar'; if(!dm[k]) dm[k]={n:0,total:0}; dm[k].n++; dm[k].total+=parsePrecio(p.total); });
+    const arr = Object.entries(dm).sort((a,b)=>b[1].total-a[1].total).slice(0,8);
+    if (!arr.length) { el.innerHTML='<div class="c2-empty">📊<p>Sin datos</p></div>'; return; }
+    const maxT = arr[0][1].total||1;
+    const COLORS = ['#28B9C1','#2563eb','#16a34a','#d97706','#7c3aed','#dc2626','#0891b2','#059669'];
+    el.innerHTML = arr.map(([nombre,d],i)=>`
+      <div class="c2-hbar-row">
+        <div class="c2-hbar-name" title="${nombre}">${nombre.split(' ').slice(0,2).join(' ')}</div>
+        <div class="c2-hbar-track">
+          <div class="c2-hbar-fill" style="width:${Math.round(d.total/maxT*100)}%;background:${COLORS[i%COLORS.length]};"></div>
+        </div>
+        <div class="c2-hbar-val" style="color:${COLORS[i%COLORS.length]};">${fmtMoney(d.total)}</div>
+      </div>`).join('');
+  }
+ 
+  /* ── Donut métodos de pago ── */
+  function _renderDonut(peds) {
     const metodos = {};
-    peds.forEach(p => {
-      const k = /transfer/i.test(p.metodo||'') ? 'Transferencia'
-              : /efecti/i.test(p.metodo||'')   ? 'Efectivo'
-              : (p.metodo || 'Otro');
-      metodos[k] = (metodos[k]||0) + 1;
-    });
-    const COLORES = ['#28B9C1','#16a34a','#2563eb','#d97706','#7c3aed','#dc2626'];
-    const metArr = Object.entries(metodos);
-    const total  = metArr.reduce((s,[,n])=>s+n,0);
-    const setTotalDonut = document.getElementById('cont-donut-total');
-    if (setTotalDonut) setTotalDonut.textContent = total || 0;
-
-    const donutSvg = document.getElementById('cont-donut');
-    if (donutSvg && metArr.length) {
-      const R=54, cx=60, cy=60, circum=2*Math.PI*R;
-      let offset = 0;
-      donutSvg.innerHTML = metArr.map(([,n],i) => {
-        const pct = n/total, dash = pct*circum, gap = circum - dash;
-        const el2 = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none"
-          stroke="${COLORES[i%COLORES.length]}" stroke-width="18"
-          stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}"
-          stroke-dashoffset="${(-offset*circum).toFixed(2)}"
-          style="transition:stroke-dasharray .4s;"/>`;
-        offset += pct; return el2;
+    peds.forEach(p=>{ const k=/transfer/i.test(p.metodo||'')?'Transf.':/efecti/i.test(p.metodo||'')?'Efectivo':(p.metodo||'Otro'); metodos[k]=(metodos[k]||0)+1; });
+    const COLS=['#28B9C1','#16a34a','#2563eb','#d97706','#7c3aed'];
+    const arr=Object.entries(metodos), total=arr.reduce((s,[,n])=>s+n,0);
+    const tot=document.getElementById('cont-donut-total'); if(tot) tot.textContent=total||0;
+    const svg=document.getElementById('cont-donut');
+    if(svg&&arr.length){
+      const R=54,cx=60,cy=60,circ=2*Math.PI*R; let off=0;
+      svg.innerHTML=arr.map(([,n],i)=>{
+        const pct=n/total,dash=pct*circ,gap=circ-dash;
+        const s=`<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="${COLS[i%COLS.length]}" stroke-width="18" stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}" stroke-dashoffset="${(-off*circ).toFixed(2)}"/>`;
+        off+=pct; return s;
       }).join('');
-    } else if (donutSvg) {
-      donutSvg.innerHTML = `<circle cx="60" cy="60" r="54" fill="none" stroke="var(--border)" stroke-width="18"/>`;
-    }
-
-    const legend = document.getElementById('cont-donut-legend');
-    if (legend) {
-      legend.innerHTML = metArr.map(([k,n],i) => `
-        <div style="display:flex;align-items:center;gap:7px;">
-          <div style="width:10px;height:10px;border-radius:3px;
-                      background:${COLORES[i%COLORES.length]};flex-shrink:0;"></div>
-          <div>
-            <div style="font-size:11px;font-weight:700;color:var(--text);">${k}</div>
-            <div style="font-size:9px;color:var(--text3);">${n} · ${Math.round(n/total*100)}%</div>
+    } else if(svg){ svg.innerHTML=`<circle cx="60" cy="60" r="54" fill="none" stroke="var(--border)" stroke-width="18"/>`; }
+    const legend=document.getElementById('cont-donut-legend');
+    if(legend) legend.innerHTML=arr.map(([k,n],i)=>`
+      <div style="display:flex;align-items:center;gap:7px;">
+        <div style="width:10px;height:10px;border-radius:3px;background:${COLS[i%COLS.length]};flex-shrink:0;"></div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--text);">${k}</div>
+          <div style="font-size:9px;color:var(--text3);">${n} · ${total?Math.round(n/total*100):0}%</div>
+        </div>
+      </div>`).join('');
+  }
+ 
+  /* ── Turnos ── */
+  function _renderTurnos(peds) {
+    const calcTurno = (turno) => {
+      const tp = peds; // sin filtro de turno en pedidos (no tenemos campo turno en pedidos)
+      const ef = tp.filter(p=>/efecti/i.test(p.metodo||'')).reduce((s,p)=>s+parsePrecio(p.total),0);
+      const tf = tp.filter(p=>/transfer/i.test(p.metodo||'')).reduce((s,p)=>s+parsePrecio(p.total),0);
+      const bs = _bases.filter(b=>b.turno===turno&&_enPeriodoCont(b.fecha)).reduce((s,b)=>s+b.monto,0);
+      const sc = _sancs.filter(s2=>s2.turno===turno&&_enPeriodoCont(s2.fecha)).reduce((s,s2)=>s+s2.monto,0);
+      const pyp= _pyp.filter(p=>p.turnoRest===turno&&_enPeriodoCont(p.fecha)).length;
+      // buscar cierre de este turno hoy
+      const hoy = new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'/');
+      const cierre = _cierres.find(c=>c.turno===turno&&c.fecha===hoy);
+      return {ef,tf,bs,sc,pyp,cierre,n:tp.length};
+    };
+    ['mañana','tarde'].forEach(t=>{
+      const d = calcTurno(t);
+      const el = document.getElementById(`cont-turno-${t==='mañana'?'m':'t'}-body`); if(!el) return;
+      const cerrado = d.cierre;
+      el.innerHTML = `
+        ${cerrado?`<div style="display:flex;align-items:center;gap:6px;background:var(--green-l);border-radius:10px;padding:8px 12px;margin-bottom:12px;border:1px solid rgba(22,163,74,.2);">
+          <span class="material-symbols-rounded" style="font-size:16px;color:var(--green);">lock</span>
+          <span style="font-size:11px;font-weight:800;color:var(--green);">Turno cerrado · ${d.cierre.admin}</span>
+        </div>`:''}
+        <div class="c2-turno-stat"><span class="c2-turno-lbl">💰 Efectivo</span><span class="c2-turno-val" style="color:var(--green);">${fmtMoney(d.ef)}</span></div>
+        <div class="c2-turno-stat"><span class="c2-turno-lbl">🏦 Transferencias</span><span class="c2-turno-val" style="color:var(--blue);">${fmtMoney(d.tf)}</span></div>
+        <div class="c2-turno-stat"><span class="c2-turno-lbl">📦 Bases dadas</span><span class="c2-turno-val" style="color:var(--orange);">${fmtMoney(d.bs)}</span></div>
+        <div class="c2-turno-stat"><span class="c2-turno-lbl">⚠️ Sanciones</span><span class="c2-turno-val" style="color:var(--red);">${fmtMoney(d.sc)}</span></div>
+        <div class="c2-turno-stat"><span class="c2-turno-lbl">🚦 P&P registrados</span><span class="c2-turno-val">${d.pyp}</span></div>`;
+    });
+  }
+ 
+  /* ── Bases ── */
+  function _renderBases() {
+    const el=document.getElementById('cont-bases-list'); if(!el) return;
+    const list=_bases.filter(b=>_enPeriodoCont(b.fecha)).sort((a,b)=>b.id.localeCompare(a.id));
+    if(!list.length){el.innerHTML='<div class="c2-empty">💵<p>Sin bases en este período</p></div>';return;}
+    el.innerHTML=list.map(b=>`
+      <div class="c2-item">
+        <div class="c2-item-ico" style="background:var(--orange-l);color:var(--orange);">
+          <span class="material-symbols-rounded" style="font-size:17px;">account_balance_wallet</span>
+        </div>
+        <div style="flex:1;">
+          <div class="c2-item-name">${b.domi} <span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:99px;background:${b.turno==='mañana'?'#fef9c3':'#ede9fe'};color:${b.turno==='mañana'?'#854d0e':'#6d28d9'};">${b.turno==='mañana'?'🌅':'🌆'} ${b.turno}</span></div>
+          <div class="c2-item-meta">${b.nota||'Sin nota'} · ${b.fecha} ${b.hora}</div>
+        </div>
+        <div class="c2-item-val" style="color:var(--orange);">${fmtMoney(b.monto)}</div>
+        <button class="c2-item-del" onclick="_delCont('eliminar-cont-base','${b.id}','¿Eliminar esta base?')">
+          <span class="material-symbols-rounded" style="font-size:13px;">delete</span>
+        </button>
+      </div>`).join('');
+  }
+ 
+  /* ── Sanciones ── */
+  const SANC_LABEL = {tardanza:'⏰ Tardanza',incumplimiento:'❌ Incumplimiento',pedido_fallido:'📦 Pedido fallido',comportamiento:'⚠️ Comportamiento',otro:'📌 Otro'};
+  function _renderSanciones() {
+    const el=document.getElementById('cont-sancs-list'); if(!el) return;
+    const list=_sancs.filter(s=>_enPeriodoCont(s.fecha)).sort((a,b)=>b.id.localeCompare(a.id));
+    if(!list.length){el.innerHTML='<div class="c2-empty">✅<p>Sin sanciones en este período</p></div>';return;}
+    el.innerHTML=list.map(s=>`
+      <div class="c2-item">
+        <div class="c2-item-ico" style="background:var(--orange-l);color:var(--orange);">
+          <span class="material-symbols-rounded" style="font-size:17px;">warning_amber</span>
+        </div>
+        <div style="flex:1;">
+          <div class="c2-item-name">${s.domi} <span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:99px;background:var(--orange-l);color:var(--orange);">${SANC_LABEL[s.tipo]||s.tipo}</span></div>
+          <div class="c2-item-meta">${s.nota||''} · ${s.fecha} ${s.hora}</div>
+        </div>
+        <div class="c2-item-val" style="color:var(--red);">${s.monto>0?'-'+fmtMoney(s.monto):'—'}</div>
+        <button class="c2-item-del" onclick="_delCont('eliminar-cont-sancion','${s.id}','¿Eliminar esta sanción?')">
+          <span class="material-symbols-rounded" style="font-size:13px;">delete</span>
+        </button>
+      </div>`).join('');
+  }
+ 
+  /* ── Pico y Placa ── */
+  function _renderPyP() {
+    const el=document.getElementById('cont-pyp-list'); if(!el) return;
+    const list=_pyp.filter(p=>_enPeriodoCont(p.fecha)).sort((a,b)=>b.id.localeCompare(a.id));
+    if(!list.length){el.innerHTML='<div class="c2-empty">🚦<p>Sin registros en este período</p></div>';return;}
+    el.innerHTML=list.map(p=>`
+      <div class="c2-item">
+        <div class="c2-item-ico" style="background:#ede9fe;color:#7c3aed;">
+          <span class="material-symbols-rounded" style="font-size:17px;">traffic</span>
+        </div>
+        <div style="flex:1;">
+          <div class="c2-item-name">${p.domi} ${p.placa?`<span style="font-size:10px;font-family:'DM Mono',monospace;background:#f1f5f9;padding:1px 7px;border-radius:6px;">${p.placa}</span>`:''}
+            <span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:99px;background:#ede9fe;color:#7c3aed;">${p.turnoRest}</span></div>
+          <div class="c2-item-meta">${p.nota||'Sin observación'} · ${p.fecha}</div>
+        </div>
+        <button class="c2-item-del" onclick="_delCont('eliminar-cont-pyp','${p.id}','¿Eliminar registro P&P?')">
+          <span class="material-symbols-rounded" style="font-size:13px;">delete</span>
+        </button>
+      </div>`).join('');
+  }
+ 
+  /* ── Permisos ── */
+  const PERM_LABEL={permiso:'📋 Permiso',incapacidad:'🏥 Incapacidad',vacaciones:'🏖️ Vacaciones',calamidad:'💔 Calamidad',ausencia:'⚠️ Ausencia'};
+  const PERM_COLOR={permiso:'#0369a1',incapacidad:'var(--red)',vacaciones:'var(--green)',calamidad:'var(--orange)',ausencia:'var(--red)'};
+  function _renderPermisos() {
+    const el=document.getElementById('cont-perms-list'); if(!el) return;
+    // mostrar los activos o los del período
+    const list=_perms.filter(p=>{
+      if (p.estado==='activo') return true;
+      return _enPeriodoCont(p.fechaFin)||_enPeriodoCont(p.fechaIni);
+    }).sort((a,b)=>b.id.localeCompare(a.id)).slice(0,10);
+    if(!list.length){el.innerHTML='<div class="c2-empty">📋<p>Sin permisos registrados</p></div>';return;}
+    el.innerHTML=list.map(p=>{
+      const color=PERM_COLOR[p.tipo]||'var(--blue)';
+      const activo=p.estado==='activo';
+      return `<div class="c2-item">
+        <div class="c2-item-ico" style="background:var(--blue-l);color:${color};">
+          <span class="material-symbols-rounded" style="font-size:17px;">event_busy</span>
+        </div>
+        <div style="flex:1;">
+          <div class="c2-item-name">${p.domi}
+            <span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:99px;background:var(--blue-l);color:${color};">${PERM_LABEL[p.tipo]||p.tipo}</span>
+            ${activo?'<span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:99px;background:var(--orange-l);color:var(--orange);">Activo</span>':''}
           </div>
-        </div>`).join('');
-    }
-
-    // ── Bases + Multas ──
-    renderBases(); renderMultas();
-
-    // ── Tabla resumen ──
-    const tbody = document.getElementById('cont-domi-tbody');
-    if (!tbody) return;
-    if (!domiArr.length) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text3);">
-        Sin entregas en este período</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = domiArr.map(([nombre, d]) => {
-      const tfD  = peds.filter(p => (p.domi||'') === nombre && /transfer/i.test(p.metodo||''));
-      const efD  = peds.filter(p => (p.domi||'') === nombre && /efecti/i.test(p.metodo||''));
-      const tfTotal = tfD.reduce((s,p)=>s+parsePrecio(p.total),0);
-      const efTotal = efD.reduce((s,p)=>s+parsePrecio(p.total),0);
-      const basesDomi   = _bases.filter(b  => b.domi === nombre).reduce((s,b)=>s+b.monto,0);
-      const multasDomi  = _multas.filter(m => m.domi === nombre).reduce((s,m)=>s+m.monto,0);
-      const balance     = efTotal - basesDomi - multasDomi;
-      const balColor    = balance >= 0 ? 'var(--green)' : 'var(--red)';
+          <div class="c2-item-meta">${p.fechaIni} → ${p.fechaFin} · ${p.nota||''}</div>
+        </div>
+        <button class="c2-item-del" onclick="_delCont('eliminar-cont-permiso','${p.id}','¿Eliminar permiso?')">
+          <span class="material-symbols-rounded" style="font-size:13px;">delete</span>
+        </button>
+      </div>`;
+    }).join('');
+  }
+ 
+  /* ── Tabla resumen por domi ── */
+  function _renderTabla(peds) {
+    const tbody=document.getElementById('cont-domi-tbody'); if(!tbody) return;
+    const dm={};
+    peds.forEach(p=>{ const k=p.domi||'Sin asignar'; if(!dm[k]) dm[k]={n:0,ef:0,tf:0,total:0,envio:0}; dm[k].n++;
+      const tot=parsePrecio(p.total); dm[k].total+=tot;
+      const env=parsePrecio(p.costoEnvio); dm[k].envio+=env;
+      if(/efecti/i.test(p.metodo||'')) dm[k].ef+=tot;
+      else if(/transfer/i.test(p.metodo||'')) dm[k].tf+=tot;
+    });
+    const arr=Object.entries(dm).sort((a,b)=>b[1].total-a[1].total);
+    if(!arr.length){ tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:28px;color:var(--text3);">Sin entregas en este período</td></tr>'; return; }
+ 
+    tbody.innerHTML=arr.map(([nombre,d])=>{
+      const bases  = _bases.filter(b=>b.domi===nombre&&_enPeriodoCont(b.fecha)).reduce((s,b)=>s+b.monto,0);
+      const sancs  = _sancs.filter(s=>s.domi===nombre&&_enPeriodoCont(s.fecha)).reduce((s,s2)=>s+s2.monto,0);
+      const pypDias= _pyp.filter(p=>p.domi===nombre&&_enPeriodoCont(p.fecha)).length;
+      const balance= d.ef - bases - sancs;
+      const bColor = balance>=0?'var(--green)':'var(--red)';
       return `<tr>
         <td><b>${nombre}</b></td>
         <td style="font-weight:800;color:var(--teal);">${d.n}</td>
-        <td style="font-family:'DM Mono',monospace;color:var(--green);">${fmtMoney(efTotal)}</td>
-        <td style="font-family:'DM Mono',monospace;color:var(--blue);">${fmtMoney(tfTotal)}</td>
+        <td style="font-family:'DM Mono',monospace;color:var(--green);">${fmtMoney(d.ef)}</td>
+        <td style="font-family:'DM Mono',monospace;color:var(--blue);">${fmtMoney(d.tf)}</td>
         <td style="font-family:'DM Mono',monospace;font-weight:800;">${fmtMoney(d.total)}</td>
-        <td style="font-family:'DM Mono',monospace;color:var(--orange);">${basesDomi > 0 ? fmtMoney(basesDomi) : '—'}</td>
-        <td style="font-family:'DM Mono',monospace;color:var(--red);">${multasDomi > 0 ? fmtMoney(multasDomi) : '—'}</td>
-        <td style="font-family:'DM Mono',monospace;font-weight:800;color:${balColor};">
-          ${fmtMoney(Math.abs(balance))} ${balance < 0 ? '⚠' : '✓'}
+        <td style="font-family:'DM Mono',monospace;color:var(--teal-d);">${fmtMoney(d.envio)}</td>
+        <td style="font-family:'DM Mono',monospace;color:var(--orange);">${bases>0?fmtMoney(bases):'—'}</td>
+        <td style="font-family:'DM Mono',monospace;color:var(--red);">${sancs>0?fmtMoney(sancs):'—'}</td>
+        <td style="text-align:center;font-weight:800;color:${pypDias>0?'#7c3aed':'var(--text3)'};">${pypDias||'—'}</td>
+        <td style="font-family:'DM Mono',monospace;font-weight:800;color:${bColor};">
+          ${fmtMoney(Math.abs(balance))} <span style="font-size:11px;">${balance<0?'⚠':'✓'}</span>
         </td>
       </tr>`;
     }).join('');
   }
-  window.renderContable = renderContable;
-
-  /* ── 7. Bases ── */
-  function renderBases() {
-    const el = document.getElementById('cont-bases-list');
-    if (!el) return;
-    const filtered = _bases.slice().reverse();
-    if (!filtered.length) {
-      el.innerHTML = `<div class="empty-state"><div class="ico" style="font-size:28px;opacity:.2;">💵</div>
-        <p>Sin bases registradas</p></div>`; return;
-    }
-    el.innerHTML = filtered.map((b, ri) => {
-      const i = _bases.length - 1 - ri;
-      return `<div class="base-item">
-        <div class="base-ico" style="background:var(--orange-l);color:var(--orange);">
-          <span class="material-symbols-rounded" style="font-size:17px;">account_balance_wallet</span>
+ 
+  /* ── Cierres de caja ── */
+  function _renderCierres() {
+    const el=document.getElementById('cont-cierres-list'); if(!el) return;
+    const list=_cierres.slice().reverse().slice(0,10);
+    if(!list.length){el.innerHTML='<div class="c2-empty" style="padding:16px 0;">📋<p>Sin cierres registrados</p></div>';return;}
+    el.innerHTML=list.map(c=>`
+      <div class="c2-cierre ${c.turno==='mañana'?'manana':'tarde'}">
+        <div style="text-align:center;">
+          <div style="font-size:22px;">${c.turno==='mañana'?'🌅':'🌆'}</div>
+          <div style="font-size:9px;font-weight:800;color:var(--text3);text-transform:uppercase;">${c.turno}</div>
         </div>
-        <div style="flex:1;">
-          <div class="base-name">${b.domi}</div>
-          <div class="base-meta">${b.nota || 'Sin nota'} · ${b.fecha}</div>
-        </div>
-        <div class="base-monto" style="color:var(--orange);">${fmtMoney(b.monto)}</div>
-        <button class="base-del" onclick="deleteBase(${i})" title="Eliminar">
-          <span class="material-symbols-rounded" style="font-size:13px;">delete</span>
-        </button>
-      </div>`;
-    }).join('');
-  }
-
-  window.openBaseModal = function() {
-    poblarSelectCont('base-domi-select');
-    document.getElementById('base-monto').value = '';
-    document.getElementById('base-nota').value  = '';
-    document.getElementById('modal-base-overlay').classList.add('show');
-  };
-
-  window.saveBase = function() {
-    const domi  = document.getElementById('base-domi-select').value;
-    const monto = parsePrecio(document.getElementById('base-monto').value);
-    const nota  = document.getElementById('base-nota').value.trim();
-    if (!domi)  { showToast('w','Falta domiciliario','Selecciona un domi'); return; }
-    if (!monto) { showToast('w','Falta monto','Ingresa el valor de la base'); return; }
-    _bases.push({ domi, monto, nota, fecha: new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) });
-    saveBases(); renderBases(); renderContable();
-    document.getElementById('modal-base-overlay').classList.remove('show');
-    showToast('s', `Base dada a ${domi}`, fmtMoney(monto) + (nota ? ' · ' + nota : ''));
-  };
-
-  window.deleteBase = function(idx) {
-    if (!confirm('¿Eliminar esta base?')) return;
-    _bases.splice(idx, 1); saveBases(); renderBases(); renderContable();
-    showToast('i','Base eliminada','');
-  };
-
-  /* ── 8. Multas ── */
-  function renderMultas() {
-    const el = document.getElementById('cont-multas-list');
-    if (!el) return;
-    const filtered = _multas.slice().reverse();
-    if (!filtered.length) {
-      el.innerHTML = `<div class="empty-state"><div class="ico" style="font-size:28px;opacity:.2;">⚖️</div>
-        <p>Sin multas ni restricciones</p></div>`; return;
-    }
-    const iconos = { multa:'gavel', pyp:'traffic', otro:'info' };
-    const labels = { multa:'Multa', pyp:'Pico & Placa', otro:'Descuento' };
-    el.innerHTML = filtered.map((m, ri) => {
-      const i = _multas.length - 1 - ri;
-      const ico = iconos[m.tipo] || 'gavel';
-      const lbl = labels[m.tipo] || 'Multa';
-      return `<div class="multa-item">
-        <div class="base-ico" style="background:var(--red-l);color:var(--red);">
-          <span class="material-symbols-rounded" style="font-size:17px;">${ico}</span>
-        </div>
-        <div style="flex:1;">
-          <div class="base-name">${m.domi}
-            <span style="font-size:9px;font-weight:800;padding:1px 7px;border-radius:99px;
-                         background:var(--red-l);color:var(--red);margin-left:6px;">${lbl}</span>
+        <div>
+          <div style="font-size:12px;font-weight:800;color:var(--text);">${c.fecha} ${c.hora||''} · ${c.admin||''}</div>
+          <div style="display:flex;gap:14px;margin-top:6px;flex-wrap:wrap;">
+            <span style="font-size:11px;color:var(--green);font-weight:700;font-family:'DM Mono',monospace;">Ef: ${fmtMoney(c.totalEfectivo)}</span>
+            <span style="font-size:11px;color:var(--blue);font-weight:700;font-family:'DM Mono',monospace;">Tf: ${fmtMoney(c.totalTransf)}</span>
+            <span style="font-size:11px;color:var(--orange);font-weight:700;font-family:'DM Mono',monospace;">Bases: ${fmtMoney(c.basesDadas)}</span>
+            <span style="font-size:11px;color:var(--teal-d);font-weight:700;">${c.nDomicilios} domicilios</span>
           </div>
-          <div class="base-meta">${m.nota || 'Sin nota'} · ${m.fecha}</div>
+          ${c.obs?`<div style="font-size:10px;color:var(--text2);margin-top:4px;font-style:italic;">${c.obs}</div>`:''}
         </div>
-        <div class="base-monto" style="color:var(--red);">-${fmtMoney(m.monto)}</div>
-        <button class="base-del" onclick="deleteMulta(${i})" title="Eliminar">
-          <span class="material-symbols-rounded" style="font-size:13px;">delete</span>
-        </button>
-      </div>`;
-    }).join('');
+        <div style="text-align:right;">
+          <div style="font-size:11px;color:var(--text3);font-weight:700;">Total</div>
+          <div style="font-size:18px;font-weight:800;color:var(--teal-d);font-family:'DM Mono',monospace;">${fmtMoney(c.totalGeneral)}</div>
+          <span style="font-size:9px;font-weight:800;padding:2px 9px;border-radius:99px;background:var(--green-l);color:var(--green);">✓ Cerrado</span>
+        </div>
+      </div>`).join('');
   }
-
-  window.openMultaModal = function() {
-    poblarSelectCont('multa-domi-select');
-    document.getElementById('multa-monto').value = '';
-    document.getElementById('multa-nota').value  = '';
-    document.getElementById('multa-tipo-sel').value = 'multa';
-    document.getElementById('modal-multa-overlay').classList.add('show');
+ 
+  /* ──────────────────────────────────────────────────────────
+     9. FUNCIONES GLOBALES
+  ────────────────────────────────────────────────────────── */
+  window._delCont = function(accion, id, msg) {
+    _eliminarCItem(accion, id, msg);
   };
-
-  window.saveMulta = function() {
-    const domi  = document.getElementById('multa-domi-select').value;
-    const monto = parsePrecio(document.getElementById('multa-monto').value);
-    const nota  = document.getElementById('multa-nota').value.trim();
-    const tipo  = document.getElementById('multa-tipo-sel').value;
-    if (!domi)  { showToast('w','Falta domiciliario','Selecciona un domi'); return; }
-    if (!monto) { showToast('w','Falta monto','Ingresa el valor'); return; }
-    _multas.push({ domi, monto, nota, tipo, fecha: new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) });
-    saveMultas(); renderMultas(); renderContable();
-    document.getElementById('modal-multa-overlay').classList.remove('show');
-    showToast('i', `Registrado para ${domi}`, fmtMoney(monto));
-  };
-
-  window.deleteMulta = function(idx) {
-    if (!confirm('¿Eliminar este registro?')) return;
-    _multas.splice(idx, 1); saveMultas(); renderMultas(); renderContable();
-    showToast('i','Registro eliminado','');
-  };
-
-  /* ── 9. Helpers ── */
-  function poblarSelectCont(selId) {
-    const sel = document.getElementById(selId);
-    if (!sel) return;
-    sel.innerHTML = '<option value="">— Selecciona —</option>' +
-      allDrivers.map(d => `<option value="${d.nombre}">${d.activo?'🟢':'⚫'} ${d.nombre}</option>`).join('');
+  async function _eliminarCItem(accion,id,msg){
+    if(!confirm(msg)) return;
+    try {
+      const json=await _post({accion,id});
+      if(json.ok!==false){ showToast('i','Eliminado',''); await loadContData(); renderContable(); }
+      else showToast('e','Error',json.error||'');
+    } catch(e){ showToast('e','Error',e.message.substring(0,50)); }
   }
-
+ 
   window.setCPeriodo = function(p, btn) {
     _periodo = p;
-    document.querySelectorAll('#cont-tabs .tab').forEach(t => t.classList.remove('on'));
-    if (btn) btn.classList.add('on');
+    document.querySelectorAll('#cont-tabs .tab').forEach(t=>t.classList.remove('on'));
+    if(btn) btn.classList.add('on');
     renderContable();
   };
-
+ 
+  window.setCTurno = function(t, btn) {
+    _turno = t;
+    document.querySelectorAll('#cont-turno-tabs .tab').forEach(x=>x.classList.remove('on'));
+    if(btn) btn.classList.add('on');
+    renderContable();
+  };
+ 
+  window.recargarContable = async function() {
+    showToast('i','Recargando contabilidad…','');
+    await loadContData();
+    renderContable();
+    showToast('s','Contabilidad actualizada','Datos en tiempo real del sheet ✓');
+  };
+ 
   window.exportarContableExcel = function() {
-    const peds = allPedidos.filter(p => p.estado === 'entregado' && enPeriodo(p));
-    if (!peds.length) { showToast('w','Sin datos','No hay entregas en este período'); return; }
-    const rows = [['Pedido','Cliente','Domiciliario','Método','Subtotal','Domicilio','Total','Fecha','Hora']];
-    peds.forEach(p => rows.push([p.id,p.cliente||'',p.domi||'',p.metodo||'',
-      calcSubtotal(p),parsePrecio(p.costoEnvio),parsePrecio(p.total),p.fecha||'',p.hora||'']));
-    const csv = rows.map(r => r.map(c => '"'+String(c||'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
-    const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'contable_wil_'+new Date().toISOString().slice(0,10)+'.csv';
+    const peds = allPedidos.filter(p=>p.estado==='entregado'&&_enPeriodoPed(p));
+    if(!peds.length){ showToast('w','Sin datos',''); return; }
+    const rows=[['Pedido','Cliente','Domiciliario','Método','Subtotal','Domicilio','Total','Fecha','Hora']];
+    peds.forEach(p=>rows.push([p.id,p.cliente||'',p.domi||'',p.metodo||'',calcSubtotal(p),parsePrecio(p.costoEnvio),parsePrecio(p.total),p.fecha||'',p.hora||'']));
+    const csv=rows.map(r=>r.map(c=>'"'+String(c||'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
+    const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download='contable_wil_'+new Date().toISOString().slice(0,10)+'.csv';
     a.click(); URL.revokeObjectURL(a.href);
     showToast('s','Excel exportado',peds.length+' registros');
   };
-
+ 
+  /* ──────────────────────────────────────────────────────────
+     10. CARGA INICIAL
+  ────────────────────────────────────────────────────────── */
+  loadContData().then(()=>{ if(document.getElementById('pg-contable')?.classList.contains('on')) renderContable(); });
+ 
+  // actualizar badge en sidebar
+  const nbCont = document.getElementById('nb-cont');
+  if (nbCont) {
+    setInterval(()=>{
+      const activos = _perms.filter(p=>p.estado==='activo').length;
+      nbCont.textContent = activos || '';
+    }, 5000);
+  }
+ 
 })();
 
 
