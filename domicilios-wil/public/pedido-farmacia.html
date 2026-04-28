@@ -3273,17 +3273,16 @@ async function coEnviarPedido(){
   items.forEach(function(c,i){
     var p=c.it.precio>0?c.it.precio:c.it.pUnit;
     var vtotal=p*c.qty;
-    if(i===0){
+   if(i===0){
+      // ── imgTransf declarado ANTES del push ──
+      var imgTransf = (coPago === 'TRANSFERENCIA' && _comprobanteBase64)
+        ? _comprobanteBase64
+        : '';
+
       rows.push([idPedido, nom, tel, coPago, 'Pendiente', imgTransf,
            c.it.desc, c.it.lab||'', c.qty, p, vtotal,
            dirCompleta, hora, fecha, totalFinal,
            '','','','', domVal, modoLabel, comercioLabel]);
-// ── Imagen del comprobante ──
-// Se manda el base64 completo; el GAS lo sube a Drive y guarda la URL en col F
-var imgTransf = (coPago === 'TRANSFERENCIA' && _comprobanteBase64)
-  ? _comprobanteBase64
-  : '';
-
     } else {
       rows.push(['','','','','','',
         c.it.desc,c.it.lab||'',c.qty,p,vtotal,
