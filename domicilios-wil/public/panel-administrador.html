@@ -3106,8 +3106,12 @@ function updateBadges() {
   document.getElementById('nb-dri').textContent = allDrivers.filter(d=>d.activo).length || '0';
   document.getElementById('nb-ped').textContent = allPedidos.filter(p=>p.estado==='pendiente'||p.estado==='proceso').length || '0';
   document.getElementById('nb-prod').textContent = productos.filter(p=>p.estado==='activo').length||'0';
+    const contBadge = document.getElementById('nb-cont');
+  if (contBadge) {
+    const pendSinAsig = allPedidos.filter(p => p.estado === 'pendiente' && (!p.domi || !p.domi.trim())).length;
+    contBadge.textContent = pendSinAsig || '0';
 }
-
+}
 
 /* ════ OFERTAS RENDER ════ */
 function renderOfertas() {
@@ -3239,7 +3243,17 @@ function sp(id, el) {
 }
 if (id === 'contable') {
   Promise.all([loadDrivers(), loadPedidos(), loadBases(), loadMultas()])
-    .then(() => { renderAll(); renderContable(); });
+    .then(() => {
+      window._basesData  = window._basesData  || [];
+      window._multasData = window._multasData || [];
+      renderAll();
+      if (typeof renderContable === 'function') renderContable();
+      else setTimeout(() => { if (typeof renderContable === 'function') renderContable(); }, 300);
+    })
+    .catch(e => {
+      console.warn('[contable load]:', e);
+      if (typeof renderContable === 'function') renderContable();
+    });
 }
     }
   }
@@ -6130,9 +6144,43 @@ function patchTransferencia() {
     });
   };
  
-  /* ── ✅ ELIMINADO el re-render automático que causaba el crash en móvil ── */
-  /* El re-render lo hará el boot después de cargar allPedidos */
+ 
 }
+
+/* ════ BASES Y MULTAS — funciones globales (deben estar fuera de initContable) ════ */
+async function loadBases() {
+  try {
+    const text = await fetchSheetCSV('Bases', 10000);
+    const lines = parseCSVText(text);
+    window._basesData = lines.map(c => ({
+      domi:  col(c, 0),
+      monto: parsePrecio(col(c, 1)),
+      nota:  col(c, 2),
+      fecha: col(c, 3)
+    })).filter(b => b.domi && b.monto);
+  } catch(e) {
+    console.warn('[loadBases]:', e.message);
+    window._basesData = [];
+  }
+}
+
+async function loadMultas() {
+  try {
+    const text = await fetchSheetCSV('Multas', 10000);
+    const lines = parseCSVText(text);
+    window._multasData = lines.map(c => ({
+      domi:  col(c, 0),
+      monto: parsePrecio(col(c, 1)),
+      tipo:  col(c, 2) || 'multa',
+      nota:  col(c, 3),
+      fecha: col(c, 4)
+    })).filter(m => m.domi && m.monto);
+  } catch(e) {
+    console.warn('[loadMultas]:', e.message);
+    window._multasData = [];
+  }
+}
+
  
  
 /* ═══════════════════════════════════════════════
@@ -6374,7 +6422,10 @@ function initContable() {
           </div>
           <div class="om-field">
             <div class="om-label"><span class="material-symbols-rounded">calendar_today</span>Fecha</div>
-            <input class="om-input" id="${tipo}-fecha" type="date" value="${new Date().toISOString().slice(0,10)}">
+            <div class="om-field">
+  <div class="om-label"><span class="material-symbols-rounded">calendar_today</span>Fecha</div>
+  <input class="om-input" id="${tipo}-fecha" type="date" value="${new Date().toISOString().slice(0,10)}">
+</div>
           </div>
           <div class="cont-modal-footer">
             <button class="om-btn-cancel" onclick="document.getElementById('modal-${tipo}-overlay').classList.remove('show')">
@@ -6394,32 +6445,7 @@ function initContable() {
   let _multas = [];
   let _periodo = 'hoy';
 
-    window.loadBases = async function() {
-    try {
-      const text = await fetchSheetCSV('Bases', 10000);
-      const lines = parseCSVText(text);
-      _bases = lines.map(c => ({
-        domi:  col(c, 0),
-        monto: parsePrecio(col(c, 1)),
-        nota:  col(c, 2),
-        fecha: col(c, 3)
-      })).filter(b => b.domi && b.monto);
-    } catch(e) { console.warn('[loadBases]:', e.message); _bases = []; }
-  }
-
-    window.loadMultas = async function() {
-    try {
-      const text = await fetchSheetCSV('Multas', 10000);
-      const lines = parseCSVText(text);
-      _multas = lines.map(c => ({
-        domi:  col(c, 0),
-        monto: parsePrecio(col(c, 1)),
-        tipo:  col(c, 2) || 'multa',
-        nota:  col(c, 3),
-        fecha: col(c, 4)
-      })).filter(m => m.domi && m.monto);
-    } catch(e) { console.warn('[loadMultas]:', e.message); _multas = []; }
-  }
+   
 
   async function saveBases(item) {
     try {
@@ -6501,6 +6527,8 @@ function initContable() {
   }
  
   function renderContable() {
+      const _bases  = window._basesData  || [];
+  const _multas = window._multasData || [];
     const peds = allPedidos.filter(p => p.estado === 'entregado' && enPeriodo(p));
     const totalFacturado = peds.reduce((s,p) => s + parsePrecio(p.total), 0);
     const totalEnvio     = peds.reduce((s,p) => s + parsePrecio(p.costoEnvio), 0);
@@ -6638,6 +6666,7 @@ function initContable() {
   window.renderContable = renderContable;
  
   function renderBases() {
+      const _bases = window._basesData || [];
     const el = document.getElementById('cont-bases-list'); if (!el) return;
     const filtered = _bases.slice().reverse();
     if (!filtered.length) { el.innerHTML=`<div class="empty-state"><div class="ico" style="font-size:28px;opacity:.2;">💵</div><p>Sin bases registradas</p></div>`; return; }
@@ -6645,6 +6674,7 @@ function initContable() {
   }
  
   function renderMultas() {
+      const _multas = window._multasData || [];
     const el = document.getElementById('cont-multas-list'); if (!el) return;
     const filtered = _multas.slice().reverse();
     if (!filtered.length) { el.innerHTML=`<div class="empty-state"><div class="ico" style="font-size:28px;opacity:.2;">⚖️</div><p>Sin multas ni restricciones</p></div>`; return; }
@@ -6662,56 +6692,112 @@ function initContable() {
   window.openMultaModal = function() { poblarSelectCont('multa-domi-select'); document.getElementById('multa-monto').value=''; document.getElementById('multa-nota').value=''; document.getElementById('multa-tipo-sel').value='multa'; document.getElementById('modal-multa-overlay').classList.add('show'); };
  
  window.saveBase = async function() {
-    const domi  = document.getElementById('base-domi-select').value;
-    const monto = parsePrecio(document.getElementById('base-monto').value);
-    const nota  = document.getElementById('base-nota').value.trim();
-    if (!domi)  { showToast('w','Falta domiciliario',''); return; }
-    if (!monto) { showToast('w','Falta monto',''); return; }
-    const fechaCampo = document.getElementById('base-fecha').value;
-    const item = { domi, monto, nota, fecha: fechaCampo || new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) };
-    _bases.push(item);
+  const domi  = document.getElementById('base-domi-select')?.value?.trim();
+  const monto = parsePrecio(document.getElementById('base-monto')?.value || '');
+  const nota  = (document.getElementById('base-nota')?.value || '').trim();
+  const fechaEl = document.getElementById('base-fecha');
+  const fecha = fechaEl?.value || new Date().toISOString().slice(0,10);
+
+  if (!domi)  { showToast('w','Falta domiciliario','Selecciona un domiciliario'); return; }
+  if (!monto) { showToast('w','Falta monto','Ingresa un monto válido'); return; }
+
+  const btn = document.querySelector('#modal-base-overlay .om-btn-save');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-rounded" style="animation:spin .8s linear infinite">progress_activity</span> Guardando…'; }
+
+  const item = { domi, monto, nota, fecha };
+  window._basesData = window._basesData || [];
+  window._basesData.push(item);
+  renderBases(); renderContable();
+  document.getElementById('modal-base-overlay').classList.remove('show');
+  showToast('i', `Guardando base para ${domi}…`, fmtMoney(monto));
+
+  try {
+    await fetch(SHEET_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ accion: 'crear-base', domi, monto, nota, fecha })
+    });
+    await loadBases();
+    window._basesData = window._basesData; // ya actualizado
     renderBases(); renderContable();
-    document.getElementById('modal-base-overlay').classList.remove('show');
     showToast('s', `Base dada a ${domi}`, fmtMoney(monto) + (nota ? ' · ' + nota : ''));
-    await saveBases(item);
-    await loadBases(); renderBases(); renderContable();
-  };
- 
-  window.saveMulta = async function() {
-    const domi  = document.getElementById('multa-domi-select').value;
-    const monto = parsePrecio(document.getElementById('multa-monto').value);
-    const nota  = document.getElementById('multa-nota').value.trim();
-    const tipo  = document.getElementById('multa-tipo-sel').value;
-    if (!domi)  { showToast('w','Falta domiciliario',''); return; }
-    if (!monto) { showToast('w','Falta monto',''); return; }
-    const fechaCampo = document.getElementById('multa-fecha').value;
-    const item = { domi, monto, nota, tipo, fecha: fechaCampo || new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) };
-    _multas.push(item);
+  } catch(e) {
+    showToast('e', 'Error al guardar base', e.message.substring(0, 60));
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-rounded">savings</span>Dar base'; }
+  }
+};
+
+window.saveMulta = async function() {
+  const domi  = document.getElementById('multa-domi-select')?.value?.trim();
+  const monto = parsePrecio(document.getElementById('multa-monto')?.value || '');
+  const nota  = (document.getElementById('multa-nota')?.value || '').trim();
+  const tipo  = document.getElementById('multa-tipo-sel')?.value || 'multa';
+  const fechaEl = document.getElementById('multa-fecha');
+  const fecha = fechaEl?.value || new Date().toISOString().slice(0,10);
+
+  if (!domi)  { showToast('w','Falta domiciliario','Selecciona un domiciliario'); return; }
+  if (!monto) { showToast('w','Falta monto','Ingresa un monto válido'); return; }
+
+  const btn = document.querySelector('#modal-multa-overlay .om-btn-save');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-rounded" style="animation:spin .8s linear infinite">progress_activity</span> Guardando…'; }
+
+  const item = { domi, monto, nota, tipo, fecha };
+  window._multasData = window._multasData || [];
+  window._multasData.push(item);
+  renderMultas(); renderContable();
+  document.getElementById('modal-multa-overlay').classList.remove('show');
+  showToast('i', `Guardando registro para ${domi}…`, fmtMoney(monto));
+
+  try {
+    await fetch(SHEET_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ accion: 'crear-multa', domi, monto, tipo, nota, fecha })
+    });
+    await loadMultas();
     renderMultas(); renderContable();
-    document.getElementById('modal-multa-overlay').classList.remove('show');
-    showToast('i', `Registrado para ${domi}`, fmtMoney(monto));
-    await saveMultas(item);
-    await loadMultas(); renderMultas(); renderContable();
-  };
+    showToast('s', `Registrado para ${domi}`, fmtMoney(monto));
+  } catch(e) {
+    showToast('e', 'Error al guardar', e.message.substring(0, 60));
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-rounded">gavel</span>Registrar'; }
+  }
+};
  
- window.deleteBase  = async function(idx) {
-    if (!confirm('¿Eliminar esta base?')) return;
-    const item = _bases[idx];
-    _bases.splice(idx, 1);
+window.deleteBase = async function(idx) {
+  const _bases = window._basesData || [];
+  if (!confirm('¿Eliminar esta base?')) return;
+  const item = _bases[idx];
+  window._basesData.splice(idx, 1);
+  renderBases(); renderContable();
+  showToast('i','Base eliminada','');
+  try {
+    await fetch(SHEET_SCRIPT_URL, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ accion: 'eliminar-base', domi: item.domi, fecha: item.fecha })
+    });
+    await loadBases();
     renderBases(); renderContable();
-    showToast('i','Base eliminada','');
-    await deleteBaseSheet(item);
-    await loadBases(); renderBases(); renderContable();
-  };
-  window.deleteMulta = async function(idx) {
-    if (!confirm('¿Eliminar este registro?')) return;
-    const item = _multas[idx];
-    _multas.splice(idx, 1);
+  } catch(e) { console.warn('[deleteBase]:', e.message); }
+};
+
+window.deleteMulta = async function(idx) {
+  const _multas = window._multasData || [];
+  if (!confirm('¿Eliminar este registro?')) return;
+  const item = _multas[idx];
+  window._multasData.splice(idx, 1);
+  renderMultas(); renderContable();
+  showToast('i','Registro eliminado','');
+  try {
+    await fetch(SHEET_SCRIPT_URL, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ accion: 'eliminar-multa', domi: item.domi, fecha: item.fecha })
+    });
+    await loadMultas();
     renderMultas(); renderContable();
-    showToast('i','Registro eliminado','');
-    await deleteMultaSheet(item);
-    await loadMultas(); renderMultas(); renderContable();
-  };
+  } catch(e) { console.warn('[deleteMulta]:', e.message); }
+};
  
   window.setCPeriodo = function(p, btn) {
     _periodo = p;
