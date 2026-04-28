@@ -853,13 +853,17 @@ mark{background:#dbeafe;color:#1e40af;border-radius:3px;padding:0 2px}
   </div>
 
   <!-- Upload comprobante -->
-  <div id="co-upload-area"
-       style="border:2px dashed #c7d2fe;border-radius:14px;padding:16px;
-              background:#f8faff;cursor:pointer;transition:.18s;text-align:center"
-       onclick="document.getElementById('co-file-inp').click()">
+ <!-- ✅ DESPUÉS -->
+<div id="co-upload-area"
+     style="border:2px dashed #c7d2fe;border-radius:14px;padding:16px;
+            background:#f8faff;cursor:pointer;transition:.18s;text-align:center;
+            position:relative;overflow:hidden">
 
-    <input id="co-file-inp" type="file" accept="image/*" style="display:none"
-           onchange="onComprobanteSelected(this)"/>
+  <!-- Overlay transparente: cubre todo el área, funciona en iOS Safari -->
+  <input id="co-file-inp" type="file" accept="image/*"
+         style="position:absolute;inset:0;width:100%;height:100%;
+                opacity:0;cursor:pointer;z-index:4;font-size:0"
+         onchange="onComprobanteSelected(this)"/>
 
     <!-- Estado: sin imagen -->
     <div id="co-upload-idle">
@@ -898,12 +902,14 @@ mark{background:#dbeafe;color:#1e40af;border-radius:3px;padding:0 2px}
                       width:fit-content;margin-bottom:5px">—</div>
           <div id="co-upload-msg"
                style="font-size:11px;font-weight:700;color:#111827;line-height:1.4">—</div>
-          <button onclick="event.stopPropagation();resetComprobante()"
-                  style="margin-top:6px;border:none;background:none;cursor:pointer;
-                         font-size:10px;font-weight:700;color:#6b7280;
-                         display:flex;align-items:center;gap:3px;padding:0">
-            <span class="sym" style="font-size:13px">refresh</span> Cambiar imagen
-          </button>
+          <!-- ✅ DESPUÉS -->
+<button onclick="event.stopPropagation();resetComprobante()"
+        style="margin-top:6px;border:none;background:none;cursor:pointer;
+               font-size:10px;font-weight:700;color:#6b7280;
+               display:flex;align-items:center;gap:3px;padding:0;
+               position:relative;z-index:5">
+  <span class="sym" style="font-size:13px">refresh</span> Cambiar imagen
+</button>
         </div>
       </div>
     </div>
@@ -2999,6 +3005,9 @@ function onComprobanteSelected(input) {
     return;
   }
 
+  var inp = document.getElementById('co-file-inp');
+if (inp) { inp.style.pointerEvents = 'none'; inp.style.zIndex = '0'; }
+
   // Mostrar spinner
   document.getElementById('co-upload-idle').style.display    = 'none';
   document.getElementById('co-upload-loading').style.display = 'block';
@@ -3029,11 +3038,20 @@ function parsearPrecioLocal(texto) {
 }
 
 // Limpia el estado del comprobante
+// ✅ DESPUÉS
 function resetComprobante() {
-  _comprobanteBase64  = null;
-  _comprobanteVerif   = false;
+  _comprobanteBase64   = null;
+  _comprobanteVerif    = false;
   _comprobanteUrlDrive = '';
-  document.getElementById('co-file-inp').value = '';
+
+  var inp = document.getElementById('co-file-inp');
+  if (inp) {
+    inp.value = '';
+    // Restaurar overlay activo para que el usuario pueda volver a tocar
+    inp.style.pointerEvents = 'auto';
+    inp.style.zIndex = '4';
+  }
+
   document.getElementById('co-upload-idle').style.display    = 'block';
   document.getElementById('co-upload-loading').style.display = 'none';
   document.getElementById('co-upload-result').style.display  = 'none';
