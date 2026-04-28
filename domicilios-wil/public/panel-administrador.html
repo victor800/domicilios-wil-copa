@@ -6090,27 +6090,48 @@ function patchTransferencia() {
     _currentPedId = null;
   };
  
-  window.verificarPago = function() {
-    if (!_currentPedId) return;
-    _verificados.add(_currentPedId);
-    try { localStorage.setItem('wil_tf_verificados', JSON.stringify([..._verificados])); } catch(e){}
-    document.querySelectorAll('#ped-tbody tr').forEach(tr => {
-      const primer = tr.querySelector('td');
-      if (primer && primer.textContent.trim() === _currentPedId)
-        tr.classList.add('ped-verificada');
-    });
-    document.getElementById('btn-verificar-pago').style.display = 'none';
-    const footer = document.getElementById('mt-footer');
-    if (!document.getElementById('mt-ya-verificada')) {
-      const badge = document.createElement('div');
-      badge.id = 'mt-ya-verificada'; badge.className = 'mt-already';
-      badge.innerHTML = '<span class="material-symbols-rounded" style="font-size:17px;">check_circle</span>Transferencia verificada ✓';
-      footer.appendChild(badge);
-    }
-    showToast('s', '✓ Transferencia verificada', 'Pedido #' + _currentPedId + ' — fila marcada en verde');
-    VOZ.hablar('Transferencia verificada');
-    setTimeout(closeMT, 1200);
-  };
+ window.verificarPago = function() {
+  if (!_currentPedId) return;
+  _verificados.add(_currentPedId);
+  try { localStorage.setItem('wil_tf_verificados', JSON.stringify([..._verificados])); } catch(e) {}
+
+  // Marcar fila en tabla de pedidos
+  document.querySelectorAll('#ped-tbody tr').forEach(tr => {
+    const primer = tr.querySelector('td');
+    if (primer && primer.textContent.trim() === _currentPedId)
+      tr.classList.add('ped-verificada');
+  });
+
+  // UI del modal
+  document.getElementById('btn-verificar-pago').style.display = 'none';
+  const footer = document.getElementById('mt-footer');
+  if (!document.getElementById('mt-ya-verificada')) {
+    const badge = document.createElement('div');
+    badge.id = 'mt-ya-verificada';
+    badge.className = 'mt-already';
+    badge.innerHTML = '<span class="material-symbols-rounded" style="font-size:17px;">check_circle</span>Transferencia verificada ✓';
+    footer.appendChild(badge);
+  }
+
+  // Cambiar imagen del header a verificada
+  const hdrIco = document.querySelector('.mt-hdr-ico');
+  if (hdrIco) {
+    hdrIco.style.background = 'rgba(22,163,74,.25)';
+    hdrIco.style.borderColor = 'rgba(22,163,74,.4)';
+    hdrIco.innerHTML = '<span class="material-symbols-rounded" style="color:#4ade80;">verified</span>';
+  }
+
+  showToast('s', '✓ Transferencia verificada', 'Pedido #' + _currentPedId + ' — confirmado');
+  VOZ.hablar('Transferencia verificada');
+
+  // Refrescar card de contable si está visible
+  if (typeof renderContable === 'function' &&
+      document.getElementById('pg-contable')?.classList.contains('on')) {
+    setTimeout(() => renderContable(), 300);
+  }
+
+  setTimeout(closeMT, 1400);
+};
  
   /* ── Monkey-patch renderPedidosTable para marcar transferencias ── */
   const _origRender = window.renderPedidosTable.bind(window);
@@ -6617,36 +6638,76 @@ const promDiario     = Math.round(pedsEntregados.length / diasPeriodo);
           </div>
         </div>
         <!-- Lista de pedidos transferencia -->
-        <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;">
-          ${tfPeds.slice(0,12).map(p => {
-            const ver = verificados.has(p.id);
-            const imgUrl = (p.imagen||'').trim();
-            const tieneImg = imgUrl.startsWith('http');
-            return `<div style="display:flex;align-items:center;gap:8px;background:${ver?'rgba(22,163,74,.07)':'var(--bg)'};border:1.5px solid ${ver?'rgba(22,163,74,.2)':'var(--border)'};border-radius:10px;padding:8px 10px;transition:all .15s;"
-              onmouseover="this.style.borderColor='#93c5fd'" onmouseout="this.style.borderColor='${ver?'rgba(22,163,74,.2)':'var(--border)'}'">
-              <!-- Estado pill -->
-              <div style="width:8px;height:8px;border-radius:50%;background:${ver?'#16a34a':'#d97706'};flex-shrink:0;box-shadow:0 0 6px ${ver?'rgba(22,163,74,.5)':'rgba(217,119,6,.5)'};"></div>
-              <!-- Info -->
-              <div style="flex:1;min-width:0;">
-                <div style="font-size:11px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.cliente||'–'}</div>
-                <div style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:1px;">#${p.id} · ${p.hora||''} ${p.fecha||''}</div>
-              </div>
-              <!-- Monto -->
-              <div style="font-size:12px;font-weight:800;color:${ver?'var(--green)':'var(--blue)'};font-family:'DM Mono',monospace;flex-shrink:0;">${fmtMoney(parsePrecio(p.total))}</div>
-              <!-- Botón comprobante -->
-              ${tieneImg ? `<button onclick="openTransferModal('${p.id}','${imgUrl.replace(/'/g,"\\'")}','${(p.cliente||'')} · ${p.hora||''} · #${p.id}')"
-                style="width:26px;height:26px;border-radius:7px;background:${ver?'rgba(22,163,74,.15)':'var(--blue-l)'};border:1px solid ${ver?'rgba(22,163,74,.3)':'rgba(37,99,235,.25)'};cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;"
-                title="Ver comprobante"
-                onmouseover="this.style.background='#1d4ed8';this.style.color='#fff'"
-                onmouseout="this.style.background='${ver?'rgba(22,163,74,.15)':'var(--blue-l)'}';this.style.color=''">
-                <span class="material-symbols-rounded" style="font-size:13px;color:var(--blue);">receipt_long</span>
-              </button>` : `<div style="width:26px;height:26px;border-radius:7px;background:var(--bg2);border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Sin comprobante">
-                <span class="material-symbols-rounded" style="font-size:13px;color:var(--text3);">image_not_supported</span>
-              </div>`}
-            </div>`;
-          }).join('')}
-          ${tfPeds.length > 12 ? `<div style="text-align:center;font-size:10px;color:var(--text3);padding:6px;">+${tfPeds.length-12} más — ver en Pedidos</div>` : ''}
+       <!-- Lista de pedidos transferencia -->
+<div style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;">
+  ${tfPeds.slice(0,15).map(p => {
+    const ver      = verificados.has(p.id);
+    const imgUrl   = (p.imagen || '').trim();
+    const tieneImg = imgUrl.startsWith('http');
+    const meta     = `${p.cliente||''} · Pedido #${p.id} · ${p.hora||''} ${p.fecha||''}`;
+    return `
+      <div style="
+        display:flex;align-items:center;gap:8px;
+        background:${ver ? 'rgba(22,163,74,.07)' : 'var(--bg)'};
+        border:1.5px solid ${ver ? 'rgba(22,163,74,.2)' : 'var(--border)'};
+        border-radius:10px;padding:9px 11px;
+        transition:all .15s;cursor:pointer;
+      "
+        onclick="openTransferModal('${p.id}','${imgUrl.replace(/'/g,"\\'")}','${meta.replace(/'/g,"\\'")}')"
+        onmouseover="this.style.borderColor='#93c5fd';this.style.background='${ver ? 'rgba(22,163,74,.1)' : 'var(--teal-l)'}';"
+        onmouseout="this.style.borderColor='${ver ? 'rgba(22,163,74,.2)' : 'var(--border)'}';this.style.background='${ver ? 'rgba(22,163,74,.07)' : 'var(--bg)'}';">
+        
+        <!-- Dot estado -->
+        <div style="
+          width:9px;height:9px;border-radius:50%;flex-shrink:0;
+          background:${ver ? '#16a34a' : '#d97706'};
+          box-shadow:0 0 6px ${ver ? 'rgba(22,163,74,.5)' : 'rgba(217,119,6,.5)'};
+        "></div>
+
+        <!-- Info pedido -->
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:11px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            ${p.cliente || '–'}
+          </div>
+          <div style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px;">
+            #${p.id} · ${p.hora || ''} · ${p.fecha || ''}
+          </div>
         </div>
+
+        <!-- Monto -->
+        <div style="font-size:12px;font-weight:800;color:${ver ? 'var(--green)' : 'var(--blue)'};font-family:'DM Mono',monospace;flex-shrink:0;">
+          ${fmtMoney(parsePrecio(p.total))}
+        </div>
+
+        <!-- Ícono comprobante o sin imagen -->
+        ${tieneImg
+          ? `<div style="
+               width:28px;height:28px;border-radius:8px;
+               background:${ver ? 'rgba(22,163,74,.15)' : 'var(--blue-l)'};
+               border:1.5px solid ${ver ? 'rgba(22,163,74,.3)' : 'rgba(37,99,235,.25)'};
+               display:flex;align-items:center;justify-content:center;
+               flex-shrink:0;transition:all .15s;
+             "
+             title="Ver comprobante">
+               <span class="material-symbols-rounded" style="font-size:14px;color:${ver ? 'var(--green)' : 'var(--blue)'};">
+                 ${ver ? 'verified' : 'receipt_long'}
+               </span>
+             </div>`
+          : `<div style="
+               width:28px;height:28px;border-radius:8px;
+               background:var(--bg2);border:1px dashed var(--border);
+               display:flex;align-items:center;justify-content:center;flex-shrink:0;
+             " title="Sin comprobante">
+               <span class="material-symbols-rounded" style="font-size:13px;color:var(--text3);">image_not_supported</span>
+             </div>`
+        }
+
+        <!-- Badge verificada -->
+        ${ver ? `<span style="font-size:8px;font-weight:800;padding:2px 7px;border-radius:99px;background:var(--green-l);color:var(--green);flex-shrink:0;white-space:nowrap;">✓ ok</span>` : ''}
+      </div>`;
+  }).join('')}
+  ${tfPeds.length > 15 ? `<div style="text-align:center;font-size:10px;color:var(--text3);padding:8px;">+${tfPeds.length - 15} más — ver en Pedidos</div>` : ''}
+</div>
       ` : `<div class="empty-state" style="padding:20px;"><div style="font-size:28px;opacity:.2;margin-bottom:6px;">💳</div><p>Sin transferencias en este período</p></div>`;
     }
 
