@@ -2053,7 +2053,15 @@ async function rastrearPedido(){
 
     state.pedidoRastreado = p;
 
-    /* ── 4. Mostrar resultado ── */
+    // ✅ Activar rastreo nativo en segundo plano (Android)
+try {
+  if (window.WilNativo && typeof window.WilNativo.rastrearPedido === 'function') {
+    window.WilNativo.rastrearPedido(id);
+    console.log('[WIL] Rastreo nativo activado:', id);
+  }
+} catch(e) { console.warn('[WIL] Bridge no disponible:', e); }
+
+  
     /* ── 4. Mostrar resultado ── */
     rtCerrarPopup();
     mostrarToast('✅ Código #' + id + ' encontrado', 'check_circle');
@@ -2244,6 +2252,10 @@ async function _rtPollCiclo() {
       mostrarToast('Estado: ' + nuevoEstado, 'update');
       var secCal = document.getElementById('seccionCalificar');
       if(secCal) secCal.style.display = (nuevoEstado==='Entregado') ? 'block' : 'none';
+      // ✅ Detener rastreo nativo cuando el pedido termina
+if (nuevoEstado === 'Entregado' || nuevoEstado === 'Cancelado') {
+  rtDetenerPolling();
+}
     }
 
     p.horaEnProceso = nuevaHoraProceso;
@@ -2340,8 +2352,16 @@ function rtIniciarPolling(){
   clearInterval(_rtPollTimer);
   _rtPollTimer = setInterval(_rtPollCiclo, 5000);
 }
+
+// ✅ DESPUÉS
 function rtDetenerPolling(){
   clearInterval(_rtPollTimer);
+  // Detener rastreo nativo en Android
+  try {
+    if (window.WilNativo && typeof window.WilNativo.detenerRastreo === 'function') {
+      window.WilNativo.detenerRastreo();
+    }
+  } catch(e) {}
 }
 
 function mostrarChatFab(p){
