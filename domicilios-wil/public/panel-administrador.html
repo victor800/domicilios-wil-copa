@@ -6420,9 +6420,7 @@ function initContable() {
             <div class="om-label"><span class="material-symbols-rounded">notes</span>Nota (opcional)</div>
             <input class="om-input" id="${tipo}-nota" type="text" placeholder="${esMulma ? 'Descripción de la multa…' : 'Ej: Base mañana del 27 abr'}">
           </div>
-          <div class="om-field">
-            <div class="om-label"><span class="material-symbols-rounded">calendar_today</span>Fecha</div>
-            <div class="om-field">
+         <div class="om-field">
   <div class="om-label"><span class="material-symbols-rounded">calendar_today</span>Fecha</div>
   <input class="om-input" id="${tipo}-fecha" type="date" value="${new Date().toISOString().slice(0,10)}">
 </div>
@@ -6499,45 +6497,74 @@ function initContable() {
       });
     } catch(e) { console.warn('[deleteMultaSheet]:', e.message); }
   }
- 
-  function parseDate(s) {
-    if (!s) return null;
-    const meses = {ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,oct:9,nov:10,dic:11};
-    let m;
-    if (m = s.match(/^(\d{1,2})\s+([a-z]{3})\s+(\d{4})/i))
-      return new Date(parseInt(m[3]), meses[m[2].toLowerCase()] ?? 0, parseInt(m[1]));
-    if (m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/))
-      return new Date(parseInt(m[3]), parseInt(m[1])-1, parseInt(m[2]));
-    return new Date(s);
+ function parseDate(s) {
+  if (!s) return null;
+  s = String(s).trim()
+    .replace(/\.\s*/g, ' ')   // "abr." → "abr"
+    .replace(/\s+/g, ' ');
+  
+  const meses = {
+    ene:0,feb:1,mar:2,abr:3,may:4,jun:5,
+    jul:6,ago:7,sep:8,oct:9,nov:10,dic:11,
+    enero:0,febrero:1,marzo:2,abril:3,mayo:4,junio:5,
+    julio:6,agosto:7,septiembre:8,octubre:9,noviembre:10,diciembre:11
+  };
+  let m;
+  // "27 abr 2025" o "27 abr. 2025"
+  if (m = s.match(/^(\d{1,2})\s+([a-záéíóúñ]+)\s+(\d{4})/i)) {
+    const mes = meses[m[2].toLowerCase()];
+    if (mes !== undefined) return new Date(parseInt(m[3]), mes, parseInt(m[1]));
   }
- 
-  function enPeriodo(pedido) {
-    const ahora = new Date();
-    const hoy   = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
-    const fped  = parseDate(pedido.fecha);
-    if (!fped || isNaN(fped)) return true;
-    const fdia  = new Date(fped.getFullYear(), fped.getMonth(), fped.getDate());
-    if (_periodo === 'hoy')  return fdia.getTime() === hoy.getTime();
-    if (_periodo === 'ayer') {
-      const ayer = new Date(hoy); ayer.setDate(ayer.getDate() - 1);
-      return fdia.getTime() === ayer.getTime();
-    }
-    const desde = new Date(hoy); desde.setDate(desde.getDate() - parseInt(_periodo) + 1);
-    return fdia >= desde && fdia <= hoy;
+  // "27/04/2025" o "04/27/2025" — asumir DD/MM/YYYY
+  if (m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)) {
+    return new Date(parseInt(m[3]), parseInt(m[2])-1, parseInt(m[1]));
   }
+  // "2025-04-27"
+  if (m = s.match(/^(\d{4})-(\d{2})-(\d{2})/)) {
+    return new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3]));
+  }
+  // fallback
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+ 
+ function enPeriodo(pedido) {
+  const ahora = new Date();
+  const hoy   = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+  const fped  = parseDate(pedido.fecha);
+  
+  // Sin fecha: incluir siempre (no excluir datos)
+  if (!fped || isNaN(fped)) return true;
+  
+  const fdia = new Date(fped.getFullYear(), fped.getMonth(), fped.getDate());
+  
+  if (_periodo === 'hoy') return fdia.getTime() === hoy.getTime();
+  if (_periodo === 'ayer') {
+    const ayer = new Date(hoy); ayer.setDate(hoy.getDate() - 1);
+    return fdia.getTime() === ayer.getTime();
+  }
+  const dias = parseInt(_periodo);
+  const desde = new Date(hoy); desde.setDate(hoy.getDate() - dias + 1);
+  return fdia >= desde && fdia <= hoy;
+}
  
   function renderContable() {
       const _bases  = window._basesData  || [];
   const _multas = window._multasData || [];
-    const peds = allPedidos.filter(p => p.estado === 'entregado' && enPeriodo(p));
-    const totalFacturado = peds.reduce((s,p) => s + parsePrecio(p.total), 0);
-    const totalEnvio     = peds.reduce((s,p) => s + parsePrecio(p.costoEnvio), 0);
-    const totalProductos = totalFacturado - totalEnvio;
-    const diasPeriodo    = _periodo === 'hoy' || _periodo === 'ayer' ? 1 : parseInt(_periodo);
-    const promDiario     = Math.round(peds.length / diasPeriodo);
+   // Incluir entregados Y en proceso para tener datos reales
+const peds = allPedidos.filter(p => 
+  (p.estado === 'entregado' || p.estado === 'proceso' || p.estado === 'encamino') && enPeriodo(p)
+);
+// Para KPIs financieros solo los entregados
+const pedsEntregados = peds.filter(p => p.estado === 'entregado');
+const totalFacturado = pedsEntregados.reduce((s,p) => s + parsePrecio(p.total), 0);
+const totalEnvio     = pedsEntregados.reduce((s,p) => s + parsePrecio(p.costoEnvio), 0);
+const totalProductos = totalFacturado - totalEnvio;
+const diasPeriodo    = _periodo === 'hoy' || _periodo === 'ayer' ? 1 : parseInt(_periodo);
+const promDiario     = Math.round(pedsEntregados.length / diasPeriodo);
     const lbl = {hoy:'Hoy',ayer:'Ayer','5':'Últimos 5 días','15':'Últimos 15 días','30':'Último mes'}[_periodo];
     const el = document.getElementById('cont-periodo-lbl');
-    if (el) el.textContent = `${lbl} · ${peds.length} entrega${peds.length!==1?'s':''}`;
+    if (el) el.textContent = `${lbl} · ${pedsEntregados.length} entregados · ${peds.length} total`;
     const kgrid = document.getElementById('cont-kpis');
     if (kgrid) kgrid.innerHTML = [
       { acc:'#28B9C1', ico:'payments',        bg:'var(--teal-m)',   c:'var(--teal-d)',  lbl:'Total facturado',  val:fmtMoney(totalFacturado), sub:`${peds.length} pedidos entregados` },
@@ -6636,7 +6663,7 @@ function initContable() {
     if (chartEl) chartEl.innerHTML = domiArr.map(([nombre,d],i) => `<div style="flex:1;display:flex;flex-direction:column;align-items:center;" title="${nombre}: ${fmtMoney(d.total)}"><div style="font-size:9px;font-weight:800;color:var(--teal-d);margin-bottom:4px;">${d.n}</div><div style="width:calc(100% - 4px);border-radius:5px 5px 0 0;background:${i===0?'var(--teal)':'var(--teal-m)'};height:${Math.round((d.total/maxT)*100)}%;min-height:4px;"></div></div>`).join('') || '<div style="color:var(--text3);font-size:12px;padding:20px;">Sin datos</div>';
     if (chartLb) chartLb.innerHTML = domiArr.map(([nombre]) => `<div style="flex:1;font-size:9px;color:var(--text3);font-weight:700;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${nombre.split(' ')[0]}</div>`).join('');
     const metodos = {};
-    peds.forEach(p => { const k=/transfer/i.test(p.metodo||'')?'Transferencia':/efecti/i.test(p.metodo||'')?'Efectivo':(p.metodo||'Otro'); metodos[k]=(metodos[k]||0)+1; });
+    peds.forEach(p => { const k=/transfer/i.test(p.metodos||'')?'Transferencia':/efecti/i.test(p.metodo||'')?'Efectivo':(p.metodo||'Otro'); metodos[k]=(metodos[k]||0)+1; });
     const COLORES = ['#28B9C1','#16a34a','#2563eb','#d97706','#7c3aed','#dc2626'];
     const metArr  = Object.entries(metodos);
     const total   = metArr.reduce((s,[,n])=>s+n,0);
@@ -6688,9 +6715,25 @@ function initContable() {
       allDrivers.map(d => `<option value="${d.nombre}">${d.activo?'🟢':'⚫'} ${d.nombre}</option>`).join('');
   }
  
-  window.openBaseModal  = function() { poblarSelectCont('base-domi-select'); document.getElementById('base-monto').value=''; document.getElementById('base-nota').value=''; document.getElementById('modal-base-overlay').classList.add('show'); };
-  window.openMultaModal = function() { poblarSelectCont('multa-domi-select'); document.getElementById('multa-monto').value=''; document.getElementById('multa-nota').value=''; document.getElementById('multa-tipo-sel').value='multa'; document.getElementById('modal-multa-overlay').classList.add('show'); };
- 
+ window.openBaseModal = function() {
+  poblarSelectCont('base-domi-select');
+  document.getElementById('base-monto').value = '';
+  document.getElementById('base-nota').value  = '';
+  const fd = document.getElementById('base-fecha');
+  if (fd) fd.value = new Date().toISOString().slice(0,10);
+  document.getElementById('modal-base-overlay').classList.add('show');
+};
+
+window.openMultaModal = function() {
+  poblarSelectCont('multa-domi-select');
+  document.getElementById('multa-monto').value = '';
+  document.getElementById('multa-nota').value  = '';
+  const fd = document.getElementById('multa-fecha');
+  if (fd) fd.value = new Date().toISOString().slice(0,10);
+  const ts = document.getElementById('multa-tipo-sel');
+  if (ts) ts.value = 'multa';
+  document.getElementById('modal-multa-overlay').classList.add('show');
+};
  window.saveBase = async function() {
   const domi  = document.getElementById('base-domi-select')?.value?.trim();
   const monto = parsePrecio(document.getElementById('base-monto')?.value || '');
