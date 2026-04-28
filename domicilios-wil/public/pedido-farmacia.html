@@ -2881,84 +2881,72 @@ function closeCheckout(){
 }
 
 function coCapturarGPS(){
-  var title=document.getElementById('co-loc-title'),sub=document.getElementById('co-loc-sub'),st=document.getElementById('co-loc-st');
-  if(!navigator.geolocation){sub.textContent='GPS no disponible';return;}
-  title.textContent='Captando ubicaci\xf3n\u2026';sub.textContent='Un momento\u2026';st.textContent='\u27f3';
-  navigator.geolocation.getCurrentPosition(function(pos){
-    coCoords={lat:pos.coords.latitude,lng:pos.coords.longitude};
-    fetch('https://nominatim.openstreetmap.org/reverse?lat='+pos.coords.latitude+'&lon='+pos.coords.longitude+'&format=json&accept-language=es',{headers:{'User-Agent':'FarmaWIL/1.0'}})
+  var title=document.getElementById('co-loc-title'),
+      sub=document.getElementById('co-loc-sub'),
+      st=document.getElementById('co-loc-st');
+  if(!navigator.geolocation){sub.textContent='GPS no disponible en este dispositivo';return;}
+  title.textContent='Captando ubicación…';
+  sub.textContent='Un momento…';
+  st.textContent='⟳';
+
+  navigator.geolocation.getCurrentPosition(
+    function(pos){
+      coCoords={lat:pos.coords.latitude,lng:pos.coords.longitude};
+      fetch(
+        'https://nominatim.openstreetmap.org/reverse?lat='+pos.coords.latitude+
+        '&lon='+pos.coords.longitude+'&format=json&accept-language=es',
+        {headers:{'User-Agent':'FarmaWIL/1.0'}}
+      )
       .then(function(r){return r.json();})
-      .then(function(data){
-        var a=data.address||{};
+      .then(function(d){
+        var a=d.address||{};
         coBarrio=a.neighbourhood||a.suburb||a.village||a.city_district||a.city||'Copacabana';
-        var calle=(a.road||a.street||'').trim(),num=(a.house_number||'').trim(),ciudad=(a.city||a.town||a.municipality||'Copacabana').trim();
+        var calle=(a.road||a.street||'').trim(),
+            num=(a.house_number||'').trim(),
+            ciudad=(a.city||a.town||a.municipality||'Copacabana').trim();
         var dirAuto=[calle+(num?' #'+num:''),coBarrio,ciudad].filter(Boolean).join(', ');
+
         var dirInput=document.getElementById('co-direccion');
-        if(dirInput&&!dirInput.value.trim())dirInput.value=dirAuto;
- 
-        // ── Función centralizada para aplicar tarifa ──
-        function aplicarTarifa(precio,nombre){
-          coDomicilio=precio;
-          coZonaNombre=nombre;
-          var zonaEl=document.getElementById('co-zona-lbl');
-          var domiEl=document.getElementById('co-domi-txt');
-          if(zonaEl)zonaEl.textContent=coZonaNombre;
-          if(domiEl)domiEl.textContent=fp(coDomicilio);
-          coActualizarResumen();
-        }
- 
-        // 1. Intentar API propia (hoja de tarifas)
-        fetch('/api/wil?action=tarifa-barrio&barrio='+encodeURIComponent(coBarrio))
-          .then(function(r){return r.json();})
-          .then(function(td){
-            if(td.ok&&td.tarifa){
-              aplicarTarifa(td.tarifa,td.barrio||coBarrio);
-            } else if(coCoords){
-              // 2. Fallback: OSRM distancia desde sede Copacabana
-              var COPA_LAT=6.34911,COPA_LNG=-75.50619;
-              fetch('https://router.project-osrm.org/route/v1/driving/'+COPA_LNG+','+COPA_LAT+';'+coCoords.lng+','+coCoords.lat+'?overview=false')
-                .then(function(r){return r.json();})
-                .then(function(od){
-                  if(od.routes&&od.routes[0]){
-                    var km=od.routes[0].distance/1000;
-                    // $1800/km redondeado a $500, mínimo $5000
-                    aplicarTarifa(
-                      Math.max(5000,Math.round(km*1800/500)*500),
-                      km>15?'\xc1rea Metro':coBarrio
-                    );
-                  } else {
-                    var z=coPrecioBarrio(coBarrio);aplicarTarifa(z.precio,z.nombre);
-                  }
-                })
-                .catch(function(){
-                  var z=coPrecioBarrio(coBarrio);aplicarTarifa(z.precio,z.nombre);
-                });
-            } else {
-              var z=coPrecioBarrio(coBarrio);aplicarTarifa(z.precio,z.nombre);
-            }
-          })
-          .catch(function(){
-            var z=coPrecioBarrio(coBarrio);aplicarTarifa(z.precio,z.nombre);
-          });
- 
-        // Actualizar chip de GPS
-        title.textContent='\ud83d\udccd '+coBarrio;
-        sub.textContent=dirAuto||'Ubicaci\xf3n capturada';
-        st.textContent='\u2713';st.style.color='#15803d';
+        if(dirInput&&!dirInput.value.trim()) dirInput.value=dirAuto;
+
+        /* ── Tarifa local directa, sin API externa ── */
+        var z=coPrecioBarrio(coBarrio);
+        coDomicilio=z.precio;
+        coZonaNombre=z.nombre;
+        var zonaEl=document.getElementById('co-zona-lbl');
+        var domiEl=document.getElementById('co-domi-txt');
+        if(zonaEl) zonaEl.textContent=coZonaNombre;
+        if(domiEl) domiEl.textContent=fp(coDomicilio);
+        coActualizarResumen();
+
+        /* ── Actualizar chip ── */
+        title.textContent='📍 '+coBarrio;
+        sub.textContent=dirAuto||'Ubicación capturada';
+        st.textContent='✓';
+        st.style.color='#15803d';
         document.getElementById('co-loc-chip').style.background='#dcfce7';
         document.getElementById('co-loc-chip').style.borderColor='#86efac';
       })
       .catch(function(){
+        /* Nominatim falló: GPS OK pero sin dirección automática */
         title.textContent='GPS capturado';
-        sub.textContent='Completa la direcci\xf3n manualmente';
-        st.textContent='\u2713';
+        sub.textContent='Completa la dirección manualmente';
+        st.textContent='✓';
+        st.style.color='#15803d';
+        document.getElementById('co-loc-chip').style.background='#dcfce7';
+        document.getElementById('co-loc-chip').style.borderColor='#86efac';
       });
-  },function(){
-    title.textContent='No se pudo captar';
-    sub.textContent='Ingresa la direcci\xf3n manualmente';
-    st.textContent='\u2717';st.style.color='#dc2626';
-  },{enableHighAccuracy:true,timeout:12000});
+    },
+    function(err){
+      title.textContent='No se pudo captar';
+      sub.textContent='Permiso denegado o GPS inactivo';
+      st.textContent='✗';
+      st.style.color='#dc2626';
+    },
+    {enableHighAccuracy:true,timeout:12000}
+  );
 }
+
 function coSelPago(m) {
   coPago = m;
 
