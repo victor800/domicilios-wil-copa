@@ -3206,9 +3206,965 @@ function _crearZonaEnSheets(data) {
     }
     return zonas;
   }
-  })();
-
  
+  /* ═══════════════════════════════════════════════════
+     FUNCIÓN PRINCIPAL — exportada globalmente
+  ═══════════════════════════════════════════════════ */
+  async function WIL_calcularTarifa(optsOverride) {
+    /*
+      optsOverride permite pasar coords/barrio/direccion manualmente
+      (útil desde pedido-farmacia.html que tiene su propio state)
+    */
+    var opts = optsOverride || {};
+    var st = window.state || {};
+ 
+    var clienteLat = (opts.lat)        || (st.coords && st.coords.lat) || null;
+    var clienteLng = (opts.lng)        || (st.coords && st.coords.lng) || null;
+    var barrioCli  = norm(opts.barrio  || st.barrio  || '');
+    var dirCli     = norm((opts.direccion || st.direccion || '') + ' ' + (opts.referencia || st.referencia || ''));
+ 
+    var resultado = { tarifa: 0, zonaStr: 'Por confirmar', esFuera: false, km: 0, mensaje: '' };
+ 
+    try {
+      var zonas = await cargarTarifas();
+      if (!zonas.length) { resultado.mensaje = 'Sin datos de tarifas'; return resultado; }
+ 
+      var mejorZona = null;
+      var mejorDist = Infinity;
+ 
+      /* ── PASO 1: Match GPS (más confiable) ── */
+      if (clienteLat && clienteLng) {
+        for (var i = 0; i < zonas.length; i++) {
+          var z = zonas[i];
+          if (z.lat === null || z.lng === null) continue;
+          var d = haversine(clienteLat, clienteLng, z.lat, z.lng);
+          if (d < mejorDist) { mejorDist = d; mejorZona = z; }
+        }
+        /* Si el centroide más cercano está a >3 km → fuera de cobertura Copacabana */
+        if (mejorDist > 3) mejorZona = null;
+      }
+ 
+      /* ── PASO 2: Match por texto (barrio + dirección + referencia) ── */
+      if (!mejorZona) {
+        var mejorScore = 0;
+        for (var j = 0; j < zonas.length; j++) {
+          var zn = zonas[j];
+          var nb = norm(zn.barrio);
+          var nd = norm(zn.direccion);
+          var score = 0;
+ 
+          /* barrio exact o substring */
+          if (barrioCli && nb && barrioCli === nb) score += 10;
+          else if (barrioCli && nb && barrioCli.indexOf(nb) !== -1) score += 7;
+          else if (barrioCli && nb && nb.indexOf(barrioCli) !== -1) score += 6;
+ 
+          /* dirección cliente contiene nombre de zona */
+          if (dirCli && nb && dirCli.indexOf(nb) !== -1) score += 5;
+          if (dirCli && nd && nd && dirCli.indexOf(nd) !== -1) score += 4;
+ 
+          if (score > mejorScore) { mejorScore = score; mejorZona = zn; }
+        }
+        if (mejorScore === 0) mejorZona = null;
+      }
+ 
+      /* ── PASO 3: Fallback a zona más barata de Copacabana si no hay coords ── */
+      if (!mejorZona && !clienteLat) {
+        var conTarifa = zonas.filter(function (z) { return z.tarifa > 0; });
+        if (conTarifa.length) {
+          mejorZona = conTarifa.reduce(function (a, b) {
+            return a.tarifa <= b.tarifa ? a : b;
+          });
+          mejorZona = Object.assign({}, mejorZona, { _fallback: true });
+        }
+      }
+ 
+      /* ── RESULTADO DENTRO DE COBERTURA ── */
+      if (mejorZona && !mejorZona._fallback) {
+        resultado.tarifa  = mejorZona.tarifa;
+        resultado.zonaStr = mejorZona.zona || mejorZona.barrio || 'Copacabana';
+        resultado.esFuera = false;
+        resultado.mensaje = 'Zona: ' + resultado.zonaStr + ' · $' + mejorZona.tarifa.toLocaleString('es-CO');
+        return resultado;
+      }
+ 
+      /* Fallback con tarifa base */
+      if (mejorZona && mejorZona._fallback) {
+        resultado.tarifa  = mejorZona.tarifa;
+        resultado.zonaStr = mejorZona.zona || 'Copacabana';
+        resultado.esFuera = false;
+        resultado.mensaje = 'Tarifa base: $' + mejorZona.tarifa.toLocaleString('es-CO');
+        return resultado;
+      }
+ 
+      /* ── FUERA DE COPACABANA → $1.800/km ── */
+      resultado.esFuera = true;
+      if (clienteLat && clienteLng) {
+        var km = haversine(ANCLA.lat, ANCLA.lng, clienteLat, clienteLng);
+        resultado.km     = Math.round(km * 10) / 10;
+        resultado.tarifa = Math.round(km * PRECIO_KM_FUERA / 500) * 500;
+        resultado.zonaStr = 'Fuera de Copacabana · ' + resultado.km + ' km';
+        resultado.mensaje = 'Por distancia: ' + resultado.km + ' km · $' + resultado.tarifa.toLocaleString('es-CO');
+      } else {
+        resultado.zonaStr = 'Fuera de Copacabana';
+        resultado.mensaje = 'Se calculará según distancia real';
+      }
+ 
+      /* Registrar zona nueva en Sheets (silencioso) */
+      _registrarZonaNueva({ barrio: barrioCli, lat: clienteLat, lng: clienteLng, tarifa: resultado.tarifa, zonaStr: resultado.zonaStr, dirCli: dirCli });
+ 
+    } catch (e) {
+      console.warn('[WIL tarifa]', e.message);
+      resultado.mensaje = 'Sin tarifa disponible';
+    }
+ 
+    return resultado;
+  }
+ 
+  /* ── Registrar zona nueva en Sheets (no-cors) ── */
+  function _registrarZonaNueva(d) {
+    if (!d.lat || !d.lng) return;
+    var GAS = 'https://script.google.com/macros/s/AKfycbyNLLKk8S6bG-MgRLWx2zUVp4lXjaMl7txlUAAGLxAa-ZmoBrWN5mWWnnDNw-ZIs78NHA/exec';
+    fetch(GAS, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accion: 'nueva-tarifa',
+        rows: [[d.barrio || 'Nuevo sector', d.tarifa, '', '', '', d.dirCli || '', d.zonaStr || '', d.lat, d.lng]]
+      })
+    }).catch(function () {});
+  }
+ 
+  /* ═══════════════════════════════════════════════════
+     WIL_inyectarTarifa()
+     Calcula la tarifa, la guarda en state y actualiza
+     el ticket visual (si ya está en pantalla).
+     Retorna el objeto resultado.
+  ═══════════════════════════════════════════════════ */
+  async function WIL_inyectarTarifa(optsOverride) {
+    var info = await WIL_calcularTarifa(optsOverride);
+    var st = window.state || {};
+ 
+    /* Guardar en state */
+    st.precioDomicilio   = info.tarifa;
+    st.tarifaZonaStr     = info.zonaStr;
+    st.tarifaEsFuera     = info.esFuera;
+    st.tarifaMensaje     = info.mensaje;
+    st.tarifaKm          = info.km || 0;
+ 
+    /* Actualizar UI del ticket si está visible */
+    _actualizarTicketUI(info);
+ 
+    console.log('[WIL Tarifa] ' + info.mensaje + (info.esFuera ? ' ⚠️ FUERA' : ' ✅'));
+    return info;
+  }
+ 
+  /* ── Actualizar elementos del ticket en pantalla ── */
+  function _actualizarTicketUI(info) {
+    /* pedido-wil.html — ticket libre */
+    var elTarifa = document.getElementById('factura-tarifa-domi');
+    if (elTarifa) {
+      elTarifa.textContent = info.tarifa > 0
+        ? '$' + info.tarifa.toLocaleString('es-CO')
+        : 'Por confirmar';
+    }
+    var elZona = document.getElementById('factura-zona-domi');
+    if (elZona) elZona.textContent = info.zonaStr;
+ 
+    /* pedido-farmacia.html — ticket farmacia */
+    var elFarmTarifa = document.getElementById('farm-tarifa-domi');
+    if (elFarmTarifa) {
+      elFarmTarifa.textContent = info.tarifa > 0
+        ? '$' + info.tarifa.toLocaleString('es-CO')
+        : 'Por confirmar';
+    }
+    var elFarmZona = document.getElementById('farm-zona-domi');
+    if (elFarmZona) elFarmZona.textContent = info.zonaStr;
+ 
+    /* Nota fuera de cobertura */
+    var elNota = document.getElementById('wil-tarifa-nota');
+    if (elNota) {
+      elNota.style.display = info.esFuera ? 'flex' : 'none';
+      if (info.esFuera) {
+        elNota.innerHTML = '<span style="font-size:15px">🛵</span>'
+          + '<span>Estás fuera de Copacabana · El domiciliario calculará el valor exacto según la distancia real ('
+          + (info.km ? info.km + ' km aprox.' : 'por confirmar') + '). <b>Tú apruebas antes del cobro.</b></span>';
+      }
+    }
+  }
+ 
+  /* ── Exponer globalmente ── */
+  window.WIL_calcularTarifa  = WIL_calcularTarifa;
+  window.WIL_inyectarTarifa  = WIL_inyectarTarifa;
+ 
+  /* ═══════════════════════════════════════════════════
+     AUTO-PATCH pedido-wil.html
+     Intercepta enviarPedido para inyectar tarifa real en col T
+     y parchea generarFacturaLibre para mostrar tarifa en ticket
+  ═══════════════════════════════════════════════════ */
+  document.addEventListener('DOMContentLoaded', function () {
+ 
+    /* ── 1. Patch generarFacturaLibre → añade filas de tarifa al ticket ── */
+    var _origGenFactura = window.generarFacturaLibre;
+    if (typeof _origGenFactura === 'function') {
+      window.generarFacturaLibre = async function () {
+        /* Llamar original primero (valida campos y muestra ticket) */
+        _origGenFactura.apply(this, arguments);
+ 
+        /* Calcular tarifa en paralelo */
+        var info = await WIL_inyectarTarifa();
+ 
+        /* Inyectar fila de tarifa en el ticket WIL */
+        _insertarFilaTarifaEnTicket(info);
+      };
+    }
+ 
+    /* ── 2. Patch enviarPedido → col T con tarifa real ── */
+    var _origEnviar = window.enviarPedido;
+    if (typeof _origEnviar === 'function') {
+      window.enviarPedido = async function (tipo) {
+        /* Calcular (o reusar si ya se calculó en generarFactura) */
+        if (!window.state.precioDomicilio) {
+          await WIL_inyectarTarifa();
+        }
+        return _origEnviar.apply(this, arguments);
+      };
+    }
+ 
+    /* ── 3. Patch para farmacia: interceptar confirmación de pedido ── */
+    var _origConfirmarFarm = window.confirmarPedidoFarmacia;
+    if (typeof _origConfirmarFarm === 'function') {
+      window.confirmarPedidoFarmacia = async function () {
+        if (!window.state || !window.state.precioDomicilio) {
+          await WIL_inyectarTarifa();
+        }
+        return _origConfirmarFarm.apply(this, arguments);
+      };
+    }
+ 
+    console.log('[WIL Tarifa Patch v3] ✅ Activo');
+  });
+ 
+  /* ── Insertar fila tarifa en ticket wil-ticket ── */
+  function _insertarFilaTarifaEnTicket(info) {
+    /* Buscar el div wil-ticket-body */
+    var body = document.querySelector('.wil-ticket-body');
+    if (!body) return;
+ 
+    /* Eliminar fila previa si existe */
+    var vieja = document.getElementById('wil-tarifa-row');
+    if (vieja) vieja.remove();
+    var viejaNota = document.getElementById('wil-tarifa-nota');
+    if (viejaNota) viejaNota.remove();
+ 
+    /* Insertar antes del footer (última hr o wil-ticket-nota) */
+    var anchor = body.querySelector('.wil-ticket-nota') || body.lastElementChild;
+ 
+    /* Fila tarifa domicilio */
+    var rowHTML = '<div id="wil-tarifa-row" class="wil-ticket-row" style="border-top:1.5px dashed #e2e9ef;margin-top:4px;padding-top:8px">'
+      + '<div class="wil-ticket-lbl">🛵 Domicilio</div>'
+      + '<div class="wil-ticket-val" style="color:' + (info.esFuera ? '#d97706' : 'var(--p)') + ';font-weight:900">'
+      + (info.tarifa > 0 ? '$' + info.tarifa.toLocaleString('es-CO') : 'Por confirmar')
+      + '<div style="font-size:9px;color:var(--on3);font-weight:500;margin-top:1px">' + info.zonaStr + '</div>'
+      + '</div></div>';
+ 
+    /* Nota fuera de Copacabana */
+    var notaHTML = info.esFuera
+      ? '<div id="wil-tarifa-nota" class="wil-ticket-nota" style="background:#fffbeb;border-color:rgba(217,119,6,.2);margin-top:8px">'
+      + '<span class="sym" style="font-size:15px;color:#d97706;flex-shrink:0">directions_bike</span>'
+      + '<span>Destino fuera de Copacabana · El domi calculará el valor exacto '
+      + (info.km ? '(' + info.km + ' km aprox.)' : '')
+      + '. <b>Tú apruebas antes del cobro.</b></span></div>'
+      : '';
+ 
+    if (anchor) {
+      anchor.insertAdjacentHTML('beforebegin', rowHTML + notaHTML);
+    } else {
+      body.insertAdjacentHTML('beforeend', rowHTML + notaHTML);
+    }
+  }
+ 
+})();
+
+
+
+/* ── 2. Tarifa automática inteligente ── */
+var WIL_TARIFA_CACHE = null;
+var WIL_TARIFA_CARGANDO = false;
+
+async function WIL_v4_calcularTarifa() {
+  if (WIL_TARIFA_CACHE) return WIL_TARIFA_CACHE;
+  var SHEET_ID = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+  var TARIFA_LEJANO_FIJO = 45000; // barrios muy lejanos → tarifa fija
+  var KM_LIMITE_FIJO = 45;        // si está a +45 km → tarifa fija
+
+  function haversine(la1,lo1,la2,lo2){
+    var R=6371,dLa=(la2-la1)*Math.PI/180,dLo=(lo2-lo1)*Math.PI/180;
+    var a=Math.sin(dLa/2)*Math.sin(dLa/2)+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLo/2)*Math.sin(dLo/2);
+    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  }
+  function norm(s){
+    return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+  }
+  function parseCsv(line){
+    var r=[],cur='',q=false;
+    for(var i=0;i<line.length;i++){var c=line[i];if(c==='"'){if(q&&line[i+1]==='"'){cur+='"';i++;}else q=!q;}else if(c===','&&!q){r.push(cur.trim());cur='';}else cur+=c;}
+    r.push(cur.trim());return r;
+  }
+
+  var resultado = { tarifa:0, zonaStr:'Copacabana', esFuera:false, km:0, mensaje:'' };
+
+  try {
+    var url = 'https://docs.google.com/spreadsheets/d/'+SHEET_ID
+            + '/gviz/tq?tqx=out:csv&sheet=Tarifas&cachebust='+Date.now();
+    var res  = await fetch(url, { cache:'no-store' });
+    var text = await res.text();
+    var lines = text.trim().split('\n');
+
+    var zonas = [];
+    for (var i=1;i<lines.length;i++){
+      var c = parseCsv(lines[i]);
+      if (!c[0]&&!c[7]) continue;
+      var lat=parseFloat(c[7]),lng=parseFloat(c[8]);
+      zonas.push({
+        barrio:   (c[0]||'').trim(),
+        tarifa:   parseInt((c[1]||'').replace(/[^0-9]/g,''))||0,
+        direccion:(c[5]||'').trim(),
+        zona:     (c[6]||'').trim(),
+        lat:      isNaN(lat)?null:lat,
+        lng:      isNaN(lng)?null:lng,
+      });
+    }
+
+    var cLat = window.state&&window.state.coords?window.state.coords.lat:null;
+    var cLng = window.state&&window.state.coords?window.state.coords.lng:null;
+    var barrioCli = norm(window.state?window.state.barrio:'');
+    var dirCli    = norm((window.state?window.state.direccion:'')+' '+(window.state?window.state.referencia:''));
+
+    var ANCLA = { lat:6.35245, lng:-75.50486 };
+    var mejorZona = null, mejorDist = Infinity;
+
+    /* GPS match */
+    if (cLat && cLng) {
+      for (var z=0;z<zonas.length;z++){
+        var zo=zonas[z];
+        if(zo.lat===null||zo.lng===null)continue;
+        var d=haversine(cLat,cLng,zo.lat,zo.lng);
+        if(d<mejorDist){mejorDist=d;mejorZona=zo;}
+      }
+      if(mejorDist>3) mejorZona=null; // fuera del radio Copacabana
+    }
+
+    /* Text match */
+    if (!mejorZona) {
+      var mejorScore=0;
+      for(var z2=0;z2<zonas.length;z2++){
+        var zn=zonas[z2];
+        var nb=norm(zn.barrio),nd=norm(zn.direccion);
+        var score=0;
+        if(barrioCli&&nb&&barrioCli===nb)score+=10;
+        else if(barrioCli&&nb&&barrioCli.indexOf(nb)!==-1)score+=7;
+        else if(barrioCli&&nb&&nb.indexOf(barrioCli)!==-1)score+=6;
+        if(dirCli&&nb&&dirCli.indexOf(nb)!==-1)score+=5;
+        if(dirCli&&nd&&nd&&dirCli.indexOf(nd)!==-1)score+=4;
+        if(score>mejorScore){mejorScore=score;mejorZona=zn;}
+      }
+      if(mejorScore===0)mejorZona=null;
+    }
+
+    /* Fallback: zona más barata (sin GPS ni texto) */
+    if(!mejorZona&&!cLat){
+      var conT=zonas.filter(function(z){return z.tarifa>0;});
+      if(conT.length){
+        mejorZona=conT.reduce(function(a,b){return a.tarifa<=b.tarifa?a:b;});
+        mejorZona=Object.assign({},mejorZona,{_fallback:true});
+      }
+    }
+
+    /* Resultado dentro de cobertura */
+    if(mejorZona&&!mejorZona._fallback){
+      resultado.tarifa  = mejorZona.tarifa;
+      resultado.zonaStr = mejorZona.zona||mejorZona.barrio||'Copacabana';
+      resultado.esFuera = false;
+      resultado.mensaje = 'OK: '+resultado.zonaStr+' $'+mejorZona.tarifa.toLocaleString('es-CO');
+      WIL_TARIFA_CACHE  = resultado;
+      return resultado;
+    }
+    if(mejorZona&&mejorZona._fallback){
+      resultado.tarifa  = mejorZona.tarifa;
+      resultado.zonaStr = mejorZona.zona||'Copacabana';
+      resultado.esFuera = false;
+      WIL_TARIFA_CACHE  = resultado;
+      return resultado;
+    }
+
+    /* Fuera de cobertura: $1800/km o tarifa fija si >45km */
+    resultado.esFuera = true;
+    if(cLat&&cLng){
+      var km=haversine(ANCLA.lat,ANCLA.lng,cLat,cLng);
+      resultado.km=Math.round(km*10)/10;
+      if(km>=KM_LIMITE_FIJO){
+        resultado.tarifa  = TARIFA_LEJANO_FIJO;
+        resultado.zonaStr = 'Barrio lejano ('+resultado.km+' km) · Tarifa fija';
+        resultado.mensaje = 'Tarifa fija por distancia alta';
+      } else {
+        resultado.tarifa  = Math.round(km*1800/500)*500;
+        resultado.zonaStr = 'Fuera de Copacabana ('+resultado.km+' km)';
+        resultado.mensaje = 'Por distancia: '+resultado.km+' km';
+      }
+    } else {
+      resultado.tarifa  = 0; // sin GPS fuera de copa → no sabemos, mostrar "$0 (por confirmar)"
+      resultado.zonaStr = 'Fuera de Copacabana';
+      resultado.mensaje = 'Sin GPS — el domi confirma';
+    }
+
+  } catch(e){
+    console.warn('[WIL tarifa v4]',e.message);
+    resultado.mensaje = 'Error: '+e.message;
+  }
+
+  WIL_TARIFA_CACHE = resultado;
+  return resultado;
+}
+
+/* ── 3. Inyectar tarifa en ticket UI ── */
+function WIL_v4_renderTarifaEnTicket(info){
+  var cont = document.getElementById('wil-ticket-tarifa-container');
+  if(!cont) return;
+  var tarifaTxt = info.tarifa>0
+    ? '$'+info.tarifa.toLocaleString('es-CO')
+    : '$0 (el domi confirma)';
+
+  cont.innerHTML =
+    '<div class="wil-ticket-tarifa-row">'
+    +'<div class="wil-ticket-tarifa-lbl">🛵 Domicilio</div>'
+    +'<div class="wil-ticket-tarifa-val">'+tarifaTxt
+      +'<div class="wil-ticket-tarifa-sub">'+info.zonaStr+'</div>'
+    +'</div></div>'
+    +(info.esFuera
+      ? '<div class="wil-ticket-tarifa-nota"><span class="sym">info</span>'
+        +'<span>Destino fuera de Copacabana'+(info.km?' ('+info.km+' km aprox.)':'')+'. El domi calcula la tarifa exacta. <strong>Tú apruebas antes del cobro.</strong></span></div>'
+      : '');
+}
+/* ══════ PARCHE WIL v5 — Ticket tarifa ÚNICO ══════ */
+
+/* -- Eliminar parche v3 que duplicaba filas -- */
+window._wilV3Disabled = true;
+
+/* -- Toggle colapsable -- */
+function wilToggleTicket(hdr) {
+  var body   = document.getElementById('ticketBodyColapsable');
+  var toggle = document.getElementById('ticketCollapseBtn');
+  var isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  toggle.classList.toggle('open', !isOpen);
+  var span = toggle.querySelector('span:first-child');
+  if (span) span.textContent = isOpen ? 'Ver detalles' : 'Ocultar detalles';
+}
+function wilAbrirTicket() {
+  var body   = document.getElementById('ticketBodyColapsable');
+  var toggle = document.getElementById('ticketCollapseBtn');
+  if (!body) return;
+  body.classList.add('open');
+  if (toggle) {
+    toggle.classList.add('open');
+    var span = toggle.querySelector('span:first-child');
+    if (span) span.textContent = 'Ocultar detalles';
+  }
+}
+
+/* -- Cache tarifa -- */
+var WIL_TARIFA_CACHE = null;
+
+/* ────────────────────────────────────────────────
+   CÁLCULO TARIFA v5
+   - Busca en hoja "Tarifas" por GPS primero, texto después
+   - Si no encuentra → calcula $1.800/km desde ancla WIL
+   - zonaStr limpio: NUNCA usa texto de productos
+──────────────────────────────────────────────── */
+async function WIL_v5_calcularTarifa() {
+  if (WIL_TARIFA_CACHE) return WIL_TARIFA_CACHE;
+
+  var SHEET_ID   = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+  var ANCLA      = { lat: 6.35245, lng: -75.50486 };
+  var PRECIO_KM  = 1800;
+  var resultado  = { tarifa: 0, zonaStr: 'Copacabana', esFuera: false, km: 0, mensaje: '' };
+
+  function haversine(la1,lo1,la2,lo2){
+    var R=6371,dLa=(la2-la1)*Math.PI/180,dLo=(lo2-lo1)*Math.PI/180;
+    var a=Math.sin(dLa/2)*Math.sin(dLa/2)
+        +Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)
+        *Math.sin(dLo/2)*Math.sin(dLo/2);
+    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  }
+
+  function parseCsv(line){
+    var r=[],cur='',q=false;
+    for(var i=0;i<line.length;i++){
+      var c=line[i];
+      if(c==='"'){if(q&&line[i+1]==='"'){cur+='"';i++;}else q=!q;}
+      else if(c===','&&!q){r.push(cur.trim());cur='';}
+      else cur+=c;
+    }
+    r.push(cur.trim()); return r;
+  }
+
+  function norm(s){
+    return (s||'').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+  }
+
+  try {
+    /* Leer hoja Tarifas */
+    var url = 'https://docs.google.com/spreadsheets/d/'+SHEET_ID
+            + '/gviz/tq?tqx=out:csv&sheet=Tarifas&cachebust='+Date.now();
+    var res  = await fetch(url, {cache:'no-store'});
+    var text = await res.text();
+    var lines = text.trim().split('\n');
+
+    var zonas = [];
+    for (var i=1;i<lines.length;i++){
+      var c = parseCsv(lines[i]);
+      if(!c[0]&&!c[7]) continue;
+      var lat=parseFloat(c[7]), lng=parseFloat(c[8]);
+      zonas.push({
+        barrio:    (c[0]||'').trim(),
+        tarifa:    parseInt((c[1]||'').replace(/[^0-9]/g,''))||0,
+        direccion: (c[5]||'').trim(),
+        zona:      (c[6]||'').trim(),
+        lat:       isNaN(lat)?null:lat,
+        lng:       isNaN(lng)?null:lng,
+      });
+    }
+
+    var st     = window.state || {};
+    /* ⚠️ Solo usar barrio y dirección — NUNCA los productos */
+    var cLat   = (st.coords&&st.coords.lat) ? st.coords.lat : null;
+    var cLng   = (st.coords&&st.coords.lng) ? st.coords.lng : null;
+    /* Barrio limpio: máximo 30 chars, sin números largos */
+    var barrioCli = norm((st.barrio||'').substring(0,30));
+    /* Dirección: solo la parte antes del primer número de teléfono/precio */
+    var dirRaw    = (st.direccion||'').replace(/\d{7,}/g,' ').substring(0,80);
+    var dirCli    = norm(dirRaw);
+
+    var mejorZona = null, mejorDist = Infinity;
+
+    /* PASO 1 — GPS */
+    if (cLat && cLng) {
+      for (var z=0;z<zonas.length;z++){
+        var zo=zonas[z];
+        if(zo.lat===null||zo.lng===null) continue;
+        var d=haversine(cLat,cLng,zo.lat,zo.lng);
+        if(d<mejorDist){mejorDist=d;mejorZona=zo;}
+      }
+      if(mejorDist>3) mejorZona=null; /* fuera del radio */
+    }
+
+    /* PASO 2 — Texto */
+    if (!mejorZona) {
+      var mejorScore=0;
+      for(var z2=0;z2<zonas.length;z2++){
+        var zn=zonas[z2];
+        var nb=norm(zn.barrio), nd=norm(zn.direccion);
+        var score=0;
+        if(barrioCli&&nb){
+          if(barrioCli===nb) score+=10;
+          else if(barrioCli.indexOf(nb)!==-1) score+=7;
+          else if(nb.indexOf(barrioCli)!==-1) score+=6;
+        }
+        if(dirCli&&nb&&dirCli.indexOf(nb)!==-1) score+=5;
+        if(dirCli&&nd&&nd&&dirCli.indexOf(nd)!==-1) score+=4;
+        if(score>mejorScore){mejorScore=score;mejorZona=zn;}
+      }
+      if(mejorScore===0) mejorZona=null;
+    }
+
+    /* PASO 3 — Fallback Copacabana más barata (sin GPS) */
+    if (!mejorZona && !cLat) {
+      var conT=zonas.filter(function(z){return z.tarifa>0;});
+      if(conT.length){
+        mejorZona=conT.reduce(function(a,b){return a.tarifa<=b.tarifa?a:b;});
+        mejorZona=Object.assign({},mejorZona,{_fallback:true});
+      }
+    }
+
+    /* Dentro de cobertura */
+    if (mejorZona && !mejorZona._fallback) {
+      resultado.tarifa  = mejorZona.tarifa;
+      resultado.zonaStr = mejorZona.zona || mejorZona.barrio || 'Copacabana';
+      resultado.esFuera = false;
+      WIL_TARIFA_CACHE  = resultado;
+      return resultado;
+    }
+    if (mejorZona && mejorZona._fallback) {
+      resultado.tarifa  = mejorZona.tarifa;
+      resultado.zonaStr = mejorZona.zona || 'Copacabana';
+      resultado.esFuera = false;
+      WIL_TARIFA_CACHE  = resultado;
+      return resultado;
+    }
+
+    /* ── FUERA DE COPACABANA ── */
+    resultado.esFuera = true;
+    if (cLat && cLng) {
+      var km = haversine(ANCLA.lat, ANCLA.lng, cLat, cLng);
+      resultado.km      = Math.round(km * 10) / 10;
+      resultado.tarifa  = Math.round(km * PRECIO_KM / 500) * 500;
+      /* zonaStr limpio con barrio real (si existe) o genérico */
+      var barNombre = (st.barrio||'').trim() || 'Fuera de Copacabana';
+      resultado.zonaStr = barNombre + ' · ' + resultado.km + ' km';
+    } else {
+      resultado.zonaStr = (st.barrio||'Fuera de Copacabana').substring(0,30);
+      resultado.tarifa  = 0;
+    }
+
+  } catch(e) {
+    console.warn('[WIL tarifa v5]', e.message);
+    resultado.mensaje = 'Error: '+e.message;
+  }
+
+  WIL_TARIFA_CACHE = resultado;
+  return resultado;
+}
+
+/* ────────────────────────────────────────────────
+   RENDER TARIFA — ÚNICO punto que escribe en el ticket
+   Elimina cualquier fila previa antes de insertar
+──────────────────────────────────────────────── */
+function WIL_v5_renderTarifa(info) {
+  /* Limpiar residuos de parches anteriores */
+  ['wil-tarifa-row','wil-tarifa-nota','wil-ticket-tarifa-container-old']
+    .forEach(function(id){var el=document.getElementById(id);if(el)el.remove();});
+
+  var cont = document.getElementById('wil-ticket-tarifa-container');
+  if (!cont) return;
+
+  /* Limpiar contenido previo del contenedor oficial */
+  cont.innerHTML = '';
+
+  var tarifaTxt = info.tarifa > 0
+    ? '$' + info.tarifa.toLocaleString('es-CO')
+    : 'El domi confirma';
+
+  cont.innerHTML =
+    '<div class="wil-ticket-tarifa-row">'
+    + '<div class="wil-ticket-tarifa-lbl">🛵 Domicilio</div>'
+    + '<div class="wil-ticket-tarifa-val">' + tarifaTxt
+      + '<div class="wil-ticket-tarifa-sub">' + info.zonaStr + '</div>'
+    + '</div></div>'
+    + (info.esFuera
+      ? '<div class="wil-ticket-tarifa-nota"><span class="sym">info</span>'
+        + '<span>Destino fuera de Copacabana'
+        + (info.km ? ' (' + info.km + ' km aprox.)' : '')
+        + '. El domi calcula la tarifa exacta. <strong>Tú apruebas antes del cobro.</strong></span></div>'
+      : '');
+}
+
+/* ────────────────────────────────────────────────
+   PATCH generarFacturaLibre — versión limpia v5
+──────────────────────────────────────────────── */
+var _wil_v5_origGenFactura = window.generarFacturaLibre;
+window.generarFacturaLibre = async function() {
+  /* 1. Resetear cache para recalcular con datos frescos */
+  WIL_TARIFA_CACHE = null;
+
+  /* 2. Llamar original */
+  if (typeof _wil_v5_origGenFactura === 'function')
+    _wil_v5_origGenFactura.apply(this, arguments);
+
+  /* 3. Actualizar resumen colapsable */
+  var st = window.state || {};
+  var nombreEl = document.getElementById('factura-nombre-resumen');
+  if (nombreEl) nombreEl.textContent = st.nombre || '—';
+  var countEl = document.getElementById('ticket-prod-count');
+  if (countEl) countEl.textContent = (st.productos && st.productos.length)
+    ? st.productos.length + ' producto' + (st.productos.length !== 1 ? 's' : '')
+    : 'Sin lista';
+  var pagoEl = document.getElementById('ticket-pago-resumen');
+  if (pagoEl) pagoEl.textContent = st.metodoPago === 'EFECTIVO' ? '💵 Efectivo' : '🏦 Transferencia';
+
+  /* 4. Calcular tarifa y renderizar en el ÚNICO contenedor */
+  var info = await WIL_v5_calcularTarifa();
+  WIL_v5_renderTarifa(info);
+
+  /* 5. Guardar en state */
+  if (window.state) {
+    window.state.precioDomicilio = info.tarifa;
+    window.state.tarifaZonaStr   = info.zonaStr;
+    window.state.tarifaEsFuera   = info.esFuera;
+  }
+
+  /* 6. Abrir ticket */
+  setTimeout(wilAbrirTicket, 100);
+};
+
+/* PATCH enviarPedido — asegurar tarifa en col T */
+var _wil_v5_origEnviar = window.enviarPedido;
+window.enviarPedido = async function(tipo) {
+  if (!WIL_TARIFA_CACHE) await WIL_v5_calcularTarifa();
+  if (window.state && WIL_TARIFA_CACHE)
+    window.state.precioDomicilio = WIL_TARIFA_CACHE.tarifa;
+  return _wil_v5_origEnviar.apply(this, arguments);
+};
+
+console.log('[WIL v5] ✅ Tarifa única · Sin duplicados · zonaStr limpio');
+
+(function (global) {
+  'use strict';
+ 
+  /* ─── Constantes ─────────────────────────────────────────── */
+  var SHEET_ID       = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+  var ANCLA          = { lat: 6.35245, lng: -75.50486 };   // Sede WIL Copacabana
+  var PRECIO_KM      = 1800;     // $/km fuera de Copacabana
+  var KM_FIJO_LIMITE = 45;       // km a partir del cual aplica tarifa fija
+  var TARIFA_FIJA    = 45000;    // tarifa fija para barrios muy lejanos
+  var RADIO_COPA     = 3.5;      // km — radio para considerar "dentro de Copacabana"
+ 
+  /* ─── Caché de sesión ────────────────────────────────────── */
+  var _cache = null;
+ 
+  /* ─── Haversine (km) ─────────────────────────────────────── */
+  function km(la1, lo1, la2, lo2) {
+    var R = 6371,
+      dLa = (la2 - la1) * Math.PI / 180,
+      dLo = (lo2 - lo1) * Math.PI / 180,
+      a = Math.sin(dLa / 2) * Math.sin(dLa / 2)
+        + Math.cos(la1 * Math.PI / 180) * Math.cos(la2 * Math.PI / 180)
+          * Math.sin(dLo / 2) * Math.sin(dLo / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+ 
+  /* ─── CSV parser mínimo ──────────────────────────────────── */
+  function parseCsv(line) {
+    var r = [], cur = '', q = false;
+    for (var i = 0; i < line.length; i++) {
+      var c = line[i];
+      if (c === '"') { if (q && line[i + 1] === '"') { cur += '"'; i++; } else q = !q; }
+      else if (c === ',' && !q) { r.push(cur.trim()); cur = ''; }
+      else cur += c;
+    }
+    r.push(cur.trim());
+    return r;
+  }
+ 
+  /* ─── Normalizar texto (solo para comparación) ───────────── */
+  function norm(s) {
+    return (s || '')
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9 ]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+ 
+  /* ─── Leer hoja "Tarifas" ────────────────────────────────── */
+  async function cargarZonas() {
+    var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
+      + '/gviz/tq?tqx=out:csv&sheet=Tarifas&cachebust=' + Date.now();
+    var res  = await fetch(url, { cache: 'no-store' });
+    var text = await res.text();
+    var lines = text.trim().split('\n');
+    var zonas = [];
+    for (var i = 1; i < lines.length; i++) {
+      var c = parseCsv(lines[i]);
+      if (!c[0] && !c[7]) continue;
+      var lat = parseFloat(c[7]);
+      var lng = parseFloat(c[8]);
+      zonas.push({
+        /* ── columnas hoja Tarifas ──────────────────────────
+           A=barrio  B=tarifa  C=paqPeq  D=paqMed  E=paqGra
+           F=direccion  G=zona  H=lat  I=lng
+        ─────────────────────────────────────────────────── */
+        barrio:    (c[0] || '').trim(),
+        tarifa:    parseInt((c[1] || '').replace(/[^0-9]/g, '')) || 0,
+        direccion: (c[5] || '').trim(),
+        /* zonaStr SEGURO: viene directamente de la hoja */
+        zona:      (c[6] || (c[0] || 'Copacabana')).trim(),
+        lat:       isNaN(lat) ? null : lat,
+        lng:       isNaN(lng) ? null : lng,
+      });
+    }
+    return zonas;
+  }
+ 
+  /* ═══════════════════════════════════════════════════════════
+     WIL_tarifa(opts?)
+     opts = { lat, lng, barrio, direccion }  — todos opcionales;
+             si se omiten, lee de window.state automáticamente.
+     Retorna: { tarifa, zonaStr, esFuera, km, mensaje }
+  ═══════════════════════════════════════════════════════════ */
+  async function WIL_tarifa(opts) {
+    if (_cache) return _cache;
+ 
+    var o   = opts || {};
+    var st  = global.state || {};
+ 
+    /* ── Coordenadas del cliente ── */
+    var cLat = o.lat || (st.coords && st.coords.lat) || null;
+    var cLng = o.lng || (st.coords && st.coords.lng) || null;
+ 
+    /* ── Solo para búsqueda de texto en la hoja, NUNCA para zonaStr final ── */
+    var barrioTxt = norm((o.barrio || st.barrio || '').substring(0, 40));
+    /* Dirección: quitar posibles residuos de números largos (tel/precios) */
+    var dirTxt = norm(
+      ((o.direccion || st.direccion || '') + ' ' + (st.referencia || ''))
+        .replace(/\d{7,}/g, ' ')
+        .substring(0, 100)
+    );
+ 
+    var resultado = { tarifa: 0, zonaStr: 'Copacabana', esFuera: false, km: 0, mensaje: '' };
+ 
+    try {
+      var zonas = await cargarZonas();
+      if (!zonas.length) {
+        resultado.mensaje = 'Sin datos de tarifas';
+        return resultado;
+      }
+ 
+      var mejor      = null;
+      var mejorDist  = Infinity;
+      var mejorScore = 0;
+ 
+      /* ── PASO 1: Match por GPS ─────────────────────────── */
+      if (cLat && cLng) {
+        for (var i = 0; i < zonas.length; i++) {
+          var z = zonas[i];
+          if (z.lat === null || z.lng === null) continue;
+          var d = km(cLat, cLng, z.lat, z.lng);
+          if (d < mejorDist) { mejorDist = d; mejor = z; }
+        }
+        /* Si está fuera del radio de Copacabana, descartar match GPS */
+        if (mejorDist > RADIO_COPA) mejor = null;
+      }
+ 
+      /* ── PASO 2: Match por texto (barrio y dirección) ──── */
+      if (!mejor) {
+        for (var j = 0; j < zonas.length; j++) {
+          var zn   = zonas[j];
+          var nb   = norm(zn.barrio);
+          var nd   = norm(zn.direccion);
+          var sc   = 0;
+ 
+          if (barrioTxt && nb) {
+            if (barrioTxt === nb)                          sc += 10;
+            else if (barrioTxt.indexOf(nb) !== -1)         sc += 7;
+            else if (nb.indexOf(barrioTxt) !== -1)         sc += 6;
+          }
+          if (dirTxt && nb && dirTxt.indexOf(nb) !== -1)   sc += 5;
+          if (dirTxt && nd && nd && dirTxt.indexOf(nd) !== -1) sc += 4;
+ 
+          if (sc > mejorScore) { mejorScore = sc; mejor = zn; }
+        }
+        if (mejorScore === 0) mejor = null;
+      }
+ 
+      /* ── PASO 3: Fallback a zona más barata de Copacabana ─
+         Aplica cuando no hay GPS ni match de texto.
+         También aplica cuando hay GPS pero está dentro de
+         Copacabana y ninguna zona tiene coordenadas cargadas. ── */
+      if (!mejor) {
+        var conTarifa = zonas.filter(function (z) { return z.tarifa > 0; });
+        if (conTarifa.length) {
+          mejor = conTarifa.reduce(function (a, b) {
+            return a.tarifa <= b.tarifa ? a : b;
+          });
+          mejor = Object.assign({}, mejor, { _fallback: true });
+        }
+      }
+ 
+      /* ── Resultado dentro de cobertura ──────────────────── */
+      if (mejor) {
+        resultado.tarifa  = mejor.tarifa;
+        /* zonaStr: campo "zona" de la hoja (ej: "Zona 1"), nunca barrio del cliente */
+        resultado.zonaStr = mejor.zona || mejor.barrio || 'Copacabana';
+        resultado.esFuera = false;
+        resultado.mensaje = (mejor._fallback ? 'Tarifa base' : 'OK')
+          + ': ' + resultado.zonaStr + ' · $' + resultado.tarifa.toLocaleString('es-CO');
+        _cache = resultado;
+        return resultado;
+      }
+ 
+      /* ── Fuera de cobertura: cálculo por km ─────────────── */
+      resultado.esFuera = true;
+      if (cLat && cLng) {
+        var distKm = km(ANCLA.lat, ANCLA.lng, cLat, cLng);
+        resultado.km = Math.round(distKm * 10) / 10;
+ 
+        if (distKm >= KM_FIJO_LIMITE) {
+          resultado.tarifa  = TARIFA_FIJA;
+          resultado.zonaStr = 'Barrio lejano · Tarifa fija';
+          resultado.mensaje = 'Tarifa fija $45.000 (>' + KM_FIJO_LIMITE + ' km)';
+        } else {
+          resultado.tarifa  = Math.round(distKm * PRECIO_KM / 500) * 500;
+          resultado.zonaStr = 'Área Metropolitana · ' + resultado.km + ' km';
+          resultado.mensaje = '$1.800/km · ' + resultado.km + ' km';
+        }
+      } else {
+        /* Sin GPS y sin match: tarifa pendiente */
+        resultado.tarifa  = 0;
+        resultado.zonaStr = 'El domi confirma la zona';
+        resultado.mensaje = 'Sin GPS — el domi confirma';
+      }
+ 
+    } catch (e) {
+      console.warn('[WIL tarifa v6]', e.message);
+      resultado.mensaje = 'Error al leer tarifas';
+    }
+ 
+    _cache = resultado;
+    return resultado;
+  }
+ 
+  /* ═══════════════════════════════════════════════════════════
+     WIL_renderTarifa(info)
+     Escribe en #wil-ticket-tarifa-container.
+     Limpia residuos de versiones anteriores antes de pintar.
+  ═══════════════════════════════════════════════════════════ */
+  function WIL_renderTarifa(info) {
+    /* Limpiar residuos de parches anteriores (v3/v4/v5) */
+    ['wil-tarifa-row', 'wil-tarifa-nota'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.remove();
+    });
+ 
+    var cont = document.getElementById('wil-ticket-tarifa-container');
+    if (!cont) return;
+    cont.innerHTML = '';
+ 
+    var tarifaTxt = info.tarifa > 0
+      ? '$' + info.tarifa.toLocaleString('es-CO')
+      : 'El domi confirma';
+ 
+    var color = info.esFuera ? '#d97706' : 'var(--p)';
+ 
+    cont.innerHTML =
+      '<div class="wil-ticket-tarifa-row">'
+      + '<div class="wil-ticket-tarifa-lbl">🛵 Domicilio</div>'
+      + '<div class="wil-ticket-tarifa-val" style="color:' + color + '">'
+        + tarifaTxt
+        + '<div class="wil-ticket-tarifa-sub">' + info.zonaStr + '</div>'
+      + '</div></div>'
+      + (info.esFuera
+        ? '<div class="wil-ticket-tarifa-nota">'
+          + '<span class="sym" style="font-size:14px;color:#d97706;flex-shrink:0">info</span>'
+          + '<span>Destino fuera de Copacabana'
+          + (info.km ? ' (' + info.km + ' km aprox.)' : '')
+          + '. El domi calcula la tarifa exacta. <strong>Tú apruebas antes del cobro.</strong></span>'
+          + '</div>'
+        : '');
+  }
+ 
+  /* ── Resetear caché (llamar cuando cambia la dirección/barrio) ── */
+  function WIL_resetTarifa() {
+    _cache = null;
+  }
+ 
+  /* ── Exponer globalmente ── */
+  global.WIL_tarifa      = WIL_tarifa;
+  global.WIL_renderTarifa = WIL_renderTarifa;
+  global.WIL_resetTarifa  = WIL_resetTarifa;
+ 
+}(window));
 </script>
 </body>
 </html>
