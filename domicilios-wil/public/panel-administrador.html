@@ -7541,28 +7541,54 @@ window.deleteMulta = async function(idx) {
 })();
    
   </script>
-
-  <style>
+<style>
 #fab-caja {
   position: fixed;
   bottom: 28px;
   right: 28px;
   z-index: 998;
   display: flex;
-  flex-direction: column-reverse;
+  flex-direction: column;
   align-items: flex-end;
-  gap: 10px;
+  gap: 8px;
   opacity: 0;
   pointer-events: none;
   transition: opacity .25s;
 }
-#fab-caja.show {
+#fab-caja.show { opacity: 1; pointer-events: auto; }
+
+.fab-secondary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition: opacity .18s, transform .18s;
+}
+#fab-caja.expanded .fab-secondary {
   opacity: 1;
+  transform: translateY(0);
   pointer-events: auto;
 }
+#fab-caja.expanded .fab-secondary:nth-child(1) { transition-delay: .10s; }
+#fab-caja.expanded .fab-secondary:nth-child(2) { transition-delay: .06s; }
+#fab-caja.expanded .fab-secondary:nth-child(3) { transition-delay: .02s; }
+
+.fab-label {
+  background: #071e22;
+  color: #e2f8f9;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 99px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.3);
+  white-space: nowrap;
+}
 #fab-main-btn {
-  width: 56px;
-  height: 56px;
+  width: 54px;
+  height: 54px;
   border-radius: 16px;
   background: var(--teal);
   border: none;
@@ -7574,85 +7600,105 @@ window.deleteMulta = async function(idx) {
   box-shadow: 0 6px 20px rgba(40,185,193,.4);
   transition: transform .2s, box-shadow .2s;
   flex-shrink: 0;
+  order: 999;
 }
 #fab-main-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 10px 28px rgba(40,185,193,.5);
 }
 .fab-icon {
-  font-size: 24px;
+  font-size: 22px;
   transition: transform .3s cubic-bezier(.34,1.56,.64,1);
-  display: block;
 }
-#fab-caja.expanded .fab-icon {
-  transform: rotate(45deg);
-}
-.fab-secondary {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  opacity: 0;
-  transform: translateY(10px);
-  pointer-events: none;
-  transition: opacity .2s, transform .2s;
-}
-#fab-caja.expanded .fab-secondary {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
-}
-#fab-caja.expanded .fab-secondary:nth-child(1) { transition-delay: .05s; }
-#fab-caja.expanded .fab-secondary:nth-child(2) { transition-delay: .10s; }
-#fab-caja.expanded .fab-secondary:nth-child(3) { transition-delay: .15s; }
-.fab-label {
-  background: var(--white);
-  color: var(--text);
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 11px;
-  font-weight: 800;
-  padding: 5px 12px;
-  border-radius: 99px;
-  border: 1.5px solid var(--border);
-  box-shadow: 0 2px 10px rgba(0,0,0,.1);
-  white-space: nowrap;
-}
+#fab-caja.expanded .fab-icon { transform: rotate(45deg); }
+
 .fab-mini {
-  width: 44px;
-  height: 44px;
-  border-radius: 13px;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: #fff;
-  box-shadow: 0 4px 14px rgba(0,0,0,.18);
-  transition: transform .18s, box-shadow .18s;
+  box-shadow: 0 4px 14px rgba(0,0,0,.2);
+  transition: transform .15s;
 }
 .fab-mini:hover { transform: translateY(-2px); }
 .fab-mini.teal   { background: var(--teal);   color: #071e22; }
-.fab-mini.red    { background: var(--red); }
-.fab-mini.orange { background: var(--orange); }
+.fab-mini.red    { background: var(--red);    color: #fff; }
+.fab-mini.orange { background: var(--orange); color: #fff; }
+
+/* ── Cierre de caja mejorado ── */
+#modal-caja-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(4,18,20,.82);
+  backdrop-filter: blur(12px);
+  z-index: 400;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+#modal-caja-overlay.show { display: flex; }
+
+.caja-modal {
+  background: var(--white);
+  border-radius: 20px;
+  width: min(480px, 100%);
+  max-height: 88vh;
+  overflow-y: auto;
+  box-shadow: 0 32px 80px rgba(4,18,20,.45);
+  animation: invUp .3s cubic-bezier(.34,1.2,.64,1);
+}
+.caja-modal::-webkit-scrollbar { width: 3px; }
+.caja-modal::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
+
+/* Cierre items */
+.cierre-item {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  transition: box-shadow .2s;
+}
+.cierre-item:hover { box-shadow: 0 4px 16px rgba(40,185,193,.08); }
+.cierre-turno-badge {
+  font-size: 10px; font-weight: 800;
+  padding: 3px 10px; border-radius: 99px;
+}
+.cierre-turno-1 { background: var(--orange-l); color: var(--orange); }
+.cierre-turno-2 { background: var(--blue-l);   color: var(--blue); }
+
+@media (max-width: 768px) {
+  #fab-caja { bottom: 16px; right: 16px; }
+  #fab-main-btn { width: 50px; height: 50px; border-radius: 14px; }
+  .caja-modal { border-radius: 16px; }
+  #modal-caja-overlay { padding: 12px; }
+}
 </style>
 
 <div id="fab-caja">
+  <!-- Los secundarios van ARRIBA del botón principal (column-reverse visual con order) -->
   <div class="fab-secondary">
     <span class="fab-label">Dar base</span>
     <button class="fab-mini teal" onclick="openBaseModal()">
-      <span class="material-symbols-rounded" style="font-size:19px;">account_balance_wallet</span>
+      <span class="material-symbols-rounded" style="font-size:18px;">account_balance_wallet</span>
     </button>
   </div>
   <div class="fab-secondary">
     <span class="fab-label">Multa / Pico &amp; Placa</span>
     <button class="fab-mini red" onclick="openMultaModal()">
-      <span class="material-symbols-rounded" style="font-size:19px;">gavel</span>
+      <span class="material-symbols-rounded" style="font-size:18px;">gavel</span>
     </button>
   </div>
   <div class="fab-secondary">
     <span class="fab-label">Cierre de caja</span>
     <button class="fab-mini orange" onclick="abrirCierreCaja()">
-      <span class="material-symbols-rounded" style="font-size:19px;">point_of_sale</span>
+      <span class="material-symbols-rounded" style="font-size:18px;">point_of_sale</span>
     </button>
   </div>
   <button id="fab-main-btn">
@@ -7662,33 +7708,44 @@ window.deleteMulta = async function(idx) {
 
 <script>
 (function() {
+  const fab    = document.getElementById('fab-caja');
+  const mainBtn = document.getElementById('fab-main-btn');
+  if (!fab || !mainBtn) return;
+
   function checkFab() {
     const contable = document.getElementById('pg-contable');
-    const fab = document.getElementById('fab-caja');
-    if (!fab || !contable) return;
-    fab.classList.toggle('show', contable.classList.contains('on'));
+    if (!contable) return;
+    const visible = contable.classList.contains('on');
+    fab.classList.toggle('show', visible);
+    if (!visible) fab.classList.remove('expanded');
   }
-  const observer = new MutationObserver(checkFab);
+
+  const obs = new MutationObserver(checkFab);
   document.querySelectorAll('.pg').forEach(pg =>
-    observer.observe(pg, { attributes: true, attributeFilter: ['class'] })
+    obs.observe(pg, { attributes: true, attributeFilter: ['class'] })
   );
   checkFab();
-  document.addEventListener('click', e => {
-    const fab = document.getElementById('fab-caja');
-    if (fab && !fab.contains(e.target)) fab.classList.remove('expanded');
-  });
-  document.getElementById('fab-main-btn').addEventListener('click', e => {
+
+  mainBtn.addEventListener('click', e => {
     e.stopPropagation();
-    document.getElementById('fab-caja').classList.toggle('expanded');
+    fab.classList.toggle('expanded');
   });
+
+  document.addEventListener('click', e => {
+    if (!fab.contains(e.target)) fab.classList.remove('expanded');
+  });
+
+  // Cerrar FAB al abrir cualquier modal
   ['openBaseModal','openMultaModal','abrirCierreCaja'].forEach(fn => {
     const orig = window[fn];
-    if (orig) window[fn] = function(...args) {
-      document.getElementById('fab-caja')?.classList.remove('expanded');
+    if (!orig) return;
+    window[fn] = function(...args) {
+      fab.classList.remove('expanded');
       return orig.apply(this, args);
     };
   });
 })();
+</script>
 
 
 
