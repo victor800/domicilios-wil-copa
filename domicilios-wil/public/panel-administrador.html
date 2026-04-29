@@ -7760,6 +7760,273 @@ window.deleteMulta = async function(idx) {
 })();
 </script>
 
+<style>
+/* ═══════════════════════════════════════════
+   PARCHE FORMULARIOS — Base / Multa / Caja
+═══════════════════════════════════════════ */
+
+/* ── Campos y labels mejorados ── */
+#modal-base-overlay .om-label,
+#modal-multa-overlay .om-label,
+#modal-caja-overlay .om-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: .10em;
+  margin-bottom: 7px;
+  padding-left: 3px;
+  border-left: 3px solid var(--teal);
+  padding-left: 7px;
+}
+
+#modal-multa-overlay .om-label {
+  border-left-color: var(--red);
+}
+
+#modal-base-overlay .om-label .material-symbols-rounded,
+#modal-multa-overlay .om-label .material-symbols-rounded,
+#modal-caja-overlay .om-label .material-symbols-rounded {
+  display: none; /* la barra de color ya da contexto */
+}
+
+/* ── Inputs y selects ── */
+#modal-base-overlay .om-input,
+#modal-base-overlay .om-select,
+#modal-multa-overlay .om-input,
+#modal-multa-overlay .om-select,
+#modal-caja-overlay .om-input,
+#modal-caja-overlay .om-select {
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: 11px;
+  padding: 11px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  transition: border-color .16s, box-shadow .16s, background .16s;
+  width: 100%;
+}
+
+#modal-base-overlay .om-input:focus,
+#modal-base-overlay .om-select:focus {
+  border-color: var(--teal);
+  background: var(--teal-ll);
+  box-shadow: 0 0 0 3px rgba(40,185,193,.10);
+  outline: none;
+}
+
+#modal-multa-overlay .om-input:focus,
+#modal-multa-overlay .om-select:focus {
+  border-color: var(--red);
+  background: #fff5f5;
+  box-shadow: 0 0 0 3px rgba(220,38,38,.08);
+  outline: none;
+}
+
+#modal-caja-overlay .om-input:focus,
+#modal-caja-overlay .om-select:focus {
+  border-color: var(--teal);
+  background: var(--teal-ll);
+  box-shadow: 0 0 0 3px rgba(40,185,193,.10);
+  outline: none;
+}
+
+/* ── Campo precio — símbolo más prominente ── */
+#modal-base-overlay .om-price-wrap .currency,
+#modal-multa-overlay .om-price-wrap .currency {
+  left: 14px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--teal-d);
+}
+#modal-multa-overlay .om-price-wrap .currency {
+  color: var(--red);
+}
+#modal-base-overlay .om-price-wrap .om-input,
+#modal-multa-overlay .om-price-wrap .om-input {
+  padding-left: 32px;
+  font-size: 22px;
+  font-weight: 800;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: -.5px;
+}
+
+/* ── Separación entre campos ── */
+#modal-base-overlay .om-field,
+#modal-multa-overlay .om-field {
+  margin-bottom: 15px;
+}
+
+/* ── Select tipo multa — botones visuales ── */
+#modal-multa-overlay #multa-tipo-sel {
+  display: none;
+}
+.multa-tipo-btns {
+  display: flex;
+  gap: 8px;
+}
+.multa-tipo-btn {
+  flex: 1;
+  padding: 9px 8px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text2);
+  cursor: pointer;
+  text-align: center;
+  transition: all .15s;
+}
+.multa-tipo-btn:hover {
+  border-color: var(--red);
+  color: var(--red);
+  background: var(--red-l);
+}
+.multa-tipo-btn.sel {
+  background: var(--red-l);
+  border-color: var(--red);
+  color: var(--red);
+  font-weight: 800;
+}
+
+/* ── Footer de modales ── */
+#modal-base-overlay .cont-modal-footer,
+#modal-multa-overlay .cont-modal-footer {
+  background: var(--bg2);
+  padding: 14px 20px 18px;
+  margin: 0 -20px -24px;
+  border-top: 1.5px solid var(--border);
+  border-radius: 0 0 20px 20px;
+  display: flex;
+  gap: 10px;
+}
+#modal-base-overlay .om-btn-cancel,
+#modal-multa-overlay .om-btn-cancel {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 11px;
+  padding: 11px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all .15s;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+#modal-base-overlay .om-btn-cancel:hover,
+#modal-multa-overlay .om-btn-cancel:hover {
+  border-color: var(--text3);
+  background: var(--bg);
+}
+#modal-base-overlay .om-btn-save {
+  flex: 2;
+  border-radius: 11px;
+  padding: 11px;
+  font-size: 13px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+#modal-multa-overlay .om-btn-save {
+  flex: 2;
+  border-radius: 11px;
+  padding: 11px;
+  font-size: 13px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+/* ── Caja: resumen compacto y elegante ── */
+#caja-resumen-auto {
+  background: linear-gradient(135deg,#071e22,#0d3540);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  border: 1.5px solid rgba(40,185,193,.2);
+}
+#caja-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4,1fr);
+  gap: 8px;
+}
+#caja-stats-grid > div {
+  background: rgba(255,255,255,.05) !important;
+  border: 1px solid rgba(255,255,255,.08) !important;
+  border-radius: 10px !important;
+  padding: 10px 8px !important;
+  text-align: center !important;
+}
+
+/* ── Caja: diferencia visual ── */
+#caja-diferencia-box {
+  border-radius: 11px;
+  padding: 12px 14px;
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  transition: all .2s;
+}
+
+/* ── Caja: grid responsive ── */
+@media (max-width: 520px) {
+  #caja-stats-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+</style>
+
+<script>
+/* ── Botones visuales para tipo de multa ── */
+(function patchMultaTipo() {
+  const interval = setInterval(() => {
+    const sel = document.getElementById('multa-tipo-sel');
+    if (!sel || document.getElementById('multa-tipo-btns-wrap')) return;
+    clearInterval(interval);
+
+    sel.style.display = 'none';
+    const tipos = [
+      { val:'multa', icon:'⚖️', lbl:'Multa'       },
+      { val:'pyp',   icon:'🚦', lbl:'Pico & Placa' },
+      { val:'otro',  icon:'📌', lbl:'Otro'          },
+    ];
+    const wrap = document.createElement('div');
+    wrap.id = 'multa-tipo-btns-wrap';
+    wrap.className = 'multa-tipo-btns';
+    tipos.forEach(t => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'multa-tipo-btn' + (t.val === 'multa' ? ' sel' : '');
+      btn.dataset.val = t.val;
+      btn.innerHTML = t.icon + ' ' + t.lbl;
+      btn.onclick = () => {
+        wrap.querySelectorAll('.multa-tipo-btn').forEach(b => b.classList.remove('sel'));
+        btn.classList.add('sel');
+        sel.value = t.val;
+      };
+      wrap.appendChild(btn);
+    });
+    sel.parentNode.insertBefore(wrap, sel);
+  }, 200);
+})();
+</script>
+
 
 
 </script>
