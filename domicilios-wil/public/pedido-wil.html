@@ -3208,6 +3208,160 @@ function _crearZonaEnSheets(data) {
   }
   })();
 
+
+/* ══════════════════════════════════════════════════
+   PARCHE: Resumen correcto en Pedido Libre
+   - Muestra costo domicilio aunque no haya productos
+   - Fallback a total del sheet cuando subtotal = 0
+   ══════════════════════════════════════════════════ */
+
+/* 1. Corregir buildProdBlockCard para Pedido Libre */
+var _origBuildProdBlock = buildProdBlockCard;
+buildProdBlockCard = function(p, pid) {
+
+  var productos = parsearProductos(p);
+  var esLibre = !productos.length;
+
+  /* Si hay productos, usar la función original */
+  if (!esLibre) return _origBuildProdBlock(p, pid);
+
+  /* ── PEDIDO LIBRE: mostrar bloque de totales ── */
+  var totalNum  = parseCOP(p.total  || '0');
+  var domiNum   = parseCOP(p.domicilio || '0');
+
+  /* Si no hay domicilio explícito y el total coincide con un número conocido,
+     intentar inferir: en WIL el domicilio suele ser la última línea de precio */
+  if (domiNum === 0 && totalNum > 0) {
+    /* Buscar patrón "domicilio: $XXXX" o "domi XXXX" en notas/dirección */
+    var mDomi = (p.direccion || p.notas || '')
+      .match(/domicilio[:\s]*\$?\s*([\d.,]+)/i);
+    if (mDomi) domiNum = parseCOP(mDomi[1]);
+  }
+
+  var subtotalNum = totalNum > domiNum ? totalNum - domiNum : totalNum;
+
+  return '<div class="ticket-wrap" id="twrap_' + pid + '">'
+    /* Cabecera */
+    + '<div class="ticket-header">'
+    + '<div><div class="ticket-header-lbl">Pedido</div><div class="ticket-header-val">' + escHtml(p.id || '—') + '</div></div>'
+    + '<div style="text-align:center"><div class="ticket-header-lbl">Tipo</div><div class="ticket-header-val">Pedido libre</div></div>'
+    + '<div style="text-align:right"><div class="ticket-header-lbl">Hora</div><div class="ticket-header-val">' + escHtml(p.hora || '—') + '</div></div>'
+    + '</div>'
+    /* Info pedido libre */
+    + '<div style="padding:10px 12px;background:#fffbec;border-bottom:1px dashed rgba(245,158,11,.2)">'
+    + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'
+    + '<span style="font-size:14px">🛍</span>'
+    + '<span style="font-size:11px;font-weight:700;color:#92400e">Pedido libre — productos variables</span>'
+    + '</div>'
+    + (p.descripcion || p.notas || p.productos
+        ? '<p style="font-size:11px;color:#78350f;margin:0;line-height:1.4">'
+          + escHtml((p.descripcion || p.notas || p.productos || '').substring(0, 120))
+          + '</p>'
+        : '')
+    + '</div>'
+    /* Totales */
+    + '<hr class="ticket-divider">'
+    + (subtotalNum > 0 && domiNum > 0
+        ? '<div class="ticket-subtotal-row"><span class="ticket-subtotal-lbl">Subtotal</span><span class="ticket-subtotal-val">'
+          + fmtCOP(subtotalNum) + '</span></div>'
+        : '')
+    + '<div class="ticket-subtotal-row"><span class="ticket-subtotal-lbl">🛵 Domicilio</span><span class="ticket-subtotal-val">'
+    + (domiNum > 0
+        ? fmtCOP(domiNum)
+        : '<span style="color:#2a9d5c;font-weight:800">Gratis 🎉</span>')
+    + '</span></div>'
+    + '<div class="ticket-total-row">'
+    + '<span class="ticket-total-lbl">TOTAL</span>'
+    + '<span class="ticket-total-val">'
+    + (totalNum > 0 ? fmtCOP(totalNum) : (p.total || '—'))
+    + '</span></div></div>';
+};
+
+/* 2. Corregir el bloque de productos en la pestaña "En Ruta"
+      para Pedido Libre — mostrar resumen de totales aunque
+      no haya array de productos */
+var _origActivarPedidoParche2 = activarPedidoEnRuta;
+activarPedidoEnRuta = function(p) {
+  _origActivarPedidoParche2(p);
+
+  if (!p) return;
+
+  var prods = parsearProductos(p);
+  if (prods.length) return; // ya lo maneja la función original
+
+  /* ── PEDIDO LIBRE en Tab Ruta ── */
+  var tabProdWrap  = document.getElementById('tabProductosWrap');
+  var pList        = document.getElementById('tabProductosList');
+  var countEl      = document.getElementById('tabProdCount');
+  var resumenEl    = document.getElementById('tabResumenTotal');
+  var subtotalEl   = document.getElementById('tabSubtotal');
+  var costoEl      = document.getElementById('tabCostoDomi');
+  var totalProdEl  = document.getElementById('tabTotalProd');
+
+  if (!tabProdWrap) return;
+  tabProdWrap.style.display = 'block';
+
+  var totalNum = parseCOP(p.total    || '0');
+  var domiNum  = parseCOP(p.domicilio || '0');
+
+  /* Inferir domicilio si no viene explícito */
+  if (domiNum === 0) {
+    var mD = (p.direccion || p.notas || '')
+      .match(/domicilio[:\s]*\$?\s*([\d.,]+)/i);
+    if (mD) domiNum = parseCOP(mD[1]);
+  }
+
+  var subtotalNum = (totalNum > domiNum && domiNum > 0)
+    ? totalNum - domiNum
+    : 0;
+
+  /* Mostrar fila "Pedido libre" en la lista */
+  if (pList) {
+    pList.innerHTML =
+      '<div class="prod-row">'
+      + '<div class="prod-num" style="background:#fff8ec;color:#d97706">🛍</div>'
+      + '<div class="prod-info">'
+      + '<span class="prod-nombre">Pedido libre</span>'
+      + '<div class="prod-meta">'
+      + '<span style="font-size:10px;color:#92400e;font-weight:600">Productos variables según cliente</span>'
+      + '</div></div>'
+      + (totalNum > 0
+          ? '<span class="prod-precio">' + fmtCOP(totalNum) + '</span>'
+          : '')
+      + '</div>';
+  }
+
+  if (countEl) countEl.textContent = 'libre';
+
+  /* Mostrar resumen de totales */
+  if (resumenEl) resumenEl.style.display = 'block';
+
+  if (subtotalEl) {
+    if (subtotalNum > 0) {
+      subtotalEl.style.display = '';
+      subtotalEl.textContent = fmtCOP(subtotalNum);
+    } else {
+      subtotalEl.parentElement.style.display = 'none';
+    }
+  }
+
+  if (costoEl) {
+    costoEl.style.display = '';
+    if (domiNum > 0) {
+      costoEl.textContent = fmtCOP(domiNum);
+      costoEl.style.color = '';
+    } else {
+      costoEl.textContent = 'Gratis 🎉';
+      costoEl.style.color = '#2a9d5c';
+    }
+  }
+
+  if (totalProdEl) {
+    totalProdEl.textContent = totalNum > 0 ? fmtCOP(totalNum) : (p.total || '—');
+  }
+};
+
+console.log('[PARCHE Pedido Libre v1.0] ✅ Resumen + domicilio correctos');
  
 </script>
 </body>
