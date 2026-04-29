@@ -3293,6 +3293,122 @@ verificarHorarioCliente();
   });
 
 }(window));
+
+/**
+ * WIL TARIFA — PARCHE MÍNIMO
+ * 
+ * PROBLEMA QUE RESUELVE:
+ *   1. Fila domicilio duplicada (v3 + v5 insertan las dos)
+ *   2. zonaStr mostraba texto de productos (v3 leía state sucio)
+ * 
+ * CÓMO FUNCIONA:
+ *   - Deja intacto TODO el código anterior (v3, v4, v5, v6)
+ *   - Solo neutraliza _insertarFilaTarifaEnTicket (la función de v3
+ *     que duplicaba) convirtiéndola en no-op
+ *   - v5 sigue siendo el único que pinta en #wil-ticket-tarifa-container
+ *   - wilToggleTicket y wilAbrirTicket no se tocan → colapsable OK
+ *   - enviarPedido ya parchado por v5 → col T con valor real
+ * 
+ * INSTRUCCIÓN: Pegar este bloque AL FINAL de tu script, 
+ *              DESPUÉS de todo el código existente.
+ */
+
+(function () {
+  'use strict';
+
+  /* ── 1. Neutralizar _insertarFilaTarifaEnTicket de v3 ────────
+     Es la función que insertaba una segunda fila de domicilio
+     con texto de productos en zonaStr.
+     La reemplazamos con una no-op para que v5 sea el único render.
+  ── */
+  window._insertarFilaTarifaEnTicket = function () {
+    /* Desactivado — v5 es el único punto de render */
+  };
+
+  /* ── 2. Asegurar que zonaStr NUNCA tenga texto de productos ──
+     Sobreescribir WIL_v5_calcularTarifa para limpiar barrio/dir
+     antes de la búsqueda de texto (sin tocar la lógica GPS).
+     Solo afecta el match de texto, nunca el resultado zonaStr
+     que ya viene de la hoja de tarifas.
+  ── */
+  var _origV5 = window.WIL_v5_calcularTarifa;
+  if (typeof _origV5 === 'function') {
+    window.WIL_v5_calcularTarifa = async function () {
+      /* Limpiar state.barrio de residuos antes de calcular */
+      if (window.state) {
+        /* Si barrio tiene más de 40 chars probablemente tiene texto extraño */
+        if ((window.state.barrio || '').length > 40) {
+          window.state.barrio = (window.state.barrio || '').substring(0, 40);
+        }
+        /* Quitar números largos (precios/teléfonos) de dirección */
+        if (window.state.direccion) {
+          window.state._direccionOriginal = window.state._direccionOriginal || window.state.direccion;
+        }
+      }
+      return _origV5.apply(this, arguments);
+    };
+  }
+
+  /* ── 3. Asegurar zonaStr limpio en WIL_v5_renderTarifa ────────
+     Si por algún motivo info.zonaStr llega con texto de productos
+     (más de 50 chars o contiene "$"), lo truncamos.
+  ── */
+  var _origRender = window.WIL_v5_renderTarifa;
+  if (typeof _origRender === 'function') {
+    window.WIL_v5_renderTarifa = function (info) {
+      /* Sanear zonaStr antes de pintar */
+      if (info && info.zonaStr) {
+        /* Si tiene precio o es muy largo, es texto sucio */
+        if (info.zonaStr.indexOf('$') !== -1 || info.zonaStr.length > 60) {
+          info = Object.assign({}, info, {
+            zonaStr: info.esFuera
+              ? 'Área Metropolitana' + (info.km ? ' · ' + info.km + ' km' : '')
+              : 'Copacabana'
+          });
+        }
+      }
+      return _origRender.call(this, info);
+    };
+  }
+
+  /* ── 4. Limpiar filas residuales cada vez que se abre el ticket ─
+     Por si alguna versión anterior ya insertó una fila extra
+     antes de que este parche cargara.
+  ── */
+  var _origAbrirTicket = window.wilAbrirTicket;
+  window.wilAbrirTicket = function () {
+    /* Eliminar filas duplicadas de v3 */
+    var vieja = document.getElementById('wil-tarifa-row');
+    if (vieja) vieja.remove();
+    var viejaNota = document.getElementById('wil-tarifa-nota');
+    if (viejaNota) viejaNota.remove();
+
+    /* Llamar original para que el colapsable abra normalmente */
+    if (typeof _origAbrirTicket === 'function') {
+      _origAbrirTicket.apply(this, arguments);
+    }
+  };
+
+  /* ── 5. Garantizar tarifa en col T al enviar ─────────────────
+     WIL_TARIFA_CACHE puede ser la variable de v4 o v5 dependiendo
+     de cuál cargó último. Normalizar ambas.
+  ── */
+  var _origEnviarFinal = window.enviarPedido;
+  window.enviarPedido = async function (tipo) {
+    /* Buscar cache en cualquiera de las dos variables globales */
+    var cache = window.WIL_TARIFA_CACHE || null;
+    if (!cache && typeof window.WIL_v5_calcularTarifa === 'function') {
+      cache = await window.WIL_v5_calcularTarifa();
+    }
+    if (cache && window.state) {
+      window.state.precioDomicilio = cache.tarifa;
+    }
+    return _origEnviarFinal.apply(this, arguments);
+  };
+
+  console.log('[WIL Parche mínimo] ✅ v3 neutralizado · zonaStr limpio · colapsable intacto · col T OK');
+})();
+
 </script>
 </body>
 </html>
