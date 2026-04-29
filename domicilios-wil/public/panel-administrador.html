@@ -7760,171 +7760,284 @@ window.deleteMulta = async function(idx) {
 })();
 </script>
 <!-- ═══ PARCHE MOBILE — MODALES BASE/MULTA + FAB ═══ -->
+<!-- ═══ PARCHE v3 — SIN FAB + BARRA CONTABLE + TRANSFERENCIAS FULL ═══ -->
 <style>
+/* ── 1. Ocultar FAB completamente ── */
+#fab-caja { display: none !important; }
+
+/* ── 2. Barra de acciones Contable ── */
+.cont-action-bar {
+  position: sticky;
+  bottom: 0;
+  left: 0; right: 0;
+  background: var(--white);
+  border-top: 1.5px solid var(--border);
+  padding: 10px 16px;
+  display: flex;
+  gap: 8px;
+  z-index: 50;
+  box-shadow: 0 -4px 20px rgba(40,185,193,.08);
+}
+.cont-action-bar button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  border-radius: 11px;
+  padding: 11px 8px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all .16s;
+  white-space: nowrap;
+}
+.cont-action-bar .cab-base   { background: var(--teal);   color: #071e22; }
+.cont-action-bar .cab-multa  { background: var(--red);    color: #fff; }
+.cont-action-bar .cab-caja   { background: var(--orange); color: #fff; }
+.cont-action-bar button:active { transform: scale(.96); }
+
+/* ── 3. Card Transferencias — hero ── */
+#cont-tf-wrap {
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #1e40af 100%);
+  border-radius: 18px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.tf-hero-hdr {
+  padding: 16px 18px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.tf-hero-ico {
+  width: 40px; height: 40px;
+  border-radius: 11px;
+  background: rgba(37,99,235,.3);
+  border: 1.5px solid rgba(37,99,235,.4);
+  display: flex; align-items: center; justify-content: center;
+  color: #93c5fd; font-size: 20px; flex-shrink: 0;
+}
+.tf-hero-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: rgba(255,255,255,.06);
+}
+.tf-kpi {
+  padding: 12px 14px;
+  text-align: center;
+  background: rgba(255,255,255,.03);
+}
+.tf-kpi-val {
+  font-size: 22px; font-weight: 800;
+  font-family: 'DM Mono', monospace;
+  line-height: 1;
+}
+.tf-kpi-lbl {
+  font-size: 8px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .1em;
+  margin-top: 4px; opacity: .5; color: #fff;
+}
+.tf-totals {
+  padding: 10px 16px;
+  display: flex; gap: 8px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  flex-wrap: wrap;
+}
+.tf-total-chip {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,.06);
+  border-radius: 8px; padding: 6px 10px;
+  flex: 1; min-width: 100px;
+}
+.tf-total-chip-lbl { font-size: 9px; color: rgba(255,255,255,.45); font-weight: 700; }
+.tf-total-chip-val { font-size: 13px; font-weight: 800; font-family: 'DM Mono', monospace; margin-top: 1px; }
+.tf-list {
+  padding: 10px 12px 14px;
+  display: flex; flex-direction: column; gap: 5px;
+  max-height: 340px; overflow-y: auto;
+}
+.tf-list::-webkit-scrollbar { width: 3px; }
+.tf-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 99px; }
+.tf-row {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 10px; padding: 9px 11px;
+  cursor: pointer; transition: all .15s;
+}
+.tf-row:hover { background: rgba(37,99,235,.2); border-color: rgba(37,99,235,.4); }
+.tf-row.verified { background: rgba(22,163,74,.08); border-color: rgba(22,163,74,.25); }
+.tf-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.tf-row-name { font-size: 11px; font-weight: 800; color: #fff; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tf-row-meta { font-size: 9px; color: rgba(255,255,255,.4); margin-top: 1px; font-family: 'DM Mono', monospace; }
+.tf-row-amount { font-size: 12px; font-weight: 800; font-family: 'DM Mono', monospace; flex-shrink: 0; }
+.tf-row-badge { font-size: 8px; font-weight: 800; padding: 2px 7px; border-radius: 99px; background: rgba(22,163,74,.25); color: #4ade80; flex-shrink: 0; }
+
 @media (max-width: 768px) {
-
-  /* ── Modales base y multa: más compactos ── */
-  #modal-base-overlay .cont-modal,
-  #modal-multa-overlay .cont-modal {
-    width: 92vw !important;
-    border-radius: 16px !important;
-    max-height: 92vh !important;
-    overflow-y: auto !important;
-  }
-
-  #modal-base-overlay .cont-modal-hdr,
-  #modal-multa-overlay .cont-modal-hdr {
-    padding: 12px 14px !important;
-  }
-
-  #modal-base-overlay .cont-modal-hdr > div:first-child,
-  #modal-multa-overlay .cont-modal-hdr > div:first-child {
-    width: 32px !important;
-    height: 32px !important;
-    border-radius: 9px !important;
-  }
-
-  #modal-base-overlay .cont-modal-hdr > div:first-child .material-symbols-rounded,
-  #modal-multa-overlay .cont-modal-hdr > div:first-child .material-symbols-rounded {
-    font-size: 16px !important;
-  }
-
-  #modal-base-overlay .cont-modal-body,
-  #modal-multa-overlay .cont-modal-body {
-    padding: 14px !important;
-  }
-
-  #modal-base-overlay .om-field,
-  #modal-multa-overlay .om-field {
-    margin-bottom: 10px !important;
-  }
-
-  #modal-base-overlay .om-label,
-  #modal-multa-overlay .om-label {
-    font-size: 9px !important;
-    margin-bottom: 5px !important;
-    padding-left: 7px !important;
-  }
-
-  /* Inputs normales: compactos */
-  #modal-base-overlay .om-input,
-  #modal-base-overlay .om-select,
-  #modal-multa-overlay .om-input,
-  #modal-multa-overlay .om-select {
-    padding: 8px 11px !important;
-    font-size: 13px !important;
-    border-radius: 9px !important;
-  }
-
-  /* Input de monto: número legible pero no gigante */
-  #modal-base-overlay .om-price-wrap .om-input,
-  #modal-multa-overlay .om-price-wrap .om-input {
-    font-size: 16px !important;
-    padding: 9px 11px 9px 26px !important;
-  }
-
-  #modal-base-overlay .om-price-wrap .currency,
-  #modal-multa-overlay .om-price-wrap .currency {
-    font-size: 13px !important;
-    left: 11px !important;
-  }
-
-  /* Footer botones: altura cómoda para dedos */
-  #modal-base-overlay .cont-modal-footer,
-  #modal-multa-overlay .cont-modal-footer {
-    padding: 12px 14px 14px !important;
-    gap: 8px !important;
-  }
-
-  #modal-base-overlay .cont-modal-footer .om-btn-cancel,
-  #modal-multa-overlay .cont-modal-footer .om-btn-cancel {
-    padding: 10px 8px !important;
-    font-size: 11px !important;
-    border-radius: 9px !important;
-    flex: 1 !important;
-  }
-
-  #modal-base-overlay .cont-modal-footer .om-btn-save,
-  #modal-multa-overlay .cont-modal-footer .om-btn-save {
-    padding: 10px 12px !important;
-    font-size: 12px !important;
-    border-radius: 9px !important;
-    flex: 2 !important;
-  }
-
-  #modal-base-overlay .cont-modal-footer .om-btn-save .material-symbols-rounded,
-  #modal-multa-overlay .cont-modal-footer .om-btn-save .material-symbols-rounded {
-    font-size: 15px !important;
-  }
-
-  /* Botones tipo multa */
-  .multa-tipo-btn {
-    padding: 7px 4px !important;
-    font-size: 10px !important;
-    border-radius: 7px !important;
-  }
-
-  /* ── FAB móvil ── */
-  #fab-caja {
-    bottom: 16px !important;
-    right: 16px !important;
-    gap: 6px !important;
-  }
-
-  #fab-main-btn {
-    width: 48px !important;
-    height: 48px !important;
-    border-radius: 14px !important;
-    box-shadow: 0 4px 16px rgba(40,185,193,.45) !important;
-  }
-
-  .fab-icon {
-    font-size: 20px !important;
-  }
-
-  .fab-mini {
-    width: 38px !important;
-    height: 38px !important;
-    border-radius: 10px !important;
-  }
-
-  .fab-mini .material-symbols-rounded {
-    font-size: 16px !important;
-  }
-
-  .fab-label {
-    font-size: 10px !important;
-    padding: 4px 10px !important;
-    border-radius: 99px !important;
-    letter-spacing: 0 !important;
-  }
-
-  /* ── Modal caja en móvil ── */
-  .caja-modal {
-    border-radius: 16px !important;
-    max-height: 90vh !important;
-  }
-
-  #modal-caja-overlay {
-    padding: 10px !important;
-  }
-
-  #caja-stats-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 6px !important;
-  }
-
-  #caja-stats-grid > div {
-    padding: 8px !important;
-  }
-
-  #caja-stats-grid .material-symbols-rounded {
-    font-size: 13px !important;
-  }
-
+  .cont-action-bar { padding: 8px 12px; gap: 6px; }
+  .cont-action-bar button { font-size: 10px; padding: 10px 6px; }
+  .cont-action-bar button .material-symbols-rounded { font-size: 15px; }
+  .tf-hero-kpis { grid-template-columns: repeat(3, 1fr); }
+  .tf-kpi-val { font-size: 18px; }
 }
 </style>
 
+<script>
+(function patchContableUI() {
+  /* ── Esperar a que initContable() cree el pg-contable ── */
+  const iv = setInterval(() => {
+    const pg = document.getElementById('pg-contable');
+    if (!pg) return;
+    clearInterval(iv);
+
+    /* ── A) Barra de acciones sticky ── */
+    const bar = document.createElement('div');
+    bar.className = 'cont-action-bar';
+    bar.innerHTML = `
+      <button class="cab-base" onclick="openBaseModal()">
+        <span class="material-symbols-rounded" style="font-size:16px;">account_balance_wallet</span>
+        Dar base
+      </button>
+      <button class="cab-multa" onclick="openMultaModal()">
+        <span class="material-symbols-rounded" style="font-size:16px;">gavel</span>
+        Multa / P&P
+      </button>
+      <button class="cab-caja" onclick="abrirCierreCaja()">
+        <span class="material-symbols-rounded" style="font-size:16px;">point_of_sale</span>
+        Cierre caja
+      </button>
+    `;
+    pg.appendChild(bar);
+
+    /* ── B) Reemplazar la card de transferencias con hero ── */
+    patchTfCard();
+  }, 300);
+
+  function buildTfHTML(peds, verificados, fmtMoney, parsePrecio) {
+    const tfPeds  = peds.filter(p => /transfer/i.test(p.metodo || ''));
+    const tfVerif = tfPeds.filter(p => verificados.has(p.id));
+    const tfPend  = tfPeds.filter(p => !verificados.has(p.id));
+    const tfTotal$ = tfPeds.reduce((s,p) => s + parsePrecio(p.total), 0);
+    const tfVerif$ = tfVerif.reduce((s,p) => s + parsePrecio(p.total), 0);
+    const tfPend$  = tfPend.reduce((s,p) => s + parsePrecio(p.total), 0);
+
+    const kpis = [
+      { val: tfPeds.length,  lbl: 'Total',       c: '#93c5fd' },
+      { val: tfVerif.length, lbl: 'Verificadas',  c: '#4ade80' },
+      { val: tfPend.length,  lbl: 'Pendientes',   c: '#fcd34d' },
+    ];
+
+    const rows = tfPeds.slice(0, 20).map(p => {
+      const ver    = verificados.has(p.id);
+      const imgUrl = (p.imagen || '').trim();
+      const tieneImg = imgUrl.startsWith('http');
+      const meta   = `${p.cliente || ''} · Pedido #${p.id} · ${p.hora || ''} ${p.fecha || ''}`;
+      return `
+        <div class="tf-row${ver ? ' verified' : ''}"
+          onclick="openTransferModal('${p.id}','${imgUrl.replace(/'/g,"\\'")}','${meta.replace(/'/g,"\\'")}')" >
+          <div class="tf-dot" style="background:${ver ? '#4ade80' : '#fcd34d'};
+               box-shadow:0 0 6px ${ver ? 'rgba(74,222,128,.5)' : 'rgba(252,211,77,.4)'};"></div>
+          <div style="flex:1;min-width:0;">
+            <div class="tf-row-name">${p.cliente || '–'}</div>
+            <div class="tf-row-meta">#${p.id} · ${p.hora || ''} · ${p.fecha || ''}</div>
+          </div>
+          <div class="tf-row-amount" style="color:${ver ? '#4ade80' : '#93c5fd'};">
+            ${fmtMoney(parsePrecio(p.total))}
+          </div>
+          ${tieneImg
+            ? `<span class="material-symbols-rounded" style="font-size:16px;color:${ver ? '#4ade80' : '#93c5fd'};flex-shrink:0;">
+                 ${ver ? 'verified' : 'receipt_long'}</span>`
+            : `<span class="material-symbols-rounded" style="font-size:14px;color:rgba(255,255,255,.2);flex-shrink:0;">image_not_supported</span>`}
+          ${ver ? `<span class="tf-row-badge">✓ ok</span>` : ''}
+        </div>`;
+    }).join('');
+
+    return `
+      <div id="cont-tf-wrap">
+        <div class="tf-hero-hdr">
+          <div class="tf-hero-ico">
+            <span class="material-symbols-rounded">receipt_long</span>
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:800;color:#fff;">Transferencias</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:1px;">Comprobantes del período</div>
+          </div>
+          <div style="font-size:20px;font-weight:800;color:#93c5fd;font-family:'DM Mono',monospace;">
+            ${fmtMoney(tfTotal$)}
+          </div>
+        </div>
+        <div class="tf-hero-kpis">
+          ${kpis.map(k => `
+            <div class="tf-kpi">
+              <div class="tf-kpi-val" style="color:${k.c};">${k.val}</div>
+              <div class="tf-kpi-lbl">${k.lbl}</div>
+            </div>`).join('')}
+        </div>
+        <div class="tf-totals">
+          <div class="tf-total-chip">
+            <div>
+              <div class="tf-total-chip-lbl">Total recibido</div>
+              <div class="tf-total-chip-val" style="color:#93c5fd;">${fmtMoney(tfTotal$)}</div>
+            </div>
+          </div>
+          <div class="tf-total-chip">
+            <div>
+              <div class="tf-total-chip-lbl">✓ Verificado</div>
+              <div class="tf-total-chip-val" style="color:#4ade80;">${fmtMoney(tfVerif$)}</div>
+            </div>
+          </div>
+          <div class="tf-total-chip">
+            <div>
+              <div class="tf-total-chip-lbl">⏳ Pendiente</div>
+              <div class="tf-total-chip-val" style="color:#fcd34d;">${fmtMoney(tfPend$)}</div>
+            </div>
+          </div>
+        </div>
+        ${tfPeds.length
+          ? `<div class="tf-list">${rows}</div>`
+          : `<div style="padding:24px;text-align:center;color:rgba(255,255,255,.3);font-size:12px;">
+               Sin transferencias en este período</div>`}
+      </div>`;
+  }
+
+  function patchTfCard() {
+    /* Monkey-patch renderContable para inyectar nuestro hero */
+    const orig = window.renderContable;
+    if (!orig) { setTimeout(patchTfCard, 400); return; }
+
+    window.renderContable = function() {
+      orig.apply(this, arguments);
+
+      /* Reemplazar el contenedor viejo de transferencias */
+      const oldCard = document.querySelector('#pg-contable > div[style*="grid-template-columns:1fr 1fr 1fr"]');
+      if (!oldCard) return;
+
+      /* Obtener datos actuales */
+      try {
+        const verificados = new Set(JSON.parse(localStorage.getItem('wil_tf_verificados') || '[]'));
+        const peds = (window.allPedidos || []).filter(p =>
+          p.estado === 'entregado' || p.estado === 'proceso' || p.estado === 'encamino'
+        );
+
+        /* Buscar el primer hijo del grid 3 cols (card transferencias) */
+        const firstCard = oldCard.querySelector('div:first-child');
+        if (firstCard) {
+          firstCard.outerHTML = buildTfHTML(peds, verificados, window.fmtMoney, window.parsePrecio);
+        }
+      } catch(e) {
+        console.warn('[patchTfCard]:', e.message);
+      }
+    };
+  }
+})();
+</script>
 
 
 </script>
