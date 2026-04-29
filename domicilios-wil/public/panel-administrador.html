@@ -2539,8 +2539,16 @@ window._imgNombrePendiente = null;
       showToast('s', ofertEditId ? 'Oferta actualizada' : 'Oferta guardada', '');
     }
  
+    const _ofUrl = json?.imagen?.startsWith('https://') ? json.imagen : null;
+    const _ofId  = ofertaId;
+
     currentImgB64 = null;
     await loadOfertasFromSheet();
+
+    if (_ofUrl) {
+      const _r = ofertas.find(o => o.id === _ofId);
+      if (_r && !_r.img) { _r.img = _ofUrl; saveOfertasLS(); }
+    }
     renderOfertas();
  
   } catch(err) {
@@ -4105,12 +4113,16 @@ const res = await sendProductoToSheet(prodData, accion, imgCaptura);
     if (res && res.imagen && res.imagen.startsWith('https://')) {
       const local = productos.find(o => o.id === pid);
       if (local) { local.img = res.imagen; }
+      window._prodUrlResguardada = res.imagen;
       showToast('s', '¡Producto guardado!', 'Imagen en Drive ✓');
     } else if (res && res.ok !== false) {
+      window._prodUrlResguardada = null;
       showToast('s', 'Producto guardado', 'Sincronizado ✓');
     } else {
+      window._prodUrlResguardada = null;
       showToast('e', 'Error en el script', res?.error || 'Revisa el Script');
     }
+    
   } catch(e) {
     showToast('e', 'Error de red', e.message.substring(0, 80));
   } finally {
@@ -4119,7 +4131,14 @@ const res = await sendProductoToSheet(prodData, accion, imgCaptura);
     currentProdImgB64 = null;  // limpiar DESPUÉS del await
   }
 
+  const _pidRes = pid;
   await loadProductosFromSheet();
+
+  if (window._prodUrlResguardada) {
+    const _rp = productos.find(o => o.id === _pidRes);
+    if (_rp && !_rp.img) _rp.img = window._prodUrlResguardada;
+    window._prodUrlResguardada = null;
+  }
   renderProductos();
   updateBadges();
 }
