@@ -918,12 +918,6 @@ mark{background:#dbeafe;color:#1e40af;border-radius:3px;padding:0 2px}
 </div>
 <!-- ══ FIN BLOQUE TRANSFERENCIA ══ -->
 
-
-
-
-
-
-
   <!-- Resumen del pedido -->
 <div style="background:#fff;border:1.5px solid #e5e7eb;border-radius:16px;padding:14px 16px;margin-top:4px">
   <div class="M" style="font-size:11px;font-weight:900;color:#9ca3af;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Resumen del pedido</div>
@@ -978,6 +972,13 @@ mark{background:#dbeafe;color:#1e40af;border-radius:3px;padding:0 2px}
 </div>
 
 <script>
+
+  function convertirUrlImagen(url) {
+  if (!url || typeof url !== 'string') return url;
+  var match = url.match(/lh3\.googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/);
+  if (match && match[1]) return 'https://drive.google.com/uc?export=view&id=' + match[1];
+  return url;
+}
 
 /* ══ CONFIG ══ */
 var SHEETS={
@@ -1404,7 +1405,8 @@ async function loadNuevoProducto(){
       var estado  = _nrmSec(col(5));
       var seccion = col(6);
       var fecha   = col(7);
-      var imagen  = col(8);
+     imagen: convertirUrlImagen(col(8))
+
 
       if(!nombre) return; // fila vacía
 
@@ -3321,29 +3323,7 @@ rows.push([idPedido, nom, tel, coPago, 'Pendiente', '',
     : null
   };
 
-  /* ══ DEBUG TEMPORAL — eliminar después ══ */
-  var _dbg = {
-    comprobanteBase64_length: payload.comprobanteBase64 ? payload.comprobanteBase64.length : 0,
-    comprobanteBase64_inicio: payload.comprobanteBase64 ? payload.comprobanteBase64.substring(0,40) : 'NULL',
-    _comprobanteBase64_global: _comprobanteBase64 ? _comprobanteBase64.substring(0,40) : 'NULL',
-    _comprobanteVerif_global: _comprobanteVerif,
-    metodoPago: payload.metodoPago,
-    nombre: payload.nombre,
-    rows_0_5: payload.rows[0][5]
-  };
-  console.warn('═══ DEBUG PAYLOAD ═══', _dbg);
-  alert(
-    '═══ DEBUG PAYLOAD ═══\n\n' +
-    'metodoPago: ' + _dbg.metodoPago + '\n' +
-    '_comprobanteVerif: ' + _dbg._comprobanteVerif_global + '\n' +
-    'comprobanteBase64 length: ' + _dbg.comprobanteBase64_length + '\n' +
-    'comprobanteBase64 inicio: ' + _dbg.comprobanteBase64_inicio + '\n' +
-    'rows[0][5]: ' + _dbg.rows_0_5 + '\n\n' +
-    '(revisa la consola F12 para más detalle)'
-  );
-  /* ══ FIN DEBUG ══ */
 
-  
 
   var GAS_URL='https://script.google.com/macros/s/AKfycbxOtPjQTvKSz7EZP8H5a6IBFXg_e2hIu7KQqjnjb2Xq01Ln4NLCPB6wDaBXVK7fRFboZA/exec';
 
