@@ -6167,46 +6167,59 @@ function patchTransferencia() {
     _currentPedId = null;
   };
  
- window.verificarPago = function() {
+window.verificarPago = async function() {
   if (!_currentPedId) return;
+
+
+  /* ── 1. Actualizar sheet: col X = TRANSACCION_VERIFICADA ── */
+  const horaVerif = new Date().toLocaleTimeString('es-CO', {hour:'2-digit',minute:'2-digit'});
+  try {
+    await fetch(SHEET_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        accion:    'verificar-transferencia',
+        pedidoId:  String(_currentPedId).trim(),
+        verificadaEn: horaVerif
+      })
+    });
+    console.log('[verificarPago] sheet actualizado pedido', _currentPedId);
+  } catch(err) {
+    console.warn('[verificarPago] fallo sync sheet:', err.message);
+  }
+
+
+  /* ── 2. Marcar localmente (igual que antes) ── */
   _verificados.add(_currentPedId);
   try { localStorage.setItem('wil_tf_verificados', JSON.stringify([..._verificados])); } catch(e) {}
 
-  // Marcar fila en tabla de pedidos
   document.querySelectorAll('#ped-tbody tr').forEach(tr => {
     const primer = tr.querySelector('td');
     if (primer && primer.textContent.trim() === _currentPedId)
       tr.classList.add('ped-verificada');
   });
 
-  // UI del modal
   document.getElementById('btn-verificar-pago').style.display = 'none';
   const footer = document.getElementById('mt-footer');
   if (!document.getElementById('mt-ya-verificada')) {
     const badge = document.createElement('div');
     badge.id = 'mt-ya-verificada';
     badge.className = 'mt-already';
-    badge.innerHTML = '<span class="material-symbols-rounded" style="font-size:17px;">check_circle</span>Transferencia verificada ✓';
+    badge.innerHTML = '<span class="material-symbols-rounded" style="font-size:17px;">verified</span>Transferencia verificada ✓';
     footer.appendChild(badge);
   }
-
-  // Cambiar imagen del header a verificada
   const hdrIco = document.querySelector('.mt-hdr-ico');
   if (hdrIco) {
-    hdrIco.style.background = 'rgba(22,163,74,.25)';
-    hdrIco.style.borderColor = 'rgba(22,163,74,.4)';
+    hdrIco.style.background   = 'rgba(22,163,74,.25)';
+    hdrIco.style.borderColor  = 'rgba(22,163,74,.4)';
     hdrIco.innerHTML = '<span class="material-symbols-rounded" style="color:#4ade80;">verified</span>';
   }
-
-  showToast('s', '✓ Transferencia verificada', 'Pedido #' + _currentPedId + ' — confirmado');
-  VOZ.hablar('Transferencia verificada');
-
-  // Refrescar card de contable si está visible
+  showToast('s', '✓ Transferencia verificada', 'Pedido #' + _currentPedId + ' — sheet actualizado');
+  VOZ.hablar('Transferencia verificada y registrada');
   if (typeof renderContable === 'function' &&
       document.getElementById('pg-contable')?.classList.contains('on')) {
     setTimeout(() => renderContable(), 300);
   }
-
   setTimeout(closeMT, 1400);
 };
  
