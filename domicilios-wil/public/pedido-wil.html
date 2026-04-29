@@ -937,8 +937,21 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
       </div>
     </div>
 
-
-
+    <!-- Cuerpo ticket -->
+   <!-- HEADER COLAPSABLE RESUMEN -->
+<div class="wil-ticket-collapse-header" onclick="wilToggleTicket(this)" id="ticketCollapseHdr">
+  <div class="wil-ticket-collapse-summary">
+    <div class="wil-ticket-collapse-summary-title" id="ticket-resumen-titulo">
+      Pedido de <span id="factura-nombre-resumen">—</span>
+    </div>
+    <div class="wil-ticket-collapse-summary-sub" id="ticket-resumen-sub">
+      <span id="ticket-prod-count">—</span> · <span id="ticket-pago-resumen">—</span>
+    </div>
+  </div>
+  <div class="wil-ticket-collapse-toggle" id="ticketCollapseBtn">
+    <span>Ver detalles</span>
+    <span class="sym">expand_more</span>
+  </div>
 </div>
 
 <!-- CUERPO COLAPSABLE -->
@@ -3350,6 +3363,142 @@ activarPedidoEnRuta = function(p) {
 
 console.log('[PARCHE Pedido Libre v1.0] ✅ Resumen + domicilio correctos');
 
+
+/* ═══════════════════════════════════════════════════════════════
+   PARCHE URGENTE: wilToggleTicket + auto-rellenar factura libre
+   Pegar al FINAL del <script>, antes del cierre
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── 1. FUNCIÓN FALTANTE: wilToggleTicket ── */
+window.wilToggleTicket = function(hdrEl) {
+  var body = document.getElementById('ticketBodyColapsable');
+  var btn  = document.getElementById('ticketCollapseBtn');
+  if (!body) { console.warn('[WIL] ticketBodyColapsable no encontrado'); return; }
+
+  var isOpen = body.classList.contains('open');
+
+  if (isOpen) {
+    body.classList.remove('open');
+    if (btn) {
+      btn.classList.remove('open');
+      btn.querySelector('span:first-child').textContent = 'Ver detalles';
+    }
+  } else {
+    /* Rellenar contenido antes de abrir */
+    _wilRellenarTicketLibre();
+    body.classList.add('open');
+    if (btn) {
+      btn.classList.add('open');
+      btn.querySelector('span:first-child').textContent = 'Ocultar detalles';
+    }
+    /* Scroll suave al ticket */
+    setTimeout(function() {
+      body.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 120);
+  }
+};
+
+/* ── 2. RELLENAR todos los campos del colapsable ── */
+function _wilRellenarTicketLibre() {
+
+  /* Comercio */
+  var comercioEl = document.getElementById('factura-comercio-val');
+  if (comercioEl && (!comercioEl.textContent || comercioEl.textContent === '—')) {
+    comercioEl.textContent = state.comercioTiene && state.comercioNombre
+      ? state.comercioNombre
+      : state.comercioTiene ? 'El domiciliario confirma' : 'El domiciliario busca';
+  }
+
+  /* Presupuesto */
+  var presEl = document.getElementById('factura-presupuesto');
+  if (presEl && (!presEl.textContent || presEl.textContent === '—')) {
+    presEl.textContent = formatCOP(state.presupuesto || 0);
+  }
+
+  /* Productos */
+  var prodEl = document.getElementById('factura-productos-list');
+  if (prodEl && !prodEl.children.length) {
+    var ph = '';
+    (state.productos || []).forEach(function(p) {
+      ph += '<div class="wil-ticket-prod-row">'
+          + '<div class="wil-ticket-prod-name">' + escHTML(p.nombre || '') + '</div>'
+          + '<div class="wil-ticket-prod-qty">×' + (p.qty || 1) + '</div>'
+          + '</div>';
+    });
+    if (!ph) ph = '<div style="font-size:12px;color:var(--on3);padding:4px 0">Sin productos listados</div>';
+    prodEl.innerHTML = ph;
+  }
+
+  /* Dirección y datos de contacto */
+  var _set = function(id, val) {
+    var el = document.getElementById(id);
+    if (el && (!el.textContent || el.textContent === '—')) el.textContent = val || '—';
+  };
+  _set('factura-direccion', state.direccion);
+  _set('factura-referencia', state.referencia || '—');
+  _set('factura-nombre',    state.nombre);
+  _set('factura-telefono',  state.telefono);
+
+  /* Pago */
+  var pagoEl = document.getElementById('factura-pago');
+  if (pagoEl && (!pagoEl.textContent || pagoEl.textContent === '—')) {
+    pagoEl.textContent = state.metodoPago === 'EFECTIVO'
+      ? 'Efectivo al entregar'
+      : 'Transferencia — pagas al recibir factura';
+  }
+
+  /* Tarifa domicilio */
+  var tarifaContainer = document.getElementById('wil-ticket-tarifa-container');
+  if (tarifaContainer && !tarifaContainer.children.length) {
+    var domiNum = state.precioDomicilio || 0;
+    var domiHtml = domiNum > 0
+      ? '<div class="wil-ticket-tarifa-row">'
+        + '<div class="wil-ticket-tarifa-lbl">🛵 Domicilio</div>'
+        + '<div><div class="wil-ticket-tarifa-val">'
+        + formatCOP(domiNum)
+        + '</div><div class="wil-ticket-tarifa-sub">'
+        + (state.tarifaZonaStr || 'Copacabana')
+        + '</div></div></div>'
+      : '<div class="wil-ticket-tarifa-nota">'
+        + '<span style="font-size:14px">🛵</span>'
+        + 'El valor del domicilio se calcula según la zona de entrega '
+        + 'y se confirma antes de iniciar el servicio.</div>';
+    tarifaContainer.innerHTML = domiHtml;
+  }
+
+  /* Resumen en el header del colapsable */
+  var tituloEl = document.getElementById('factura-nombre-resumen');
+  if (tituloEl && (!tituloEl.textContent || tituloEl.textContent === '—')) {
+    tituloEl.textContent = state.nombre || '—';
+  }
+  var countEl = document.getElementById('ticket-prod-count');
+  if (countEl && (!countEl.textContent || countEl.textContent === '—')) {
+    var n = (state.productos || []).length;
+    countEl.textContent = n + ' producto' + (n !== 1 ? 's' : '');
+  }
+  var pagoResEl = document.getElementById('ticket-pago-resumen');
+  if (pagoResEl && (!pagoResEl.textContent || pagoResEl.textContent === '—')) {
+    pagoResEl.textContent = state.metodoPago === 'EFECTIVO' ? '💵 Efectivo' : '🏦 Transferencia';
+  }
+}
+
+/* ── 3. También parchear generarFacturaLibre para que
+         el header del colapsable siempre tenga datos
+         (aunque el usuario no abra los detalles) ── */
+var _origGenFactura = generarFacturaLibre;
+generarFacturaLibre = function() {
+  _origGenFactura();
+  /* Forzar datos en el resumen del header ahora que state ya está listo */
+  setTimeout(function() { _wilRellenarTicketLibre(); }, 80);
+};
+
+/* ── 4. Reasignar onclick al botón por si el HTML quedó cacheado ── */
+setTimeout(function() {
+  var hdr = document.getElementById('ticketCollapseHdr');
+  if (hdr) hdr.setAttribute('onclick', 'wilToggleTicket(this)');
+}, 300);
+
+console.log('[PARCHE wilToggleTicket v1.0] ✅ Función creada + contenido rellenado');
 
  
 </script>
