@@ -901,128 +901,6 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
     font-size: 12px !important;
   }
 
-  /* 1. DOMI DETENIDO — marcador parpadeante naranja */
-@keyframes stuckBlink {
-  0%,100%{ opacity:1; }
-  50%     { opacity:.45; }
-}
-.domi-stuck-marker {
-  filter: hue-rotate(-90deg) saturate(3.5) brightness(1.2) !important;
-  animation: stuckBlink .85s ease-in-out infinite !important;
-}
- 
-/* Toast domi detenido */
-#stuck-alert-toast {
-  position:fixed;
-  top:78px; left:50%;
-  transform:translateX(-50%) translateY(-18px);
-  opacity:0;
-  background:linear-gradient(135deg,#7c2d12,#c2410c);
-  color:#fff;
-  border-radius:16px;
-  padding:14px 18px;
-  font-family:'Plus Jakarta Sans',sans-serif;
-  display:flex; align-items:center; gap:12px;
-  box-shadow:0 8px 32px rgba(249,115,22,.55);
-  z-index:9000;
-  transition:all .4s cubic-bezier(.34,1.56,.64,1);
-  max-width:min(400px,92vw);
-  pointer-events:auto;
-}
-#stuck-alert-toast.show {
-  opacity:1;
-  transform:translateX(-50%) translateY(0);
-}
-#stuck-alert-toast .sat-ico {
-  width:38px; height:38px; border-radius:10px;
-  background:rgba(255,255,255,.15);
-  display:flex; align-items:center; justify-content:center;
-  flex-shrink:0;
-}
-#stuck-alert-toast button {
-  background:rgba(255,255,255,.2);
-  border:1.5px solid rgba(255,255,255,.35);
-  border-radius:8px;
-  padding:5px 12px;
-  color:#fff;
-  font-family:'Plus Jakarta Sans',sans-serif;
-  font-size:10px; font-weight:800;
-  cursor:pointer; white-space:nowrap; flex-shrink:0;
-  transition:background .15s;
-}
-#stuck-alert-toast button:hover { background:rgba(255,255,255,.35); }
- 
-/* 2. MAP CONTROL BUTTONS */
-.map-ctrl-btn {
-  display:inline-flex; align-items:center; gap:5px;
-  background:#fff; color:#3f6165;
-  border:1.5px solid #dde8ea;
-  border-radius:9px;
-  padding:6px 12px;
-  font-family:'Plus Jakarta Sans',sans-serif;
-  font-size:11px; font-weight:800;
-  cursor:pointer;
-  transition:all .18s;
-  white-space:nowrap; flex-shrink:0;
-}
-.map-ctrl-btn:hover {
-  border-color:#28B9C1; color:#1e9aa1;
-  background:#e6f8f9;
-}
-.map-ctrl-btn.active {
-  background:#28B9C1; color:#071e22;
-  border-color:#28B9C1;
-  box-shadow:0 4px 14px rgba(40,185,193,.3);
-}
-.map-ctrl-btn .material-symbols-rounded { font-size:15px; }
- 
-/* Ocultar texto en móvil, solo icono */
-@media(max-width:640px){
-  .map-ctrl-btn .mcb-txt { display:none; }
-  .map-ctrl-btn { padding:6px 8px; }
-}
- 
-/* 3. FULLSCREEN */
-body.act-fullscreen .sb,
-body.act-fullscreen .tb { display:none !important; }
-body.act-fullscreen .main {
-  margin-left:0 !important;
-  padding-top:0 !important;
-}
-body.act-fullscreen #pg-actividad {
-  position:fixed !important; inset:0 !important;
-  height:100vh !important; z-index:500 !important;
-  display:flex !important; flex-direction:column !important;
-}
-/* Hint de salida */
-.fs-hint-bar {
-  position:fixed; top:12px; left:50%;
-  transform:translateX(-50%) translateY(-8px);
-  opacity:0;
-  background:rgba(7,30,34,.9);
-  color:#e2f8f9;
-  font-family:'Plus Jakarta Sans',sans-serif;
-  font-size:11px; font-weight:700;
-  padding:7px 18px; border-radius:99px;
-  z-index:9999; white-space:nowrap;
-  pointer-events:none;
-  animation:fsHint 3.8s forwards;
-}
-@keyframes fsHint {
-  0%  { opacity:0; transform:translateX(-50%) translateY(-8px); }
-  12% { opacity:1; transform:translateX(-50%) translateY(0);    }
-  78% { opacity:1; }
-  100%{ opacity:0; }
-}
- 
-/* Badge stuck en popup */
-.stuck-popup-badge {
-  display:flex; align-items:center; gap:7px;
-  background:#fef3c7; border:1.5px solid #f59e0b;
-  border-radius:9px; padding:8px 10px; margin-bottom:9px;
-  font-size:11px; font-weight:700; color:#92400e;
-}
-
 </style>
 
 
@@ -7913,7 +7791,147 @@ window.deleteMulta = async function(idx) {
     };
   });
 })();
+</script>
 
+<!--
+  =====================================================================
+  PARCHE ACTIVIDAD PRO — Domicilios WIL
+  Pega este bloque JUSTO ANTES de </body> en tu HTML principal.
+  
+  FUNCIONALIDADES:
+    1. Alerta domi detenido  — marcador naranja parpadeante + voz
+    2. Toggle satelital nocturno — Esri satélite + overlay oscuro
+    3. Modo fullscreen — oculta sidebar y topbar, ESC para salir
+  =====================================================================
+-->
+
+<!-- ─── CSS PARCHE ─── -->
+<style>
+/* 1. DOMI DETENIDO — marcador parpadeante naranja */
+@keyframes stuckBlink {
+  0%,100%{ opacity:1; }
+  50%     { opacity:.45; }
+}
+.domi-stuck-marker {
+  filter: hue-rotate(-90deg) saturate(3.5) brightness(1.2) !important;
+  animation: stuckBlink .85s ease-in-out infinite !important;
+}
+
+/* Toast domi detenido */
+#stuck-alert-toast {
+  position:fixed;
+  top:78px; left:50%;
+  transform:translateX(-50%) translateY(-18px);
+  opacity:0;
+  background:linear-gradient(135deg,#7c2d12,#c2410c);
+  color:#fff;
+  border-radius:16px;
+  padding:14px 18px;
+  font-family:'Plus Jakarta Sans',sans-serif;
+  display:flex; align-items:center; gap:12px;
+  box-shadow:0 8px 32px rgba(249,115,22,.55);
+  z-index:9000;
+  transition:all .4s cubic-bezier(.34,1.56,.64,1);
+  max-width:min(400px,92vw);
+  pointer-events:auto;
+}
+#stuck-alert-toast.show {
+  opacity:1;
+  transform:translateX(-50%) translateY(0);
+}
+#stuck-alert-toast .sat-ico {
+  width:38px; height:38px; border-radius:10px;
+  background:rgba(255,255,255,.15);
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0;
+}
+#stuck-alert-toast button {
+  background:rgba(255,255,255,.2);
+  border:1.5px solid rgba(255,255,255,.35);
+  border-radius:8px;
+  padding:5px 12px;
+  color:#fff;
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:10px; font-weight:800;
+  cursor:pointer; white-space:nowrap; flex-shrink:0;
+  transition:background .15s;
+}
+#stuck-alert-toast button:hover { background:rgba(255,255,255,.35); }
+
+/* 2. MAP CONTROL BUTTONS */
+.map-ctrl-btn {
+  display:inline-flex; align-items:center; gap:5px;
+  background:#fff; color:#3f6165;
+  border:1.5px solid #dde8ea;
+  border-radius:9px;
+  padding:6px 12px;
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:11px; font-weight:800;
+  cursor:pointer;
+  transition:all .18s;
+  white-space:nowrap; flex-shrink:0;
+}
+.map-ctrl-btn:hover {
+  border-color:#28B9C1; color:#1e9aa1;
+  background:#e6f8f9;
+}
+.map-ctrl-btn.active {
+  background:#28B9C1; color:#071e22;
+  border-color:#28B9C1;
+  box-shadow:0 4px 14px rgba(40,185,193,.3);
+}
+.map-ctrl-btn .material-symbols-rounded { font-size:15px; }
+
+/* Ocultar texto en móvil, solo icono */
+@media(max-width:640px){
+  .map-ctrl-btn .mcb-txt { display:none; }
+  .map-ctrl-btn { padding:6px 8px; }
+}
+
+/* 3. FULLSCREEN */
+body.act-fullscreen .sb,
+body.act-fullscreen .tb { display:none !important; }
+body.act-fullscreen .main {
+  margin-left:0 !important;
+  padding-top:0 !important;
+}
+body.act-fullscreen #pg-actividad {
+  position:fixed !important; inset:0 !important;
+  height:100vh !important; z-index:500 !important;
+  display:flex !important; flex-direction:column !important;
+}
+/* Hint de salida */
+.fs-hint-bar {
+  position:fixed; top:12px; left:50%;
+  transform:translateX(-50%) translateY(-8px);
+  opacity:0;
+  background:rgba(7,30,34,.9);
+  color:#e2f8f9;
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:11px; font-weight:700;
+  padding:7px 18px; border-radius:99px;
+  z-index:9999; white-space:nowrap;
+  pointer-events:none;
+  animation:fsHint 3.8s forwards;
+}
+@keyframes fsHint {
+  0%  { opacity:0; transform:translateX(-50%) translateY(-8px); }
+  12% { opacity:1; transform:translateX(-50%) translateY(0);    }
+  78% { opacity:1; }
+  100%{ opacity:0; }
+}
+
+/* Badge stuck en popup */
+.stuck-popup-badge {
+  display:flex; align-items:center; gap:7px;
+  background:#fef3c7; border:1.5px solid #f59e0b;
+  border-radius:9px; padding:8px 10px; margin-bottom:9px;
+  font-size:11px; font-weight:700; color:#92400e;
+}
+</style>
+
+<!-- ─── SCRIPT PARCHE ─── -->
+<script>
 /* ================================================================
    PARCHE ACTIVIDAD PRO  v1.0
    Funcionalidades:
@@ -7925,13 +7943,13 @@ window.deleteMulta = async function(idx) {
   'use strict';
   if(window.__actPatchV1) return;
   window.__actPatchV1 = true;
- 
+
   /* ════ ESTADO ════ */
   const _posTrack  = {};          // { id:{ lat,lng,movedAt,alertedAt } }
   let   _mapMode   = 'normal';    // 'normal' | 'noche'
   let   _isFS      = false;
   const STUCK_MINS = 10;          // minutos para disparar alerta
- 
+
   /* ════ TILE LAYERS ════ */
   const TILE_OSM = {
     url : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -7947,16 +7965,16 @@ window.deleteMulta = async function(idx) {
     url : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
     opts: { attribution:'© CartoDB', maxZoom:19, subdomains:'abcd', opacity:0.48 }
   };
- 
+
   /* ════ CAMBIAR TILES ════ */
   function setMapTiles(mode){
     const map = window._map;
     if(!map || typeof L==='undefined') return;
     _mapMode = mode;
- 
+
     /* Quitar todas las capas de tiles existentes */
     map.eachLayer(l=>{ if(l instanceof L.TileLayer) map.removeLayer(l); });
- 
+
     if(mode === 'noche'){
       /* 1. Base satelital */
       L.tileLayer(TILE_SAT.url, TILE_SAT.opts).addTo(map);
@@ -7967,7 +7985,7 @@ window.deleteMulta = async function(idx) {
     }
     _syncSatBtn();
   }
- 
+
   function _syncSatBtn(){
     const btn = document.getElementById('map-btn-sat');
     if(!btn) return;
@@ -7981,24 +7999,24 @@ window.deleteMulta = async function(idx) {
       btn.title = 'Vista satelital nocturna estilo Uber';
     }
   }
- 
+
   /* ════ FULLSCREEN ════ */
   function enterFS(){
     _isFS = true;
     document.body.classList.add('act-fullscreen');
     _syncFsBtn();
     setTimeout(()=>{ window._map?.invalidateSize(); }, 230);
- 
+
     /* Hint flotante — desaparece solo */
     const hint = document.createElement('div');
     hint.className = 'fs-hint-bar';
     hint.textContent = 'Modo pantalla completa · Presiona ESC o clic en ⊠ para salir';
     document.body.appendChild(hint);
     setTimeout(()=>hint.remove(), 4000);
- 
+
     document.addEventListener('keydown', _onFsKey);
   }
- 
+
   function exitFS(){
     _isFS = false;
     document.body.classList.remove('act-fullscreen');
@@ -8006,11 +8024,11 @@ window.deleteMulta = async function(idx) {
     setTimeout(()=>{ window._map?.invalidateSize(); }, 230);
     document.removeEventListener('keydown', _onFsKey);
   }
- 
+
   function _onFsKey(e){ if(e.key==='Escape' && _isFS) exitFS(); }
- 
+
   function toggleFS(){ _isFS ? exitFS() : enterFS(); }
- 
+
   function _syncFsBtn(){
     const btn = document.getElementById('map-btn-fs');
     if(!btn) return;
@@ -8022,29 +8040,29 @@ window.deleteMulta = async function(idx) {
       btn.innerHTML = `<span class="material-symbols-rounded">fullscreen</span><span class="mcb-txt">Pantalla completa</span>`;
     }
   }
- 
+
   /* ════ INSERTAR BOTONES EN EL TOPBAR DEL MAPA ════ */
   function insertMapButtons(){
     if(document.getElementById('map-btn-sat')) return;   /* ya existen */
- 
+
     /* Buscar la barra superior del panel de actividad */
     const topbar = document.querySelector('#pg-actividad > div:first-child');
     if(!topbar) return;
- 
+
     const btnSat = document.createElement('button');
     btnSat.id = 'map-btn-sat';
     btnSat.className = 'map-ctrl-btn';
     btnSat.innerHTML = `<span class="material-symbols-rounded">satellite_alt</span><span class="mcb-txt">Satelital 🌙</span>`;
     btnSat.title = 'Vista satelital nocturna estilo Uber';
     btnSat.addEventListener('click', ()=>setMapTiles(_mapMode==='normal'?'noche':'normal'));
- 
+
     const btnFs = document.createElement('button');
     btnFs.id = 'map-btn-fs';
     btnFs.className = 'map-ctrl-btn';
     btnFs.innerHTML = `<span class="material-symbols-rounded">fullscreen</span><span class="mcb-txt">Pantalla completa</span>`;
     btnFs.title = 'Expandir mapa a pantalla completa (ESC para salir)';
     btnFs.addEventListener('click', toggleFS);
- 
+
     /* Insertar ANTES del último botón (Actualizar) */
     const lastBtn = topbar.querySelector('button:last-child');
     if(lastBtn){
@@ -8054,15 +8072,15 @@ window.deleteMulta = async function(idx) {
       topbar.appendChild(btnSat);
       topbar.appendChild(btnFs);
     }
- 
+
     _syncSatBtn(); _syncFsBtn();
   }
- 
+
   /* ════ DOMI DETENIDO — detección ════ */
   function checkStuckDrivers(ubicaciones){
     const now      = Date.now();
     const activeIds = new Set(ubicaciones.map(u=>u.id));
- 
+
     /* Limpiar domis que ya no reportan GPS */
     for(const id of Object.keys(_posTrack)){
       if(!activeIds.has(id)){
@@ -8070,21 +8088,21 @@ window.deleteMulta = async function(idx) {
         delete _posTrack[id];
       }
     }
- 
+
     ubicaciones.forEach(u=>{
       const prev = _posTrack[u.id];
- 
+
       /* Primera vez que vemos a este domi */
       if(!prev){
         _posTrack[u.id] = { lat:u.lat, lng:u.lng, movedAt:now, alertedAt:null };
         return;
       }
- 
+
       /* ¿Se movió? Umbral ≈ 20 metros (≈ 0.00018 °) */
       const moved =
         Math.abs(u.lat - prev.lat) > 0.00018 ||
         Math.abs(u.lng - prev.lng) > 0.00018;
- 
+
       if(moved){
         _posTrack[u.id].lat     = u.lat;
         _posTrack[u.id].lng     = u.lng;
@@ -8093,25 +8111,25 @@ window.deleteMulta = async function(idx) {
         _setMarkerStuck(u.id, false);
         return;
       }
- 
+
       /* Sin movimiento — ¿tiene pedido activo? */
       const domiObj = (window.allDrivers||[]).find(
         d=>(d.id||'').toUpperCase()===u.id.toUpperCase()
       ) || { nombre: u.nombre, id: u.id };
- 
+
       const hasActive = (window.allPedidos||[]).some(p=>
         window.matchDomi?.(p, domiObj) &&
         (p.estado==='proceso'||p.estado==='encamino'||p.estado==='asignado')
       );
- 
+
       if(!hasActive) return;
- 
+
       const stuckMins = (now - prev.movedAt) / 60000;
       if(stuckMins < STUCK_MINS) return;
- 
+
       /* ¡Detenido más de 10 min con pedido activo! */
       _setMarkerStuck(u.id, true);
- 
+
       /* Alertar máximo cada 5 min para no spamear */
       const canAlert = !prev.alertedAt || (now - prev.alertedAt) > 5*60000;
       if(canAlert){
@@ -8120,7 +8138,7 @@ window.deleteMulta = async function(idx) {
       }
     });
   }
- 
+
   /* Aplicar / quitar clase de alerta al elemento del marcador Leaflet */
   function _setMarkerStuck(domiId, isStuck){
     const marker = window._driMarkers?.[domiId];
@@ -8129,11 +8147,11 @@ window.deleteMulta = async function(idx) {
     if(!el) return;
     el.classList.toggle('domi-stuck-marker', isStuck);
   }
- 
+
   /* Disparar alerta visual + voz + sonido */
   function _fireStuckAlert(nombre, mins, domiId){
     const short = nombre.split(' ').slice(0,2).join(' ');
- 
+
     /* Toast */
     let toast = document.getElementById('stuck-alert-toast');
     if(!toast){
@@ -8160,13 +8178,13 @@ window.deleteMulta = async function(idx) {
     requestAnimationFrame(()=>requestAnimationFrame(()=>toast.classList.add('show')));
     clearTimeout(toast._hideTimer);
     toast._hideTimer = setTimeout(()=>toast.classList.remove('show'), 9000);
- 
+
     /* Voz */
     window.VOZ?.hablar(
       `¡Atención! ${short} lleva ${mins} minutos sin moverse con un pedido activo.`,
       1.0, 1.15
     );
- 
+
     /* Sonido de alerta (4 pits ascendentes) */
     try{
       const ctx = window.SONIDO?.ctx || new(window.AudioContext||window.webkitAudioContext)();
@@ -8185,10 +8203,10 @@ window.deleteMulta = async function(idx) {
         });
       }
     }catch(e){}
- 
+
     /* Vibración en móvil */
     if(navigator.vibrate) navigator.vibrate([200,80,200,80,500]);
- 
+
     /* Resaltar en mapa si la pestaña Actividad está activa */
     const pgAct = document.getElementById('pg-actividad');
     if(pgAct && (pgAct.style.display==='flex'||pgAct.classList.contains('on'))){
@@ -8196,18 +8214,18 @@ window.deleteMulta = async function(idx) {
       marker?.openPopup?.();
     }
   }
- 
+
   /* ════ PATCH renderActividad ════ */
   function _patchRenderActividad(){
     const orig = window.renderActividad;
     if(!orig || orig.__actPatched) return;
- 
+
     window.renderActividad = async function patchedRenderActividad(){
       /* Interceptar obtenerUbicacionesGPS para capturar los datos
          sin hacer un fetch adicional */
       const origGPS = window.obtenerUbicacionesGPS;
       let _captured  = [];
- 
+
       if(origGPS && !origGPS.__intercepted){
         window.obtenerUbicacionesGPS = async function(){
           const r = await origGPS.apply(this, arguments);
@@ -8216,29 +8234,29 @@ window.deleteMulta = async function(idx) {
         };
         window.obtenerUbicacionesGPS.__intercepted = true;
       }
- 
+
       await orig.apply(this, arguments);
- 
+
       /* Restaurar */
       if(origGPS) window.obtenerUbicacionesGPS = origGPS;
- 
+
       /* Post-proceso */
       if(window._map){
         insertMapButtons();
         checkStuckDrivers(_captured);
- 
+
         /* Si el modo era satelital antes de un posible re-init, restaurar */
         if(_mapMode === 'noche') setMapTiles('noche');
       }
     };
     window.renderActividad.__actPatched = true;
   }
- 
+
   /* ════ PATCH initActividadTab ════ */
   function _patchInitActividad(){
     const orig = window.initActividadTab;
     if(!orig || orig.__actPatched) return;
- 
+
     window.initActividadTab = function patchedInitActividad(){
       orig.apply(this, arguments);
       /* Intentar insertar botones una vez cargue Leaflet */
@@ -8250,7 +8268,7 @@ window.deleteMulta = async function(idx) {
     };
     window.initActividadTab.__actPatched = true;
   }
- 
+
   /* ════ INICIAR — esperar a que existan las funciones objetivo ════ */
   let _initTries = 0;
   const _waitInit = setInterval(()=>{
@@ -8262,15 +8280,14 @@ window.deleteMulta = async function(idx) {
     }
     if(++_initTries > 60) clearInterval(_waitInit); /* timeout 30s */
   }, 500);
- 
+
   /* ESC global para salir de fullscreen */
   document.addEventListener('keydown', e=>{
     if(e.key==='Escape' && _isFS) exitFS();
   });
- 
+
 })();
 </script>
-
 
 </script>
 </body>
