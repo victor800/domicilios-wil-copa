@@ -3144,76 +3144,8 @@ function _crearZonaEnSheets(data) {
   }).catch(function(){});
 }
 
-(function () {
-  'use strict';
- 
-  /* ── Ancla sede WIL Copacabana ── */
-  var ANCLA = { lat: 6.35245, lng: -75.50486 };
-  var SHEET_ID = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
-  var PRECIO_KM_FUERA = 1800;
- 
-  /* ── Haversine ── */
-  function haversine(lat1, lng1, lat2, lng2) {
-    var R = 6371;
-    var dLat = (lat2 - lat1) * Math.PI / 180;
-    var dLng = (lng2 - lng1) * Math.PI / 180;
-    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-      + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180)
-      * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  }
- 
-  /* ── CSV parser ── */
-  function parseCsv(line) {
-    var r = [], cur = '', q = false;
-    for (var i = 0; i < line.length; i++) {
-      var c = line[i];
-      if (c === '"') { if (q && line[i + 1] === '"') { cur += '"'; i++; } else q = !q; }
-      else if (c === ',' && !q) { r.push(cur.trim()); cur = ''; }
-      else cur += c;
-    }
-    r.push(cur.trim());
-    return r;
-  }
- 
-  /* ── Normalizar texto para comparación ── */
-  function norm(s) {
-    return (s || '').toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9 ]/g, ' ')
-      .replace(/\s+/g, ' ').trim();
-  }
- 
-  /* ── Cargar hoja Tarifas ── */
-  async function cargarTarifas() {
-    var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
-      + '/gviz/tq?tqx=out:csv&sheet=Tarifas&cachebust=' + Date.now();
-    var res = await fetch(url, { cache: 'no-store' });
-    var text = await res.text();
-    var lines = text.trim().split('\n');
-    var zonas = [];
-    for (var i = 1; i < lines.length; i++) {
-      var c = parseCsv(lines[i]);
-      if (!c[0] && !c[7]) continue;
-      var lat = parseFloat(c[7]);
-      var lng = parseFloat(c[8]);
-      zonas.push({
-        barrio:    (c[0] || '').trim(),
-        tarifa:    parseInt((c[1] || '').replace(/[^0-9]/g, '')) || 0,
-        paqPeq:   parseInt((c[2] || '').replace(/[^0-9]/g, '')) || 0,
-        paqMed:   parseInt((c[3] || '').replace(/[^0-9]/g, '')) || 0,
-        paqGra:   parseInt((c[4] || '').replace(/[^0-9]/g, '')) || 0,
-        direccion: (c[5] || '').trim(),
-        zona:      (c[6] || '').trim(),
-        lat:       isNaN(lat) ? null : lat,
-        lng:       isNaN(lng) ? null : lng,
-      });
-    }
-    return zonas;
-  }
- 
 
-})();
+
 
 
 
