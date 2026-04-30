@@ -3362,92 +3362,11 @@ function _crearZonaEnSheets(data) {
     console.log('[WIL Tarifa] ' + info.mensaje + (info.esFuera ? ' ⚠️ FUERA' : ' ✅'));
     return info;
   }
+
+
+  
  
-  /* ── Actualizar elementos del ticket en pantalla ── */
-  function _actualizarTicketUI(info) {
-    /* pedido-wil.html — ticket libre */
-    var elTarifa = document.getElementById('factura-tarifa-domi');
-    if (elTarifa) {
-      elTarifa.textContent = info.tarifa > 0
-        ? '$' + info.tarifa.toLocaleString('es-CO')
-        : 'Por confirmar';
-    }
-    var elZona = document.getElementById('factura-zona-domi');
-    if (elZona) elZona.textContent = info.zonaStr;
  
-    /* pedido-farmacia.html — ticket farmacia */
-    var elFarmTarifa = document.getElementById('farm-tarifa-domi');
-    if (elFarmTarifa) {
-      elFarmTarifa.textContent = info.tarifa > 0
-        ? '$' + info.tarifa.toLocaleString('es-CO')
-        : 'Por confirmar';
-    }
-    var elFarmZona = document.getElementById('farm-zona-domi');
-    if (elFarmZona) elFarmZona.textContent = info.zonaStr;
- 
-    /* Nota fuera de cobertura */
-    var elNota = document.getElementById('wil-tarifa-nota');
-    if (elNota) {
-      elNota.style.display = info.esFuera ? 'flex' : 'none';
-      if (info.esFuera) {
-        elNota.innerHTML = '<span style="font-size:15px">🛵</span>'
-          + '<span>Estás fuera de Copacabana · El domiciliario calculará el valor exacto según la distancia real ('
-          + (info.km ? info.km + ' km aprox.' : 'por confirmar') + '). <b>Tú apruebas antes del cobro.</b></span>';
-      }
-    }
-  }
- 
-  /* ── Exponer globalmente ── */
-  window.WIL_calcularTarifa  = WIL_calcularTarifa;
-  window.WIL_inyectarTarifa  = WIL_inyectarTarifa;
- 
-  /* ═══════════════════════════════════════════════════
-     AUTO-PATCH pedido-wil.html
-     Intercepta enviarPedido para inyectar tarifa real en col T
-     y parchea generarFacturaLibre para mostrar tarifa en ticket
-  ═══════════════════════════════════════════════════ */
-  document.addEventListener('DOMContentLoaded', function () {
- 
-    /* ── 1. Patch generarFacturaLibre → añade filas de tarifa al ticket ── */
-    var _origGenFactura = window.generarFacturaLibre;
-    if (typeof _origGenFactura === 'function') {
-      window.generarFacturaLibre = async function () {
-        /* Llamar original primero (valida campos y muestra ticket) */
-        _origGenFactura.apply(this, arguments);
- 
-        /* Calcular tarifa en paralelo */
-        var info = await WIL_inyectarTarifa();
- 
-        /* Inyectar fila de tarifa en el ticket WIL */
-        _insertarFilaTarifaEnTicket(info);
-      };
-    }
- 
-    /* ── 2. Patch enviarPedido → col T con tarifa real ── */
-    var _origEnviar = window.enviarPedido;
-    if (typeof _origEnviar === 'function') {
-      window.enviarPedido = async function (tipo) {
-        /* Calcular (o reusar si ya se calculó en generarFactura) */
-        if (!window.state.precioDomicilio) {
-          await WIL_inyectarTarifa();
-        }
-        return _origEnviar.apply(this, arguments);
-      };
-    }
- 
-    /* ── 3. Patch para farmacia: interceptar confirmación de pedido ── */
-    var _origConfirmarFarm = window.confirmarPedidoFarmacia;
-    if (typeof _origConfirmarFarm === 'function') {
-      window.confirmarPedidoFarmacia = async function () {
-        if (!window.state || !window.state.precioDomicilio) {
-          await WIL_inyectarTarifa();
-        }
-        return _origConfirmarFarm.apply(this, arguments);
-      };
-    }
- 
-    console.log('[WIL Tarifa Patch v3] ✅ Activo');
-  });
  
   /* ── Insertar fila tarifa en ticket wil-ticket ── */
   function _insertarFilaTarifaEnTicket(info) {
