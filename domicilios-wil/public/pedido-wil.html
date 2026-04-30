@@ -11,7 +11,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
  <script src="pedido-libre.js"></script>
- 
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
@@ -3254,678 +3253,313 @@ function wilAbrirTicket() {
 }(window));
 
 
+
 (function (W) {
   'use strict';
 
-  /* ═══════════════════════════════════════════════════
-     CONFIG
-  ═══════════════════════════════════════════════════ */
-  var CFG = {
-    LOCATIONIQ_KEY : 'pk.1d5fa1a2768413987356b3c66772022b',
-    SHEET_ID       : '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU',
-    ANCLA          : { lat: 6.35245, lng: -75.50486 },
-    PRECIO_KM      : 1800,
-    TARIFA_FIJA    : 50000,
-    KM_LIMITE_FIJA : 25,
-    /* ── Clave del GAS: debe coincidir con la del endpoint real ── */
-    GAS_MARK       : 'AKfycbxVgkSWg5l9GChSxxbF4HQua1xjFIGgv8wMHiYhDF76fuflhn9EOmpml-nK_M6KOn_HJg',
-    ZONAS_FIJA     : [
-      'caldas','bello','itagui','itagüí','la estrella','sabaneta',
-      'san antonio de prado','envigado','el poblado','laureles',
-      'robledo','belén','belen','guayabal','castilla','manrique',
-      'aranjuez','san javier','la america','america','buenos aires',
-      'villa hermosa','santa cruz','florencia','medellin','medellín',
-      'barrio','mesa','la table','primavera','obrero bello'
-    ],
-  };
+  /* ── CONFIG ─────────────────────────────────────────────── */
+  var SHEET_ID   = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+  var ANCLA      = { lat: 6.3491, lng: -75.5062 }; // Sede WIL Copacabana
+  var PRECIO_KM  = 1800;
+  var TARIFA_FIJA = 45000;
 
-  /* ═══════════════════════════════════════════════════
-     1. PARSER INTELIGENTE
-  ═══════════════════════════════════════════════════ */
-  function parsearTextoInteligente(texto) {
-    if (!texto || !texto.trim()) return [];
+  /* Municipios que SIEMPRE = tarifa fija (Bello/Niquía/Madera NO están aquí) */
+  var FIJA = ['envigado','girardota','barbosa','la estrella','estrella',
+    'san antonio de prado','san antonio de p','itagui','itagüí',
+    'sabaneta','caldas','la tablaza','heliconia','ebejico',
+    'san jeronimo','san jerónimo','sopetran','sopetrán',
+    'santa barbara','santa bárbara','el retiro'];
 
-    var segmentos = texto
-      .split(/[,;\n\|\/]+/)
-      .map(function (s) { return s.trim(); })
-      .filter(function (s) { return s.length > 1; });
+  var _cache = null; // caché de sesión
 
-    var items = [];
-
-    segmentos.forEach(function (seg) {
-      var re   = /(\d+(?:[.,]\d+)?)\s+([^0-9,;\n|\/]+?)(?=\s+\d+\s|\s*$)/g;
-      var hits = [];
-      var m;
-
-      while ((m = re.exec(seg)) !== null) {
-        var nombre = m[2].trim().replace(/^(de|del|y|un|una|unos|unas)\s+/i, '');
-        if (nombre.length < 2) continue;
-        hits.push({ qty: parseFloat(m[1].replace(',', '.')) || 1, nombre: capitalizar(nombre) });
-      }
-
-      if (hits.length >= 2) {
-        items = items.concat(hits);
-      } else {
-        var simple = seg.match(/^(\d+(?:[.,]\d+)?)\s+(.+)$/);
-        if (simple) {
-          var nombre = simple[2].trim().replace(/^(de|del)\s+/i, '');
-          items.push({ qty: parseFloat(simple[1].replace(',', '.')) || 1, nombre: capitalizar(nombre) });
-        } else {
-          items.push({ qty: 1, nombre: capitalizar(seg) });
-        }
-      }
-    });
-
-    return items.filter(function (i) {
-      return i.nombre && i.nombre.length > 2 && !/^(y|de|del|la|el|los|las|un|una)$/i.test(i.nombre);
-    });
+  /* ── Haversine km ───────────────────────────────────────── */
+  function hv(la1,lo1,la2,lo2){
+    var R=6371,dL=(la2-la1)*Math.PI/180,dO=(lo2-lo1)*Math.PI/180;
+    var a=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dO/2)*Math.sin(dO/2);
+    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
   }
 
-  function capitalizar(s) {
-    if (!s) return '';
-    return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+  /* ── Normalizar ─────────────────────────────────────────── */
+  function n(s){
+    return(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
   }
 
-  /* ═══════════════════════════════════════════════════
-     2. EXTRACCIÓN CON IA (Claude)
-  ═══════════════════════════════════════════════════ */
-  async function extractWithAI(texto) {
-    var resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body   : JSON.stringify({
-        model     : 'claude-sonnet-4-20250514',
-        max_tokens: 800,
-        messages  : [{
-          role   : 'user',
-          content: 'Eres asistente de una app de domicilios colombiana. '
-            + 'Extrae SOLO los productos del pedido. Devuelve ÚNICAMENTE JSON válido sin texto extra, '
-            + 'sin bloques de código:\n'
-            + '{"productos":[{"nombre":"Nombre","qty":1}]}\n\n'
-            + 'Reglas:\n'
-            + '- Infiere cantidades: una=1, dos=2, 2x=2, etc.\n'
-            + '- Capitaliza nombres.\n'
-            + '- Incluye modificadores en el nombre (con queso, grande, etc.).\n'
-            + '- Ignora referencias a comercio/tienda.\n'
-            + '- Si el texto es ambiguo, igual extrae algo.\n\n'
-            + 'Pedido:\n' + texto
-        }]
-      })
-    });
-    var data  = await resp.json();
-    var raw   = (data.content && data.content[0] && data.content[0].text) || '{"productos":[]}';
-    var clean = raw.replace(/```json|```/g, '').trim();
-    return JSON.parse(clean);
+  /* ── CSV parser ─────────────────────────────────────────── */
+  function csv(line){
+    var r=[],cur='',q=false;
+    for(var i=0;i<line.length;i++){var c=line[i];if(c==='"'){if(q&&line[i+1]==='"'){cur+='"';i++;}else q=!q;}else if(c===','&&!q){r.push(cur.trim());cur='';}else cur+=c;}
+    r.push(cur.trim());return r;
   }
 
-  /* ═══════════════════════════════════════════════════
-     3. GEOCODIFICACIÓN CON LOCATIONIQ
-  ═══════════════════════════════════════════════════ */
-  async function geocodificar(dir) {
-    try {
-      var query = encodeURIComponent(dir + ', Antioquia, Colombia');
-      var url   = 'https://us1.locationiq.com/v1/search?key=' + CFG.LOCATIONIQ_KEY
-                + '&q=' + query + '&format=json&limit=1&countrycodes=co';
-      var res   = await fetch(url);
-      var data  = await res.json();
-      if (!data || !data[0]) return null;
-      return {
-        lat        : parseFloat(data[0].lat),
-        lng        : parseFloat(data[0].lon),
-        displayName: data[0].display_name || ''
-      };
-    } catch (e) {
-      return null;
-    }
+  /* ── ¿Municipio de tarifa fija? ─────────────────────────── */
+  function esFija(barrio,dir){
+    var h=n((barrio||'')+' '+(dir||''));
+    return FIJA.some(function(m){return h===m||h.indexOf(m)!==-1;});
   }
 
-  /* ═══════════════════════════════════════════════════
-     4. CÁLCULO DE TARIFA
-  ═══════════════════════════════════════════════════ */
-  var _tarifaCache = null;
-
-  function resetTarifaCache() { _tarifaCache = null; }
-
-  function haversine(la1, lo1, la2, lo2) {
-    var R = 6371,
-        dLa = (la2 - la1) * Math.PI / 180,
-        dLo = (lo2 - lo1) * Math.PI / 180,
-        a   = Math.sin(dLa / 2) * Math.sin(dLa / 2)
-            + Math.cos(la1 * Math.PI / 180) * Math.cos(la2 * Math.PI / 180)
-              * Math.sin(dLo / 2) * Math.sin(dLo / 2);
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  /* ── Leer hoja Tarifas ──────────────────────────────────── */
+  async function leerZonas(){
+    var url='https://docs.google.com/spreadsheets/d/'+SHEET_ID
+      +'/gviz/tq?tqx=out:csv&sheet=Tarifas&cachebust='+Date.now();
+    var r=await fetch(url,{cache:'no-store'});
+    var t=await r.text();
+    return t.trim().split('\n').slice(1).map(function(l){
+      var c=csv(l);
+      var lat=parseFloat(c[7]),lng=parseFloat(c[8]);
+      var tar=parseInt((c[1]||'').replace(/[^0-9]/g,''))||0;
+      return{barrio:(c[0]||'').trim(),tarifa:tar,
+             direccion:(c[5]||'').trim(),
+             zona:(c[6]||(c[0]||'Copacabana')).trim(),
+             lat:isNaN(lat)?null:lat,lng:isNaN(lng)?null:lng};
+    }).filter(function(z){return z.barrio||z.tarifa;});
   }
 
-  function norm(s) {
-    return (s || '').toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9 ]/g, ' ')
-      .replace(/\s+/g, ' ').trim();
-  }
+  /* ── Match GPS + texto ──────────────────────────────────── */
+  function matchZona(zonas,cLat,cLng,barrioRaw,dirRaw){
+    var bn=n((barrioRaw||'').substring(0,50));
+    var dn=n((dirRaw||'').replace(/\d{7,}/g,' ').substring(0,120));
+    var mejor=null,mejorDist=Infinity,mejorScore=0;
 
-  function esZonaFija(barrio) {
-    var n = norm(barrio || '');
-    return CFG.ZONAS_FIJA.some(function (z) {
-      return n === z || n.indexOf(z) !== -1;
-    });
-  }
-
-  async function calcularTarifa() {
-    if (_tarifaCache) return _tarifaCache;
-
-    var st  = W.state || {};
-    var res = { tarifa: 0, zonaStr: 'Copacabana', esFuera: false, km: 0, mensaje: '' };
-
-    var cLat = st.coords && st.coords.lat ? st.coords.lat : null;
-    var cLng = st.coords && st.coords.lng ? st.coords.lng : null;
-
-    if ((!cLat || !cLng) && st.direccion && CFG.LOCATIONIQ_KEY.indexOf('your') === -1) {
-      var geo = await geocodificar((st.direccion || '') + ' ' + (st.barrio || ''));
-      if (geo) { cLat = geo.lat; cLng = geo.lng; }
+    /* GPS — radio 18 km cubre Copacabana + Bello + Niquía + Madera */
+    if(cLat&&cLng){
+      zonas.forEach(function(z){
+        if(z.lat===null||z.lng===null)return;
+        var d=hv(cLat,cLng,z.lat,z.lng);
+        if(d<mejorDist){mejorDist=d;mejor=z;}
+      });
+      if(mejorDist>18)mejor=null;
     }
 
-    var barrioRaw = (st.barrio || '').substring(0, 40);
-
-    /* REGLA 1: Zona de tarifa fija */
-    if (esZonaFija(barrioRaw)) {
-      res.tarifa  = CFG.TARIFA_FIJA;
-      res.zonaStr = 'Área Metropolitana';
-      res.esFuera = true;
-      res.km      = cLat && cLng ? Math.round(haversine(CFG.ANCLA.lat, CFG.ANCLA.lng, cLat, cLng) * 10) / 10 : 0;
-      res.mensaje = 'Tarifa fija área metro: $' + CFG.TARIFA_FIJA.toLocaleString('es-CO');
-      _tarifaCache = res;
-      return res;
+    /* Texto */
+    if(!mejor){
+      zonas.forEach(function(z){
+        var zb=n(z.barrio),zd=n(z.direccion),sc=0;
+        if(bn&&zb){if(bn===zb)sc+=10;else if(bn.indexOf(zb)!==-1)sc+=7;else if(zb.indexOf(bn)!==-1)sc+=6;}
+        if(dn&&zb&&dn.indexOf(zb)!==-1)sc+=5;
+        if(dn&&zd&&dn.indexOf(zd)!==-1)sc+=4;
+        if(sc>mejorScore){mejorScore=sc;mejor=z;}
+      });
+      if(mejorScore<6)mejor=null;
     }
-
-    /* REGLA 2: Buscar en hoja Tarifas */
-    try {
-      var url   = 'https://docs.google.com/spreadsheets/d/' + CFG.SHEET_ID
-                + '/gviz/tq?tqx=out:csv&sheet=Tarifas&cachebust=' + Date.now();
-      var resp  = await fetch(url, { cache: 'no-store' });
-      var text  = await resp.text();
-      var lines = text.trim().split('\n');
-
-      var zonas = [];
-      for (var i = 1; i < lines.length; i++) {
-        var c   = _parseCsvLine(lines[i]);
-        var lat = parseFloat(c[7]);
-        var lng = parseFloat(c[8]);
-        zonas.push({
-          barrio   : (c[0] || '').trim(),
-          tarifa   : parseInt((c[1] || '').replace(/[^0-9]/g, '')) || 0,
-          direccion: (c[5] || '').trim(),
-          zona     : (c[6] || (c[0] || 'Copacabana')).trim(),
-          lat      : isNaN(lat) ? null : lat,
-          lng      : isNaN(lng) ? null : lng,
-        });
-      }
-
-      var mejor = _matchZona(zonas, cLat, cLng, barrioRaw, st.direccion || '');
-
-      if (mejor) {
-        res.tarifa  = mejor.tarifa;
-        res.zonaStr = mejor.zona || mejor.barrio || 'Copacabana';
-        res.esFuera = false;
-        res.mensaje = 'Zona: ' + res.zonaStr + ' · $' + res.tarifa.toLocaleString('es-CO');
-        _tarifaCache = res;
-        return res;
-      }
-    } catch (e) {
-      console.warn('[WIL tarifa] fallo sheet:', e.message);
-    }
-
-    /* REGLA 3: Fuera de cobertura por distancia */
-    res.esFuera = true;
-    if (cLat && cLng) {
-      var km = haversine(CFG.ANCLA.lat, CFG.ANCLA.lng, cLat, cLng);
-      res.km = Math.round(km * 10) / 10;
-
-      if (km >= CFG.KM_LIMITE_FIJA) {
-        res.tarifa  = CFG.TARIFA_FIJA;
-        res.zonaStr = 'Área Metropolitana';
-        res.mensaje = 'Tarifa fija (>' + CFG.KM_LIMITE_FIJA + ' km)';
-      } else {
-        res.tarifa  = Math.round(km * CFG.PRECIO_KM / 500) * 500;
-        res.zonaStr = 'Fuera de Copacabana · ' + res.km + ' km';
-        res.mensaje = '$1.800/km · ' + res.km + ' km aprox.';
-      }
-    } else {
-      res.tarifa  = 0;
-      res.zonaStr = 'El domi confirma';
-      res.mensaje = 'Sin GPS · el domi confirma el valor';
-    }
-
-    _tarifaCache = res;
-    return res;
-  }
-
-  function _parseCsvLine(line) {
-    var r = [], cur = '', q = false;
-    for (var i = 0; i < line.length; i++) {
-      var c = line[i];
-      if (c === '"') { if (q && line[i+1] === '"') { cur += '"'; i++; } else q = !q; }
-      else if (c === ',' && !q) { r.push(cur.trim()); cur = ''; }
-      else cur += c;
-    }
-    r.push(cur.trim()); return r;
-  }
-
-  function _matchZona(zonas, cLat, cLng, barrioRaw, dirRaw) {
-    var RADIO_COPA = 3.5;
-    var mejor = null, mejorDist = Infinity, mejorScore = 0;
-    var bn = norm(barrioRaw.substring(0, 40));
-    var dn = norm(dirRaw.replace(/\d{7,}/g, ' ').substring(0, 100));
-
-    if (cLat && cLng) {
-      for (var i = 0; i < zonas.length; i++) {
-        var z = zonas[i];
-        if (z.lat === null || z.lng === null) continue;
-        var d = haversine(cLat, cLng, z.lat, z.lng);
-        if (d < mejorDist) { mejorDist = d; mejor = z; }
-      }
-      if (mejorDist > RADIO_COPA) mejor = null;
-    }
-
-    if (!mejor) {
-      for (var j = 0; j < zonas.length; j++) {
-        var zn = zonas[j];
-        var zb = norm(zn.barrio), zd = norm(zn.direccion);
-        var sc = 0;
-        if (bn && zb) {
-          if (bn === zb) sc += 10;
-          else if (bn.indexOf(zb) !== -1) sc += 7;
-          else if (zb.indexOf(bn) !== -1) sc += 6;
-        }
-        if (dn && zb && dn.indexOf(zb) !== -1) sc += 5;
-        if (dn && zd && zd && dn.indexOf(zd) !== -1) sc += 4;
-        if (sc > mejorScore) { mejorScore = sc; mejor = zn; }
-      }
-      if (mejorScore === 0) mejor = null;
-    }
-
-    if (!mejor && !cLat) {
-      var conT = zonas.filter(function (z) { return z.tarifa > 0; });
-      if (conT.length) mejor = conT.reduce(function (a, b) { return a.tarifa <= b.tarifa ? a : b; });
-    }
-
     return mejor;
   }
 
-  /* ═══════════════════════════════════════════════════
-     5. RENDER TARIFA EN TICKET
-  ═══════════════════════════════════════════════════ */
-  function renderTarifaEnTicket(info) {
-    ['wil-tarifa-row', 'wil-tarifa-nota',
-     'wil-ticket-tarifa-container-old', 'wil-ticket-tarifa-container']
-      .forEach(function (id) {
-        var el = document.getElementById(id);
-        if (el) el.innerHTML = '';
-      });
+  /* ═══════════════════════════════════════════════════════════
+     FUNCIÓN PRINCIPAL — expuesta globalmente como
+     window.calcularTarifaDomicilio(opts?)
+     opts = { lat, lng, barrio, direccion }  (todos opcionales)
+     Retorna: { tarifa, zonaStr, esFuera, km, mensaje }
+  ═══════════════════════════════════════════════════════════ */
+  async function calcularTarifaDomicilio(opts){
+    if(_cache)return _cache;
 
-    var cont = document.getElementById('wil-ticket-tarifa-container');
-    if (!cont) return;
+    var o=opts||{};
+    var st=W.state||{};
+    var cLat=o.lat||(st.coords&&st.coords.lat)||null;
+    var cLng=o.lng||(st.coords&&st.coords.lng)||null;
+    var barrioRaw=(o.barrio||st.barrio||'').substring(0,50);
+    var dirRaw=((o.direccion||st.direccion||'')+' '+(st.referencia||'')).substring(0,120);
 
-    var tarifaTxt = info.tarifa > 0
-      ? '$' + info.tarifa.toLocaleString('es-CO')
-      : 'Por confirmar';
+    var res={tarifa:0,zonaStr:'Copacabana',esFuera:false,km:0,mensaje:''};
 
-    var color = info.esFuera ? '#d97706' : 'var(--p)';
+    /* PASO 1 — Hoja Tarifas */
+    try{
+      var zonas=await leerZonas();
+      var match=zonas.length?matchZona(zonas,cLat,cLng,barrioRaw,dirRaw):null;
+      if(match&&match.tarifa>0){
+        res.tarifa=match.tarifa;
+        res.zonaStr=match.zona||match.barrio||'Copacabana';
+        res.esFuera=false;
+        res.mensaje='Zona: '+res.zonaStr+' · $'+res.tarifa.toLocaleString('es-CO');
+        _cache=res;return res;
+      }
+    }catch(e){console.warn('[WIL tarifa] hoja:',e.message);}
 
-    cont.innerHTML =
-      '<div class="wil-ticket-tarifa-row">'
-      + '<div class="wil-ticket-tarifa-lbl">🛵 Domicilio</div>'
-      + '<div class="wil-ticket-tarifa-val" style="color:' + color + '">'
-        + tarifaTxt
-        + '<div class="wil-ticket-tarifa-sub">' + _escHTML(info.zonaStr) + '</div>'
-      + '</div></div>'
-      + (info.esFuera
-        ? '<div class="wil-ticket-tarifa-nota">'
-          + '<span class="sym" style="font-size:14px;color:#d97706;flex-shrink:0">info</span>'
-          + '<span>⚠️ Estás fuera del área de cobertura de Copacabana'
-          + (info.km ? ' (' + info.km + ' km aprox.)' : '')
-          + '. El domicilio se cobra según la distancia recorrida adicional. <strong>El domi confirma el valor antes del cobro y tú apruebas.</strong></span>'
-          + '</div>'
-        : '');
+    /* PASO 2 — Municipio fijo */
+    if(esFija(barrioRaw,dirRaw)){
+      res.tarifa=TARIFA_FIJA;res.esFuera=true;
+      res.zonaStr='Municipio lejano';
+      res.km=cLat&&cLng?Math.round(hv(ANCLA.lat,ANCLA.lng,cLat,cLng)*10)/10:0;
+      res.mensaje='Tarifa fija $'+TARIFA_FIJA.toLocaleString('es-CO');
+      _cache=res;return res;
+    }
+
+    /* PASO 3 — Por km */
+    res.esFuera=true;
+    if(cLat&&cLng){
+      var km=hv(ANCLA.lat,ANCLA.lng,cLat,cLng);
+      res.km=Math.round(km*10)/10;
+      res.tarifa=Math.max(2000,Math.round(km*PRECIO_KM/500)*500);
+      res.zonaStr='Fuera de cobertura · '+res.km+' km';
+      res.mensaje='$1.800/km · '+res.km+' km';
+    }else{
+      res.tarifa=0;res.zonaStr='El domi confirma';res.mensaje='Sin GPS';
+    }
+    _cache=res;return res;
   }
 
-  /* ═══════════════════════════════════════════════════
-     6. VISTA DE REVISIÓN
-  ═══════════════════════════════════════════════════ */
-  var CSS_REVISION = `
-    #view-libre-2b .rl-prod-row {
-      display:flex;align-items:center;gap:8px;
-      background:#f8fafb;border-radius:11px;padding:9px 12px;
-      border:1.5px solid #e8edf2;margin-bottom:7px;
-    }
-    #view-libre-2b .rl-prod-row:focus-within { border-color:var(--p); }
-    #view-libre-2b .rl-prod-inp {
-      flex:1;border:none;background:transparent;font-family:'Plus Jakarta Sans',sans-serif;
-      font-size:13.5px;font-weight:600;color:var(--on);outline:none;min-width:0;
-    }
-    #view-libre-2b .rl-qty-box {
-      display:flex;align-items:center;gap:5px;flex-shrink:0;
-    }
-    #view-libre-2b .rl-qty-btn {
-      width:26px;height:26px;border-radius:50%;border:none;
-      background:var(--pl);color:var(--p);font-size:16px;font-weight:700;
-      cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;
-    }
-    #view-libre-2b .rl-qty-n {
-      font-size:13px;font-weight:800;min-width:20px;text-align:center;color:var(--on);
-    }
-    #view-libre-2b .rl-del {
-      width:28px;height:28px;border-radius:50%;border:none;
-      background:#fef2f2;color:#dc2626;cursor:pointer;
-      display:flex;align-items:center;justify-content:center;flex-shrink:0;
-    }
-    #view-libre-2b .rl-add-row {
-      display:flex;gap:8px;align-items:center;margin-top:4px;
-    }
-    #view-libre-2b .rl-add-inp {
-      flex:1;border:1.5px dashed #c8d4dc;border-radius:11px;
-      padding:10px 13px;font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;
-      color:var(--on);background:#fff;outline:none;transition:.15s;
-    }
-    #view-libre-2b .rl-add-inp:focus { border-color:var(--p);border-style:solid; }
-    #view-libre-2b .rl-add-btn {
-      width:40px;height:40px;border-radius:50%;border:none;
-      background:var(--p);color:#fff;cursor:pointer;
-      display:flex;align-items:center;justify-content:center;flex-shrink:0;
-      box-shadow:0 3px 10px rgba(0,105,112,.25);font-size:22px;font-weight:700;
-    }
-    #view-libre-2b .rl-texto-original {
-      background:rgba(0,105,112,.05);border:1px solid var(--plb);
-      border-radius:11px;padding:10px 13px;font-size:11.5px;
-      color:var(--p);font-style:italic;line-height:1.5;margin-bottom:10px;
-      display:flex;gap:7px;align-items:flex-start;
-    }
-  `;
+  function resetTarifa(){_cache=null;}
 
-  function inyectarVistaRevision() {
-    if (document.getElementById('view-libre-2b')) return;
-
-    var styleEl = document.createElement('style');
-    styleEl.textContent = CSS_REVISION;
-    document.head.appendChild(styleEl);
-
-    var div = document.createElement('div');
-    div.className = 'view';
-    div.id = 'view-libre-2b';
-    div.innerHTML = `
-      <div style="padding:20px 16px 8px">
-        <div style="font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:4px">
-          Pedido Libre 🛍️
-        </div>
-        <div style="font-size:13px;color:var(--on3);font-weight:500">Paso 2b — Revisa y edita tu lista</div>
-      </div>
-      <div class="card">
-        <div class="card-tit"><span class="sym f">fact_check</span>Productos detectados</div>
-        <div class="rl-texto-original" id="rl-texto-ref">
-          <span class="sym f" style="font-size:14px;color:var(--p);flex-shrink:0">format_quote</span>
-          <span id="rl-texto-ref-txt"></span>
-        </div>
-        <div id="rl-lista"></div>
-        <div class="rl-add-row">
-          <input class="rl-add-inp" id="rl-nuevo-inp" placeholder="Agregar otro producto…"
-            onkeydown="if(event.key==='Enter'){WIL_LIBRE.agregarProd();event.preventDefault()}"/>
-          <button class="rl-add-btn" onclick="WIL_LIBRE.agregarProd()">+</button>
-        </div>
-        <div style="margin-top:10px;background:rgba(22,163,74,.06);border:1px solid rgba(22,163,74,.18);border-radius:10px;padding:9px 12px;font-size:11px;color:#16a34a;display:flex;gap:6px;align-items:flex-start">
-          <span class="sym f" style="font-size:14px;flex-shrink:0">edit</span>
-          <span>Edita nombres, ajusta cantidades o agrega ítems que falten. El domi verá exactamente esto.</span>
-        </div>
-      </div>
-      <div class="act-row">
-        <button class="btn-b" onclick="WIL_LIBRE.volverA2()">Editar texto</button>
-        <button class="btn-n" onclick="WIL_LIBRE.confirmarRevision()">
-          <span class="sym" style="font-size:17px">arrow_forward</span>Continuar
-        </button>
-      </div>
-    `;
-
-    var ref = document.getElementById('view-libre-2');
-    if (ref && ref.parentNode) {
-      ref.parentNode.insertBefore(div, ref.nextSibling);
-    } else {
-      document.querySelector('.main').appendChild(div);
-    }
+  /* ── Render tarifa en ticket ────────────────────────────── */
+  function renderTarifa(info){
+    var cont=document.getElementById('wil-ticket-tarifa-container');
+    if(!cont)return;
+    cont.innerHTML='';
+    var txt=info.tarifa>0?'$'+info.tarifa.toLocaleString('es-CO'):'El domi confirma';
+    var col=info.esFuera?'#d97706':'var(--p)';
+    var e=function(t){return(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+    cont.innerHTML='<div class="wil-ticket-tarifa-row">'
+      +'<div class="wil-ticket-tarifa-lbl">🛵 Domicilio</div>'
+      +'<div class="wil-ticket-tarifa-val" style="color:'+col+'">'+txt
+        +'<div class="wil-ticket-tarifa-sub">'+e(info.zonaStr)+'</div>'
+      +'</div></div>'
+      +(info.esFuera
+        ?'<div class="wil-ticket-tarifa-nota">'
+          +'<span class="sym" style="font-size:14px;color:#d97706;flex-shrink:0">info</span>'
+          +'<span>Destino fuera de Copacabana'
+          +(info.km?' ('+info.km+' km aprox.)':'')
+          +'. El domi confirma el valor exacto. <strong>Tú apruebas.</strong></span>'
+          +'</div>'
+        :'');
   }
 
-  function renderListaRevision(productos) {
-    var lista = document.getElementById('rl-lista');
-    if (!lista) return;
-    lista.innerHTML = '';
+  /* ═══════════════════════════════════════════════════════════
+     PARCHE PARA pedir.html
+     Detectado por: existe #view-libre-3
+  ═══════════════════════════════════════════════════════════ */
+  function patchPedir(){
 
-    (productos || []).forEach(function (p, idx) {
-      var row = document.createElement('div');
-      row.className = 'rl-prod-row';
-      row.id = 'rl-row-' + idx;
-      row.innerHTML =
-        '<input class="rl-prod-inp" value="' + _escAttr(p.nombre) + '" '
-        + 'oninput="WIL_LIBRE.editarNombre(' + idx + ',this.value)"/>'
-        + '<div class="rl-qty-box">'
-          + '<button class="rl-qty-btn" onclick="WIL_LIBRE.cambiarQty(' + idx + ',-1)">−</button>'
-          + '<span class="rl-qty-n" id="rl-qty-' + idx + '">' + (p.qty || 1) + '</span>'
-          + '<button class="rl-qty-btn" onclick="WIL_LIBRE.cambiarQty(' + idx + ',1)">+</button>'
-        + '</div>'
-        + '<button class="rl-del" onclick="WIL_LIBRE.eliminarProd(' + idx + ')">'
-          + '<span class="sym" style="font-size:14px">close</span>'
-        + '</button>';
-      lista.appendChild(row);
-    });
-  }
-
-  /* ═══════════════════════════════════════════════════
-     7. API PÚBLICA DEL MÓDULO
-  ═══════════════════════════════════════════════════ */
-  var API = {
-    goLibre3Async: async function () {
-      var txt = ((document.getElementById('libreTextoLibre') || {}).value || '').trim();
-      if (!txt) {
-        mostrarToast('Escribe qué necesitas pedir.', 'edit_note');
-        return;
-      }
-
-      resetTarifaCache();
-
-      var btn      = document.getElementById('btnLibre2Sig');
-      var statusEl = document.getElementById('libreAiStatus');
-      if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Procesando…'; }
-      if (statusEl) statusEl.innerHTML = '<span class="spin dk"></span><span>Detectando productos…</span>';
-
-      var productos = [];
-
-      try {
-        var aiResult = await extractWithAI(txt);
-        productos = (aiResult.productos || []).filter(function (p) { return p && p.nombre; });
-      } catch (e) {
-        productos = parsearTextoInteligente(txt);
-      }
-
-      if (!productos.length) productos = parsearTextoInteligente(txt);
-      if (!productos.length) productos = [{ nombre: capitalizar(txt.substring(0, 60)), qty: 1 }];
-
-      if (W.state) W.state.productos = productos;
-
-      if (statusEl) statusEl.innerHTML =
-        '<span class="sym f" style="font-size:15px;color:#16a34a">check_circle</span>'
-        + '<span style="color:#16a34a;font-weight:700">'
-        + productos.length + ' producto' + (productos.length !== 1 ? 's' : '') + ' detectados</span>';
-
-      if (btn) { btn.disabled = false; btn.innerHTML = '<span class="sym" style="font-size:17px">arrow_forward</span>Continuar'; }
-
-      inyectarVistaRevision();
-      var refEl = document.getElementById('rl-texto-ref-txt');
-      if (refEl) refEl.textContent = txt.length > 120 ? txt.substring(0, 120) + '…' : txt;
-      renderListaRevision(productos);
-
-      setTimeout(function () {
-        if (W.showView) W.showView('view-libre-2b');
-      }, 200);
-    },
-
-    editarNombre: function (idx, val) {
-      if (W.state && W.state.productos && W.state.productos[idx]) {
-        W.state.productos[idx].nombre = val;
-      }
-    },
-
-    cambiarQty: function (idx, delta) {
-      if (!W.state || !W.state.productos || !W.state.productos[idx]) return;
-      var qty = Math.max(1, (W.state.productos[idx].qty || 1) + delta);
-      W.state.productos[idx].qty = qty;
-      var el = document.getElementById('rl-qty-' + idx);
-      if (el) el.textContent = qty;
-    },
-
-    eliminarProd: function (idx) {
-      if (!W.state || !W.state.productos) return;
-      W.state.productos.splice(idx, 1);
-      renderListaRevision(W.state.productos);
-    },
-
-    agregarProd: function () {
-      var inp  = document.getElementById('rl-nuevo-inp');
-      var val  = (inp ? inp.value : '').trim();
-      if (!val) return;
-      if (!W.state.productos) W.state.productos = [];
-      W.state.productos.push({ nombre: capitalizar(val), qty: 1 });
-      renderListaRevision(W.state.productos);
-      if (inp) { inp.value = ''; inp.focus(); }
-    },
-
-    confirmarRevision: function () {
-      var inputs = document.querySelectorAll('#rl-lista .rl-prod-inp');
-      inputs.forEach(function (inp, i) {
-        if (W.state && W.state.productos && W.state.productos[i]) {
-          W.state.productos[i].nombre = inp.value.trim() || W.state.productos[i].nombre;
-        }
-      });
-      if (W.showView) W.showView('view-libre-3');
-    },
-
-    volverA2: function () {
-      if (W.showView) W.showView('view-libre-2');
-    },
-
-    inyectarTarifa: async function () {
-      var info = await calcularTarifa();
-      renderTarifaEnTicket(info);
-      if (W.state) {
-        W.state.precioDomicilio = info.tarifa;
-        W.state.tarifaZonaStr  = info.zonaStr;
-        W.state.tarifaEsFuera  = info.esFuera;
-      }
-      return info;
-    },
-
-    parsearTexto    : parsearTextoInteligente,
-    calcularTarifa  : calcularTarifa,
-    resetTarifaCache: resetTarifaCache,
-  };
-
-  /* ═══════════════════════════════════════════════════
-     8. PARCHEAR FUNCIONES DEL HTML PRINCIPAL
-  ═══════════════════════════════════════════════════ */
-  function patchearFlujoPrincipal() {
-    /* ── A: Reemplazar goLibre3Async ── */
-    W.goLibre3Async = API.goLibre3Async;
-
-    /* ── B: Parchear generarFacturaLibre para inyectar tarifa ── */
-    var _origGen = W.generarFacturaLibre;
-    W.generarFacturaLibre = async function () {
-      resetTarifaCache();
-
-      if (typeof _origGen === 'function') _origGen.apply(this, arguments);
-
-      var st = W.state || {};
-      var nombreEl = document.getElementById('factura-nombre-resumen');
-      if (nombreEl) nombreEl.textContent = st.nombre || '—';
-      var countEl = document.getElementById('ticket-prod-count');
-      if (countEl) countEl.textContent = (st.productos && st.productos.length)
-        ? st.productos.length + ' producto' + (st.productos.length !== 1 ? 's' : '')
-        : 'Sin lista';
-      var pagoEl = document.getElementById('ticket-pago-resumen');
-      if (pagoEl) pagoEl.textContent = st.metodoPago === 'EFECTIVO' ? '💵 Efectivo' : '🏦 Transferencia';
-
-      var info = await API.inyectarTarifa();
-      console.log('[WIL-LIBRE] Tarifa:', info.mensaje);
-
-      setTimeout(function () { if (W.wilAbrirTicket) W.wilAbrirTicket(); }, 100);
+    /* A — generarFacturaLibre: calcular + render + guardar en state */
+    var _origGen=W.generarFacturaLibre;
+    W.generarFacturaLibre=async function(){
+      resetTarifa();
+      /* Llamar original — valida campos y navega a view-factura-libre */
+      if(typeof _origGen==='function')_origGen.apply(this,arguments);
+      /* Solo si llegamos a la vista de factura */
+      var vf=document.getElementById('view-factura-libre');
+      if(!vf||!vf.classList.contains('active'))return;
+      /* Calcular tarifa */
+      var info=await calcularTarifaDomicilio();
+      renderTarifa(info);
+      /* Guardar en state */
+      if(W.state)W.state.precioDomicilio=info.tarifa;
+      /* Resumen colapsable */
+      var st=W.state||{};
+      var nEl=document.getElementById('factura-nombre-resumen');
+      if(nEl)nEl.textContent=st.nombre||'—';
+      var cEl=document.getElementById('ticket-prod-count');
+      if(cEl)cEl.textContent=(st.productos&&st.productos.length)?st.productos.length+' producto'+(st.productos.length!==1?'s':''):'Sin lista';
+      var pEl=document.getElementById('ticket-pago-resumen');
+      if(pEl)pEl.textContent=st.metodoPago==='EFECTIVO'?'💵 Efectivo':'🏦 Transferencia';
+      if(W.wilAbrirTicket)setTimeout(W.wilAbrirTicket,100);
+      console.log('[WIL tarifa final]',info.mensaje);
     };
 
-    /* ── C: Parchear enviarPedido — escribe state antes de la cadena ── */
-    var _origEnviar = W.enviarPedido;
-    W.enviarPedido = async function (tipo) {
-      if (!_tarifaCache) await calcularTarifa();
-      if (W.state && _tarifaCache) W.state.precioDomicilio = _tarifaCache.tarifa;
-      return _origEnviar.apply(this, arguments);
+    /* B — enviarPedido: parche FINAL (el último en ejecutarse)
+       Garantiza que state.precioDomicilio tenga el valor correcto
+       ANTES de que cualquier wrapper anterior construya las rows.
+       Estrategia: sobreescribir state.precioDomicilio justo antes
+       de llamar a la cadena anterior. */
+    var _prevEnviar=W.enviarPedido;
+    W.enviarPedido=async function(tipo){
+      /* 1. Calcular (desde caché si ya está) */
+      var info=await calcularTarifaDomicilio();
+      /* 2. Escribir en state — esto persiste para todos los wrappers */
+      if(W.state)W.state.precioDomicilio=info.tarifa;
+      /* 3. Llamar cadena anterior (parchearEnviarPedido, WIL_LIBRE, original) */
+      return _prevEnviar.apply(this,arguments);
     };
 
-    /* ── D: Resetear caché cuando cambia dirección/barrio ── */
-    ['libre-direccion', 'libre-referencia'].forEach(function (id) {
-      var el = document.getElementById(id);
-      if (el) el.addEventListener('input', resetTarifaCache);
+    /* C — Reset caché cuando el cliente toca dirección */
+    ['libre-direccion','libre-referencia'].forEach(function(id){
+      var el=document.getElementById(id);
+      if(el)el.addEventListener('input',resetTarifa);
     });
 
-    /* ── E: Interceptar fetch al GAS para inyectar tarifa en col T (índice 19) ──
-       Este es el bloque que faltaba en la versión original.
-       Garantiza que el valor llegue a la hoja sin importar cómo el original
-       construye las rows, igual que lo hace tarifa-final.js para farmacia.   ── */
-    var _origFetch = W.fetch;
-    W.fetch = async function (url, opts) {
-      if (
-        typeof url === 'string' &&
-        url.indexOf(CFG.GAS_MARK) !== -1 &&
-        opts && opts.method === 'POST'
-      ) {
-        try {
-          var body = JSON.parse(opts.body || '{}');
-          if (body.rows && body.rows.length) {
-            /* Asegurar que la tarifa esté calculada */
-            if (!_tarifaCache) await calcularTarifa();
-            var info = _tarifaCache;
-            /* Solo inyectar si la col T está vacía o en cero */
-            if (info && info.tarifa > 0 && (!body.rows[0][19] || body.rows[0][19] === 0)) {
-              body.rows[0][19] = info.tarifa;
-              opts = Object.assign({}, opts, { body: JSON.stringify(body) });
-              console.log('[WIL-LIBRE] col T inyectada =', info.tarifa, '—', info.mensaje);
+    console.log('[WIL tarifa final] ✅ pedir.html parchado');
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     PARCHE PARA pedido-farmacia.html
+     Detectado por: ausencia de #view-libre-3
+     Estrategia: interceptar la función que envía a GAS
+     e inyectar VALOR_DOMICILIO (col T, índice 19) en rows[0]
+  ═══════════════════════════════════════════════════════════ */
+  function patchFarmacia(){
+
+    /* Interceptar fetch global para capturar el POST al GAS
+       y añadir la tarifa ANTES de que salga */
+    var _origFetch=W.fetch;
+    W.fetch=async function(url,opts){
+      /* Solo interceptar el GAS de WIL */
+      var GAS_MARK='AKfycbxVgkSWg5l9GChSxxbF4HQua1xjFIGgv8wMHiYhDF76fuflhn9EOmpml-nK_M6KOn_HJg';
+      if(typeof url==='string'&&url.indexOf(GAS_MARK)!==-1&&opts&&opts.method==='POST'){
+        try{
+          var body=JSON.parse(opts.body||'{}');
+          /* Solo si tiene rows y la col T (índice 19) está vacía o es 0 */
+          if(body.rows&&body.rows.length){
+            /* Obtener coords y dirección del pedido */
+            var dir=(body.direccion||'')+(body.zona?', '+body.zona:'');
+            var coords=body.coords||null;
+            var info=await calcularTarifaDomicilio({
+              lat:coords&&coords.lat?coords.lat:null,
+              lng:coords&&coords.lng?coords.lng:null,
+              barrio:body.zona||'',
+              direccion:dir
+            });
+            /* Inyectar en primera fila, índice 19 = col T */
+            if(info.tarifa>0&&(!body.rows[0][19]||body.rows[0][19]===0)){
+              body.rows[0][19]=info.tarifa;
+              opts=Object.assign({},opts,{body:JSON.stringify(body)});
+              console.log('[WIL tarifa farmacia] col T =',info.tarifa,'—',info.mensaje);
             }
+            /* También guardar domicilio en el campo del body si existe */
+            if(typeof body.domicilio!=='undefined')body.domicilio=info.tarifa;
+            opts=Object.assign({},opts,{body:JSON.stringify(body)});
           }
-        } catch (ex) {
-          console.warn('[WIL-LIBRE] fetch patch error:', ex.message);
-        }
+        }catch(ex){console.warn('[WIL tarifa farmacia] patch error:',ex.message);}
       }
-      return _origFetch.apply(this, arguments);
+      return _origFetch.apply(this,arguments);
     };
 
-    console.log('[WIL-LIBRE v1.1] ✅ Parches activos — tarifa limpia · col T garantizada · revisión de productos · parser inteligente');
+    /* También exponer función para que pedido-farmacia.html
+       la llame manualmente antes de armar rows si lo prefiere */
+    W.WIL_calcularTarifaFarmacia=async function(direccion,barrio,coords){
+      _cache=null; // limpiar para nueva consulta
+      return calcularTarifaDomicilio({
+        lat:coords&&coords.lat?coords.lat:null,
+        lng:coords&&coords.lng?coords.lng:null,
+        barrio:barrio||'',
+        direccion:direccion||''
+      });
+    };
+
+    console.log('[WIL tarifa final] ✅ pedido-farmacia.html parchado');
   }
 
-  /* ═══════════════════════════════════════════════════
-     UTILIDADES PRIVADAS
-  ═══════════════════════════════════════════════════ */
-  function _escHTML(t) {
-    return (t || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-  function _escAttr(t) {
-    return (t || '').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  /* ── Inicializar según página ───────────────────────────── */
+  function init(){
+    /* Exponer siempre — parchearEnviarPedido la necesita */
+    W.calcularTarifaDomicilio=calcularTarifaDomicilio;
+    W.WIL_resetTarifa=resetTarifa;
+
+    var esPedir=!!document.getElementById('view-libre-3');
+    if(esPedir){
+      patchPedir();
+    }else{
+      /* Cualquier otra página (farmacia, paquetería, etc.) */
+      patchFarmacia();
+    }
   }
 
-  function init() {
-    inyectarVistaRevision();
-    patchearFlujoPrincipal();
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',init);
+  }else{
+    setTimeout(init,0);
   }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    setTimeout(init, 0);
-  }
-
-  W.WIL_LIBRE = API;
 
 }(window));
+
 
 </script>
 </body>
