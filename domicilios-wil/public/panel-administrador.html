@@ -7793,255 +7793,214 @@ window.deleteMulta = async function(idx) {
 })();
 </script>
 
-<style id="actpro-styles">
-/* ── 1. DOMI DETENIDO ── */
-@keyframes stuckBlink {0%,100%{opacity:1}50%{opacity:.4}}
-.domi-stuck-marker{filter:hue-rotate(-90deg) saturate(4) brightness(1.2)!important;animation:stuckBlink .9s ease-in-out infinite!important}
+<style>
+@keyframes stuckBlink{0%,100%{opacity:1}50%{opacity:.35}}
+.domi-stuck-marker{filter:hue-rotate(-90deg) saturate(4) brightness(1.3)!important;animation:stuckBlink .85s ease-in-out infinite!important}
+#apro-toast{position:fixed;top:74px;left:50%;transform:translateX(-50%) translateY(-24px);opacity:0;pointer-events:none;background:#c2410c;color:#fff;border-radius:14px;padding:12px 16px;font-family:'Plus Jakarta Sans',sans-serif;display:flex;align-items:center;gap:10px;box-shadow:0 8px 28px rgba(249,115,22,.55);z-index:9999;max-width:min(400px,92vw);transition:all .42s cubic-bezier(.34,1.56,.64,1)}
+#apro-toast.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
+#apro-toast button{background:rgba(255,255,255,.22);border:1.5px solid rgba(255,255,255,.4);border-radius:8px;padding:4px 11px;color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:800;cursor:pointer;white-space:nowrap;flex-shrink:0}
+body.apro-fs .sb,body.apro-fs header.tb{display:none!important}
+body.apro-fs .main{margin-left:0!important;padding-top:0!important}
+body.apro-fs #pg-actividad{position:fixed!important;inset:0!important;height:100vh!important;z-index:9000!important;display:flex!important;flex-direction:column!important}
+@keyframes fshint{0%{opacity:0;transform:translateX(-50%) translateY(-10px)}15%{opacity:1;transform:translateX(-50%) translateY(0)}80%{opacity:1}100%{opacity:0}}
+#apro-fshint{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:rgba(7,30,34,.92);color:#e2f8f9;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;padding:7px 20px;border-radius:99px;z-index:9998;pointer-events:none;animation:fshint 4.2s forwards}
  
-#actpro-stuck-toast{
-  position:fixed;top:76px;left:50%;
-  transform:translateX(-50%) translateY(-20px);
-  opacity:0;pointer-events:none;
-  background:#c2410c;color:#fff;
-  border-radius:14px;padding:12px 16px;
-  font-family:'Plus Jakarta Sans',sans-serif;
-  display:flex;align-items:center;gap:10px;
-  box-shadow:0 8px 28px rgba(249,115,22,.5);
-  z-index:9999;
-  max-width:min(400px,92vw);
-  transition:all .4s cubic-bezier(.34,1.56,.64,1);
-}
-#actpro-stuck-toast.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
-#actpro-stuck-toast .st-ico{
-  width:36px;height:36px;border-radius:9px;
-  background:rgba(255,255,255,.15);
-  display:flex;align-items:center;justify-content:center;
-  flex-shrink:0;font-size:16px;
-}
-#actpro-stuck-toast button{
-  background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.35);
-  border-radius:8px;padding:4px 11px;color:#fff;
-  font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:800;
-  cursor:pointer;white-space:nowrap;flex-shrink:0;transition:background .15s;
-}
-#actpro-stuck-toast button:hover{background:rgba(255,255,255,.35)}
- 
-/* ── 2. BOTONES DEL MAPA ── */
-.actpro-btn{
-  display:inline-flex;align-items:center;gap:5px;
-  background:#fff;color:#3f6165;
-  border:1.5px solid #dde8ea;border-radius:9px;
-  padding:6px 12px;
-  font-family:'Plus Jakarta Sans',sans-serif;
-  font-size:11px;font-weight:800;
-  cursor:pointer;transition:all .18s;white-space:nowrap;flex-shrink:0;
-}
-.actpro-btn:hover{border-color:#28B9C1;color:#1e9aa1;background:#e6f8f9}
-.actpro-btn.active{background:#28B9C1;color:#071e22;border-color:#28B9C1;box-shadow:0 4px 14px rgba(40,185,193,.3)}
-.actpro-btn .material-symbols-rounded{font-size:15px}
-@media(max-width:640px){.actpro-btn .mcb-txt{display:none}.actpro-btn{padding:6px 8px}}
- 
-/* ── 3. FULLSCREEN ── */
-body.actpro-fs .sb,body.actpro-fs .tb{display:none!important}
-body.actpro-fs .main{margin-left:0!important;padding-top:0!important}
-body.actpro-fs #pg-actividad{
-  position:fixed!important;inset:0!important;
-  height:100vh!important;z-index:500!important;
-  display:flex!important;flex-direction:column!important;
-}
- 
-#actpro-fs-hint{
-  position:fixed;top:14px;left:50%;
-  transform:translateX(-50%);
-  background:rgba(7,30,34,.9);color:#e2f8f9;
-  font-family:'Plus Jakarta Sans',sans-serif;
-  font-size:11px;font-weight:700;
-  padding:7px 18px;border-radius:99px;
-  z-index:9998;pointer-events:none;
-  animation:fshint 4s forwards;
-}
-@keyframes fshint{
-  0%  {opacity:0;transform:translateX(-50%) translateY(-8px)}
-  12% {opacity:1;transform:translateX(-50%) translateY(0)}
-  78% {opacity:1}
-  100%{opacity:0}
-}
+/* Botones del mapa */
+.apro-mapbtn{display:inline-flex;align-items:center;gap:5px;background:#fff;color:#3f6165;border:1.5px solid #dde8ea;border-radius:9px;padding:6px 13px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer;transition:all .18s;white-space:nowrap;flex-shrink:0;line-height:1}
+.apro-mapbtn:hover{border-color:#28B9C1;color:#1e9aa1;background:#e6f8f9}
+.apro-mapbtn.on{background:#28B9C1;color:#071e22;border-color:#28B9C1;box-shadow:0 4px 14px rgba(40,185,193,.3)}
+.apro-mapbtn .material-symbols-rounded{font-size:15px}
+@media(max-width:600px){.apro-mapbtn .mbt{display:none}.apro-mapbtn{padding:6px 8px}}
 </style>
  
-<!-- Toast de domi detenido -->
-<div id="actpro-stuck-toast">
-  <div class="st-ico">
-    <span class="material-symbols-rounded" style="font-size:18px;">warning</span>
+<!-- Toast domi detenido -->
+<div id="apro-toast">
+  <span class="material-symbols-rounded" style="font-size:20px;flex-shrink:0;">warning</span>
+  <div style="flex:1;min-width:0">
+    <div id="apro-toast-msg" style="font-size:12px;font-weight:800;line-height:1.3"></div>
+    <div style="font-size:10px;opacity:.82;margin-top:2px">Tiene pedido activo — puede necesitar ayuda</div>
   </div>
-  <div style="flex:1;min-width:0;">
-    <div id="actpro-stuck-msg" style="font-size:12px;font-weight:800;line-height:1.3;"></div>
-    <div style="font-size:10px;opacity:.8;margin-top:2px;">Tiene pedido activo — puede necesitar ayuda</div>
-  </div>
-  <button onclick="document.getElementById('actpro-stuck-toast').classList.remove('show')">OK</button>
+  <button onclick="document.getElementById('apro-toast').classList.remove('show')">OK</button>
 </div>
  
-<script id="actpro-script">
-(function patchActividadPro(){
+<script>
+/* ═══ PARCHE ACTIVIDAD PRO v3 ═══ */
+(function(){
   'use strict';
-  if(window.__actProV2) return;
-  window.__actProV2 = true;
+  if(window.__apro3) return;
+  window.__apro3 = true;
  
-  /* ════ CONFIG ════ */
-  const STUCK_MINS    = 10;
-  const ALERT_COOLDOWN= 5 * 60 * 1000;
-  const MOVED_THRESH  = 0.00018;
+  const STUCK_MIN   = 10;
+  const COOL_MS     = 5 * 60 * 1000;
+  const MOVE_DEG    = 0.00018;
+  const _pos        = {};
+  let   _mode       = 'normal';
+  let   _fs         = false;
+  let   _inserted   = false;
  
-  /* ════ ESTADO ════ */
-  const _pos  = {};
-  let _mode   = 'normal';
-  let _isFS   = false;
-  let _btnsSat = null, _btnFS = null;
+  /* ── Tiles ── */
+  const OSM  = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  const SAT  = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+  const DARK = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
  
-  /* ════ TILE LAYERS ════ */
-  const TILES = {
-    osm : {
-      url : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      opt : { attribution:'© OpenStreetMap', maxZoom:19 }
-    },
-    sat : {
-      url : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      opt : { attribution:'© Esri, Maxar', maxZoom:19 }
-    },
-    dark: {
-      url : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-      opt : { attribution:'© CartoDB', maxZoom:19, subdomains:'abcd', opacity:0.46 }
-    }
-  };
- 
-  /* ════ CAMBIAR TILES ════ */
-  function setTiles(mode){
+  function applyTiles(mode){
     const map = window._map;
-    if(!map || typeof L === 'undefined') return;
+    if(!map || !window.L) return;
     _mode = mode;
     map.eachLayer(l => { if(l instanceof L.TileLayer) map.removeLayer(l); });
     if(mode === 'noche'){
-      L.tileLayer(TILES.sat.url, TILES.sat.opt).addTo(map);
-      L.tileLayer(TILES.dark.url, TILES.dark.opt).addTo(map);
+      L.tileLayer(SAT, {attribution:'© Esri',maxZoom:19}).addTo(map);
+      L.tileLayer(DARK,{attribution:'© CartoDB',maxZoom:19,subdomains:'abcd',opacity:.46}).addTo(map);
     } else {
-      L.tileLayer(TILES.osm.url, TILES.osm.opt).addTo(map);
+      L.tileLayer(OSM, {attribution:'© OpenStreetMap',maxZoom:19}).addTo(map);
     }
-    syncSatBtn();
+    syncSatUI();
   }
  
-  function syncSatBtn(){
-    if(!_btnsSat) return;
-    const isNight = _mode === 'noche';
-    _btnsSat.classList.toggle('active', isNight);
-    _btnsSat.innerHTML = isNight
-      ? '<span class="material-symbols-rounded">map</span><span class="mcb-txt">Mapa normal</span>'
-      : '<span class="material-symbols-rounded">satellite_alt</span><span class="mcb-txt">Satelital 🌙</span>';
+  function syncSatUI(){
+    const b = document.getElementById('apro-btn-sat');
+    if(!b) return;
+    const on = _mode === 'noche';
+    b.classList.toggle('on', on);
+    b.innerHTML = on
+      ? '<span class="material-symbols-rounded">map</span><span class="mbt"> Mapa normal</span>'
+      : '<span class="material-symbols-rounded">satellite_alt</span><span class="mbt"> Satelital 🌙</span>';
   }
  
-  /* ════ FULLSCREEN ════ */
+  /* ── Fullscreen ── */
   function enterFS(){
-    _isFS = true;
-    document.body.classList.add('actpro-fs');
-    syncFsBtn();
-    setTimeout(() => window._map?.invalidateSize(), 220);
+    _fs = true;
+    document.body.classList.add('apro-fs');
+    syncFsUI();
+    setTimeout(()=> window._map?.invalidateSize(), 240);
     const h = document.createElement('div');
-    h.id = 'actpro-fs-hint';
-    h.textContent = 'Pantalla completa · Presiona ESC o clic en ⊠ para salir';
+    h.id = 'apro-fshint';
+    h.textContent = 'Pantalla completa · Presiona ESC para salir';
     document.body.appendChild(h);
-    setTimeout(() => h.remove(), 4200);
-    document.addEventListener('keydown', onFsKey);
+    setTimeout(()=> h.remove(), 4500);
+    document.addEventListener('keydown', escHandler);
   }
- 
   function exitFS(){
-    _isFS = false;
-    document.body.classList.remove('actpro-fs');
-    syncFsBtn();
-    setTimeout(() => window._map?.invalidateSize(), 220);
-    document.removeEventListener('keydown', onFsKey);
+    _fs = false;
+    document.body.classList.remove('apro-fs');
+    syncFsUI();
+    setTimeout(()=> window._map?.invalidateSize(), 240);
+    document.removeEventListener('keydown', escHandler);
+  }
+  function escHandler(e){ if(e.key === 'Escape') exitFS(); }
+  function syncFsUI(){
+    const b = document.getElementById('apro-btn-fs');
+    if(!b) return;
+    b.classList.toggle('on', _fs);
+    b.innerHTML = _fs
+      ? '<span class="material-symbols-rounded">fullscreen_exit</span><span class="mbt"> Salir FS</span>'
+      : '<span class="material-symbols-rounded">fullscreen</span><span class="mbt"> Pantalla completa</span>';
   }
  
-  function toggleFS(){ _isFS ? exitFS() : enterFS(); }
-  function onFsKey(e){ if(e.key === 'Escape') exitFS(); }
- 
-  function syncFsBtn(){
-    if(!_btnFS) return;
-    _btnFS.classList.toggle('active', _isFS);
-    _btnFS.innerHTML = _isFS
-      ? '<span class="material-symbols-rounded">fullscreen_exit</span><span class="mcb-txt">Salir FS</span>'
-      : '<span class="material-symbols-rounded">fullscreen</span><span class="mcb-txt">Pantalla completa</span>';
-  }
- 
-  /* ════ INSERTAR BOTONES ════ */
+  /* ── Insertar botones ── */
+  /* 
+    ESTRATEGIA: buscamos el div que contiene los botones "Centrar" y "Actualizar"
+    dentro de #pg-actividad. Lo hacemos leyendo TODOS los divs hijos directos
+    y buscando el que contenga un botón con texto "Centrar".
+  */
   function insertButtons(){
-    if(document.getElementById('actpro-btn-sat')) return;
+    if(_inserted && document.getElementById('apro-btn-sat')) return;
  
-    /* 
-      Busca el topbar del panel Actividad.
-      Tiene 2 botones al final: "Centrar" y "Actualizar".
-      Insertamos ANTES de "Actualizar" (último botón).
-    */
-    const topbar = document.querySelector('#pg-actividad > div:first-child');
-    if(!topbar) return;
+    const pg = document.getElementById('pg-actividad');
+    if(!pg){ console.warn('[APRO] #pg-actividad no encontrado'); return; }
  
-    _btnsSat = document.createElement('button');
-    _btnsSat.id = 'actpro-btn-sat';
-    _btnsSat.className = 'actpro-btn';
-    _btnsSat.title = 'Vista satelital nocturna';
-    _btnsSat.innerHTML = '<span class="material-symbols-rounded">satellite_alt</span><span class="mcb-txt">Satelital 🌙</span>';
-    _btnsSat.onclick = () => setTiles(_mode === 'normal' ? 'noche' : 'normal');
+    /* Buscar el div topbar: contiene al menos 2 botones */
+    let topbar = null;
+    const children = pg.children;
+    for(let i = 0; i < children.length; i++){
+      const ch = children[i];
+      /* El topbar es el div con padding superior y fondo blanco — buscamos por botones */
+      const btns = ch.querySelectorAll('button');
+      if(btns.length >= 2){
+        topbar = ch;
+        break;
+      }
+    }
  
-    _btnFS = document.createElement('button');
-    _btnFS.id = 'actpro-btn-fs';
-    _btnFS.className = 'actpro-btn';
-    _btnFS.title = 'Pantalla completa (ESC para salir)';
-    _btnFS.innerHTML = '<span class="material-symbols-rounded">fullscreen</span><span class="mcb-txt">Pantalla completa</span>';
-    _btnFS.onclick = toggleFS;
+    /* Fallback: buscar directamente por el botón "Centrar" en todo el pg */
+    if(!topbar){
+      const allBtns = pg.querySelectorAll('button');
+      for(const btn of allBtns){
+        if(btn.textContent.includes('Centrar') || btn.textContent.includes('Actualizar')){
+          topbar = btn.closest('div');
+          break;
+        }
+      }
+    }
  
-    /* Insertar antes del último botón (Actualizar) */
+    if(!topbar){
+      console.warn('[APRO] Topbar del mapa no encontrado — reintentando...');
+      return;
+    }
+ 
+    /* Evitar duplicados */
+    if(document.getElementById('apro-btn-sat')){ _inserted = true; return; }
+ 
+    /* Crear botón Satelital */
+    const bSat = document.createElement('button');
+    bSat.id = 'apro-btn-sat';
+    bSat.className = 'apro-mapbtn';
+    bSat.title = 'Vista satelital nocturna estilo Uber';
+    bSat.innerHTML = '<span class="material-symbols-rounded">satellite_alt</span><span class="mbt"> Satelital 🌙</span>';
+    bSat.onclick = () => applyTiles(_mode === 'normal' ? 'noche' : 'normal');
+ 
+    /* Crear botón Fullscreen */
+    const bFs = document.createElement('button');
+    bFs.id = 'apro-btn-fs';
+    bFs.className = 'apro-mapbtn';
+    bFs.title = 'Pantalla completa (ESC para salir)';
+    bFs.innerHTML = '<span class="material-symbols-rounded">fullscreen</span><span class="mbt"> Pantalla completa</span>';
+    bFs.onclick = () => { _fs ? exitFS() : enterFS(); };
+ 
+    /* Insertar ANTES del último botón del topbar */
     const lastBtn = topbar.querySelector('button:last-of-type');
     if(lastBtn){
-      topbar.insertBefore(_btnsSat, lastBtn);
-      topbar.insertBefore(_btnFS, lastBtn);
+      topbar.insertBefore(bSat, lastBtn);
+      topbar.insertBefore(bFs, lastBtn);
     } else {
-      topbar.appendChild(_btnsSat);
-      topbar.appendChild(_btnFS);
+      topbar.appendChild(bSat);
+      topbar.appendChild(bFs);
     }
  
-    syncSatBtn();
-    syncFsBtn();
+    _inserted = true;
+    console.info('[APRO] ✅ Botones insertados correctamente en el topbar del mapa');
+    syncSatUI();
+    syncFsUI();
   }
  
-  /* ════ DOMI DETENIDO ════ */
+  /* ── Alerta domi detenido ── */
   function checkStuck(ubicaciones){
-    const now      = Date.now();
-    const activeIds= new Set(ubicaciones.map(u => u.id));
+    if(!Array.isArray(ubicaciones)) return;
+    const now  = Date.now();
+    const seen = new Set(ubicaciones.map(u => u.id));
  
-    /* Limpiar domis que ya no reportan */
+    /* Limpiar domis que apagaron tracker */
     Object.keys(_pos).forEach(id => {
-      if(!activeIds.has(id)){
-        setMarkerStuck(id, false);
-        delete _pos[id];
-      }
+      if(!seen.has(id)){ setStuck(id, false); delete _pos[id]; }
     });
  
     ubicaciones.forEach(u => {
       const prev = _pos[u.id];
- 
       if(!prev){
-        _pos[u.id] = { lat:u.lat, lng:u.lng, movedAt:now, alertedAt:null };
+        _pos[u.id] = { lat:u.lat, lng:u.lng, movedAt:now, alertedAt:0 };
         return;
       }
  
-      const moved = Math.abs(u.lat - prev.lat) > MOVED_THRESH
-                 || Math.abs(u.lng - prev.lng) > MOVED_THRESH;
- 
+      const moved = Math.abs(u.lat - prev.lat) > MOVE_DEG
+                 || Math.abs(u.lng - prev.lng) > MOVE_DEG;
       if(moved){
-        _pos[u.id] = { lat:u.lat, lng:u.lng, movedAt:now, alertedAt:prev.alertedAt };
-        _pos[u.id].alertedAt = null;
-        setMarkerStuck(u.id, false);
+        prev.lat = u.lat; prev.lng = u.lng;
+        prev.movedAt = now; prev.alertedAt = 0;
+        setStuck(u.id, false);
         return;
       }
  
-      /* Sin movimiento — ¿tiene pedido activo? */
+      /* ¿Tiene pedido activo? */
       const domiObj = (window.allDrivers||[]).find(
         d => (d.id||'').toUpperCase() === u.id.toUpperCase()
       ) || { nombre: u.nombre, id: u.id };
@@ -8050,148 +8009,138 @@ body.actpro-fs #pg-actividad{
         window.matchDomi?.(p, domiObj) &&
         ['proceso','encamino','asignado'].includes(p.estado)
       );
- 
       if(!hasActive) return;
  
       const mins = (now - prev.movedAt) / 60000;
-      if(mins < STUCK_MINS) return;
+      if(mins < STUCK_MIN) return;
  
-      setMarkerStuck(u.id, true);
+      setStuck(u.id, true);
  
-      const canAlert = !prev.alertedAt || (now - prev.alertedAt) > ALERT_COOLDOWN;
-      if(canAlert){
-        _pos[u.id].alertedAt = now;
-        fireStuckAlert(domiObj.nombre || u.nombre, Math.round(mins));
+      if((now - prev.alertedAt) > COOL_MS){
+        prev.alertedAt = now;
+        fireAlert(domiObj.nombre || u.nombre, Math.round(mins));
       }
     });
   }
  
-  function setMarkerStuck(id, isStuck){
-    const marker = window._driMarkers?.[id];
-    const el     = marker?.getElement?.();
-    if(el) el.classList.toggle('domi-stuck-marker', isStuck);
+  function setStuck(id, val){
+    const el = window._driMarkers?.[id]?.getElement?.();
+    if(el) el.classList.toggle('domi-stuck-marker', val);
   }
  
-  function fireStuckAlert(nombre, mins){
-    const short = nombre.split(' ').slice(0,2).join(' ');
- 
-    /* Toast */
-    const toast = document.getElementById('actpro-stuck-toast');
-    const msg   = document.getElementById('actpro-stuck-msg');
-    if(toast && msg){
-      msg.textContent = `${short} lleva ${mins} min sin moverse`;
-      toast.classList.add('show');
-      clearTimeout(toast._t);
-      toast._t = setTimeout(() => toast.classList.remove('show'), 9000);
+  function fireAlert(nombre, mins){
+    const n = nombre.split(' ').slice(0,2).join(' ');
+    const t = document.getElementById('apro-toast');
+    const m = document.getElementById('apro-toast-msg');
+    if(t && m){
+      m.textContent = `${n} lleva ${mins} min sin moverse`;
+      t.classList.add('show');
+      clearTimeout(t._tt);
+      t._tt = setTimeout(() => t.classList.remove('show'), 9000);
     }
- 
-    /* Voz */
-    window.VOZ?.hablar(
-      `¡Atención! ${short} lleva ${mins} minutos sin moverse con un pedido activo.`,
-      1.0, 1.15
-    );
- 
-    /* Sonido urgente */
+    window.VOZ?.hablar(`Atención. ${n} lleva ${mins} minutos sin moverse con pedido activo.`, 1.0, 1.15);
     try{
       if(!window.SONIDO?.ctx) window.SONIDO.ctx = new(window.AudioContext||window.webkitAudioContext)();
       const ctx = window.SONIDO.ctx;
-      [880,1047,1175,1319].forEach((freq,i) => {
-        const t0  = ctx.currentTime + i*0.22;
-        const osc = ctx.createOscillator();
-        const g   = ctx.createGain();
+      [880,1047,1175,1319].forEach((f,i)=>{
+        const t0=ctx.currentTime+i*.22, osc=ctx.createOscillator(), g=ctx.createGain();
         osc.connect(g); g.connect(ctx.destination);
-        osc.type = 'sine'; osc.frequency.value = freq;
-        g.gain.setValueAtTime(0, t0);
-        g.gain.linearRampToValueAtTime(0.55, t0+0.025);
-        g.gain.exponentialRampToValueAtTime(0.001, t0+0.18);
-        osc.start(t0); osc.stop(t0+0.22);
+        osc.type='sine'; osc.frequency.value=f;
+        g.gain.setValueAtTime(0,t0);
+        g.gain.linearRampToValueAtTime(.55,t0+.025);
+        g.gain.exponentialRampToValueAtTime(.001,t0+.18);
+        osc.start(t0); osc.stop(t0+.22);
       });
     }catch(e){}
- 
     if(navigator.vibrate) navigator.vibrate([200,80,200,80,500]);
   }
  
-  /* ════ PATCH PRINCIPAL: hookeamos renderActividad ════ */
-  function patchRender(){
+  /* ── Hooking de renderActividad ── */
+  function hookRender(){
     const orig = window.renderActividad;
-    if(!orig || orig.__apv2) return;
+    if(!orig || orig.__apro3) return;
  
-    window.renderActividad = async function patchedRA(){
-      /* Interceptar obtenerUbicacionesGPS para capturar sin fetch extra */
+    window.renderActividad = async function(){
+      /* Capturar ubicaciones GPS sin fetch extra */
       const origGPS = window.obtenerUbicacionesGPS;
-      let captured  = [];
- 
-      if(origGPS && !origGPS.__apv2){
+      let captured = [];
+      if(origGPS){
         window.obtenerUbicacionesGPS = async function(){
           const r = await origGPS.apply(this, arguments);
           captured = Array.isArray(r) ? r : [];
           return r;
         };
-        window.obtenerUbicacionesGPS.__apv2 = true;
       }
  
       await orig.apply(this, arguments);
  
-      /* Restaurar GPS original */
-      if(origGPS && !origGPS.__apv2) window.obtenerUbicacionesGPS = origGPS;
+      /* Restaurar */
+      if(origGPS) window.obtenerUbicacionesGPS = origGPS;
  
-      /* Post-proceso SIEMPRE después del render */
-      if(window._map){
-        /* Pequeño delay para garantizar que Leaflet terminó de renderizar */
-        setTimeout(() => {
-          insertButtons();
-          checkStuck(captured);
-          /* Si el modo era satélite antes de un re-init, restaurar */
-          if(_mode === 'noche') setTiles('noche');
-        }, 50);
-      }
+      /* Post-proceso con delay para que Leaflet termine */
+      setTimeout(()=>{
+        insertButtons();
+        checkStuck(captured);
+        if(_mode === 'noche') applyTiles('noche');
+      }, 80);
     };
-    window.renderActividad.__apv2 = true;
+    window.renderActividad.__apro3 = true;
   }
  
-  /* ════ PATCH initActividadTab ════ */
-  function patchInitTab(){
+  /* ── Hooking de initActividadTab ── */
+  function hookInit(){
     const orig = window.initActividadTab;
-    if(!orig || orig.__apv2) return;
+    if(!orig || orig.__apro3) return;
  
-    window.initActividadTab = function patchedIAT(){
+    window.initActividadTab = function(){
       orig.apply(this, arguments);
- 
-      /* Esperar a que Leaflet esté listo y el mapa inicializado */
-      let tries = 0;
-      const poll = setInterval(() => {
-        if(window._map && typeof L !== 'undefined'){
+      /* Polling hasta que Leaflet esté listo */
+      let n = 0;
+      const poll = setInterval(()=>{
+        if(window._map && window.L){
           clearInterval(poll);
-          /* Insertar botones con delay para que el DOM del topbar esté pintado */
-          setTimeout(insertButtons, 400);
+          /* Múltiples intentos con delay creciente para garantizar que el DOM está listo */
+          [300, 700, 1400, 2500].forEach(d => setTimeout(insertButtons, d));
         }
-        if(++tries > 40) clearInterval(poll);
-      }, 250);
+        if(++n > 50) clearInterval(poll);
+      }, 200);
     };
-    window.initActividadTab.__apv2 = true;
+    window.initActividadTab.__apro3 = true;
   }
  
-  /* ════ ESPERAR A QUE EXISTAN LAS FUNCIONES ════ */
+  /* ── MutationObserver: detectar cuando pg-actividad se hace visible ── */
+  function watchVisibility(){
+    const pg = document.getElementById('pg-actividad');
+    if(!pg) return;
+ 
+    const obs = new MutationObserver(()=>{
+      const visible = pg.style.display === 'flex' || pg.classList.contains('on');
+      if(visible && window._map && window.L){
+        [200, 600, 1200].forEach(d => setTimeout(insertButtons, d));
+      }
+    });
+    obs.observe(pg, { attributes:true, attributeFilter:['style','class'] });
+  }
+ 
+  /* ── Arranque ── */
   let tries = 0;
-  const wait = setInterval(() => {
+  const boot = setInterval(()=>{
     if(window.renderActividad && window.initActividadTab){
-      clearInterval(wait);
-      patchRender();
-      patchInitTab();
- 
-      /* Si ya estamos en la pestaña Actividad cuando se carga este script */
-      if(window._map && typeof L !== 'undefined') setTimeout(insertButtons, 500);
- 
-      console.info('[ActividadPro v2] ✓ Listo — alerta domi · satelital · fullscreen');
+      clearInterval(boot);
+      hookRender();
+      hookInit();
+      watchVisibility();
+      /* Si ya está en la pestaña al cargar */
+      if(window._map && window.L) setTimeout(insertButtons, 600);
+      console.info('[APRO v3] ✅ Parche activo');
     }
-    if(++tries > 80) clearInterval(wait);
-  }, 400);
+    if(++tries > 100) clearInterval(boot);
+  }, 300);
  
-  /* ESC global */
-  document.addEventListener('keydown', e => { if(e.key === 'Escape' && _isFS) exitFS(); });
- 
+  document.addEventListener('keydown', e => { if(e.key==='Escape' && _fs) exitFS(); });
 })();
 </script>
+
 </script>
 
 </script>
