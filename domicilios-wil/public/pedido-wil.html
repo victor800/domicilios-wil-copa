@@ -11,6 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
  <script src="pedido-libre.js"></script>
+ 
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
@@ -3252,20 +3253,22 @@ function wilAbrirTicket() {
  
 }(window));
 
+
 (function (W) {
   'use strict';
- 
+
   /* ═══════════════════════════════════════════════════
      CONFIG
   ═══════════════════════════════════════════════════ */
   var CFG = {
-    LOCATIONIQ_KEY : 'pk.1d5fa1a2768413987356b3c66772022b',   // ← reemplaza con tu clave
+    LOCATIONIQ_KEY : 'pk.1d5fa1a2768413987356b3c66772022b',
     SHEET_ID       : '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU',
-    ANCLA          : { lat: 6.35245, lng: -75.50486 }, // Sede WIL Copacabana
-    PRECIO_KM      : 1800,   // COP por km fuera de Copacabana
-    TARIFA_FIJA    : 50000,  // Tarifa fija para barrios MUY lejos
-    KM_LIMITE_FIJA : 25,     // km a partir del cual aplica tarifa fija
-    // Barrios que siempre usan tarifa fija (sin importar GPS)
+    ANCLA          : { lat: 6.35245, lng: -75.50486 },
+    PRECIO_KM      : 1800,
+    TARIFA_FIJA    : 50000,
+    KM_LIMITE_FIJA : 25,
+    /* ── Clave del GAS: debe coincidir con la del endpoint real ── */
+    GAS_MARK       : 'AKfycbxVgkSWg5l9GChSxxbF4HQua1xjFIGgv8wMHiYhDF76fuflhn9EOmpml-nK_M6KOn_HJg',
     ZONAS_FIJA     : [
       'caldas','bello','itagui','itagüí','la estrella','sabaneta',
       'san antonio de prado','envigado','el poblado','laureles',
@@ -3275,41 +3278,34 @@ function wilAbrirTicket() {
       'barrio','mesa','la table','primavera','obrero bello'
     ],
   };
- 
+
   /* ═══════════════════════════════════════════════════
      1. PARSER INTELIGENTE
-     Detecta items sin necesitar comas.
-     "1 pollo 1 cocacola" → [{qty:1,nombre:"Pollo"},{qty:1,nombre:"Cocacola"}]
   ═══════════════════════════════════════════════════ */
   function parsearTextoInteligente(texto) {
     if (!texto || !texto.trim()) return [];
- 
-    // Paso 1: dividir por separadores explícitos
+
     var segmentos = texto
       .split(/[,;\n\|\/]+/)
       .map(function (s) { return s.trim(); })
       .filter(function (s) { return s.length > 1; });
- 
+
     var items = [];
- 
+
     segmentos.forEach(function (seg) {
-      // Detectar patrón múltiple SIN comas: "1 pollo 2 hamburguesa 3 agua"
-      // Regex: captura (número)(texto) hasta el siguiente número o fin
       var re   = /(\d+(?:[.,]\d+)?)\s+([^0-9,;\n|\/]+?)(?=\s+\d+\s|\s*$)/g;
       var hits = [];
       var m;
- 
+
       while ((m = re.exec(seg)) !== null) {
         var nombre = m[2].trim().replace(/^(de|del|y|un|una|unos|unas)\s+/i, '');
         if (nombre.length < 2) continue;
         hits.push({ qty: parseFloat(m[1].replace(',', '.')) || 1, nombre: capitalizar(nombre) });
       }
- 
+
       if (hits.length >= 2) {
-        // Se detectaron múltiples items en el segmento
         items = items.concat(hits);
       } else {
-        // Segmento simple: extraer cantidad inicial si existe
         var simple = seg.match(/^(\d+(?:[.,]\d+)?)\s+(.+)$/);
         if (simple) {
           var nombre = simple[2].trim().replace(/^(de|del)\s+/i, '');
@@ -3319,18 +3315,17 @@ function wilAbrirTicket() {
         }
       }
     });
- 
-    // Filtrar items vacíos o sólo palabras de relleno
+
     return items.filter(function (i) {
       return i.nombre && i.nombre.length > 2 && !/^(y|de|del|la|el|los|las|un|una)$/i.test(i.nombre);
     });
   }
- 
+
   function capitalizar(s) {
     if (!s) return '';
     return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
   }
- 
+
   /* ═══════════════════════════════════════════════════
      2. EXTRACCIÓN CON IA (Claude)
   ═══════════════════════════════════════════════════ */
@@ -3362,10 +3357,9 @@ function wilAbrirTicket() {
     var clean = raw.replace(/```json|```/g, '').trim();
     return JSON.parse(clean);
   }
- 
+
   /* ═══════════════════════════════════════════════════
      3. GEOCODIFICACIÓN CON LOCATIONIQ
-     Devuelve { lat, lng, displayName } o null
   ═══════════════════════════════════════════════════ */
   async function geocodificar(dir) {
     try {
@@ -3384,14 +3378,14 @@ function wilAbrirTicket() {
       return null;
     }
   }
- 
+
   /* ═══════════════════════════════════════════════════
-     4. CÁLCULO DE TARIFA v7 — SIN BUGS DE ZONASTR
+     4. CÁLCULO DE TARIFA
   ═══════════════════════════════════════════════════ */
   var _tarifaCache = null;
- 
+
   function resetTarifaCache() { _tarifaCache = null; }
- 
+
   function haversine(la1, lo1, la2, lo2) {
     var R = 6371,
         dLa = (la2 - la1) * Math.PI / 180,
@@ -3401,40 +3395,38 @@ function wilAbrirTicket() {
               * Math.sin(dLo / 2) * Math.sin(dLo / 2);
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
- 
+
   function norm(s) {
     return (s || '').toLowerCase()
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9 ]/g, ' ')
       .replace(/\s+/g, ' ').trim();
   }
- 
+
   function esZonaFija(barrio) {
     var n = norm(barrio || '');
     return CFG.ZONAS_FIJA.some(function (z) {
       return n === z || n.indexOf(z) !== -1;
     });
   }
- 
+
   async function calcularTarifa() {
     if (_tarifaCache) return _tarifaCache;
- 
+
     var st  = W.state || {};
     var res = { tarifa: 0, zonaStr: 'Copacabana', esFuera: false, km: 0, mensaje: '' };
- 
-    /* Coordenadas del cliente: GPS directo o geocodificación */
+
     var cLat = st.coords && st.coords.lat ? st.coords.lat : null;
     var cLng = st.coords && st.coords.lng ? st.coords.lng : null;
- 
-    /* Si no hay GPS pero sí dirección → geocodificar */
+
     if ((!cLat || !cLng) && st.direccion && CFG.LOCATIONIQ_KEY.indexOf('your') === -1) {
       var geo = await geocodificar((st.direccion || '') + ' ' + (st.barrio || ''));
       if (geo) { cLat = geo.lat; cLng = geo.lng; }
     }
- 
+
     var barrioRaw = (st.barrio || '').substring(0, 40);
- 
-    /* ── REGLA 1: Barrio en lista de zonas con tarifa fija ── */
+
+    /* REGLA 1: Zona de tarifa fija */
     if (esZonaFija(barrioRaw)) {
       res.tarifa  = CFG.TARIFA_FIJA;
       res.zonaStr = 'Área Metropolitana';
@@ -3444,15 +3436,15 @@ function wilAbrirTicket() {
       _tarifaCache = res;
       return res;
     }
- 
-    /* ── REGLA 2: Buscar en hoja Tarifas ── */
+
+    /* REGLA 2: Buscar en hoja Tarifas */
     try {
       var url   = 'https://docs.google.com/spreadsheets/d/' + CFG.SHEET_ID
                 + '/gviz/tq?tqx=out:csv&sheet=Tarifas&cachebust=' + Date.now();
       var resp  = await fetch(url, { cache: 'no-store' });
       var text  = await resp.text();
       var lines = text.trim().split('\n');
- 
+
       var zonas = [];
       for (var i = 1; i < lines.length; i++) {
         var c   = _parseCsvLine(lines[i]);
@@ -3462,18 +3454,16 @@ function wilAbrirTicket() {
           barrio   : (c[0] || '').trim(),
           tarifa   : parseInt((c[1] || '').replace(/[^0-9]/g, '')) || 0,
           direccion: (c[5] || '').trim(),
-          /* zona: SIEMPRE de la columna G de la hoja, no del cliente */
           zona     : (c[6] || (c[0] || 'Copacabana')).trim(),
           lat      : isNaN(lat) ? null : lat,
           lng      : isNaN(lng) ? null : lng,
         });
       }
- 
+
       var mejor = _matchZona(zonas, cLat, cLng, barrioRaw, st.direccion || '');
- 
+
       if (mejor) {
         res.tarifa  = mejor.tarifa;
-        /* ⚠️ zonaStr SIEMPRE desde la hoja, NUNCA del cliente */
         res.zonaStr = mejor.zona || mejor.barrio || 'Copacabana';
         res.esFuera = false;
         res.mensaje = 'Zona: ' + res.zonaStr + ' · $' + res.tarifa.toLocaleString('es-CO');
@@ -3483,13 +3473,13 @@ function wilAbrirTicket() {
     } catch (e) {
       console.warn('[WIL tarifa] fallo sheet:', e.message);
     }
- 
-    /* ── REGLA 3: Fuera de cobertura por distancia ── */
+
+    /* REGLA 3: Fuera de cobertura por distancia */
     res.esFuera = true;
     if (cLat && cLng) {
       var km = haversine(CFG.ANCLA.lat, CFG.ANCLA.lng, cLat, cLng);
       res.km = Math.round(km * 10) / 10;
- 
+
       if (km >= CFG.KM_LIMITE_FIJA) {
         res.tarifa  = CFG.TARIFA_FIJA;
         res.zonaStr = 'Área Metropolitana';
@@ -3500,16 +3490,15 @@ function wilAbrirTicket() {
         res.mensaje = '$1.800/km · ' + res.km + ' km aprox.';
       }
     } else {
-      /* Sin GPS y sin match → tarifa pendiente */
       res.tarifa  = 0;
       res.zonaStr = 'El domi confirma';
       res.mensaje = 'Sin GPS · el domi confirma el valor';
     }
- 
+
     _tarifaCache = res;
     return res;
   }
- 
+
   function _parseCsvLine(line) {
     var r = [], cur = '', q = false;
     for (var i = 0; i < line.length; i++) {
@@ -3520,15 +3509,13 @@ function wilAbrirTicket() {
     }
     r.push(cur.trim()); return r;
   }
- 
+
   function _matchZona(zonas, cLat, cLng, barrioRaw, dirRaw) {
     var RADIO_COPA = 3.5;
     var mejor = null, mejorDist = Infinity, mejorScore = 0;
     var bn = norm(barrioRaw.substring(0, 40));
-    /* Limpiar dirección de residuos (teléfonos, precios) */
     var dn = norm(dirRaw.replace(/\d{7,}/g, ' ').substring(0, 100));
- 
-    /* GPS match */
+
     if (cLat && cLng) {
       for (var i = 0; i < zonas.length; i++) {
         var z = zonas[i];
@@ -3538,8 +3525,7 @@ function wilAbrirTicket() {
       }
       if (mejorDist > RADIO_COPA) mejor = null;
     }
- 
-    /* Text match */
+
     if (!mejor) {
       for (var j = 0; j < zonas.length; j++) {
         var zn = zonas[j];
@@ -3556,37 +3542,35 @@ function wilAbrirTicket() {
       }
       if (mejorScore === 0) mejor = null;
     }
- 
-    /* Fallback: zona más barata de Copacabana si no hay GPS */
+
     if (!mejor && !cLat) {
       var conT = zonas.filter(function (z) { return z.tarifa > 0; });
       if (conT.length) mejor = conT.reduce(function (a, b) { return a.tarifa <= b.tarifa ? a : b; });
     }
- 
+
     return mejor;
   }
- 
+
   /* ═══════════════════════════════════════════════════
-     5. RENDER TARIFA EN TICKET — ÚNICO punto de escritura
+     5. RENDER TARIFA EN TICKET
   ═══════════════════════════════════════════════════ */
   function renderTarifaEnTicket(info) {
-    /* Limpiar residuos de TODOS los parches anteriores */
     ['wil-tarifa-row', 'wil-tarifa-nota',
      'wil-ticket-tarifa-container-old', 'wil-ticket-tarifa-container']
       .forEach(function (id) {
         var el = document.getElementById(id);
-        if (el) el.innerHTML = ''; /* vaciar, no eliminar el contenedor oficial */
+        if (el) el.innerHTML = '';
       });
- 
+
     var cont = document.getElementById('wil-ticket-tarifa-container');
     if (!cont) return;
- 
+
     var tarifaTxt = info.tarifa > 0
-  ? '$' + info.tarifa.toLocaleString('es-CO')
-  : 'Por confirmar';
- 
+      ? '$' + info.tarifa.toLocaleString('es-CO')
+      : 'Por confirmar';
+
     var color = info.esFuera ? '#d97706' : 'var(--p)';
- 
+
     cont.innerHTML =
       '<div class="wil-ticket-tarifa-row">'
       + '<div class="wil-ticket-tarifa-lbl">🛵 Domicilio</div>'
@@ -3598,13 +3582,15 @@ function wilAbrirTicket() {
         ? '<div class="wil-ticket-tarifa-nota">'
           + '<span class="sym" style="font-size:14px;color:#d97706;flex-shrink:0">info</span>'
           + '<span>⚠️ Estás fuera del área de cobertura de Copacabana'
-+ (info.km ? ' (' + info.km + ' km aprox.)' : '')
-+ '. El domicilio se cobra según la distancia recorrida adicional. <strong>El domi confirma el valor antes del cobro y tú apruebas.</strong></span>'
+          + (info.km ? ' (' + info.km + ' km aprox.)' : '')
+          + '. El domicilio se cobra según la distancia recorrida adicional. <strong>El domi confirma el valor antes del cobro y tú apruebas.</strong></span>'
           + '</div>'
         : '');
   }
- 
- 
+
+  /* ═══════════════════════════════════════════════════
+     6. VISTA DE REVISIÓN
+  ═══════════════════════════════════════════════════ */
   var CSS_REVISION = `
     #view-libre-2b .rl-prod-row {
       display:flex;align-items:center;gap:8px;
@@ -3654,16 +3640,14 @@ function wilAbrirTicket() {
       display:flex;gap:7px;align-items:flex-start;
     }
   `;
- 
+
   function inyectarVistaRevision() {
-    if (document.getElementById('view-libre-2b')) return; /* ya existe */
- 
-    /* Estilos */
+    if (document.getElementById('view-libre-2b')) return;
+
     var styleEl = document.createElement('style');
     styleEl.textContent = CSS_REVISION;
     document.head.appendChild(styleEl);
- 
-    /* Vista */
+
     var div = document.createElement('div');
     div.className = 'view';
     div.id = 'view-libre-2b';
@@ -3676,14 +3660,11 @@ function wilAbrirTicket() {
       </div>
       <div class="card">
         <div class="card-tit"><span class="sym f">fact_check</span>Productos detectados</div>
-        <!-- Texto original del cliente (referencia) -->
         <div class="rl-texto-original" id="rl-texto-ref">
           <span class="sym f" style="font-size:14px;color:var(--p);flex-shrink:0">format_quote</span>
           <span id="rl-texto-ref-txt"></span>
         </div>
-        <!-- Lista editable -->
         <div id="rl-lista"></div>
-        <!-- Agregar ítem -->
         <div class="rl-add-row">
           <input class="rl-add-inp" id="rl-nuevo-inp" placeholder="Agregar otro producto…"
             onkeydown="if(event.key==='Enter'){WIL_LIBRE.agregarProd();event.preventDefault()}"/>
@@ -3701,8 +3682,7 @@ function wilAbrirTicket() {
         </button>
       </div>
     `;
- 
-    /* Insertar después de view-libre-2 */
+
     var ref = document.getElementById('view-libre-2');
     if (ref && ref.parentNode) {
       ref.parentNode.insertBefore(div, ref.nextSibling);
@@ -3710,13 +3690,12 @@ function wilAbrirTicket() {
       document.querySelector('.main').appendChild(div);
     }
   }
- 
-  /* Renderizar lista editable */
+
   function renderListaRevision(productos) {
     var lista = document.getElementById('rl-lista');
     if (!lista) return;
     lista.innerHTML = '';
- 
+
     (productos || []).forEach(function (p, idx) {
       var row = document.createElement('div');
       row.className = 'rl-prod-row';
@@ -3735,71 +3714,62 @@ function wilAbrirTicket() {
       lista.appendChild(row);
     });
   }
- 
+
   /* ═══════════════════════════════════════════════════
      7. API PÚBLICA DEL MÓDULO
   ═══════════════════════════════════════════════════ */
   var API = {
-    /* ── Llamado desde botón "Continuar" del paso 2 ── */
     goLibre3Async: async function () {
       var txt = ((document.getElementById('libreTextoLibre') || {}).value || '').trim();
       if (!txt) {
         mostrarToast('Escribe qué necesitas pedir.', 'edit_note');
         return;
       }
- 
-      /* Resetear caché de tarifa al cambiar el pedido */
+
       resetTarifaCache();
- 
+
       var btn      = document.getElementById('btnLibre2Sig');
       var statusEl = document.getElementById('libreAiStatus');
       if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Procesando…'; }
       if (statusEl) statusEl.innerHTML = '<span class="spin dk"></span><span>Detectando productos…</span>';
- 
+
       var productos = [];
- 
+
       try {
-        /* Primero IA, fallback a parser local */
         var aiResult = await extractWithAI(txt);
         productos = (aiResult.productos || []).filter(function (p) { return p && p.nombre; });
       } catch (e) {
-        /* Fallback: parser inteligente local */
         productos = parsearTextoInteligente(txt);
       }
- 
-      /* Si IA devolvió vacío, usar parser local */
+
       if (!productos.length) productos = parsearTextoInteligente(txt);
       if (!productos.length) productos = [{ nombre: capitalizar(txt.substring(0, 60)), qty: 1 }];
- 
-      /* Guardar en state */
+
       if (W.state) W.state.productos = productos;
- 
+
       if (statusEl) statusEl.innerHTML =
         '<span class="sym f" style="font-size:15px;color:#16a34a">check_circle</span>'
         + '<span style="color:#16a34a;font-weight:700">'
         + productos.length + ' producto' + (productos.length !== 1 ? 's' : '') + ' detectados</span>';
- 
+
       if (btn) { btn.disabled = false; btn.innerHTML = '<span class="sym" style="font-size:17px">arrow_forward</span>Continuar'; }
- 
-      /* Mostrar pantalla de revisión */
+
       inyectarVistaRevision();
       var refEl = document.getElementById('rl-texto-ref-txt');
       if (refEl) refEl.textContent = txt.length > 120 ? txt.substring(0, 120) + '…' : txt;
       renderListaRevision(productos);
- 
-      /* Navegar a paso 2b */
+
       setTimeout(function () {
         if (W.showView) W.showView('view-libre-2b');
       }, 200);
     },
- 
-    /* ── Edición en la vista de revisión ── */
+
     editarNombre: function (idx, val) {
       if (W.state && W.state.productos && W.state.productos[idx]) {
         W.state.productos[idx].nombre = val;
       }
     },
- 
+
     cambiarQty: function (idx, delta) {
       if (!W.state || !W.state.productos || !W.state.productos[idx]) return;
       var qty = Math.max(1, (W.state.productos[idx].qty || 1) + delta);
@@ -3807,13 +3777,13 @@ function wilAbrirTicket() {
       var el = document.getElementById('rl-qty-' + idx);
       if (el) el.textContent = qty;
     },
- 
+
     eliminarProd: function (idx) {
       if (!W.state || !W.state.productos) return;
       W.state.productos.splice(idx, 1);
       renderListaRevision(W.state.productos);
     },
- 
+
     agregarProd: function () {
       var inp  = document.getElementById('rl-nuevo-inp');
       var val  = (inp ? inp.value : '').trim();
@@ -3823,9 +3793,8 @@ function wilAbrirTicket() {
       renderListaRevision(W.state.productos);
       if (inp) { inp.value = ''; inp.focus(); }
     },
- 
+
     confirmarRevision: function () {
-      /* Sincronizar valores de los inputs antes de continuar */
       var inputs = document.querySelectorAll('#rl-lista .rl-prod-inp');
       inputs.forEach(function (inp, i) {
         if (W.state && W.state.productos && W.state.productos[i]) {
@@ -3834,12 +3803,11 @@ function wilAbrirTicket() {
       });
       if (W.showView) W.showView('view-libre-3');
     },
- 
+
     volverA2: function () {
       if (W.showView) W.showView('view-libre-2');
     },
- 
-    /* ── Calcular + renderizar tarifa (llamado desde generarFacturaLibre) ── */
+
     inyectarTarifa: async function () {
       var info = await calcularTarifa();
       renderTarifaEnTicket(info);
@@ -3850,30 +3818,26 @@ function wilAbrirTicket() {
       }
       return info;
     },
- 
-    /* ── Helpers expuestos ── */
+
     parsearTexto    : parsearTextoInteligente,
     calcularTarifa  : calcularTarifa,
     resetTarifaCache: resetTarifaCache,
   };
- 
+
   /* ═══════════════════════════════════════════════════
      8. PARCHEAR FUNCIONES DEL HTML PRINCIPAL
   ═══════════════════════════════════════════════════ */
   function patchearFlujoPrincipal() {
     /* ── A: Reemplazar goLibre3Async ── */
     W.goLibre3Async = API.goLibre3Async;
- 
-    /* ── B: Parchear generarFacturaLibre para inyectar tarifa v7 ── */
+
+    /* ── B: Parchear generarFacturaLibre para inyectar tarifa ── */
     var _origGen = W.generarFacturaLibre;
     W.generarFacturaLibre = async function () {
-      /* Reset cache: el usuario pudo cambiar dirección */
       resetTarifaCache();
- 
-      /* 1. Llamar original (valida campos, muestra ticket) */
+
       if (typeof _origGen === 'function') _origGen.apply(this, arguments);
- 
-      /* 2. Actualizar resumen colapsable */
+
       var st = W.state || {};
       var nombreEl = document.getElementById('factura-nombre-resumen');
       if (nombreEl) nombreEl.textContent = st.nombre || '—';
@@ -3883,33 +3847,61 @@ function wilAbrirTicket() {
         : 'Sin lista';
       var pagoEl = document.getElementById('ticket-pago-resumen');
       if (pagoEl) pagoEl.textContent = st.metodoPago === 'EFECTIVO' ? '💵 Efectivo' : '🏦 Transferencia';
- 
-      /* 3. Calcular tarifa y renderizar */
+
       var info = await API.inyectarTarifa();
       console.log('[WIL-LIBRE] Tarifa:', info.mensaje);
- 
-      /* 4. Abrir ticket colapsable */
+
       setTimeout(function () { if (W.wilAbrirTicket) W.wilAbrirTicket(); }, 100);
     };
- 
-    /* ── C: Parchear enviarPedido para asegurar tarifa en col T ── */
+
+    /* ── C: Parchear enviarPedido — escribe state antes de la cadena ── */
     var _origEnviar = W.enviarPedido;
     W.enviarPedido = async function (tipo) {
       if (!_tarifaCache) await calcularTarifa();
       if (W.state && _tarifaCache) W.state.precioDomicilio = _tarifaCache.tarifa;
       return _origEnviar.apply(this, arguments);
     };
- 
+
     /* ── D: Resetear caché cuando cambia dirección/barrio ── */
-    var watchFields = ['libre-direccion', 'libre-referencia'];
-    watchFields.forEach(function (id) {
+    ['libre-direccion', 'libre-referencia'].forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.addEventListener('input', resetTarifaCache);
     });
- 
-    console.log('[WIL-LIBRE v1.0] ✅ Parches activos — tarifa limpia · revisión de productos · parser inteligente');
+
+    /* ── E: Interceptar fetch al GAS para inyectar tarifa en col T (índice 19) ──
+       Este es el bloque que faltaba en la versión original.
+       Garantiza que el valor llegue a la hoja sin importar cómo el original
+       construye las rows, igual que lo hace tarifa-final.js para farmacia.   ── */
+    var _origFetch = W.fetch;
+    W.fetch = async function (url, opts) {
+      if (
+        typeof url === 'string' &&
+        url.indexOf(CFG.GAS_MARK) !== -1 &&
+        opts && opts.method === 'POST'
+      ) {
+        try {
+          var body = JSON.parse(opts.body || '{}');
+          if (body.rows && body.rows.length) {
+            /* Asegurar que la tarifa esté calculada */
+            if (!_tarifaCache) await calcularTarifa();
+            var info = _tarifaCache;
+            /* Solo inyectar si la col T está vacía o en cero */
+            if (info && info.tarifa > 0 && (!body.rows[0][19] || body.rows[0][19] === 0)) {
+              body.rows[0][19] = info.tarifa;
+              opts = Object.assign({}, opts, { body: JSON.stringify(body) });
+              console.log('[WIL-LIBRE] col T inyectada =', info.tarifa, '—', info.mensaje);
+            }
+          }
+        } catch (ex) {
+          console.warn('[WIL-LIBRE] fetch patch error:', ex.message);
+        }
+      }
+      return _origFetch.apply(this, arguments);
+    };
+
+    console.log('[WIL-LIBRE v1.1] ✅ Parches activos — tarifa limpia · col T garantizada · revisión de productos · parser inteligente');
   }
- 
+
   /* ═══════════════════════════════════════════════════
      UTILIDADES PRIVADAS
   ═══════════════════════════════════════════════════ */
@@ -3919,28 +3911,21 @@ function wilAbrirTicket() {
   function _escAttr(t) {
     return (t || '').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
- 
 
   function init() {
     inyectarVistaRevision();
     patchearFlujoPrincipal();
   }
- 
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
-    /* El script se cargó tarde (defer/async) — init inmediato */
     setTimeout(init, 0);
   }
- 
-  /* Exponer API pública */
+
   W.WIL_LIBRE = API;
 
-
-  
- 
 }(window));
-
 
 </script>
 </body>
