@@ -3363,9 +3363,39 @@ function _crearZonaEnSheets(data) {
     return info;
   }
  
-    
-  
-  
+  /* ── Actualizar elementos del ticket en pantalla ── */
+  function _actualizarTicketUI(info) {
+    /* pedido-wil.html — ticket libre */
+    var elTarifa = document.getElementById('factura-tarifa-domi');
+    if (elTarifa) {
+      elTarifa.textContent = info.tarifa > 0
+        ? '$' + info.tarifa.toLocaleString('es-CO')
+        : 'Por confirmar';
+    }
+    var elZona = document.getElementById('factura-zona-domi');
+    if (elZona) elZona.textContent = info.zonaStr;
+ 
+    /* pedido-farmacia.html — ticket farmacia */
+    var elFarmTarifa = document.getElementById('farm-tarifa-domi');
+    if (elFarmTarifa) {
+      elFarmTarifa.textContent = info.tarifa > 0
+        ? '$' + info.tarifa.toLocaleString('es-CO')
+        : 'Por confirmar';
+    }
+    var elFarmZona = document.getElementById('farm-zona-domi');
+    if (elFarmZona) elFarmZona.textContent = info.zonaStr;
+ 
+    /* Nota fuera de cobertura */
+    var elNota = document.getElementById('wil-tarifa-nota');
+    if (elNota) {
+      elNota.style.display = info.esFuera ? 'flex' : 'none';
+      if (info.esFuera) {
+        elNota.innerHTML = '<span style="font-size:15px">🛵</span>'
+          + '<span>Estás fuera de Copacabana · El domiciliario calculará el valor exacto según la distancia real ('
+          + (info.km ? info.km + ' km aprox.' : 'por confirmar') + '). <b>Tú apruebas antes del cobro.</b></span>';
+      }
+    }
+  }
  
   /* ── Exponer globalmente ── */
   window.WIL_calcularTarifa  = WIL_calcularTarifa;
