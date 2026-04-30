@@ -1641,11 +1641,15 @@ window._initMapResult=function(pedido){
       fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(dir+' Copacabana Antioquia Colombia')+'&format=json&limit=1',
         {headers:{'User-Agent':'DomiciliosWIL/1.0'}})
         .then(function(r){return r.json();})
-        .then(function(d){if(d&&d[0])colocarDestino(parseFloat(d[0].lat),parseFloat(d[0].lon));})
-        .catch(function(){});
+        .then(function(d){
+  if(d&&d[0])colocarDestino(parseFloat(d[0].lat),parseFloat(d[0].lon));
+  else colocarDestino(6.3491,-75.5062);
+})
+.catch(function(){colocarDestino(6.3491,-75.5062);});
     }
   }
 };
+
 async function trazarRutaResult(latO,lngO,latD,lngD,pedido){
  var url='https://routing.openstreetmap.de/routed-car/route/v1/driving/'+lngO+','+latO+';'+lngD+','+latD+'?overview=full&geometries=geojson';
     try{
