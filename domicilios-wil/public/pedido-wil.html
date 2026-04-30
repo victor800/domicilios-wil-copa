@@ -3325,8 +3325,7 @@ function _crearZonaEnSheets(data) {
   }
  
 
- 
- 
+
 })();
 
 
@@ -3377,54 +3376,6 @@ function wilAbrirTicket() {
 }
 
 
-/* ────────────────────────────────────────────────
-   PATCH generarFacturaLibre — versión limpia v5
-──────────────────────────────────────────────── */
-var _wil_v5_origGenFactura = window.generarFacturaLibre;
-window.generarFacturaLibre = async function() {
-  /* 1. Resetear cache para recalcular con datos frescos */
-  WIL_TARIFA_CACHE = null;
-
-  /* 2. Llamar original */
-  if (typeof _wil_v5_origGenFactura === 'function')
-    _wil_v5_origGenFactura.apply(this, arguments);
-
-  /* 3. Actualizar resumen colapsable */
-  var st = window.state || {};
-  var nombreEl = document.getElementById('factura-nombre-resumen');
-  if (nombreEl) nombreEl.textContent = st.nombre || '—';
-  var countEl = document.getElementById('ticket-prod-count');
-  if (countEl) countEl.textContent = (st.productos && st.productos.length)
-    ? st.productos.length + ' producto' + (st.productos.length !== 1 ? 's' : '')
-    : 'Sin lista';
-  var pagoEl = document.getElementById('ticket-pago-resumen');
-  if (pagoEl) pagoEl.textContent = st.metodoPago === 'EFECTIVO' ? '💵 Efectivo' : '🏦 Transferencia';
-
-  /* 4. Calcular tarifa y renderizar en el ÚNICO contenedor */
-  var info = await WIL_v5_calcularTarifa();
-  WIL_v5_renderTarifa(info);
-
-  /* 5. Guardar en state */
-  if (window.state) {
-    window.state.precioDomicilio = info.tarifa;
-    window.state.tarifaZonaStr   = info.zonaStr;
-    window.state.tarifaEsFuera   = info.esFuera;
-  }
-
-  /* 6. Abrir ticket */
-  setTimeout(wilAbrirTicket, 100);
-};
-
-/* PATCH enviarPedido — asegurar tarifa en col T */
-var _wil_v5_origEnviar = window.enviarPedido;
-window.enviarPedido = async function(tipo) {
-  if (!WIL_TARIFA_CACHE) await WIL_v5_calcularTarifa();
-  if (window.state && WIL_TARIFA_CACHE)
-    window.state.precioDomicilio = WIL_TARIFA_CACHE.tarifa;
-  return _wil_v5_origEnviar.apply(this, arguments);
-};
-
-console.log('[WIL v5] ✅ Tarifa única · Sin duplicados · zonaStr limpio');
 
 (function (global) {
   'use strict';
