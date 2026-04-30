@@ -2202,7 +2202,7 @@ async function loadDrivers() {
     const parsed = lines.map(c => {
       const rawA = col(c, 5).toUpperCase();
       const activo = ['TRUE','1','VERDADERO','SI','SÍ','YES','ACTIVO'].includes(rawA);
-      return { id: col(c, 0), nombre: col(c, 1), tel: col(c, 3), activo, foto: fotoPath(col(c, 1)) };
+      return { id: col(c, 0), nombre: col(c, 1), tel: col(c, 3), activo, foto: col(c, 4) ? 'icons/' + col(c, 4).trim() : fotoPath(col(c, 1)) };
     }).filter(d => d.id || d.nombre);
     if (parsed.length > 0) allDrivers = parsed;
     return true;
@@ -4701,9 +4701,24 @@ let _noTrackerMsg   = null;
   document.head.appendChild(s);
 })();
 
-/* ── Icono moto ── */
-function crearIconoMoto(nombre, ts) {
+/* ──FOTO DOMI ── */
+function crearIconoMoto(nombre, ts, fotoUrl) {
   const n = (nombre || '').split(' ').slice(0, 2).join(' ');
+
+  const imgContent = fotoUrl
+    ? `<img src="${fotoUrl}"
+         style="width:44px;height:44px;border-radius:50%;
+                object-fit:cover;object-position:center 20%;
+                border:3px solid #fff;
+                box-shadow:0 4px 16px rgba(22,163,74,.55);
+                animation:mbounce 2s ease-in-out infinite;"
+         onerror="this.outerHTML='<div style=width:44px;height:44px;border-radius:50%;background:#16a34a;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;font-weight:800;animation:mbounce 2s ease-in-out infinite;>${n.charAt(0)}</div>'">`
+    : `<div style="width:44px;height:44px;border-radius:50%;
+                   background:#16a34a;border:3px solid #fff;
+                   display:flex;align-items:center;justify-content:center;
+                   font-size:18px;color:#fff;font-weight:800;
+                   animation:mbounce 2s ease-in-out infinite;">${n.charAt(0)}</div>`;
+
   return L.divIcon({
     className: '',
     html: `
@@ -4714,19 +4729,19 @@ function crearIconoMoto(nombre, ts) {
                     border:1.5px solid rgba(40,185,193,.5);box-shadow:0 2px 8px rgba(0,0,0,.4);">
           ${n}
         </div>
-        <div style="position:relative;width:44px;height:44px;
+        <div style="position:relative;width:50px;height:50px;
                     display:flex;align-items:center;justify-content:center;">
           <div class="mp-ring"></div>
           <div class="mp-ring2"></div>
-          <div class="mp-circle">🛵</div>
+          ${imgContent}
         </div>
         ${ts ? `<div style="font-size:10px;font-weight:800;color:#16a34a;background:#dcfce7;
                             border-radius:99px;padding:2px 8px;font-family:monospace;">${ts}</div>` : ''}
         <div style="width:3px;height:10px;background:#16a34a;
                     border-radius:0 0 3px 3px;opacity:.6;"></div>
       </div>`,
-    iconSize:   [90, 108],
-    iconAnchor: [45, 108]
+    iconSize:   [90, 114],
+    iconAnchor: [45, 114]
   });
 }
 
@@ -5106,7 +5121,8 @@ async function renderActividad() {
     const domi = allDrivers.find(d => (d.id||'').toUpperCase() === id.toUpperCase())
               || { id, nombre, tel: '' };
     const ped  = allPedidos.find(p => matchDomi(p, domi) && p.estado === 'proceso');
-    const icono = crearIconoMoto(nombre, ts);
+    const fotoUrl = domi.foto || null;
+    const icono   = crearIconoMoto(nombre, ts, fotoUrl);
 
    const buildPopup = (did, dlat, dlng, dts, dacc) => {
       const domiF = allDrivers.find(d => (d.id||'').toUpperCase() === did.toUpperCase())
