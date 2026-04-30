@@ -11,6 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
  <script src="pedido-libre.js"></script>
+ <script src="parche-ruta-rastrear.js"></script>
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
@@ -4040,6 +4041,187 @@ function wilToggleTicket(hdr) {
   }
 
 }(window));
+
+
+(function(W){
+  'use strict';
+ 
+  /* ── coords destino guardadas al primer geocode ── */
+  W._wilDestCoords = null;   /* { lat, lng } */
+  W._wilRutaEnCurso = false; /* evita llamadas simultáneas */
+ 
+  /* ── versión mejorada de trazarRutaResult ── */
+  W.trazarRutaResult = async function(latO, lngO, latD, lngD, pedido){
+    if(!W.mapResult) return;
+    if(W._wilRutaEnCurso) return;
+    W._wilRutaEnCurso = true;
+ 
+    /* Guardar destino para polls futuros */
+    W._wilDestCoords = { lat: latD, lng: lngD };
+ 
+    var OSRM = 'https://router.project-osrm.org/route/v1/driving/'
+      + lngO + ',' + latO + ';' + lngD + ',' + latD
+      + '?overview=full&geometries=geojson&steps=false';
+ 
+    try {
+      var r = await fetch(OSRM, { cache: 'no-store' });
+      var data = await r.json();
+ 
+      if(!data.routes || !data.routes[0]) throw new Error('sin ruta');
+ 
+      var coords  = data.routes[0].geometry.coordinates;
+      var latLngs = coords.map(function(c){ return [c[1], c[0]]; });
+      var dur     = Math.round(data.routes[0].duration / 60);
+      var distKm  = (data.routes[0].distance / 1000).toFixed(1);
+ 
+      /* Limpiar capas anteriores */
+      if(W.routeLayerResult){
+        W.mapResult.removeLayer(W.routeLayerResult);
+        W.routeLayerResult = null;
+      }
+      if(W.routeLayerResultTop){
+        W.mapResult.removeLayer(W.routeLayerResultTop);
+        W.routeLayerResultTop = null;
+      }
+ 
+      /* Sombra blanca + línea principal */
+      W.routeLayerResult = L.polyline(latLngs, {
+        color:'#fff', weight:9, opacity:.55,
+        lineCap:'round', lineJoin:'round'
+      }).addTo(W.mapResult);
+ 
+      W.routeLayerResultTop = L.polyline(latLngs, {
+        color:'#006970', weight:5, opacity:.95,
+        lineCap:'round', lineJoin:'round'
+      }).addTo(W.mapResult);
+ 
+      /* ETA overlay */
+      var etaOverlay = document.getElementById('rtMapEtaOverlay');
+      var etaMinEl   = document.getElementById('rtMapEtaMins');
+      if(etaMinEl) etaMinEl.textContent = dur > 0 ? dur : '¡Ya!';
+      if(etaOverlay) etaOverlay.style.display = 'flex';
+ 
+      /* Distancia en estado (opcional) */
+      var riId = document.getElementById('ri-id-display');
+      if(riId && distKm){
+        var base = riId.textContent.replace(/·.*$/,'').trim();
+        riId.textContent = base + ' · ' + distKm + ' km · ' + (dur > 0 ? dur + ' min' : '¡Ya!');
+      }
+ 
+      /* Ajustar bounds para ver domi + destino */
+      var bounds = L.latLngBounds([[latO,lngO],[latD,lngD]]);
+      W.mapResult.fitBounds(bounds, {
+        paddingTopLeft:[20,90], paddingBottomRight:[20,30], maxZoom:16, animate:true
+      });
+ 
+    } catch(e){
+      /* Fallback: sólo si OSRM falla completamente */
+      console.warn('[WIL ruta] OSRM falló, reintentando en 5 s:', e.message);
+      setTimeout(function(){
+        W._wilRutaEnCurso = false;
+        W.trazarRutaResult(latO, lngO, latD, lngD, pedido);
+      }, 5000);
+      return; /* no tocar _wilRutaEnCurso aquí */
+    }
+ 
+    W._wilRutaEnCurso = false;
+  };
+ 
+  /* ── versión mejorada de _initMapResult ──
+     Geocodifica el destino UNA SOLA VEZ y guarda _wilDestCoords.
+     Domi se posiciona en Copacabana si no hay GPS real.          */
+  var _origInit = W._initMapResult;
+  W._initMapResult = function(pedido){
+    /* Si el mapa ya existe y el domi actualizó GPS → solo mover marcador */
+    if(W.mapResult && W._wilDestCoords){
+      if(pedido.domiLat && pedido.domiLng){
+        var dLat = parseFloat(pedido.domiLat);
+        var dLng = parseFloat(pedido.domiLng);
+        if(!isNaN(dLat) && !isNaN(dLng)){
+          if(W.domiMarkerResult) W.domiMarkerResult.setLatLng([dLat, dLng]);
+          /* Re-trazar ruta real desde nueva posición domi */
+          W.trazarRutaResult(dLat, dLng,
+            W._wilDestCoords.lat, W._wilDestCoords.lng, pedido);
+        }
+      }
+      return;
+    }
+ 
+    /* Primera vez: inicializar mapa normalmente */
+    if(typeof _origInit === 'function') _origInit(pedido);
+ 
+    /* Intentar geocodificar destino y guardar coords */
+    var dirRaw = (pedido && pedido.direccion) || '';
+    var coordsM = dirRaw.match(/\[(-?\d+\.\d+),\s*(-?\d+\.\d+)\]/);
+ 
+    if(coordsM){
+      /* Coords inline — guardar de inmediato */
+      W._wilDestCoords = {
+        lat: parseFloat(coordsM[1]),
+        lng: parseFloat(coordsM[2])
+      };
+    } else if(pedido && pedido.direccion){
+      /* Geocodificar y guardar */
+      var dir = pedido.direccion
+        .replace(/\s*\[.+\]/,'')
+        .replace(/\s*\(Ref:[^)]+\)/,'')
+        .replace(/\s*—\s*Ref:.*/,'')
+        .trim();
+      if(dir){
+        fetch('https://nominatim.openstreetmap.org/search?q='
+          + encodeURIComponent(dir + ' Copacabana Antioquia Colombia')
+          + '&format=json&limit=1',
+          { headers:{ 'User-Agent':'DomiciliosWIL/1.0' } })
+          .then(function(r){ return r.json(); })
+          .then(function(d){
+            if(d && d[0]){
+              var latD = parseFloat(d[0].lat);
+              var lngD = parseFloat(d[0].lon);
+              W._wilDestCoords = { lat: latD, lng: lngD };
+ 
+              /* Trazar ruta con el domi actual */
+              var orLat = COPA_LAT, orLng = COPA_LNG;
+              if(pedido.domiLat && pedido.domiLng){
+                var dl = parseFloat(pedido.domiLat);
+                var dl2 = parseFloat(pedido.domiLng);
+                if(!isNaN(dl) && !isNaN(dl2)){ orLat = dl; orLng = dl2; }
+              }
+              W.trazarRutaResult(orLat, orLng, latD, lngD, pedido);
+ 
+              /* Marcador destino */
+              if(W.destMarkerResult) W.mapResult.removeLayer(W.destMarkerResult);
+              W.destMarkerResult = L.marker([latD, lngD], { icon: W.iconDestino() })
+                .addTo(W.mapResult)
+                .bindPopup('<b>' + ((pedido && pedido.cliente) || 'Cliente') + '</b><br>📍 Destino');
+            }
+          })
+          .catch(function(){});
+      }
+    }
+  };
+ 
+  /* ── Parche del ciclo de polling GPS del domi (_rtPollCiclo) ──
+     El polling ya tiene lógica para mover el marcador y llamar
+     trazarRutaResult con coords del destino. Con _wilDestCoords
+     guardado, solo aseguramos que use esas coords.             */
+  var _origPoll = W._rtPollCiclo;
+  W._rtPollCiclo = async function(){
+    /* Ejecutar poll original */
+    if(typeof _origPoll === 'function') await _origPoll.apply(this, arguments);
+ 
+    /* Extra: si hay domi en el mapa y destino guardado, re-trazar */
+    if(W.domiMarkerResult && W._wilDestCoords && W.mapResult){
+      var pos = W.domiMarkerResult.getLatLng();
+      W.trazarRutaResult(pos.lat, pos.lng,
+        W._wilDestCoords.lat, W._wilDestCoords.lng,
+        W.state && W.state.pedidoRastreado);
+    }
+  };
+ 
+  console.log('[WIL] Parche ruta real activado ✓');
+ 
+}(window));
+ 
 
 
 </script>
