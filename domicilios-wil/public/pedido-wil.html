@@ -512,7 +512,6 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 }
 .wil-ticket-tarifa-nota .sym{font-size:14px;color:var(--am);flex-shrink:0;margin-top:1px}
 
-  
 </style>
 </head>
 <body>
@@ -785,7 +784,7 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 
 <!-- ════ LIBRE P1 ════ -->
 <div class="view" id="view-libre-1">
-  <div style="padding:20px 16px 8px"><div style="font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:4px">Pedido Libre 🛍️</div><div style="font-size:13px;color:var(--on3);font-weight:500">Paso 1 de 3 — Comercio </div></div>
+  <div style="padding:20px 16px 8px"><div style="font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:4px">Pedido Libre 🛍️</div><div style="font-size:13px;color:var(--on3);font-weight:500">Paso 1 de 3 — Comercio y presupuesto</div></div>
   <div class="card">
     <div class="card-tit"><span class="sym f">storefront</span>¿Ya tienes el comercio?</div>
     <div class="yn-grid">
@@ -952,7 +951,10 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
       <div class="wil-ticket-lbl">🏪 Comercio</div>
       <div class="wil-ticket-val" id="factura-comercio-val">—</div>
     </div>
-    
+    <div class="wil-ticket-row">
+      <div class="wil-ticket-lbl">💰 Presupuesto</div>
+      <div class="wil-ticket-val" id="factura-presupuesto">—</div>
+    </div>
 
     <hr class="wil-ticket-divider"/>
 
@@ -1014,300 +1016,37 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
   </div>
   <div class="spacer"></div>
 </div>
+
+<!-- PAQUETE FORM -->
 <div class="view" id="view-paquete-form">
-  <div style="padding:20px 16px 8px">
-    <div style="font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:4px">Envío por Zona 📦</div>
-    <div style="font-size:13px;color:var(--on3);font-weight:500" id="pq-form-sub">Completa los datos del envío</div>
-  </div>
- 
-  <!-- QUIÉN ENVÍA -->
+  <div style="padding:20px 16px 8px"><div style="font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:4px">Envío por Zona 📦</div><div style="font-size:13px;color:var(--on3);font-weight:500" id="pq-form-sub">Completa los datos del envío</div></div>
+  <div class="card"><div class="card-tit"><span class="sym f">package_2</span>¿Qué envías?</div><div class="field"><label>Descripción del paquete</label><textarea id="paquete-descripcion" placeholder="Ropa, documentos, mercancía, regalo…"></textarea></div></div>
   <div class="card">
-    <div class="card-tit"><span class="sym f">person</span>¿Quién envía?</div>
-    <div class="field">
-      <label>Nombre de quien envía *</label>
-      <input type="text" id="paquete-remitente" placeholder="Nombre completo del remitente"/>
-    </div>
-    <div class="field">
-      <label>Teléfono de contacto *</label>
-      <input type="tel" id="paquete-tel-remitente" placeholder="310 123 4567"/>
-    </div>
-   <div class="field">
-  <label>Dirección de recogida *</label>
-  <div style="display:flex;gap:8px;align-items:flex-start">
-    <input type="text" id="paquete-origen" placeholder="Calle 52 #48-09, Barrio Centro, Copacabana" style="flex:1"/>
-    <button type="button" onclick="captarGpsPaquete('origen')"
-      style="flex-shrink:0;width:40px;height:44px;border-radius:10px;border:1.5px solid var(--plb);background:var(--pl);cursor:pointer;display:flex;align-items:center;justify-content:center">
-      <span class="sym f" style="font-size:18px;color:var(--p)">my_location</span>
-    </button>
+    <div class="card-tit"><span class="sym f">location_on</span>Dirección de entrega</div>
+    <div class="field"><label>Dirección completa *</label><input type="text" id="paquete-direccion" placeholder="Cra 43 #18-20, Barrio El Poblado, Medellín"/><div class="field-note">Incluye calle, número, barrio y ciudad</div></div>
+    <div class="field"><label>Referencia</label><input type="text" id="paquete-referencia" placeholder="Frente al Éxito, edificio azul, piso 3…"/></div>
+    <div class="field"><label>Nombre quien recibe *</label><input type="text" id="paquete-nombre" placeholder="Nombre completo"/></div>
+    <div class="field"><label>Teléfono *</label><input type="tel" id="paquete-telefono" placeholder="310 123 4567"/></div>
   </div>
-  <div id="pq-gps-origen-st" style="font-size:10px;color:var(--on3);margin-top:3px;font-weight:600"></div>
-  <div class="field-note">¿Dónde recoge el domiciliario tu paquete?</div>
+  <div class="card"><div class="card-tit"><span class="sym f">payments</span>Método de pago</div><div class="pago-grid"><div class="pago-c" id="pago-efectivo-p" onclick="selectPagoPaquete('EFECTIVO')"><div class="pago-ico">💵</div><div class="pago-lbl">Efectivo</div></div><div class="pago-c" id="pago-transferencia-p" onclick="selectPagoPaquete('TRANSFERENCIA')"><div class="pago-ico">🏦</div><div class="pago-lbl">Transferencia</div></div></div></div>
+  <div class="act-row"><button class="btn-b" onclick="showView('view-inicio')">Atrás</button><button class="btn-n" onclick="generarFacturaPaquete()"><span class="sym" style="font-size:17px">receipt_long</span>Ver resumen</button></div>
 </div>
-  </div>
- 
-  <!-- QUÉ SE ENVÍA -->
-  <div class="card">
-    <div class="card-tit"><span class="sym f">package_2</span>¿Qué envías?</div>
-    <div class="field">
-      <label>Descripción del paquete *</label>
-      <textarea id="paquete-descripcion" placeholder="Ropa, documentos, regalo, mercancía…"></textarea>
-    </div>
- 
-    <!-- Tipo de paquete -->
-    <div style="margin-bottom:14px">
-      <label style="display:block;font-size:11px;font-weight:700;color:var(--on3);margin-bottom:8px;letter-spacing:.04em;text-transform:uppercase">Tipo de paquete</label>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-        <button class="yn-btn" id="pq-tipo-sobre" onclick="selectPqTipo('sobre')">
-          <span style="font-size:22px">✉️</span>Sobre / doc.
-        </button>
-        <button class="yn-btn" id="pq-tipo-caja" onclick="selectPqTipo('caja')">
-          <span style="font-size:22px">📦</span>Caja
-        </button>
-        <button class="yn-btn" id="pq-tipo-bolsa" onclick="selectPqTipo('bolsa')">
-          <span style="font-size:22px">🛍️</span>Bolsa
-        </button>
-      </div>
-    </div>
- 
-    <!-- Tamaño -->
-    <div style="margin-bottom:14px">
-      <label style="display:block;font-size:11px;font-weight:700;color:var(--on3);margin-bottom:8px;letter-spacing:.04em;text-transform:uppercase">Tamaño</label>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-        <button class="yn-btn" id="pq-tam-pequeno" onclick="selectPqTam('pequeño')">
-          <span style="font-size:18px">🔹</span>Pequeño
-        </button>
-        <button class="yn-btn" id="pq-tam-mediano" onclick="selectPqTam('mediano')">
-          <span style="font-size:20px">🔷</span>Mediano
-        </button>
-        <button class="yn-btn" id="pq-tam-grande" onclick="selectPqTam('grande')">
-          <span style="font-size:22px">🔵</span>Grande
-        </button>
-      </div>
-      <div style="margin-top:6px;background:var(--pl);border:1px solid var(--plb);border-radius:var(--r-md);padding:8px 11px;font-size:11px;color:var(--p);font-weight:600;display:flex;align-items:center;gap:6px">
-        <span class="sym f" style="font-size:13px">info</span>
-        El costo exacto lo confirma el domi según el tamaño real
-      </div>
-    </div>
- 
-    <!-- ¿Es delicado? -->
-    <div style="margin-bottom:4px">
-      <label style="display:block;font-size:11px;font-weight:700;color:var(--on3);margin-bottom:8px;letter-spacing:.04em;text-transform:uppercase">¿Es delicado?</label>
-      <div class="yn-grid">
-        <button class="yn-btn" id="pq-del-si" onclick="selectPqDelicado(true)">
-          <span class="sym f" style="font-size:22px;color:#d97706">warning</span>Sí, manejar con cuidado
-        </button>
-        <button class="yn-btn" id="pq-del-no" onclick="selectPqDelicado(false)">
-          <span class="sym f" style="font-size:22px">check_circle</span>No, normal
-        </button>
-      </div>
-    </div>
- 
-    <!-- Valor declarado -->
-    <div class="field" style="margin-top:12px">
-      <label>Valor declarado del paquete *</label>
-      <input type="number" id="paquete-valor" placeholder="Ej: 50000" min="0"/>
-      <div class="field-note">El domi te informará el costo del envío al confirmar. El valor declarado es para seguro.</div>
-    </div>
-  </div>
- 
-  <!-- A DÓNDE SE ENVÍA -->
-  <div class="card">
-    <div class="card-tit"><span class="sym f">location_on</span>¿A dónde se envía?</div>
-   <div class="field">
-  <label>Dirección de entrega *</label>
-  <div style="display:flex;gap:8px;align-items:flex-start">
-    <input type="text" id="paquete-direccion" placeholder="Cra 43 #18-20, Barrio El Poblado, Medellín" style="flex:1"/>
-    <button type="button" onclick="captarGpsPaquete('destino')"
-      style="flex-shrink:0;width:40px;height:44px;border-radius:10px;border:1.5px solid var(--plb);background:var(--pl);cursor:pointer;display:flex;align-items:center;justify-content:center">
-      <span class="sym f" style="font-size:18px;color:var(--p)">my_location</span>
-    </button>
-  </div>
-  <div id="pq-gps-destino-st" style="font-size:10px;color:var(--on3);margin-top:3px;font-weight:600"></div>
-  <div class="field-note">Incluye calle, número, barrio y ciudad</div>
-</div>
-    <div class="field">
-      <label>Punto de referencia</label>
-      <input type="text" id="paquete-referencia" placeholder="Frente al Éxito, edificio azul, piso 3…"/>
-    </div>
-    <div id="pq-dist-info" style="display:none;background:var(--pl);border:1px solid var(--plb);
-  border-radius:var(--r-md);padding:9px 12px;font-size:11.5px;color:var(--p);font-weight:700;
-  margin-bottom:8px;align-items:center;gap:7px">
-  <span class="sym f" style="font-size:14px">route</span>
-  <span id="pq-dist-txt"></span>
-</div>
-    <div style="background:rgba(0,105,112,.05);border:1.5px solid rgba(0,105,112,.16);border-radius:var(--r-lg);padding:10px 12px;margin-bottom:4px;display:flex;align-items:flex-start;gap:9px">
-      <span style="font-size:18px;flex-shrink:0">🛵</span>
-      <span style="font-size:11.5px;color:var(--p);font-weight:600;line-height:1.5">Tarifa: <b>$1.800/km</b> fuera de Copacabana. El domi calcula la distancia real y te confirma antes de salir.</span>
-    </div>
-  </div>
- 
-  <!-- QUIÉN RECIBE -->
-  <div class="card">
-    <div class="card-tit"><span class="sym f">person_pin</span>¿Quién recibe?</div>
-    <div class="field">
-      <label>Nombre de quien recibe *</label>
-      <input type="text" id="paquete-nombre" placeholder="Nombre completo"/>
-    </div>
-    <div class="field">
-      <label>Teléfono *</label>
-      <input type="tel" id="paquete-telefono" placeholder="310 123 4567"/>
-    </div>
-  </div>
- 
-  <!-- MÉTODO DE PAGO -->
-  <div class="card">
-    <div class="card-tit"><span class="sym f">payments</span>¿Cómo pagas el domicilio?</div>
-    <div class="pago-ticket-grid">
-      <div class="pago-ticket-c" id="pago-efectivo-p" onclick="selectPagoPaquete('EFECTIVO')">
-        <div class="pago-ticket-ico">💵</div>
-        <div class="pago-ticket-lbl">Efectivo</div>
-        <div class="pago-ticket-sub">El domi cobra al entregar</div>
-      </div>
-      <div class="pago-ticket-c" id="pago-transferencia-p" onclick="selectPagoPaquete('TRANSFERENCIA')">
-        <div class="pago-ticket-ico">🏦</div>
-        <div class="pago-ticket-lbl">Transferencia</div>
-        <div class="pago-ticket-sub">Pagas al confirmar la tarifa</div>
-      </div>
-    </div>
-  </div>
- 
-  <div class="act-row">
-    <button class="btn-b" onclick="showView('view-inicio')">Atrás</button>
-    <button class="btn-n" onclick="generarFacturaPaquete()">
-      <span class="sym" style="font-size:17px">receipt_long</span>Ver resumen
-    </button>
-  </div>
-</div>
- 
-<!-- ══════════════════════════════════════════════
-     FACTURA PAQUETE — reemplaza todo el view-factura-paquete
-════════════════════════════════════════════════ -->
+
+<!-- FACTURA PAQUETE -->
 <div class="view" id="view-factura-paquete">
-  <div style="padding:20px 16px 8px">
-    <div style="font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:4px">Confirmar envío 📦</div>
-    <div style="font-size:13px;color:var(--on3);font-weight:500">Revisa bien antes de confirmar</div>
+  <div style="padding:20px 16px 8px"><div style="font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:4px">Confirmar envío 📦</div><div style="font-size:13px;color:var(--on3);font-weight:500">Revisa bien antes de confirmar</div></div>
+  <div class="factura">
+    <div class="fac-hdr"><img class="fac-logo" src="icons/icon-192.png" alt="WIL"/><div><div class="fac-tit">Domicilios WIL</div></div></div>
+    <div class="fac-row"><div class="fac-lbl">Destino</div><div class="fac-val" id="fp-zona">—</div></div>
+    <div class="fac-row"><div class="fac-lbl">Descripción</div><div class="fac-val" id="fp-desc">—</div></div>
+    <div class="fac-row"><div class="fac-lbl">📍 Dirección</div><div class="fac-val" id="fp-dir">—</div></div>
+    <div class="fac-row"><div class="fac-lbl">🗺️ Referencia</div><div class="fac-val" id="fp-ref">—</div></div>
+    <div class="fac-row"><div class="fac-lbl">👤 Recibe</div><div class="fac-val" id="fp-nombre">—</div></div>
+    <div class="fac-row"><div class="fac-lbl">📱 Teléfono</div><div class="fac-val" id="fp-tel">—</div></div>
+    <div class="fac-row"><div class="fac-lbl">💳 Pago</div><div class="fac-val" id="fp-pago">—</div></div>
+    <div class="fac-nota"><span class="sym">info</span>La tarifa se calcula según la distancia real. El domi te confirmará el valor antes de partir.</div>
   </div>
- 
-  <div class="wil-ticket">
-    <div class="wil-ticket-header">
-      <div class="wil-ticket-logo-row">
-        <img class="wil-ticket-logo" src="icons/icon-192.png" alt="WIL" onerror="this.style.display='none'"/>
-        <span class="wil-ticket-brand">DOMICILIOS WIL</span>
-      </div>
-      <div class="wil-ticket-sub">Paquetería · Copacabana y Área Metro</div>
-      <div class="wil-ticket-id">
-        <span class="sym f" style="font-size:11px">package_2</span>
-        <span id="fp-fecha-id">Envío nuevo</span>
-      </div>
-    </div>
- 
-    <!-- Colapsable -->
-    <div class="wil-ticket-collapse-header" onclick="wilToggleTicket(this)" id="ticketPaqCollapseHdr">
-      <div class="wil-ticket-collapse-summary">
-        <div class="wil-ticket-collapse-summary-title">Envío de <span id="fp-remitente-resumen">—</span></div>
-        <div class="wil-ticket-collapse-summary-sub">Para <span id="fp-receptor-resumen">—</span> · <span id="fp-pago-resumen-paq">—</span></div>
-      </div>
-      <div class="wil-ticket-collapse-toggle" id="ticketPaqCollapseBtn">
-        <span>Ver detalles</span><span class="sym">expand_more</span>
-      </div>
-    </div>
- 
-    <div class="wil-ticket-body-colapsable" id="ticketPaqBodyColapsable">
-      <div class="wil-ticket-body">
- 
-        <div class="wil-ticket-row">
-          <div class="wil-ticket-lbl">📤 Remitente</div>
-          <div class="wil-ticket-val" id="fp-remitente">—</div>
-        </div>
-        <div class="wil-ticket-row">
-          <div class="wil-ticket-lbl">📍 Recogida</div>
-          <div class="wil-ticket-val" id="fp-origen">—</div>
-        </div>
- 
-        <hr class="wil-ticket-divider"/>
- 
-        <div class="wil-ticket-row">
-          <div class="wil-ticket-lbl">📦 Qué es</div>
-          <div class="wil-ticket-val" id="fp-desc">—</div>
-        </div>
-        <div class="wil-ticket-row">
-          <div class="wil-ticket-lbl">🏷️ Tipo</div>
-          <div class="wil-ticket-val" id="fp-tipo">—</div>
-        </div>
-        <div class="wil-ticket-row">
-          <div class="wil-ticket-lbl">📐 Tamaño</div>
-          <div class="wil-ticket-val" id="fp-tam">—</div>
-        </div>
-        <div class="wil-ticket-row">
-          <div class="wil-ticket-lbl">⚠️ Delicado</div>
-          <div class="wil-ticket-val" id="fp-delicado">—</div>
-        </div>
-        <div class="wil-ticket-row">
-          <div class="wil-ticket-lbl">💰 Valor declarado</div>
-          <div class="wil-ticket-val" id="fp-valor">—</div>
-        </div>
- 
-        <hr class="wil-ticket-divider"/>
- 
-       
-        <div class="wil-ticket-row">
-          <div class="wil-ticket-lbl">📍 Dirección</div>
-          <div class="wil-ticket-val" id="fp-dir">—</div>
-        </div>
-        <div class="wil-ticket-row">
-          <div class="wil-ticket-lbl">🗺️ Referencia</div>
-          <div class="wil-ticket-val" id="fp-ref">—</div>
-        </div>
-        <div class="wil-ticket-row">
-          <div class="wil-ticket-lbl">👤 Recibe</div>
-          <div class="wil-ticket-val" id="fp-nombre">—</div>
-        </div>
-        <div class="wil-ticket-row">
-          <div class="wil-ticket-lbl">📱 Teléfono</div>
-          <div class="wil-ticket-val" id="fp-tel">—</div>
-        </div>
- 
-        <hr class="wil-ticket-divider"/>
- 
-        <!-- Tarifa domicilio -->
-        <div class="wil-ticket-tarifa-row">
-          <div class="wil-ticket-tarifa-lbl">🛵 Costo envío</div>
-          <div class="wil-ticket-tarifa-val" id="fp-tarifa-val">
-            El domi confirma
-            <div class="wil-ticket-tarifa-sub" id="fp-tarifa-sub">$1.800/km · El domi calcula la distancia real</div>
-          </div>
-        </div>
-        <div class="wil-ticket-tarifa-nota">
-          <span class="sym" style="font-size:14px;color:var(--am);flex-shrink:0">info</span>
-          <span>El domiciliario calcula la tarifa según la distancia real y te confirma <strong>antes de salir</strong>. Tú apruebas.</span>
-        </div>
- 
-        <div style="text-align:center;padding:4px 0 10px">
-          <div class="wil-ticket-pago-badge">
-            <span id="fp-pago-ico">💳</span> <span id="fp-pago">—</span>
-          </div>
-        </div>
- 
-        <div class="wil-ticket-nota">
-          <span class="sym">verified</span>
-          <span>El valor del paquete se te informa una vez el domi revise los detalles. <strong>Tú apruebas antes del cobro.</strong></span>
-        </div>
-      </div>
-    </div>
- 
-    <div class="wil-ticket-footer">
-      <div class="wil-ticket-footer-brand">DOMICILIOS WIL</div>
-      <div class="wil-ticket-footer-dots">· · · · · · · · · · · · · · · · ·</div>
-      <div style="font-size:10px;color:var(--on3);margin-top:2px">Copacabana, Antioquia</div>
-    </div>
-  </div>
- 
-  <div class="act-row">
-    <button class="btn-b" onclick="showView('view-paquete-form')">Editar</button>
-    <button class="btn-n" id="btnConfirmarPaquete" onclick="enviarPedido('paquete')">
-      <span class="sym f" style="font-size:17px">check_circle</span>Confirmar envío
-    </button>
-  </div>
+  <div class="act-row"><button class="btn-b" onclick="showView('view-paquete-form')">Editar</button><button class="btn-n" id="btnConfirmarPaquete" onclick="enviarPedido('paquete')"><span class="sym f" style="font-size:17px">check_circle</span>Confirmar envío</button></div>
   <div class="spacer"></div>
 </div>
 
@@ -2039,11 +1778,8 @@ function captarUbicacion(){
 
 /* ── FORM LIBRE ── */
 function selectComercio(tiene){state.comercioTiene=tiene;document.getElementById('yn-si').classList.toggle('sel',tiene);document.getElementById('yn-no').classList.toggle('sel',!tiene);document.getElementById('comercio-field').classList.toggle('hidden',!tiene);}
-  
 function selectBudget(val,el){state.presupuesto=val;document.querySelectorAll('.chip').forEach(function(c){c.classList.remove('sel');});el.classList.add('sel');document.getElementById('otro-budget-field').classList.add('hidden');}
-  
 function selectBudgetOtro(){document.querySelectorAll('.chip').forEach(function(c){c.classList.remove('sel');});document.querySelector('.chip.otro').classList.add('sel');document.getElementById('otro-budget-field').classList.remove('hidden');document.getElementById('otro-budget-input').focus();}
-  
 function goLibre2(){
   if(state.comercioTiene===null){mostrarToast('¿Ya tienes el comercio o el domi busca?','help');return;}
   state.comercioNombre=document.getElementById('comercio-nombre').value;
@@ -2129,7 +1865,10 @@ function generarFacturaLibre(){
   document.getElementById('factura-comercio-val').textContent=
     state.comercioTiene&&state.comercioNombre?state.comercioNombre:
     state.comercioTiene?'El domiciliario confirma':'El domiciliario busca';
-
+ 
+  /* Presupuesto */
+  document.getElementById('factura-presupuesto').textContent=formatCOP(state.presupuesto);
+ 
   /* Fecha */
   document.getElementById('factura-fecha').textContent=
     new Date().toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'})
@@ -2161,230 +1900,21 @@ function generarFacturaLibre(){
  
 /* Helpers */
 function escHTML(t){return(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-  
-  function captarGpsPaquete(tipo) {
-  /* tipo: 'origen' | 'destino' */
-  var statusId = tipo === 'origen' ? 'pq-gps-origen-st' : 'pq-gps-destino-st';
-  var inputId  = tipo === 'origen' ? 'paquete-origen'   : 'paquete-direccion';
-  var statusEl = document.getElementById(statusId);
-  var inputEl  = document.getElementById(inputId);
- 
-  if (!navigator.geolocation) {
-    if (statusEl) statusEl.textContent = '✗ GPS no disponible';
-    return;
-  }
-  if (statusEl) { statusEl.textContent = '⟳ Captando…'; statusEl.style.color = '#d97706'; }
- 
-  navigator.geolocation.getCurrentPosition(function(pos) {
-    var lat = pos.coords.latitude, lng = pos.coords.longitude;
-    if (tipo === 'origen')  _pqGpsOrigen  = { lat: lat, lng: lng };
-    else                    _pqGpsDestino = { lat: lat, lng: lng };
- 
-    /* Geocodificación inversa para rellenar el campo */
-    fetch('https://nominatim.openstreetmap.org/reverse?lat='+lat+'&lon='+lng+'&format=json&accept-language=es',
-      { headers: { 'User-Agent': 'DomiciliosWIL/1.0' } })
-      .then(function(r){ return r.json(); })
-      .then(function(data) {
-        var a = data.address || {};
-        var calle  = (a.road || a.street || '').trim();
-        var num    = (a.house_number || '').trim();
-        var barrio = (a.neighbourhood || a.suburb || a.village || '').trim();
-        var ciudad = (a.city || a.town || a.municipality || 'Copacabana').trim();
-        var dir    = [calle + (num ? ' #' + num : ''), barrio, ciudad].filter(Boolean).join(', ');
-        if (inputEl && !inputEl.value.trim()) inputEl.value = dir;
-        if (statusEl) { statusEl.textContent = '✓ GPS capturado'; statusEl.style.color = '#16a34a'; }
- 
-        /* Si tenemos ambos puntos, calcular distancia estimada */
-        if (_pqGpsOrigen && _pqGpsDestino) _calcularDistanciaPaq();
-      })
-      .catch(function() {
-        if (statusEl) { statusEl.textContent = '✓ Coords capturadas'; statusEl.style.color = '#16a34a'; }
-      });
- 
-  }, function() {
-    if (statusEl) { statusEl.textContent = '✗ No se pudo captar'; statusEl.style.color = '#dc2626'; }
-  }, { enableHighAccuracy: true, timeout: 12000 });
-}
- 
-function _calcularDistanciaPaq() {
-  if (!_pqGpsOrigen || !_pqGpsDestino) return;
-  var R = 6371;
-  var dLat = (_pqGpsDestino.lat - _pqGpsOrigen.lat) * Math.PI / 180;
-  var dLng = (_pqGpsDestino.lng - _pqGpsOrigen.lng) * Math.PI / 180;
-  var a = Math.sin(dLat/2)*Math.sin(dLat/2)
-        + Math.cos(_pqGpsOrigen.lat*Math.PI/180)*Math.cos(_pqGpsDestino.lat*Math.PI/180)
-          *Math.sin(dLng/2)*Math.sin(dLng/2);
-  var distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  distKm = Math.round(distKm * 10) / 10;
-  var costo = distKm < 3 ? 0 : Math.round(distKm * 1800 / 500) * 500;
-  var infoEl = document.getElementById('pq-dist-info');
-  if (infoEl) {
-    infoEl.textContent = distKm + ' km · Costo estimado: '
-      + (costo > 0 ? '$' + costo.toLocaleString('es-CO') : 'Dentro de Copacabana');
-    infoEl.style.display = 'flex';
-    /* Guardar para usar en factura */
-    window._pqDistKm  = distKm;
-    window._pqCostoKm = costo;
-  }
-}
 
 /* ── PAQUETE ── */
-var _pqTipo = '';
-var _pqTam  = '';
-var _pqDelicado = null;
-var _pqGpsOrigen = null;   /* coords del punto de recogida */
-var _pqGpsDestino = null; 
- 
-function selectPagoPaquete(m){
-  state.metodoPagoPaquete=m;
-  var ef=document.getElementById('pago-efectivo-p');
-  var tr=document.getElementById('pago-transferencia-p');
-  if(ef)ef.classList.toggle('sel',m==='EFECTIVO');
-  if(tr)tr.classList.toggle('sel',m==='TRANSFERENCIA');
-}
- 
-function selectPqTipo(t){
-  _pqTipo=t;
-  ['sobre','caja','bolsa'].forEach(function(k){
-    var el=document.getElementById('pq-tipo-'+k);
-    if(el)el.classList.toggle('sel',k===t);
-  });
-}
-function selectPqTam(t){
-  _pqTam=t;
-  var idMap={'pequeño':'pequeno','mediano':'mediano','grande':'grande'};
-  var key=idMap[t]||t;
-  ['pequeno','mediano','grande'].forEach(function(k){
-    var el=document.getElementById('pq-tam-'+k);
-    if(el)el.classList.toggle('sel',k===key);
-  });
-}
-  
-function selectPqDelicado(v){
-  _pqDelicado=v;
-  var si=document.getElementById('pq-del-si');
-  var no=document.getElementById('pq-del-no');
-  if(si)si.classList.toggle('sel',v===true);
-  if(no)no.classList.toggle('sel',v===false);
-}
-  
-  DUPLICADA
+function selectPagoPaquete(m){state.metodoPagoPaquete=m;document.getElementById('pago-efectivo-p').classList.toggle('sel',m==='EFECTIVO');document.getElementById('pago-transferencia-p').classList.toggle('sel',m==='TRANSFERENCIA');}
 function generarFacturaPaquete(){
- 
-  var remitente = (document.getElementById('paquete-remitente')     ||{}).value||'';
-  var telRem    = (document.getElementById('paquete-tel-remitente') ||{}).value||'';
-  var origen    = (document.getElementById('paquete-origen')         ||{}).value||'';
-  var desc      = (document.getElementById('paquete-descripcion')    ||{}).value||'';
-  var dir       = (document.getElementById('paquete-direccion')      ||{}).value||'';
-  var ref       = (document.getElementById('paquete-referencia')     ||{}).value||'';
-  var nom       = (document.getElementById('paquete-nombre')         ||{}).value||'';
-  var tel       = (document.getElementById('paquete-telefono')       ||{}).value||'';
-  var valorRaw  = (document.getElementById('paquete-valor')          ||{}).value||'0';
-  var valorDec  = parseInt(valorRaw)||0;
- 
-  remitente=remitente.trim(); telRem=telRem.trim(); origen=origen.trim();
-  desc=desc.trim(); dir=dir.trim(); ref=ref.trim(); nom=nom.trim(); tel=tel.trim();
- 
-  if(!remitente||!telRem||!origen){
-    mostrarToast('Completa los datos de quien envía.','person'); return;
-  }
-  if(!desc){
-    mostrarToast('Describe el paquete.','package_2'); return;
-  }
-  if(!dir||!nom||!tel){
-    mostrarToast('Completa dirección, nombre y teléfono de entrega.','warning'); return;
-  }
-  if(!state.metodoPagoPaquete){
-    mostrarToast('Selecciona método de pago.','payments'); return;
-  }
- 
-  /* Guardar en state */
-  state.nombre           = nom;
-  state.telefono         = tel;
-  state.direccion        = dir;
-  state.referencia       = ref;
-  state.metodoPago       = state.metodoPagoPaquete;
-  state.paqueteRemitente = remitente;
-  state.paqueteTelRem    = telRem;
-  state.paqueteOrigen    = origen;
-  state.paqueteDesc      = desc;
-  state.paqueteValorDec  = valorDec;
-  state.coords           = _pqGpsDestino || state.coords;
- 
-  /* Tarifa por tamaño + km */
-  var TARIFAS = { 'pequeño': 10000, 'mediano': 15000, 'grande': 20000 };
-  var tarifaTam = _pqTam ? (TARIFAS[_pqTam]||0) : 0;
-  var tarifaKm  = (window._pqCostoKm || 0);
-  /* Si hay tarifa por tamaño la usamos de base; si también hay km los sumamos */
-  var tarifaTotal = tarifaTam > 0
-    ? tarifaTam + (tarifaKm > 0 && tarifaKm > tarifaTam ? tarifaKm - tarifaTam : 0)
-    : (tarifaKm > 0 ? tarifaKm : 0);
- 
-  var tarifaTxt = tarifaTotal > 0
-    ? '$' + tarifaTotal.toLocaleString('es-CO') + ' COP'
-    : 'El domi confirma';
- 
-  var distStr = window._pqDistKm ? window._pqDistKm + ' km · ' : '';
-  var tarifaSub = _pqTam
-    ? 'Paquete ' + _pqTam + ' (máx. 5 kg) · ' + distStr + '$1.800/km fuera de Copacabana'
-    : distStr + '$1.800/km · El domi calcula la distancia real';
- 
-  state.precioDomicilio = tarifaTotal;
- 
-  /* Fecha/hora */
-  var now = new Date();
-  var fechaStr = now.toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'})
-               + ' · ' + now.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true});
-  var fFechaEl = document.getElementById('fp-fecha-id');
-  if(fFechaEl) fFechaEl.textContent = fechaStr;
- 
-  /* Resumen colapsable header */
-  function get(id){ var e=document.getElementById(id); return e?e:{}; }
-  function set(id,val){ var e=document.getElementById(id); if(e) e.textContent=val||'—'; }
- 
-  set('fp-remitente-resumen', remitente);
-  set('fp-receptor-resumen',  nom);
-  set('fp-pago-resumen-paq',  state.metodoPagoPaquete==='EFECTIVO' ? '💵 Efectivo' : '🏦 Transferencia');
- 
-  /* Detalle completo ticket */
-  set('fp-remitente', remitente + (telRem ? ' · ' + telRem : ''));
-  set('fp-origen',    origen);
-  set('fp-desc',      desc);
-  set('fp-tipo',      _pqTipo ? _pqTipo.charAt(0).toUpperCase()+_pqTipo.slice(1) : 'No especificado');
-  set('fp-tam',       _pqTam  ? _pqTam.charAt(0).toUpperCase()+_pqTam.slice(1)+' (máx. 5 kg)' : 'El domi confirma');
-  set('fp-delicado',  _pqDelicado===true  ? '⚠️ Sí — manejar con cuidado'
-                    : _pqDelicado===false ? '✅ No'
-                    : 'No indicado');
-  set('fp-valor',     valorDec > 0 ? '$' + valorDec.toLocaleString('es-CO') + ' COP' : 'No declarado');
-  /* ── ELIMINAR "Zona seleccionada" — usar dirección real ── */
-  set('fp-dir',       dir);
-  set('fp-ref',       ref || '—');
-  set('fp-nombre',    nom);
-  set('fp-tel',       tel);
-  set('fp-pago',      state.metodoPagoPaquete==='EFECTIVO'
-                    ? 'Efectivo al entregar'
-                    : 'Transferencia — pagas al confirmar tarifa');
- 
-  var pagoIco = document.getElementById('fp-pago-ico');
-  if(pagoIco) pagoIco.textContent = state.metodoPagoPaquete==='EFECTIVO' ? '💵' : '🏦';
- 
-  /* Tarifa en ticket */
-  var tarifaValEl = document.getElementById('fp-tarifa-val');
-  if(tarifaValEl){
-    tarifaValEl.style.color = tarifaTotal > 0 ? 'var(--p)' : '#d97706';
-    tarifaValEl.innerHTML = tarifaTxt
-      + '<div class="wil-ticket-tarifa-sub">' + tarifaSub + '</div>';
-  }
- 
-  /* Abrir colapsable usando nextElementSibling */
-  var hdrPaq = document.getElementById('ticketPaqCollapseHdr');
-  if(hdrPaq) wilToggleTicket(hdrPaq);
- 
+  var dir=document.getElementById('paquete-direccion').value.trim(),ref=document.getElementById('paquete-referencia').value.trim();
+  var nom=document.getElementById('paquete-nombre').value.trim(),tel=document.getElementById('paquete-telefono').value.trim();
+  if(!dir||!nom||!tel){mostrarToast('Completa dirección, nombre y teléfono.','warning');return;}if(!state.metodoPagoPaquete){mostrarToast('Selecciona método de pago.','payments');return;}
+  state.nombre=nom;state.telefono=tel;state.direccion=dir;state.referencia=ref;state.metodoPago=state.metodoPagoPaquete;
+  document.getElementById('fp-zona').textContent=state.paqueteZonaNombre||'Zona seleccionada';
+  document.getElementById('fp-desc').textContent=document.getElementById('paquete-descripcion').value.trim()||'No especificado';
+  document.getElementById('fp-dir').textContent=dir;document.getElementById('fp-ref').textContent=ref||'—';
+  document.getElementById('fp-nombre').textContent=nom;document.getElementById('fp-tel').textContent=tel;
+  document.getElementById('fp-pago').textContent=state.metodoPagoPaquete==='EFECTIVO'?'💵 Efectivo':'🏦 Transferencia';
   showView('view-factura-paquete');
 }
- 
-  
-
 
 /* ── ENVIAR PEDIDO ── */
 async function enviarPedido(tipo){
@@ -3446,25 +2976,18 @@ function _crearZonaEnSheets(data) {
 
 /* -- Toggle colapsable -- */
 function wilToggleTicket(hdr) {
-  /* Busca el cuerpo colapsable como siguiente hermano del header */
-  var body   = hdr.nextElementSibling;
-  var toggle = hdr.querySelector('.wil-ticket-collapse-toggle');
-  if (!body) return;
+  var body   = document.getElementById('ticketBodyColapsable');
+  var toggle = document.getElementById('ticketCollapseBtn');
   var isOpen = body.classList.contains('open');
   body.classList.toggle('open', !isOpen);
-  if (toggle) {
-    toggle.classList.toggle('open', !isOpen);
-    var span = toggle.querySelector('span:first-child');
-    if (span) span.textContent = isOpen ? 'Ver detalles' : 'Ocultar detalles';
-  }
+  toggle.classList.toggle('open', !isOpen);
+  var span = toggle.querySelector('span:first-child');
+  if (span) span.textContent = isOpen ? 'Ver detalles' : 'Ocultar detalles';
 }
-  
-  function wilAbrirTicket() {
-  /* Abre el primero que encuentre (pedido libre) */
-  var hdr = document.getElementById('ticketCollapseHdr');
-  if (!hdr) return;
-  var body   = hdr.nextElementSibling;
-  var toggle = hdr.querySelector('.wil-ticket-collapse-toggle');
+
+function wilAbrirTicket() {
+  var body   = document.getElementById('ticketBodyColapsable');
+  var toggle = document.getElementById('ticketCollapseBtn');
   if (!body) return;
   body.classList.add('open');
   if (toggle) {
@@ -3473,6 +2996,7 @@ function wilToggleTicket(hdr) {
     if (span) span.textContent = 'Ocultar detalles';
   }
 }
+
 
 
 
