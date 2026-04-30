@@ -3814,8 +3814,9 @@ async function WIL_v5_calcularTarifa() {
       resultado.km      = Math.round(km * 10) / 10;
       resultado.tarifa  = Math.round(km * PRECIO_KM / 500) * 500;
       /* zonaStr limpio con barrio real (si existe) o genérico */
-      var barNombre = (st.barrio||'').trim() || 'Fuera de Copacabana';
-      resultado.zonaStr = barNombre + ' · ' + resultado.km + ' km';
+      resultado.zonaStr = resultado.km 
+  ? 'Área Metropolitana · ' + resultado.km + ' km'
+  : 'Fuera de Copacabana';
     } else {
       resultado.zonaStr = (st.barrio||'Fuera de Copacabana').substring(0,30);
       resultado.tarifa  = 0;
@@ -4499,8 +4500,8 @@ console.log('[WIL v5] ✅ Tarifa única · Sin duplicados · zonaStr limpio');
     if (!cont) return;
  
     var tarifaTxt = info.tarifa > 0
-      ? '$' + info.tarifa.toLocaleString('es-CO')
-      : 'El domi confirma';
+  ? '$' + info.tarifa.toLocaleString('es-CO')
+  : 'Por confirmar';
  
     var color = info.esFuera ? '#d97706' : 'var(--p)';
  
@@ -4514,9 +4515,9 @@ console.log('[WIL v5] ✅ Tarifa única · Sin duplicados · zonaStr limpio');
       + (info.esFuera
         ? '<div class="wil-ticket-tarifa-nota">'
           + '<span class="sym" style="font-size:14px;color:#d97706;flex-shrink:0">info</span>'
-          + '<span>Fuera de Copacabana'
-          + (info.km ? ' · ' + info.km + ' km aprox.' : '')
-          + '. El domi calcula el valor exacto. <strong>Tú apruebas antes del cobro.</strong></span>'
+          + '<span>⚠️ Estás fuera del área de cobertura de Copacabana'
++ (info.km ? ' (' + info.km + ' km aprox.)' : '')
++ '. El domicilio se cobra según la distancia recorrida adicional. <strong>El domi confirma el valor antes del cobro y tú apruebas.</strong></span>'
           + '</div>'
         : '');
   }
