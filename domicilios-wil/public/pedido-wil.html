@@ -1647,8 +1647,7 @@ window._initMapResult=function(pedido){
   }
 };
 async function trazarRutaResult(latO,lngO,latD,lngD,pedido){
-  var url='https://graphhopper.com/api/1/route?point='+latO+','+lngO+'&point='+latD+','+lngD+'&vehicle=car&locale=es&points_encoded=false&key=LijBPDQGfu7Iiq80w3HzwB4RUDJbMbj6T3GeI';
-  for(var intento=0;intento<3;intento++){
+ var url='https://routing.openstreetmap.de/routed-car/route/v1/driving/'+lngO+','+latO+';'+lngD+','+latD+'?overview=full&geometries=geojson';
     try{
       var r=await fetch(url,{cache:'no-store'});
       var data=await r.json();
@@ -1671,7 +1670,7 @@ async function trazarRutaResult(latO,lngO,latD,lngD,pedido){
       if(intento<2)await new Promise(function(r){setTimeout(r,2000*(intento+1));});
     }
   }
-}
+
 var _domiPollUbicTimer=null;
 function iniciarPollUbicacionDomi(pedido){
   clearInterval(_domiPollUbicTimer);
