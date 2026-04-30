@@ -793,19 +793,7 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
     </div>
     <div id="comercio-field" class="field hidden"><label>Nombre del comercio</label><input type="text" id="comercio-nombre" placeholder="Ej: Éxito Copacabana, Tienda Don Pedro…"/></div>
   </div>
-  <div class="card">
-    <div class="card-tit"><span class="sym f">payments</span>¿Cuánto tienes disponible?</div>
-    <div class="chips">
-      <div class="chip" onclick="selectBudget(30000,this)">$30.000</div>
-      <div class="chip" onclick="selectBudget(50000,this)">$50.000</div>
-      <div class="chip" onclick="selectBudget(80000,this)">$80.000</div>
-      <div class="chip" onclick="selectBudget(100000,this)">$100.000</div>
-      <div class="chip" onclick="selectBudget(120000,this)">$120.000</div>
-      <div class="chip" onclick="selectBudget(150000,this)">$150.000</div>
-      <div class="chip otro" onclick="selectBudgetOtro()">✏️ Otro valor</div>
-    </div>
-    <div class="field hidden" id="otro-budget-field" style="margin-top:10px"><label>Escribe el valor</label><input type="number" id="otro-budget-input" placeholder="65000" oninput="state.presupuesto=parseInt(this.value)||0"/></div>
-  </div>
+ 
   <div class="act-row"><button class="btn-b" onclick="showView('view-inicio')">Atrás</button><button class="btn-n" onclick="goLibre2()"><span class="sym" style="font-size:17px">arrow_forward</span>Continuar</button></div>
 </div>
 
@@ -1794,9 +1782,7 @@ function selectBudget(val,el){state.presupuesto=val;document.querySelectorAll('.
 function selectBudgetOtro(){document.querySelectorAll('.chip').forEach(function(c){c.classList.remove('sel');});document.querySelector('.chip.otro').classList.add('sel');document.getElementById('otro-budget-field').classList.remove('hidden');document.getElementById('otro-budget-input').focus();}
 function goLibre2(){
   if(state.comercioTiene===null){mostrarToast('¿Ya tienes el comercio o el domi busca?','help');return;}
-  if(!state.presupuesto){mostrarToast('Selecciona tu presupuesto.','payments');return;}
   state.comercioNombre=document.getElementById('comercio-nombre').value;
-  /* Limpiar textarea para nueva sesión */
   var txt=document.getElementById('libreTextoLibre');
   if(txt&&!txt.value.trim()&&state.categoriaPreset){
     txt.placeholder='Ej: 2 hamburguesas con queso, una coca cola 600ml…';
@@ -1808,7 +1794,9 @@ function renderProductos(){}
 function changeQty(i,d){}
 function removeProduct(i){}
 function goLibre3(){showView('view-libre-3');}
-/* ── goLibre3Async: llama IA para extraer productos ── */
+
+
+/* ── goLibre3Async: IA → revisión en view-libre-2b ── */
 async function goLibre3Async(){
   var txt=(document.getElementById('libreTextoLibre').value||'').trim();
   if(!txt){mostrarToast('Escribe qué necesitas pedir.','edit_note');return;}
@@ -1817,15 +1805,31 @@ async function goLibre3Async(){
   btn.disabled=true;
   btn.innerHTML='<span class="spin"></span> Organizando…';
   statusEl.innerHTML='<span class="spin dk"></span><span>Analizando tu pedido con IA…</span>';
+
+  function irRevision(){
+    var refEl=document.getElementById('rl-ref-txt');
+    if(refEl)refEl.textContent=txt.length>120?txt.substring(0,120)+'…':txt;
+    if(typeof window._rlRenderLista==='function')
+      window._rlRenderLista(state.productos);
+    var dest=document.getElementById('view-libre-2b');
+    if(dest){
+      document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
+      dest.classList.add('active');
+      window.scrollTo(0,0);
+      updateHeader('view-libre-2b');
+    } else {
+      showView('view-libre-3');
+    }
+  }
+
   try{
     var result=await extractProductsWithAI(txt);
     state.productos=result.productos||[{nombre:txt,qty:1}];
     if(!state.productos.length)state.productos=[{nombre:txt,qty:1}];
     statusEl.innerHTML='<span class="sym f" style="font-size:15px;color:#16a34a">check_circle</span>'
       +'<span style="color:#16a34a;font-weight:700">'+state.productos.length+' producto'+(state.productos.length!==1?'s':'')+' detectado'+(state.productos.length!==1?'s':'')+'</span>';
-    setTimeout(function(){showView('view-libre-3');},350);
+    setTimeout(irRevision,350);
   }catch(e){
-    /* Fallback: línea por línea */
     state.productos=txt.split(/[,\n;]+/)
       .map(function(s){return s.trim();})
       .filter(function(s){return s.length>1;})
@@ -1833,7 +1837,7 @@ async function goLibre3Async(){
     if(!state.productos.length)state.productos=[{nombre:txt,qty:1}];
     statusEl.innerHTML='<span class="sym f" style="font-size:14px;color:var(--am)">info</span>'
       +'<span style="color:var(--am)">'+state.productos.length+' ítem(s) — modo básico</span>';
-    setTimeout(function(){showView('view-libre-3');},350);
+    setTimeout(irRevision,350);
   }finally{
     btn.disabled=false;
     btn.innerHTML='<span class="sym" style="font-size:17px">arrow_forward</span>Continuar';
