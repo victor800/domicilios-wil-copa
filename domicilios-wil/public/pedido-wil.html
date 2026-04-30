@@ -3376,42 +3376,6 @@ function wilAbrirTicket() {
   }
 }
 
-/* -- Cache tarifa -- */
-var WIL_TARIFA_CACHE = null;
-
-
-/* ────────────────────────────────────────────────
-   RENDER TARIFA — ÚNICO punto que escribe en el ticket
-   Elimina cualquier fila previa antes de insertar
-──────────────────────────────────────────────── */
-function WIL_v5_renderTarifa(info) {
-  /* Limpiar residuos de parches anteriores */
-  ['wil-tarifa-row','wil-tarifa-nota','wil-ticket-tarifa-container-old']
-    .forEach(function(id){var el=document.getElementById(id);if(el)el.remove();});
-
-  var cont = document.getElementById('wil-ticket-tarifa-container');
-  if (!cont) return;
-
-  /* Limpiar contenido previo del contenedor oficial */
-  cont.innerHTML = '';
-
-  var tarifaTxt = info.tarifa > 0
-    ? '$' + info.tarifa.toLocaleString('es-CO')
-    : 'El domi confirma';
-
-  cont.innerHTML =
-    '<div class="wil-ticket-tarifa-row">'
-    + '<div class="wil-ticket-tarifa-lbl">🛵 Domicilio</div>'
-    + '<div class="wil-ticket-tarifa-val">' + tarifaTxt
-      + '<div class="wil-ticket-tarifa-sub">' + info.zonaStr + '</div>'
-    + '</div></div>'
-    + (info.esFuera
-      ? '<div class="wil-ticket-tarifa-nota"><span class="sym">info</span>'
-        + '<span>Destino fuera de Copacabana'
-        + (info.km ? ' (' + info.km + ' km aprox.)' : '')
-        + '. El domi calcula la tarifa exacta. <strong>Tú apruebas antes del cobro.</strong></span></div>'
-      : '');
-}
 
 /* ────────────────────────────────────────────────
    PATCH generarFacturaLibre — versión limpia v5
