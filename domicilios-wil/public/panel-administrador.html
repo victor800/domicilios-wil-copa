@@ -7793,500 +7793,405 @@ window.deleteMulta = async function(idx) {
 })();
 </script>
 
-<!--
-  =====================================================================
-  PARCHE ACTIVIDAD PRO — Domicilios WIL
-  Pega este bloque JUSTO ANTES de </body> en tu HTML principal.
-  
-  FUNCIONALIDADES:
-    1. Alerta domi detenido  — marcador naranja parpadeante + voz
-    2. Toggle satelital nocturno — Esri satélite + overlay oscuro
-    3. Modo fullscreen — oculta sidebar y topbar, ESC para salir
-  =====================================================================
--->
-
-<!-- ─── CSS PARCHE ─── -->
-<style>
-/* 1. DOMI DETENIDO — marcador parpadeante naranja */
-@keyframes stuckBlink {
-  0%,100%{ opacity:1; }
-  50%     { opacity:.45; }
-}
-.domi-stuck-marker {
-  filter: hue-rotate(-90deg) saturate(3.5) brightness(1.2) !important;
-  animation: stuckBlink .85s ease-in-out infinite !important;
-}
-
-/* Toast domi detenido */
-#stuck-alert-toast {
-  position:fixed;
-  top:78px; left:50%;
-  transform:translateX(-50%) translateY(-18px);
-  opacity:0;
-  background:linear-gradient(135deg,#7c2d12,#c2410c);
-  color:#fff;
-  border-radius:16px;
-  padding:14px 18px;
+<style id="actpro-styles">
+/* ── 1. DOMI DETENIDO ── */
+@keyframes stuckBlink {0%,100%{opacity:1}50%{opacity:.4}}
+.domi-stuck-marker{filter:hue-rotate(-90deg) saturate(4) brightness(1.2)!important;animation:stuckBlink .9s ease-in-out infinite!important}
+ 
+#actpro-stuck-toast{
+  position:fixed;top:76px;left:50%;
+  transform:translateX(-50%) translateY(-20px);
+  opacity:0;pointer-events:none;
+  background:#c2410c;color:#fff;
+  border-radius:14px;padding:12px 16px;
   font-family:'Plus Jakarta Sans',sans-serif;
-  display:flex; align-items:center; gap:12px;
-  box-shadow:0 8px 32px rgba(249,115,22,.55);
-  z-index:9000;
-  transition:all .4s cubic-bezier(.34,1.56,.64,1);
+  display:flex;align-items:center;gap:10px;
+  box-shadow:0 8px 28px rgba(249,115,22,.5);
+  z-index:9999;
   max-width:min(400px,92vw);
-  pointer-events:auto;
+  transition:all .4s cubic-bezier(.34,1.56,.64,1);
 }
-#stuck-alert-toast.show {
-  opacity:1;
-  transform:translateX(-50%) translateY(0);
-}
-#stuck-alert-toast .sat-ico {
-  width:38px; height:38px; border-radius:10px;
+#actpro-stuck-toast.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
+#actpro-stuck-toast .st-ico{
+  width:36px;height:36px;border-radius:9px;
   background:rgba(255,255,255,.15);
-  display:flex; align-items:center; justify-content:center;
-  flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;font-size:16px;
 }
-#stuck-alert-toast button {
-  background:rgba(255,255,255,.2);
-  border:1.5px solid rgba(255,255,255,.35);
-  border-radius:8px;
-  padding:5px 12px;
-  color:#fff;
-  font-family:'Plus Jakarta Sans',sans-serif;
-  font-size:10px; font-weight:800;
-  cursor:pointer; white-space:nowrap; flex-shrink:0;
-  transition:background .15s;
+#actpro-stuck-toast button{
+  background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.35);
+  border-radius:8px;padding:4px 11px;color:#fff;
+  font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:800;
+  cursor:pointer;white-space:nowrap;flex-shrink:0;transition:background .15s;
 }
-#stuck-alert-toast button:hover { background:rgba(255,255,255,.35); }
-
-/* 2. MAP CONTROL BUTTONS */
-.map-ctrl-btn {
-  display:inline-flex; align-items:center; gap:5px;
-  background:#fff; color:#3f6165;
-  border:1.5px solid #dde8ea;
-  border-radius:9px;
+#actpro-stuck-toast button:hover{background:rgba(255,255,255,.35)}
+ 
+/* ── 2. BOTONES DEL MAPA ── */
+.actpro-btn{
+  display:inline-flex;align-items:center;gap:5px;
+  background:#fff;color:#3f6165;
+  border:1.5px solid #dde8ea;border-radius:9px;
   padding:6px 12px;
   font-family:'Plus Jakarta Sans',sans-serif;
-  font-size:11px; font-weight:800;
-  cursor:pointer;
-  transition:all .18s;
-  white-space:nowrap; flex-shrink:0;
+  font-size:11px;font-weight:800;
+  cursor:pointer;transition:all .18s;white-space:nowrap;flex-shrink:0;
 }
-.map-ctrl-btn:hover {
-  border-color:#28B9C1; color:#1e9aa1;
-  background:#e6f8f9;
+.actpro-btn:hover{border-color:#28B9C1;color:#1e9aa1;background:#e6f8f9}
+.actpro-btn.active{background:#28B9C1;color:#071e22;border-color:#28B9C1;box-shadow:0 4px 14px rgba(40,185,193,.3)}
+.actpro-btn .material-symbols-rounded{font-size:15px}
+@media(max-width:640px){.actpro-btn .mcb-txt{display:none}.actpro-btn{padding:6px 8px}}
+ 
+/* ── 3. FULLSCREEN ── */
+body.actpro-fs .sb,body.actpro-fs .tb{display:none!important}
+body.actpro-fs .main{margin-left:0!important;padding-top:0!important}
+body.actpro-fs #pg-actividad{
+  position:fixed!important;inset:0!important;
+  height:100vh!important;z-index:500!important;
+  display:flex!important;flex-direction:column!important;
 }
-.map-ctrl-btn.active {
-  background:#28B9C1; color:#071e22;
-  border-color:#28B9C1;
-  box-shadow:0 4px 14px rgba(40,185,193,.3);
-}
-.map-ctrl-btn .material-symbols-rounded { font-size:15px; }
-
-/* Ocultar texto en móvil, solo icono */
-@media(max-width:640px){
-  .map-ctrl-btn .mcb-txt { display:none; }
-  .map-ctrl-btn { padding:6px 8px; }
-}
-
-/* 3. FULLSCREEN */
-body.act-fullscreen .sb,
-body.act-fullscreen .tb { display:none !important; }
-body.act-fullscreen .main {
-  margin-left:0 !important;
-  padding-top:0 !important;
-}
-body.act-fullscreen #pg-actividad {
-  position:fixed !important; inset:0 !important;
-  height:100vh !important; z-index:500 !important;
-  display:flex !important; flex-direction:column !important;
-}
-/* Hint de salida */
-.fs-hint-bar {
-  position:fixed; top:12px; left:50%;
-  transform:translateX(-50%) translateY(-8px);
-  opacity:0;
-  background:rgba(7,30,34,.9);
-  color:#e2f8f9;
+ 
+#actpro-fs-hint{
+  position:fixed;top:14px;left:50%;
+  transform:translateX(-50%);
+  background:rgba(7,30,34,.9);color:#e2f8f9;
   font-family:'Plus Jakarta Sans',sans-serif;
-  font-size:11px; font-weight:700;
-  padding:7px 18px; border-radius:99px;
-  z-index:9999; white-space:nowrap;
-  pointer-events:none;
-  animation:fsHint 3.8s forwards;
+  font-size:11px;font-weight:700;
+  padding:7px 18px;border-radius:99px;
+  z-index:9998;pointer-events:none;
+  animation:fshint 4s forwards;
 }
-@keyframes fsHint {
-  0%  { opacity:0; transform:translateX(-50%) translateY(-8px); }
-  12% { opacity:1; transform:translateX(-50%) translateY(0);    }
-  78% { opacity:1; }
-  100%{ opacity:0; }
-}
-
-/* Badge stuck en popup */
-.stuck-popup-badge {
-  display:flex; align-items:center; gap:7px;
-  background:#fef3c7; border:1.5px solid #f59e0b;
-  border-radius:9px; padding:8px 10px; margin-bottom:9px;
-  font-size:11px; font-weight:700; color:#92400e;
+@keyframes fshint{
+  0%  {opacity:0;transform:translateX(-50%) translateY(-8px)}
+  12% {opacity:1;transform:translateX(-50%) translateY(0)}
+  78% {opacity:1}
+  100%{opacity:0}
 }
 </style>
-
-<!-- ─── SCRIPT PARCHE ─── -->
-<script>
-/* ================================================================
-   PARCHE ACTIVIDAD PRO  v1.0
-   Funcionalidades:
-     1. Alerta domi detenido  (>10 min sin moverse con pedido activo)
-     2. Toggle satelital nocturno (Esri sat + overlay oscuro CartoDB)
-     3. Modo fullscreen (ESC para salir)
-================================================================ */
+ 
+<!-- Toast de domi detenido -->
+<div id="actpro-stuck-toast">
+  <div class="st-ico">
+    <span class="material-symbols-rounded" style="font-size:18px;">warning</span>
+  </div>
+  <div style="flex:1;min-width:0;">
+    <div id="actpro-stuck-msg" style="font-size:12px;font-weight:800;line-height:1.3;"></div>
+    <div style="font-size:10px;opacity:.8;margin-top:2px;">Tiene pedido activo — puede necesitar ayuda</div>
+  </div>
+  <button onclick="document.getElementById('actpro-stuck-toast').classList.remove('show')">OK</button>
+</div>
+ 
+<script id="actpro-script">
 (function patchActividadPro(){
   'use strict';
-  if(window.__actPatchV1) return;
-  window.__actPatchV1 = true;
-
+  if(window.__actProV2) return;
+  window.__actProV2 = true;
+ 
+  /* ════ CONFIG ════ */
+  const STUCK_MINS    = 10;
+  const ALERT_COOLDOWN= 5 * 60 * 1000;
+  const MOVED_THRESH  = 0.00018;
+ 
   /* ════ ESTADO ════ */
-  const _posTrack  = {};          // { id:{ lat,lng,movedAt,alertedAt } }
-  let   _mapMode   = 'normal';    // 'normal' | 'noche'
-  let   _isFS      = false;
-  const STUCK_MINS = 10;          // minutos para disparar alerta
-
+  const _pos  = {};
+  let _mode   = 'normal';
+  let _isFS   = false;
+  let _btnsSat = null, _btnFS = null;
+ 
   /* ════ TILE LAYERS ════ */
-  const TILE_OSM = {
-    url : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    opts: { attribution:'© OpenStreetMap contributors', maxZoom:19 }
+  const TILES = {
+    osm : {
+      url : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      opt : { attribution:'© OpenStreetMap', maxZoom:19 }
+    },
+    sat : {
+      url : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      opt : { attribution:'© Esri, Maxar', maxZoom:19 }
+    },
+    dark: {
+      url : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+      opt : { attribution:'© CartoDB', maxZoom:19, subdomains:'abcd', opacity:0.46 }
+    }
   };
-  /* Esri World Imagery — satélite real */
-  const TILE_SAT = {
-    url : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    opts: { attribution:'© Esri, Maxar, Earthstar Geographics', maxZoom:19 }
-  };
-  /* CartoDB Dark — overlay oscuro estilo Uber */
-  const TILE_DARK = {
-    url : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    opts: { attribution:'© CartoDB', maxZoom:19, subdomains:'abcd', opacity:0.48 }
-  };
-
+ 
   /* ════ CAMBIAR TILES ════ */
-  function setMapTiles(mode){
+  function setTiles(mode){
     const map = window._map;
-    if(!map || typeof L==='undefined') return;
-    _mapMode = mode;
-
-    /* Quitar todas las capas de tiles existentes */
-    map.eachLayer(l=>{ if(l instanceof L.TileLayer) map.removeLayer(l); });
-
+    if(!map || typeof L === 'undefined') return;
+    _mode = mode;
+    map.eachLayer(l => { if(l instanceof L.TileLayer) map.removeLayer(l); });
     if(mode === 'noche'){
-      /* 1. Base satelital */
-      L.tileLayer(TILE_SAT.url, TILE_SAT.opts).addTo(map);
-      /* 2. Overlay oscuro encima → efecto nocturno */
-      L.tileLayer(TILE_DARK.url, TILE_DARK.opts).addTo(map);
+      L.tileLayer(TILES.sat.url, TILES.sat.opt).addTo(map);
+      L.tileLayer(TILES.dark.url, TILES.dark.opt).addTo(map);
     } else {
-      L.tileLayer(TILE_OSM.url, TILE_OSM.opts).addTo(map);
+      L.tileLayer(TILES.osm.url, TILES.osm.opt).addTo(map);
     }
-    _syncSatBtn();
+    syncSatBtn();
   }
-
-  function _syncSatBtn(){
-    const btn = document.getElementById('map-btn-sat');
-    if(!btn) return;
-    if(_mapMode === 'noche'){
-      btn.classList.add('active');
-      btn.innerHTML = `<span class="material-symbols-rounded">map</span><span class="mcb-txt">Mapa diurno</span>`;
-      btn.title = 'Volver al mapa normal';
-    } else {
-      btn.classList.remove('active');
-      btn.innerHTML = `<span class="material-symbols-rounded">satellite_alt</span><span class="mcb-txt">Satelital 🌙</span>`;
-      btn.title = 'Vista satelital nocturna estilo Uber';
-    }
+ 
+  function syncSatBtn(){
+    if(!_btnsSat) return;
+    const isNight = _mode === 'noche';
+    _btnsSat.classList.toggle('active', isNight);
+    _btnsSat.innerHTML = isNight
+      ? '<span class="material-symbols-rounded">map</span><span class="mcb-txt">Mapa normal</span>'
+      : '<span class="material-symbols-rounded">satellite_alt</span><span class="mcb-txt">Satelital 🌙</span>';
   }
-
+ 
   /* ════ FULLSCREEN ════ */
   function enterFS(){
     _isFS = true;
-    document.body.classList.add('act-fullscreen');
-    _syncFsBtn();
-    setTimeout(()=>{ window._map?.invalidateSize(); }, 230);
-
-    /* Hint flotante — desaparece solo */
-    const hint = document.createElement('div');
-    hint.className = 'fs-hint-bar';
-    hint.textContent = 'Modo pantalla completa · Presiona ESC o clic en ⊠ para salir';
-    document.body.appendChild(hint);
-    setTimeout(()=>hint.remove(), 4000);
-
-    document.addEventListener('keydown', _onFsKey);
+    document.body.classList.add('actpro-fs');
+    syncFsBtn();
+    setTimeout(() => window._map?.invalidateSize(), 220);
+    const h = document.createElement('div');
+    h.id = 'actpro-fs-hint';
+    h.textContent = 'Pantalla completa · Presiona ESC o clic en ⊠ para salir';
+    document.body.appendChild(h);
+    setTimeout(() => h.remove(), 4200);
+    document.addEventListener('keydown', onFsKey);
   }
-
+ 
   function exitFS(){
     _isFS = false;
-    document.body.classList.remove('act-fullscreen');
-    _syncFsBtn();
-    setTimeout(()=>{ window._map?.invalidateSize(); }, 230);
-    document.removeEventListener('keydown', _onFsKey);
+    document.body.classList.remove('actpro-fs');
+    syncFsBtn();
+    setTimeout(() => window._map?.invalidateSize(), 220);
+    document.removeEventListener('keydown', onFsKey);
   }
-
-  function _onFsKey(e){ if(e.key==='Escape' && _isFS) exitFS(); }
-
+ 
   function toggleFS(){ _isFS ? exitFS() : enterFS(); }
-
-  function _syncFsBtn(){
-    const btn = document.getElementById('map-btn-fs');
-    if(!btn) return;
-    if(_isFS){
-      btn.classList.add('active');
-      btn.innerHTML = `<span class="material-symbols-rounded">fullscreen_exit</span><span class="mcb-txt">Salir FS</span>`;
-    } else {
-      btn.classList.remove('active');
-      btn.innerHTML = `<span class="material-symbols-rounded">fullscreen</span><span class="mcb-txt">Pantalla completa</span>`;
-    }
+  function onFsKey(e){ if(e.key === 'Escape') exitFS(); }
+ 
+  function syncFsBtn(){
+    if(!_btnFS) return;
+    _btnFS.classList.toggle('active', _isFS);
+    _btnFS.innerHTML = _isFS
+      ? '<span class="material-symbols-rounded">fullscreen_exit</span><span class="mcb-txt">Salir FS</span>'
+      : '<span class="material-symbols-rounded">fullscreen</span><span class="mcb-txt">Pantalla completa</span>';
   }
-
-  /* ════ INSERTAR BOTONES EN EL TOPBAR DEL MAPA ════ */
-  function insertMapButtons(){
-    if(document.getElementById('map-btn-sat')) return;   /* ya existen */
-
-    /* Buscar la barra superior del panel de actividad */
+ 
+  /* ════ INSERTAR BOTONES ════ */
+  function insertButtons(){
+    if(document.getElementById('actpro-btn-sat')) return;
+ 
+    /* 
+      Busca el topbar del panel Actividad.
+      Tiene 2 botones al final: "Centrar" y "Actualizar".
+      Insertamos ANTES de "Actualizar" (último botón).
+    */
     const topbar = document.querySelector('#pg-actividad > div:first-child');
     if(!topbar) return;
-
-    const btnSat = document.createElement('button');
-    btnSat.id = 'map-btn-sat';
-    btnSat.className = 'map-ctrl-btn';
-    btnSat.innerHTML = `<span class="material-symbols-rounded">satellite_alt</span><span class="mcb-txt">Satelital 🌙</span>`;
-    btnSat.title = 'Vista satelital nocturna estilo Uber';
-    btnSat.addEventListener('click', ()=>setMapTiles(_mapMode==='normal'?'noche':'normal'));
-
-    const btnFs = document.createElement('button');
-    btnFs.id = 'map-btn-fs';
-    btnFs.className = 'map-ctrl-btn';
-    btnFs.innerHTML = `<span class="material-symbols-rounded">fullscreen</span><span class="mcb-txt">Pantalla completa</span>`;
-    btnFs.title = 'Expandir mapa a pantalla completa (ESC para salir)';
-    btnFs.addEventListener('click', toggleFS);
-
-    /* Insertar ANTES del último botón (Actualizar) */
-    const lastBtn = topbar.querySelector('button:last-child');
+ 
+    _btnsSat = document.createElement('button');
+    _btnsSat.id = 'actpro-btn-sat';
+    _btnsSat.className = 'actpro-btn';
+    _btnsSat.title = 'Vista satelital nocturna';
+    _btnsSat.innerHTML = '<span class="material-symbols-rounded">satellite_alt</span><span class="mcb-txt">Satelital 🌙</span>';
+    _btnsSat.onclick = () => setTiles(_mode === 'normal' ? 'noche' : 'normal');
+ 
+    _btnFS = document.createElement('button');
+    _btnFS.id = 'actpro-btn-fs';
+    _btnFS.className = 'actpro-btn';
+    _btnFS.title = 'Pantalla completa (ESC para salir)';
+    _btnFS.innerHTML = '<span class="material-symbols-rounded">fullscreen</span><span class="mcb-txt">Pantalla completa</span>';
+    _btnFS.onclick = toggleFS;
+ 
+    /* Insertar antes del último botón (Actualizar) */
+    const lastBtn = topbar.querySelector('button:last-of-type');
     if(lastBtn){
-      topbar.insertBefore(btnSat, lastBtn);
-      topbar.insertBefore(btnFs, lastBtn);
+      topbar.insertBefore(_btnsSat, lastBtn);
+      topbar.insertBefore(_btnFS, lastBtn);
     } else {
-      topbar.appendChild(btnSat);
-      topbar.appendChild(btnFs);
+      topbar.appendChild(_btnsSat);
+      topbar.appendChild(_btnFS);
     }
-
-    _syncSatBtn(); _syncFsBtn();
+ 
+    syncSatBtn();
+    syncFsBtn();
   }
-
-  /* ════ DOMI DETENIDO — detección ════ */
-  function checkStuckDrivers(ubicaciones){
+ 
+  /* ════ DOMI DETENIDO ════ */
+  function checkStuck(ubicaciones){
     const now      = Date.now();
-    const activeIds = new Set(ubicaciones.map(u=>u.id));
-
-    /* Limpiar domis que ya no reportan GPS */
-    for(const id of Object.keys(_posTrack)){
+    const activeIds= new Set(ubicaciones.map(u => u.id));
+ 
+    /* Limpiar domis que ya no reportan */
+    Object.keys(_pos).forEach(id => {
       if(!activeIds.has(id)){
-        _setMarkerStuck(id, false);
-        delete _posTrack[id];
+        setMarkerStuck(id, false);
+        delete _pos[id];
       }
-    }
-
-    ubicaciones.forEach(u=>{
-      const prev = _posTrack[u.id];
-
-      /* Primera vez que vemos a este domi */
+    });
+ 
+    ubicaciones.forEach(u => {
+      const prev = _pos[u.id];
+ 
       if(!prev){
-        _posTrack[u.id] = { lat:u.lat, lng:u.lng, movedAt:now, alertedAt:null };
+        _pos[u.id] = { lat:u.lat, lng:u.lng, movedAt:now, alertedAt:null };
         return;
       }
-
-      /* ¿Se movió? Umbral ≈ 20 metros (≈ 0.00018 °) */
-      const moved =
-        Math.abs(u.lat - prev.lat) > 0.00018 ||
-        Math.abs(u.lng - prev.lng) > 0.00018;
-
+ 
+      const moved = Math.abs(u.lat - prev.lat) > MOVED_THRESH
+                 || Math.abs(u.lng - prev.lng) > MOVED_THRESH;
+ 
       if(moved){
-        _posTrack[u.id].lat     = u.lat;
-        _posTrack[u.id].lng     = u.lng;
-        _posTrack[u.id].movedAt = now;
-        _posTrack[u.id].alertedAt = null;
-        _setMarkerStuck(u.id, false);
+        _pos[u.id] = { lat:u.lat, lng:u.lng, movedAt:now, alertedAt:prev.alertedAt };
+        _pos[u.id].alertedAt = null;
+        setMarkerStuck(u.id, false);
         return;
       }
-
+ 
       /* Sin movimiento — ¿tiene pedido activo? */
       const domiObj = (window.allDrivers||[]).find(
-        d=>(d.id||'').toUpperCase()===u.id.toUpperCase()
+        d => (d.id||'').toUpperCase() === u.id.toUpperCase()
       ) || { nombre: u.nombre, id: u.id };
-
-      const hasActive = (window.allPedidos||[]).some(p=>
+ 
+      const hasActive = (window.allPedidos||[]).some(p =>
         window.matchDomi?.(p, domiObj) &&
-        (p.estado==='proceso'||p.estado==='encamino'||p.estado==='asignado')
+        ['proceso','encamino','asignado'].includes(p.estado)
       );
-
+ 
       if(!hasActive) return;
-
-      const stuckMins = (now - prev.movedAt) / 60000;
-      if(stuckMins < STUCK_MINS) return;
-
-      /* ¡Detenido más de 10 min con pedido activo! */
-      _setMarkerStuck(u.id, true);
-
-      /* Alertar máximo cada 5 min para no spamear */
-      const canAlert = !prev.alertedAt || (now - prev.alertedAt) > 5*60000;
+ 
+      const mins = (now - prev.movedAt) / 60000;
+      if(mins < STUCK_MINS) return;
+ 
+      setMarkerStuck(u.id, true);
+ 
+      const canAlert = !prev.alertedAt || (now - prev.alertedAt) > ALERT_COOLDOWN;
       if(canAlert){
-        _posTrack[u.id].alertedAt = now;
-        _fireStuckAlert(domiObj.nombre||u.nombre, Math.round(stuckMins), u.id);
+        _pos[u.id].alertedAt = now;
+        fireStuckAlert(domiObj.nombre || u.nombre, Math.round(mins));
       }
     });
   }
-
-  /* Aplicar / quitar clase de alerta al elemento del marcador Leaflet */
-  function _setMarkerStuck(domiId, isStuck){
-    const marker = window._driMarkers?.[domiId];
-    if(!marker) return;
-    const el = marker.getElement?.();
-    if(!el) return;
-    el.classList.toggle('domi-stuck-marker', isStuck);
+ 
+  function setMarkerStuck(id, isStuck){
+    const marker = window._driMarkers?.[id];
+    const el     = marker?.getElement?.();
+    if(el) el.classList.toggle('domi-stuck-marker', isStuck);
   }
-
-  /* Disparar alerta visual + voz + sonido */
-  function _fireStuckAlert(nombre, mins, domiId){
+ 
+  function fireStuckAlert(nombre, mins){
     const short = nombre.split(' ').slice(0,2).join(' ');
-
+ 
     /* Toast */
-    let toast = document.getElementById('stuck-alert-toast');
-    if(!toast){
-      toast = document.createElement('div');
-      toast.id = 'stuck-alert-toast';
-      document.body.appendChild(toast);
+    const toast = document.getElementById('actpro-stuck-toast');
+    const msg   = document.getElementById('actpro-stuck-msg');
+    if(toast && msg){
+      msg.textContent = `${short} lleva ${mins} min sin moverse`;
+      toast.classList.add('show');
+      clearTimeout(toast._t);
+      toast._t = setTimeout(() => toast.classList.remove('show'), 9000);
     }
-    toast.innerHTML = `
-      <div class="sat-ico">
-        <span class="material-symbols-rounded" style="font-size:20px;">warning</span>
-      </div>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:800;line-height:1.25;">
-          ${short} lleva ${mins} min sin moverse
-        </div>
-        <div style="font-size:10px;opacity:.85;margin-top:3px;">
-          Tiene un pedido activo — puede necesitar ayuda
-        </div>
-      </div>
-      <button onclick="document.getElementById('stuck-alert-toast').classList.remove('show')">
-        Entendido
-      </button>`;
-    /* doble rAF para asegurar transición */
-    requestAnimationFrame(()=>requestAnimationFrame(()=>toast.classList.add('show')));
-    clearTimeout(toast._hideTimer);
-    toast._hideTimer = setTimeout(()=>toast.classList.remove('show'), 9000);
-
+ 
     /* Voz */
     window.VOZ?.hablar(
       `¡Atención! ${short} lleva ${mins} minutos sin moverse con un pedido activo.`,
       1.0, 1.15
     );
-
-    /* Sonido de alerta (4 pits ascendentes) */
+ 
+    /* Sonido urgente */
     try{
-      const ctx = window.SONIDO?.ctx || new(window.AudioContext||window.webkitAudioContext)();
-      if(ctx){
-        [880, 1047, 1175, 1319].forEach((freq,i)=>{
-          const t0 = ctx.currentTime + i*0.22;
-          const osc  = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.connect(gain); gain.connect(ctx.destination);
-          osc.type = 'sine';
-          osc.frequency.value = freq;
-          gain.gain.setValueAtTime(0, t0);
-          gain.gain.linearRampToValueAtTime(0.55, t0+0.025);
-          gain.gain.exponentialRampToValueAtTime(0.001, t0+0.18);
-          osc.start(t0); osc.stop(t0+0.2);
-        });
-      }
+      if(!window.SONIDO?.ctx) window.SONIDO.ctx = new(window.AudioContext||window.webkitAudioContext)();
+      const ctx = window.SONIDO.ctx;
+      [880,1047,1175,1319].forEach((freq,i) => {
+        const t0  = ctx.currentTime + i*0.22;
+        const osc = ctx.createOscillator();
+        const g   = ctx.createGain();
+        osc.connect(g); g.connect(ctx.destination);
+        osc.type = 'sine'; osc.frequency.value = freq;
+        g.gain.setValueAtTime(0, t0);
+        g.gain.linearRampToValueAtTime(0.55, t0+0.025);
+        g.gain.exponentialRampToValueAtTime(0.001, t0+0.18);
+        osc.start(t0); osc.stop(t0+0.22);
+      });
     }catch(e){}
-
-    /* Vibración en móvil */
+ 
     if(navigator.vibrate) navigator.vibrate([200,80,200,80,500]);
-
-    /* Resaltar en mapa si la pestaña Actividad está activa */
-    const pgAct = document.getElementById('pg-actividad');
-    if(pgAct && (pgAct.style.display==='flex'||pgAct.classList.contains('on'))){
-      const marker = window._driMarkers?.[domiId];
-      marker?.openPopup?.();
-    }
   }
-
-  /* ════ PATCH renderActividad ════ */
-  function _patchRenderActividad(){
+ 
+  /* ════ PATCH PRINCIPAL: hookeamos renderActividad ════ */
+  function patchRender(){
     const orig = window.renderActividad;
-    if(!orig || orig.__actPatched) return;
-
-    window.renderActividad = async function patchedRenderActividad(){
-      /* Interceptar obtenerUbicacionesGPS para capturar los datos
-         sin hacer un fetch adicional */
+    if(!orig || orig.__apv2) return;
+ 
+    window.renderActividad = async function patchedRA(){
+      /* Interceptar obtenerUbicacionesGPS para capturar sin fetch extra */
       const origGPS = window.obtenerUbicacionesGPS;
-      let _captured  = [];
-
-      if(origGPS && !origGPS.__intercepted){
+      let captured  = [];
+ 
+      if(origGPS && !origGPS.__apv2){
         window.obtenerUbicacionesGPS = async function(){
           const r = await origGPS.apply(this, arguments);
-          _captured = r;
+          captured = Array.isArray(r) ? r : [];
           return r;
         };
-        window.obtenerUbicacionesGPS.__intercepted = true;
+        window.obtenerUbicacionesGPS.__apv2 = true;
       }
-
+ 
       await orig.apply(this, arguments);
-
-      /* Restaurar */
-      if(origGPS) window.obtenerUbicacionesGPS = origGPS;
-
-      /* Post-proceso */
+ 
+      /* Restaurar GPS original */
+      if(origGPS && !origGPS.__apv2) window.obtenerUbicacionesGPS = origGPS;
+ 
+      /* Post-proceso SIEMPRE después del render */
       if(window._map){
-        insertMapButtons();
-        checkStuckDrivers(_captured);
-
-        /* Si el modo era satelital antes de un posible re-init, restaurar */
-        if(_mapMode === 'noche') setMapTiles('noche');
+        /* Pequeño delay para garantizar que Leaflet terminó de renderizar */
+        setTimeout(() => {
+          insertButtons();
+          checkStuck(captured);
+          /* Si el modo era satélite antes de un re-init, restaurar */
+          if(_mode === 'noche') setTiles('noche');
+        }, 50);
       }
     };
-    window.renderActividad.__actPatched = true;
+    window.renderActividad.__apv2 = true;
   }
-
+ 
   /* ════ PATCH initActividadTab ════ */
-  function _patchInitActividad(){
+  function patchInitTab(){
     const orig = window.initActividadTab;
-    if(!orig || orig.__actPatched) return;
-
-    window.initActividadTab = function patchedInitActividad(){
+    if(!orig || orig.__apv2) return;
+ 
+    window.initActividadTab = function patchedIAT(){
       orig.apply(this, arguments);
-      /* Intentar insertar botones una vez cargue Leaflet */
+ 
+      /* Esperar a que Leaflet esté listo y el mapa inicializado */
       let tries = 0;
-      const poll = setInterval(()=>{
-        if(window._map){ clearInterval(poll); insertMapButtons(); return; }
-        if(++tries > 30) clearInterval(poll);
-      }, 300);
+      const poll = setInterval(() => {
+        if(window._map && typeof L !== 'undefined'){
+          clearInterval(poll);
+          /* Insertar botones con delay para que el DOM del topbar esté pintado */
+          setTimeout(insertButtons, 400);
+        }
+        if(++tries > 40) clearInterval(poll);
+      }, 250);
     };
-    window.initActividadTab.__actPatched = true;
+    window.initActividadTab.__apv2 = true;
   }
-
-  /* ════ INICIAR — esperar a que existan las funciones objetivo ════ */
-  let _initTries = 0;
-  const _waitInit = setInterval(()=>{
-    if(window.renderActividad && window.initActividadTab && window.obtenerUbicacionesGPS){
-      clearInterval(_waitInit);
-      _patchRenderActividad();
-      _patchInitActividad();
-      console.info('[ActividadPro] ✓ Parche aplicado — alerta domi · satelital · fullscreen');
+ 
+  /* ════ ESPERAR A QUE EXISTAN LAS FUNCIONES ════ */
+  let tries = 0;
+  const wait = setInterval(() => {
+    if(window.renderActividad && window.initActividadTab){
+      clearInterval(wait);
+      patchRender();
+      patchInitTab();
+ 
+      /* Si ya estamos en la pestaña Actividad cuando se carga este script */
+      if(window._map && typeof L !== 'undefined') setTimeout(insertButtons, 500);
+ 
+      console.info('[ActividadPro v2] ✓ Listo — alerta domi · satelital · fullscreen');
     }
-    if(++_initTries > 60) clearInterval(_waitInit); /* timeout 30s */
-  }, 500);
-
-  /* ESC global para salir de fullscreen */
-  document.addEventListener('keydown', e=>{
-    if(e.key==='Escape' && _isFS) exitFS();
-  });
-
+    if(++tries > 80) clearInterval(wait);
+  }, 400);
+ 
+  /* ESC global */
+  document.addEventListener('keydown', e => { if(e.key === 'Escape' && _isFS) exitFS(); });
+ 
 })();
+</script>
 </script>
 
 </script>
