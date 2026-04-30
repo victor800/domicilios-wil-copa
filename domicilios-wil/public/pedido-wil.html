@@ -1908,34 +1908,27 @@ window._initMapResult=function(pedido){
   }
 };
 async function trazarRutaResult(latO,lngO,latD,lngD,pedido){
-  var intentos=0;
-  while(intentos<3){
-    try{
-      var url='https://router.project-osrm.org/route/v1/driving/'+lngO+','+latO+';'+lngD+','+latD+'?overview=full&geometries=geojson';
-      var r=await fetch(url,{cache:'no-store'});
-      var data=await r.json();
-      if(!data.routes||!data.routes[0])throw new Error('sin ruta');
-      var coords=data.routes[0].geometry.coordinates;
-      var latLngs=coords.map(function(c){return[c[1],c[0]];});
-      var dur=Math.round(data.routes[0].duration/60);
-      if(routeLayerResult){mapResult.removeLayer(routeLayerResult);routeLayerResult=null;}
-      if(routeLayerResultTop){mapResult.removeLayer(routeLayerResultTop);routeLayerResultTop=null;}
-      routeLayerResult=L.polyline(latLngs,{color:'#fff',weight:9,opacity:.6,lineCap:'round',lineJoin:'round'}).addTo(mapResult);
-      routeLayerResultTop=L.polyline(latLngs,{color:'#006970',weight:5,opacity:.92,lineCap:'round',lineJoin:'round'}).addTo(mapResult);
-      var etaOverlay=document.getElementById('rtMapEtaOverlay');
-      var etaMinEl=document.getElementById('rtMapEtaMins');
-      function setEta(v){if(etaMinEl)etaMinEl.textContent=v;if(etaOverlay)etaOverlay.style.display='flex';}
-      setEta(dur>0?dur:'¡Ya!');
-      var bounds=L.latLngBounds([[latO,lngO],[latD,lngD]]);
-      mapResult.fitBounds(bounds,{paddingTopLeft:[20,80],paddingBottomRight:[20,20],maxZoom:16});
-      return; // éxito — salir
-    }catch(e){
-      intentos++;
-      if(intentos<3)await new Promise(function(res){setTimeout(res,2000*intentos);}); // esperar antes de reintentar
-    }
+  var url='https://router.project-osrm.org/route/v1/driving/'+lngO+','+latO+';'+lngD+','+latD+'?overview=full&geometries=geojson';
+  try{
+    var r=await fetch(url);var data=await r.json();
+    if(!data.routes||!data.routes[0])return;
+    var coords=data.routes[0].geometry.coordinates;
+    var latLngs=coords.map(function(c){return[c[1],c[0]];});
+    var dur=Math.round(data.routes[0].duration/60);
+    if(routeLayerResult){mapResult.removeLayer(routeLayerResult);routeLayerResult=null;}
+    if(routeLayerResultTop){mapResult.removeLayer(routeLayerResultTop);routeLayerResultTop=null;}
+    routeLayerResult=L.polyline(latLngs,{color:'#fff',weight:9,opacity:.6,lineCap:'round',lineJoin:'round'}).addTo(mapResult);
+    routeLayerResultTop=L.polyline(latLngs,{color:'#006970',weight:5,opacity:.92,lineCap:'round',lineJoin:'round'}).addTo(mapResult);
+    var etaOverlay=document.getElementById('rtMapEtaOverlay');
+    var etaMinEl=document.getElementById('rtMapEtaMins');
+    function setEta(v){if(etaMinEl)etaMinEl.textContent=v;if(etaOverlay)etaOverlay.style.display='flex';}
+    setEta(dur>0?dur:'¡Ya!');
+    var remaining=dur;
+    var _etaCd=setInterval(function(){if(remaining>0){remaining--;setEta(remaining>0?remaining:'¡Ya!');}else clearInterval(_etaCd);},60000);
+  }catch(e){
+    if(routeLayerResultTop){mapResult.removeLayer(routeLayerResultTop);}
+    routeLayerResultTop=L.polyline([[latO,lngO],[latD,lngD]],{color:'#006970',weight:4,opacity:.7,dashArray:'8,6'}).addTo(mapResult);
   }
-  // Solo llega aquí si los 3 intentos fallaron — NO dibujar línea recta, mostrar mensaje
-  console.warn('[WIL ruta] OSRM no disponible tras 3 intentos');
 }
 
 var _domiPollUbicTimer=null;
@@ -4047,9 +4040,6 @@ function wilToggleTicket(hdr) {
   }
 
 }(window));
-
-
-
 
 
 </script>
