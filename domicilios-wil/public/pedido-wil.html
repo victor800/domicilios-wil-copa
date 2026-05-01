@@ -2605,32 +2605,37 @@ try {
 });
 
     /* ── 6. Card del domi (elegante) ── */
-    var dc = document.getElementById('domiCard');
-    if(p.domiciliario && p.domiciliario.trim()){
-      dc.style.display = 'block';
-      var nombreDomi = p.domiciliario.replace(/\s*\([^)]+\)/,'').trim();
-      document.getElementById('domiNombre').textContent = nombreDomi;
-      var avEl = document.getElementById('domiFotoWrap');
-      avEl.textContent = nombreDomi.charAt(0).toUpperCase();
+  /* ── 6. Card del domi (elegante) con foto real ── */
+var dc = document.getElementById('domiCard');
+if(p.domiciliario && p.domiciliario.trim()){
+  dc.style.display = 'block';
+  var nombreDomi = p.domiciliario.replace(/\s*\([^)]+\)/,'').trim();
+  document.getElementById('domiNombre').textContent = nombreDomi;
+  
+  // ✅ Mostrar inicial mientras carga la foto
+  var avEl = document.getElementById('domiFotoWrap');
+  avEl.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff;">${nombreDomi.charAt(0).toUpperCase()}</div>`;
+  
+  // ✅ Cargar foto desde el sheet
+  cargarFotoDomi(nombreDomi, avEl);
 
-      var estadoTxtMap = {
-        'En camino':'En camino hacia ti 🛵',
-        'Confirmado':'Pedido confirmado ✅',
-        'Entregado':'Entregado 🏠',
-        'Pendiente':'Asignando domiciliario…'
-      };
-      document.getElementById('domiEstadoTxt').textContent =
-        estadoTxtMap[p.estado] || p.estado;
+  var estadoTxtMap = {
+    'En camino':'En camino hacia ti 🛵',
+    'Confirmado':'Pedido confirmado ✅',
+    'Entregado':'Entregado 🏠',
+    'Pendiente':'Asignando domiciliario…'
+  };
+  document.getElementById('domiEstadoTxt').textContent =
+    estadoTxtMap[p.estado] || p.estado;
 
-      // Hora clave según estado
-      var horaClave = p.horaEnCamino || p.horaEnProceso || '';
-      if(horaClave){
-        document.getElementById('domiEstadoTxt').textContent +=
-          '  ·  ' + horaClave;
-      }
-    } else {
-      dc.style.display = 'none';
-    }
+  // Hora clave según estado
+  var horaClave = p.horaEnCamino || p.horaEnProceso || '';
+  if(horaClave){
+    document.getElementById('domiEstadoTxt').textContent += '  ·  ' + horaClave;
+  }
+} else {
+  dc.style.display = 'none';
+}
 
 
     /* ── 7. Info grid (fecha, dirección, horas) ── */
@@ -2677,6 +2682,67 @@ try {
     console.error('rastrear:', e);
   }
 }
+
+async function cargarFotoDomi(nombreDomi, avEl) {
+  var SHEET_ID = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+  var nombreBuscar = nombreDomi.trim().toLowerCase();
+  
+  try {
+    var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
+            + '/gviz/tq?tqx=out:csv&sheet=Domiciliarios&cachebust=' + Date.now();
+    var res = await fetch(url, { cache: 'no-store' });
+    var txt = await res.text();
+    var lines = txt.trim().split('\n');
+    
+    function parseCsvLine(line) {
+      var result = [], cur = '', inQ = false;
+      for (var i = 0; i < line.length; i++) {
+        var c = line[i];
+        if (c === '"') {
+          if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+          else inQ = !inQ;
+        }
+        else if (c === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
+        else cur += c;
+      }
+      result.push(cur.trim());
+      return result;
+    }
+    
+    for (var i = 1; i < lines.length; i++) {
+      var cols = parseCsvLine(lines[i]);
+      var nombreSheet = (cols[1] || '').trim().toLowerCase();
+      if (!nombreSheet) continue;
+      
+      // Comparar nombres (puede contener parte del nombre)
+      if (nombreSheet === nombreBuscar || 
+          nombreBuscar.indexOf(nombreSheet) !== -1 || 
+          nombreSheet.indexOf(nombreBuscar) !== -1) {
+        
+        var foto = (cols[4] || '').trim(); // columna FOTO
+        if (foto) {
+          // Normalizar URL de Drive
+          var fotoUrl = foto;
+          if (foto.indexOf('drive.google.com') !== -1) {
+            var match = foto.match(/\/d\/([^/?\s]+)/);
+            if (match) fotoUrl = 'https://lh3.googleusercontent.com/d/' + match[1];
+          } else if (!foto.startsWith('http')) {
+            fotoUrl = 'icons/' + foto;
+          }
+          
+          avEl.innerHTML = `<img src="${fotoUrl}" 
+            style="width:100%;height:100%;object-fit:cover;object-position:center 20%"
+            onerror="this.parentElement.innerHTML='<div style=width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff;>${nombreDomi.charAt(0).toUpperCase()}</div>'">`;
+        }
+        break;
+      }
+    }
+  } catch(e) {
+    console.warn('[cargarFotoDomi]', e.message);
+    // Si hay error, mantener la inicial
+  }
+}
+
 function cliVerImagen(src){var ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';ov.onclick=function(){document.body.removeChild(ov);};var img=document.createElement('img');img.src=src;img.style.cssText='max-width:100%;max-height:90dvh;border-radius:12px';ov.appendChild(img);document.body.appendChild(ov);}
 
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(console.warn);}
