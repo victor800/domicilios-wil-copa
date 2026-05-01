@@ -512,6 +512,48 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 }
 .wil-ticket-tarifa-nota .sym{font-size:14px;color:var(--am);flex-shrink:0;margin-top:1px}
 
+.wil-radio-opt{
+  border:1.5px solid var(--bd,#e2e2de);
+  border-radius:var(--r-md,10px);
+  padding:11px 14px;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  transition:border-color .15s, background .15s;
+}
+.wil-radio-opt.sel{
+  border-color:var(--p,#6c47ff);
+  background:var(--pl,#f0edff);
+}
+.wil-radio-dot{
+  width:16px; height:16px; flex-shrink:0;
+  border-radius:50%;
+  border:2px solid var(--bd,#e2e2de);
+  display:flex; align-items:center; justify-content:center;
+  transition:all .15s;
+}
+.wil-radio-opt.sel .wil-radio-dot{
+  border-color:var(--p,#6c47ff);
+  background:var(--p,#6c47ff);
+}
+.wil-radio-dot::after{
+  content:''; width:6px; height:6px;
+  border-radius:50%; background:#fff; opacity:0;
+}
+.wil-radio-opt.sel .wil-radio-dot::after{ opacity:1; }
+ 
+/* Tarifa pill */
+.wil-tarifa-pill{
+  display:flex; align-items:center; gap:8px;
+  background:#f0fdf4;
+  border:1px solid #86efac;
+  border-radius:var(--r-md,10px);
+  padding:10px 14px;
+  margin-top:8px;
+  margin-bottom:4px;
+}
+
 </style>
 </head>
 <body>
@@ -784,52 +826,139 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 
 <!-- ════ LIBRE P1 ════ -->
 <div class="view" id="view-libre-1">
-  <div style="padding:20px 16px 8px"><div style="font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:4px">Pedido Libre 🛍️</div><div style="font-size:13px;color:var(--on3);font-weight:500">Paso 1 de 3 — Comercio y presupuesto</div></div>
-  <div class="card">
-    <div class="card-tit"><span class="sym f">storefront</span>¿Ya tienes el comercio?</div>
-    <div class="yn-grid">
-      <button class="yn-btn" id="yn-si" onclick="selectComercio(true)"><span class="sym f" style="font-size:22px">check_circle</span>Sí, ya sé dónde</button>
-      <button class="yn-btn" id="yn-no" onclick="selectComercio(false)"><span class="sym f" style="font-size:22px">help</span>El domi busca</button>
-    </div>
-    <div id="comercio-field" class="field hidden"><label>Nombre del comercio</label><input type="text" id="comercio-nombre" placeholder="Ej: Éxito Copacabana, Tienda Don Pedro…"/></div>
-  </div>
  
-  <div class="act-row"><button class="btn-b" onclick="showView('view-inicio')">Atrás</button><button class="btn-n" onclick="goLibre2()"><span class="sym" style="font-size:17px">arrow_forward</span>Continuar</button></div>
-</div>
-
-
-<!-- ════ LIBRE P2 — TEXTO LIBRE + IA ════ -->
-<div class="view" id="view-libre-2">
   <div style="padding:20px 16px 8px">
     <div style="font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:4px">
       Pedido Libre 🛍️
     </div>
-    <div style="font-size:13px;color:var(--on3);font-weight:500">Paso 2 de 3 — ¿Qué necesitas?</div>
-  </div>
-  <div class="card">
-    <div class="card-tit"><span class="sym f">edit_note</span>Escribe tu pedido completo</div>
-    <textarea
-      id="libreTextoLibre"
-      class="libre-txt-area"
-      placeholder="Ej: 2 hamburguesas con queso, una coca cola 600ml, papas fritas grandes, una botella de agua sin gas...&#10;&#10;O también: mercado de la tienda — 1 arroz, 2 aceites, una leche, pan tajado..."
-    ></textarea>
-    <!-- Estado IA -->
-    <div class="libre-ai-status" id="libreAiStatus"></div>
-    <div style="margin-top:10px;background:var(--pl);border:1px solid var(--plb);border-radius:var(--r-md);padding:10px 12px;display:flex;align-items:flex-start;gap:8px">
-      <span class="sym f" style="font-size:15px;color:var(--p);flex-shrink:0;margin-top:1px">auto_awesome</span>
-      <span style="font-size:11.5px;color:var(--p);font-weight:600;line-height:1.5">
-        Analizamos tu texto y organizamos los productos automáticamente en tu factura. Escribe en lenguaje natural, como le dirías a un amigo.
-      </span>
+    <div style="font-size:13px;color:var(--on3);font-weight:500">
+      Paso 1 de 3 — Comercio y entrega
     </div>
   </div>
+ 
+  <!-- ── ¿YA TIENES EL COMERCIO? ── -->
+  <div class="card">
+    <div class="card-tit"><span class="sym f">storefront</span>¿Ya tienes el comercio?</div>
+    <div class="yn-grid">
+      <button class="yn-btn" id="yn-si"  onclick="wilSelComercio(true)">
+        <span class="sym f" style="font-size:22px">check_circle</span>Sí, ya sé dónde
+      </button>
+      <button class="yn-btn" id="yn-no" onclick="wilSelComercio(false)">
+        <span class="sym f" style="font-size:22px">help</span>El domi busca
+      </button>
+    </div>
+    <div id="wil-comercio-field" class="field hidden">
+      <label>Nombre del comercio</label>
+      <input type="text" id="comercio-nombre"
+             placeholder="Ej: Éxito Copacabana, Tienda Don Pedro…"/>
+    </div>
+  </div>
+ 
+  <!-- ── ¿PARA QUIÉN? (aparece tras elegir comercio) ── -->
+  <div class="card" id="wil-card-para-quien" style="display:none">
+    <div class="card-tit"><span class="sym f">group</span>¿El domicilio es para ti o envías a alguien?</div>
+ 
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
+      <div class="wil-radio-opt" id="wil-opt-mi"   onclick="wilSelDestino('mi')">
+        <div class="wil-radio-dot" id="wil-dot-mi"></div>
+        <div>
+          <div style="font-size:14px;font-weight:600">Para mí</div>
+          <div style="font-size:12px;color:var(--on3)">El domi me lo entrega a mí</div>
+        </div>
+      </div>
+      <div class="wil-radio-opt" id="wil-opt-otro" onclick="wilSelDestino('otro')">
+        <div class="wil-radio-dot" id="wil-dot-otro"></div>
+        <div>
+          <div style="font-size:14px;font-weight:600">Envío a alguien más</div>
+          <div style="font-size:12px;color:var(--on3)">Indicas la dirección de otra persona</div>
+        </div>
+      </div>
+    </div>
+ 
+    <!-- PARA MÍ: solo barrio -->
+    <div id="wil-sec-mi" class="hidden">
+      <div class="field">
+        <label>Tu barrio</label>
+        <select id="wil-barrio-mi" onchange="wilMostrarTarifa('mi')">
+          <option value="">— Selecciona tu barrio —</option>
+        </select>
+      </div>
+      <div class="wil-tarifa-pill hidden" id="wil-tarifa-mi">
+        <span class="sym f" style="font-size:20px;color:#15803d">delivery_dining</span>
+        <div>
+          <div style="font-size:18px;font-weight:900;color:#15803d" id="wil-tarifa-mi-val">$0</div>
+          <div style="font-size:12px;color:#166534;font-weight:600">Tarifa de domicilio</div>
+        </div>
+      </div>
+    </div>
+ 
+    <!-- PARA ALGUIEN MÁS: barrio + dirección + contactos -->
+    <div id="wil-sec-otro" class="hidden">
+      <div class="field">
+        <label>Barrio de entrega</label>
+        <select id="wil-barrio-otro" onchange="wilMostrarTarifa('otro')">
+          <option value="">— Selecciona el barrio —</option>
+        </select>
+      </div>
+      <div class="wil-tarifa-pill hidden" id="wil-tarifa-otro">
+        <span class="sym f" style="font-size:20px;color:#15803d">delivery_dining</span>
+        <div>
+          <div style="font-size:18px;font-weight:900;color:#15803d" id="wil-tarifa-otro-val">$0</div>
+          <div style="font-size:12px;color:#166534;font-weight:600">Tarifa de domicilio</div>
+        </div>
+      </div>
+ 
+      <div class="field" style="margin-top:10px">
+        <label>Dirección de entrega *</label>
+        <input type="text" id="wil-dir-otro"
+               placeholder="Calle 50 #45-23, Barrio El Centro"/>
+        <div class="field-note">Incluye calle, número y barrio</div>
+      </div>
+      <div class="field">
+        <label>Punto de referencia</label>
+        <input type="text" id="wil-ref-otro"
+               placeholder="Casa azul, frente al parque, piso 2…"/>
+      </div>
+ 
+      <div style="border-top:0.5px solid var(--bd,#e2e2de);margin:12px 0 10px"></div>
+ 
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;
+                  letter-spacing:.06em;color:var(--on3);margin-bottom:8px">
+        Quien envía
+      </div>
+      <div class="field">
+        <label>Tu nombre *</label>
+        <input type="text" id="wil-envia-nombre" placeholder="Tu nombre completo"/>
+      </div>
+      <div class="field">
+        <label>Tu teléfono *</label>
+        <input type="tel" id="wil-envia-tel" placeholder="310 123 4567"/>
+      </div>
+ 
+      <div style="border-top:0.5px solid var(--bd,#e2e2de);margin:12px 0 10px"></div>
+ 
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;
+                  letter-spacing:.06em;color:var(--on3);margin-bottom:8px">
+        Quien recibe
+      </div>
+      <div class="field">
+        <label>Nombre *</label>
+        <input type="text" id="wil-recibe-nombre" placeholder="Nombre del destinatario"/>
+      </div>
+      <div class="field">
+        <label>Teléfono *</label>
+        <input type="tel" id="wil-recibe-tel" placeholder="310 987 6543"/>
+      </div>
+    </div>
+  </div>
+ 
   <div class="act-row">
-    <button class="btn-b" onclick="showView('view-libre-1')">Atrás</button>
-    <button class="btn-n" id="btnLibre2Sig" onclick="goLibre3Async()">
+    <button class="btn-b" onclick="showView('view-inicio')">Atrás</button>
+    <button class="btn-n" onclick="wilGoLibre2()">
       <span class="sym" style="font-size:17px">arrow_forward</span>Continuar
     </button>
   </div>
 </div>
-
 
 <!-- ════ LIBRE P3 — UBICACIÓN + DATOS + PAGO ════ -->
 <div class="view" id="view-libre-3">
@@ -3728,472 +3857,156 @@ function wilAbrirTicket() {
 
 }(window));
 
-/* ═══════════════════════════════════════════════════════════════
-   PARCHE URGENTE: BARRIOS CON PRECIOS EN PEDIDO LIBRE
-   ═══════════════════════════════════════════════════════════════ */
-
-(function() {
-  // ──────────────────────────────────────────────────────────────
-  // 1. DATOS DE BARRIOS CON PRECIOS (según tu lista)
-  // ──────────────────────────────────────────────────────────────
-  const BARRIOS_PRECIOS = [
-    { nombre: "ASUNCIÓN", precio: 5000 },
-    { nombre: "FÁTIMA", precio: 5000 },
-    { nombre: "MIRADOR AZUL", precio: 5000 },
-    { nombre: "AZULITA PARTE BAJA", precio: 5000 },
-    { nombre: "CRISTO REY ABAJO DE LA PISCINA", precio: 5000 },
-    { nombre: "HORIZONTES", precio: 5000 },
-    { nombre: "MIRAFLORES", precio: 5000 },
-    { nombre: "MISERICORDIA HASTA PRINCESS", precio: 5000 },
-    { nombre: "MOJÓN", precio: 5000 },
-    { nombre: "OBRERO", precio: 5000 },
-    { nombre: "PEDREGAL PARTE BAJA", precio: 5000 },
-    { nombre: "PEDRERA", precio: 5000 },
-    { nombre: "SAN FRANCISCO", precio: 5000 },
-    { nombre: "SHANGAY", precio: 5000 },
-    { nombre: "SIMÓN BOLÍVAR", precio: 5000 },
-    { nombre: "TOBÓN QUINTERO", precio: 5000 },
-    { nombre: "VEGAS PARTE BAJA", precio: 10000 },
-    { nombre: "MONTE VERDE", precio: 5000 },
-    { nombre: "REMANSO", precio: 5000 },
-    { nombre: "YARUMITO PARTE BAJA", precio: 5000 },
-    { nombre: "CANOAS HASTA LA TIENDA DEL CUSCO", precio: 5000 },
-    { nombre: "PIEDRAS BLANCAS", precio: 5000 },
-    { nombre: "PORVENIR", precio: 5000 },
-    { nombre: "RECREO", precio: 5000 },
-    { nombre: "CALORCOL", precio: 6000 },
-    { nombre: "AZULITA PARTE ALTA", precio: 6000 },
-    { nombre: "VILLAS DE COPACABANA", precio: 6000 },
-    { nombre: "TABLAZO", precio: 6000 },
-    { nombre: "CANOAS DESPUÉS DE LA TIENDA DEL CUSCO", precio: 6000 },
-    { nombre: "CRISTO REY DE LA PISCINA HACIA ARRIBA", precio: 6000 },
-    { nombre: "PEDREGAL PARTE ALTA", precio: 6000 },
-    { nombre: "COLINAS DEL PEDREGAL", precio: 6000 },
-    { nombre: "VEGAS INTERIORES IGLESIA MANANTIALES", precio: 6000 },
-    { nombre: "YARUMITO DESPUÉS DEL EMPEDRADO", precio: 6000 },
-    { nombre: "YARUMITO INTERIOR CANCHA NUEVA", precio: 6000 },
-    { nombre: "VEGAS PARTE ALTA", precio: 6000 },
-    { nombre: "EDIFICIOS AMARILLOS", precio: 6000 },
-    { nombre: "MONTESION", precio: 6000 },
-    { nombre: "JARDÍN DE LA MARGARITA", precio: 6000 },
-    { nombre: "RESERVAS DE SAN JUAN 1", precio: 6000 },
-    { nombre: "POSADA DEL VIENTO", precio: 6000 },
-    { nombre: "ROSA DE LOS VIENTOS", precio: 6000 },
-    { nombre: "VICENZA", precio: 6000 },
-    { nombre: "RESERVAS DE SAN JUAN 2", precio: 6000 },
-    { nombre: "BARRIO MARIA", precio: 7000 },
-    { nombre: "PORTERIA PARCELACIÓN EL PARAISO", precio: 7000 },
-    { nombre: "TORRE DEL BOSQUE", precio: 7000 },
-    { nombre: "EDIFICIO POBLADO NORTE", precio: 7000 },
-    { nombre: "SAN JUAN CAMPESTRE", precio: 7000 },
-    { nombre: "VIA MACHADO", precio: 8000 },
-    { nombre: "CANTERAS", precio: 8000 },
-    { nombre: "VILLANUEVA PARTE BAJA Y ALTA", precio: 8000 },
-    { nombre: "VILLA ROCA", precio: 8000 },
-    { nombre: "SAN JUAN", precio: 8000 },
-    { nombre: "GUASIMALITO", precio: 10000 },
-    { nombre: "MACHADO", precio: 10000 },
-    { nombre: "UNIDADES DE MACHADO", precio: 11000 },
-    { nombre: "ARBOLEDA DEL CAMPO", precio: 11000 },
-    { nombre: "FONTIDUEÑO", precio: 13000 },
-    { nombre: "NAVARRA", precio: 14000 },
-    { nombre: "NIQUIA PARTE BAJA", precio: 14000 },
-    { nombre: "UNIDADES DE NAVARRA", precio: 14000 },
-    { nombre: "PARQUE DE GIRARDOTA", precio: 17000 },
-    { nombre: "TOLEDO CAMPESTRE", precio: 17000 },
-    { nombre: "PARQUE DE BELLO", precio: 18000 },
-    { nombre: "FABRICATO", precio: 19000 },
-    { nombre: "UNIDADES DE MADERA", precio: 25000 }
-  ];
-
-  // ──────────────────────────────────────────────────────────────
-  // 2. CREAR NUEVA VISTA: SELECCIÓN DE TIPO (para mí / para otro)
-  // ──────────────────────────────────────────────────────────────
-  const main = document.querySelector('.main');
-  
-  // Vista 1.5: ¿Para quién es el pedido?
-  const viewTipo = document.createElement('div');
-  viewTipo.id = 'view-libre-tipo';
-  viewTipo.className = 'view';
-  viewTipo.innerHTML = `
-    <div style="padding:20px 16px 8px">
-      <div style="font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:4px">
-        Pedido Libre 🛍️
-      </div>
-      <div style="font-size:13px;color:var(--on3);font-weight:500">¿El pedido es para ti o para alguien más?</div>
-    </div>
-    <div class="card">
-      <div class="card-tit"><span class="sym f">person</span>¿Quién recibe el pedido?</div>
-      <div class="yn-grid">
-        <button class="yn-btn" id="tipo-para-mi">
-          <span class="sym f" style="font-size:22px">face</span>
-          Para mí
-          <span style="font-size:10px;color:var(--on3);display:block;margin-top:4px">Entrego en mi dirección</span>
-        </button>
-        <button class="yn-btn" id="tipo-para-otro">
-          <span class="sym f" style="font-size:22px">group</span>
-          Para alguien más
-          <span style="font-size:10px;color:var(--on3);display:block;margin-top:4px">Entrego en otra dirección</span>
-        </button>
-      </div>
-    </div>
-    <div class="act-row">
-      <button class="btn-b" onclick="window.goBackTipo ? window.goBackTipo() : showView('view-libre-2')">Atrás</button>
-      <button class="btn-n" id="btn-continuar-tipo" disabled style="opacity:0.5">Continuar</button>
-    </div>
-  `;
-  main.appendChild(viewTipo);
-
-  // Vista 1.6: Selector de barrios (tanto para mí como para otro)
-  const viewBarrios = document.createElement('div');
-  viewBarrios.id = 'view-libre-barrios';
-  viewBarrios.className = 'view';
-  viewBarrios.innerHTML = `
-    <div style="padding:20px 16px 8px">
-      <div style="font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:4px">
-        Pedido Libre 🛍️
-      </div>
-      <div style="font-size:13px;color:var(--on3);font-weight:500" id="barrio-subtitulo">Selecciona tu barrio</div>
-    </div>
-    <div class="card">
-      <div class="card-tit"><span class="sym f">location_city</span>Barrios de Copacabana con tarifa</div>
-      <div class="field">
-        <input type="text" id="buscar-barrio" placeholder="🔍 Buscar barrio..." style="margin-bottom:12px">
-      </div>
-      <div id="lista-barrios" style="max-height:400px;overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
-      <div id="barrio-seleccionado-info" class="field-note" style="margin-top:12px;text-align:center;font-weight:700;"></div>
-    </div>
-    <div class="act-row">
-      <button class="btn-b" id="btn-atras-barrios">Atrás</button>
-      <button class="btn-n" id="btn-confirmar-barrio" disabled style="opacity:0.5">
-        <span class="sym" style="font-size:17px">check_circle</span>Continuar
-      </button>
-    </div>
-  `;
-  main.appendChild(viewBarrios);
-
-  // ──────────────────────────────────────────────────────────────
-  // 3. RENDERIZAR LISTA DE BARRIOS
-  // ──────────────────────────────────────────────────────────────
-  let barrioSeleccionado = null;
-  let tipoPedido = null; // 'mi' o 'otro'
-
-  function renderizarListaBarrios(filtro = '') {
-    const contenedor = document.getElementById('lista-barrios');
-    if (!contenedor) return;
-    
-    const filtroLower = filtro.toLowerCase();
-    const filtrados = BARRIOS_PRECIOS.filter(b => 
-      b.nombre.toLowerCase().includes(filtroLower)
-    );
-    
-    contenedor.innerHTML = filtrados.map(barrio => `
-      <div class="barrio-option" data-nombre="${barrio.nombre}" data-precio="${barrio.precio}"
-           style="background:${barrioSeleccionado?.nombre === barrio.nombre ? 'var(--pl)' : 'var(--w2)'};
-                  border:1.5px solid ${barrioSeleccionado?.nombre === barrio.nombre ? 'var(--p)' : '#e2eaef'};
-                  border-radius:12px;padding:12px;cursor:pointer;transition:all 0.15s">
-        <div style="font-weight:800;font-size:13px;color:var(--on)">${barrio.nombre}</div>
-        <div style="font-size:11px;color:var(--p);font-weight:700;margin-top:4px">
-          🛵 Domicilio: $${barrio.precio.toLocaleString('es-CO')}
-        </div>
-      </div>
-    `).join('');
-    
-    // Agregar event listeners a cada opción
-    document.querySelectorAll('.barrio-option').forEach(el => {
-      el.addEventListener('click', () => {
-        const nombre = el.dataset.nombre;
-        const precio = parseInt(el.dataset.precio);
-        barrioSeleccionado = { nombre, precio };
-        
-        // Actualizar UI
-        renderizarListaBarrios(filtro);
-        
-        const infoEl = document.getElementById('barrio-seleccionado-info');
-        if (infoEl) {
-          infoEl.innerHTML = `✅ Barrio seleccionado: <strong>${nombre}</strong> — Domicilio: <strong style="color:var(--p)">$${precio.toLocaleString('es-CO')}</strong>`;
-        }
-        
-        const btnConfirmar = document.getElementById('btn-confirmar-barrio');
-        if (btnConfirmar) {
-          btnConfirmar.disabled = false;
-          btnConfirmar.style.opacity = '1';
-        }
-      });
+const WIL_BARRIOS = [
+  ["ASUNCION",5000],["FÁTIMA",5000],["MIRADOR AZUL",5000],
+  ["AZULITA PARTE BAJA",5000],["CRISTO REY ABAJO DE LA PISCINA",5000],
+  ["HORIZONTES",5000],["MIRAFLORES",5000],["MISERICORDIA HASTA PRINCESS",5000],
+  ["MOJÓN",5000],["OBRERO",5000],["PEDREGAL PARTE BAJA",5000],
+  ["PEDRERA",5000],["SAN FRANCISCO",5000],["SHANGAY",5000],
+  ["SIMÓN BOLÍVAR",5000],["TOBÓN QUINTERO",5000],["MONTE VERDE",5000],
+  ["REMANSO",5000],["YARUMITO PARTE BAJA",5000],
+  ["CANOAS HASTA LA TIENDA DEL CUSCO",5000],["PIEDRAS BLANCAS",5000],
+  ["PORVENIR",5000],["RECREO",5000],
+  ["CALORCOL",6000],["AZULITA PARTE ALTA",6000],["VILLAS DE COPACABANA",6000],
+  ["TABLAZO",6000],["CANOAS DESPUÉS DE LA TIENDA DEL CUSCO",6000],
+  ["CRISTO REY DE LA PISCINA HACIA ARRIBA",6000],["PEDREGAL PARTE ALTA",6000],
+  ["COLINAS DEL PEDREGAL",6000],["VEGAS INTERIORES IGLESIA MANANTIALES",6000],
+  ["YARUMITO DESPUÉS DEL EMPEDRADO",6000],["YARUMITO INTERIOR CANCHA NUEVA",6000],
+  ["VEGAS PARTE ALTA",6000],["EDIFICIOS AMARILLOS",6000],["MONTESION",6000],
+  ["JARDÍN DE LA MARGARITA",6000],["RESERVAS DE SAN JUAN 1",6000],
+  ["POSADA DEL VIENTO",6000],["ROSA DE LOS VIENTOS",6000],["VICENZA",6000],
+  ["RESERVAS DE SAN JUAN 2",6000],
+  ["BARRIO MARIA",7000],["PORTERIA PARCELACIÓN EL PARAISO",7000],
+  ["TORRE DEL BOSQUE",7000],["EDIFICIO POBLADO NORTE",7000],
+  ["SAN JUAN CAMPESTRE",7000],
+  ["VIA MACHADO",8000],["CANTERAS",8000],["VILLANUEVA PARTE BAJA Y ALTA",8000],
+  ["VILLA ROCA",8000],["SAN JUAN",8000],
+  ["VEGAS PARTE BAJA",10000],["GUASIMALITO",10000],["MACHADO",10000],
+  ["UNIDADES DE MACHADO",11000],["ARBOLEDA DEL CAMPO",11000],
+  ["FONTIDUEÑO",13000],["NAVARRA",14000],["NIQUIA PARTE BAJA",14000],
+  ["UNIDADES DE NAVARRA",14000],["PARQUE DE GIRARDOTA",17000],
+  ["TOLEDO CAMPESTRE",17000],["PARQUE DE BELLO",18000],
+  ["FABRICATO",19000],["UNIDADES DE MADERA",25000]
+];
+ 
+/* Estado global del paso 1 */
+window.WIL_LIBRE = {
+  comercio: null,      // true=sí sabe / false=el domi busca
+  comercioNombre: '',
+  destino: null,       // 'mi' | 'otro'
+  barrio: '',
+  tarifaDomi: 0,
+  direccion: '',
+  referencia: '',
+  enviaNombre: '',
+  enviaTel: '',
+  recibeNombre: '',
+  recibeTel: ''
+};
+ 
+/* Poblar selects al cargar */
+(function wilInit(){
+  ['wil-barrio-mi','wil-barrio-otro'].forEach(id => {
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    WIL_BARRIOS.forEach(([nombre, precio]) => {
+      const opt = document.createElement('option');
+      opt.value = nombre;
+      opt.dataset.precio = precio;
+      opt.textContent = nombre + ' — $' + precio.toLocaleString('es-CO');
+      sel.appendChild(opt);
     });
-  }
-
-  // ──────────────────────────────────────────────────────────────
-  // 4. CAPTURAR UBICACIÓN Y SUGERIR BARRIO
-  // ──────────────────────────────────────────────────────────────
-  async function sugerirBarrioPorGPS() {
-    return new Promise((resolve) => {
-      if (!navigator.geolocation) {
-        resolve(null);
-        return;
-      }
-      
-      navigator.geolocation.getCurrentPosition(async (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        
-        try {
-          // Usar Nominatim para obtener nombre del barrio
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=es`, {
-            headers: { 'User-Agent': 'DomiciliosWIL/1.0' }
-          });
-          const data = await res.json();
-          const barrioNombre = (data.address?.neighbourhood || data.address?.suburb || data.address?.village || '').toUpperCase();
-          
-          if (barrioNombre) {
-            const encontrado = BARRIOS_PRECIOS.find(b => 
-              b.nombre.includes(barrioNombre) || barrioNombre.includes(b.nombre.split(' ')[0])
-            );
-            resolve(encontrado || null);
-          } else {
-            resolve(null);
-          }
-        } catch(e) {
-          console.warn('Error reverse geocoding:', e);
-          resolve(null);
-        }
-      }, () => resolve(null), { timeout: 8000 });
-    });
-  }
-
-  // ──────────────────────────────────────────────────────────────
-  // 5. MODIFICAR goLibre2() para redirigir a la nueva pantalla
-  // ──────────────────────────────────────────────────────────────
-  const originalGoLibre2 = window.goLibre2;
-  window.goLibre2 = function() {
-    // Validar comercio igual que antes
-    if (state.comercioTiene === null) {
-      mostrarToast('¿Ya tienes el comercio o el domi busca?', 'help');
-      return;
-    }
-    state.comercioNombre = document.getElementById('comercio-nombre')?.value || '';
-    
-    // Ir a la nueva pantalla de tipo de pedido
-    showView('view-libre-tipo');
-  };
-  
-  window.goBackTipo = function() {
-    showView('view-libre-2');
-  };
-
-  // ──────────────────────────────────────────────────────────────
-  // 6. CONFIGURAR EVENTOS DE LAS NUEVAS VISTAS
-  // ──────────────────────────────────────────────────────────────
-  function initNuevasVistas() {
-    // Botones de tipo de pedido
-    const btnMi = document.getElementById('tipo-para-mi');
-    const btnOtro = document.getElementById('tipo-para-otro');
-    const btnContinuarTipo = document.getElementById('btn-continuar-tipo');
-    
-    let tipoTemp = null;
-    
-    if (btnMi) {
-      btnMi.addEventListener('click', () => {
-        tipoTemp = 'mi';
-        btnMi.classList.add('sel');
-        btnOtro?.classList.remove('sel');
-        if (btnContinuarTipo) {
-          btnContinuarTipo.disabled = false;
-          btnContinuarTipo.style.opacity = '1';
-        }
-      });
-    }
-    
-    if (btnOtro) {
-      btnOtro.addEventListener('click', () => {
-        tipoTemp = 'otro';
-        btnOtro.classList.add('sel');
-        btnMi?.classList.remove('sel');
-        if (btnContinuarTipo) {
-          btnContinuarTipo.disabled = false;
-          btnContinuarTipo.style.opacity = '1';
-        }
-      });
-    }
-    
-    if (btnContinuarTipo) {
-      btnContinuarTipo.addEventListener('click', async () => {
-        if (!tipoTemp) return;
-        tipoPedido = tipoTemp;
-        
-        // Actualizar subtítulo según tipo
-        const subtitulo = document.getElementById('barrio-subtitulo');
-        if (subtitulo) {
-          subtitulo.textContent = tipoPedido === 'mi' 
-            ? '📍 Selecciona tu barrio (GPS sugerido abajo)' 
-            : '📍 Selecciona el barrio de entrega';
-        }
-        
-        // Si es "Para mí", intentar GPS automático
-        if (tipoPedido === 'mi') {
-          mostrarToast('📍 Detectando tu ubicación...', 'my_location');
-          const sugerido = await sugerirBarrioPorGPS();
-          if (sugerido) {
-            barrioSeleccionado = sugerido;
-            mostrarToast(`📍 Detectamos: ${sugerido.nombre} — $${sugerido.precio.toLocaleString()}`, 'check_circle');
-            const infoEl = document.getElementById('barrio-seleccionado-info');
-            if (infoEl) {
-              infoEl.innerHTML = `📍 GPS detectó: <strong>${sugerido.nombre}</strong> — Domicilio: <strong style="color:var(--p)">$${sugerido.precio.toLocaleString()}</strong><br>
-              <span style="font-size:10px">¿No es correcto? Selecciona manualmente.</span>`;
-            }
-            const btnConfirmar = document.getElementById('btn-confirmar-barrio');
-            if (btnConfirmar) {
-              btnConfirmar.disabled = false;
-              btnConfirmar.style.opacity = '1';
-            }
-          } else {
-            mostrarToast('No pudimos detectar tu barrio, selecciónalo manualmente', 'info');
-          }
-        }
-        
-        renderizarListaBarrios('');
-        showView('view-libre-barrios');
-      });
-    }
-    
-    // Búsqueda de barrios
-    const buscarInput = document.getElementById('buscar-barrio');
-    if (buscarInput) {
-      buscarInput.addEventListener('input', (e) => {
-        renderizarListaBarrios(e.target.value);
-      });
-    }
-    
-    // Botón atrás en selector de barrios
-    const btnAtrasBarrios = document.getElementById('btn-atras-barrios');
-    if (btnAtrasBarrios) {
-      btnAtrasBarrios.addEventListener('click', () => {
-        barrioSeleccionado = null;
-        showView('view-libre-tipo');
-      });
-    }
-    
-    // Botón confirmar barrio
-    const btnConfirmarBarrio = document.getElementById('btn-confirmar-barrio');
-    if (btnConfirmarBarrio) {
-      btnConfirmarBarrio.addEventListener('click', () => {
-        if (!barrioSeleccionado) {
-          mostrarToast('Selecciona un barrio primero', 'warning');
-          return;
-        }
-        
-        // Guardar en state
-        state.barrio = barrioSeleccionado.nombre;
-        state.precioDomicilio = barrioSeleccionado.precio;
-        state.tarifaZonaStr = barrioSeleccionado.nombre;
-        
-        mostrarToast(`Barrio: ${barrioSeleccionado.nombre} — Domicilio: $${barrioSeleccionado.precio.toLocaleString()}`, 'check_circle');
-        
-        // Continuar al paso 2 (texto libre / productos)
-        showView('view-libre-2');
-        
-        // Si hay categoría preset, poner texto de ejemplo
-        if (state.categoriaPreset) {
-          const txtArea = document.getElementById('libreTextoLibre');
-          if (txtArea && !txtArea.value.trim()) {
-            txtArea.placeholder = `Ej: Pedido de ${state.categoriaPreset.toLowerCase()}...`;
-          }
-        }
-      });
-    }
-  }
-  
-  // ──────────────────────────────────────────────────────────────
-  // 7. MODIFICAR generarFacturaLibre para mostrar barrio y tarifa
-  // ──────────────────────────────────────────────────────────────
-  const originalGenerarFactura = window.generarFacturaLibre;
-  window.generarFacturaLibre = function() {
-    // Validaciones originales
-    const dir = document.getElementById('libre-direccion')?.value.trim();
-    const ref = document.getElementById('libre-referencia')?.value.trim();
-    const nom = document.getElementById('libre-nombre')?.value.trim();
-    const tel = document.getElementById('libre-telefono')?.value.trim();
-    
-    if (!dir) { mostrarToast('Ingresa la dirección completa.', 'location_on'); return; }
-    if (!nom || !tel) { mostrarToast('Completa tu nombre y teléfono.', 'person'); return; }
-    if (!state.metodoPago) { mostrarToast('Selecciona método de pago.', 'payments'); return; }
-    
-    state.direccion = dir;
-    state.referencia = ref;
-    state.nombre = nom;
-    state.telefono = tel;
-    
-    // Actualizar resumen con barrio y tarifa
-    const comercioVal = document.getElementById('factura-comercio-val');
-    if (comercioVal) {
-      comercioVal.textContent = state.comercioTiene && state.comercioNombre ? 
-        state.comercioNombre : (state.comercioTiene ? 'El domiciliario confirma' : 'El domiciliario busca');
-    }
-    
-    // Mostrar barrio y tarifa en el ticket
-    const tarifaContainer = document.getElementById('wil-ticket-tarifa-container');
-    if (tarifaContainer && state.barrio && state.precioDomicilio) {
-      tarifaContainer.innerHTML = `
-        <div class="wil-ticket-tarifa-row">
-          <div class="wil-ticket-tarifa-lbl">📍 Barrio</div>
-          <div class="wil-ticket-tarifa-val" style="color:var(--p)">
-            ${state.barrio}
-            <div class="wil-ticket-tarifa-sub">🛵 Domicilio: $${state.precioDomicilio.toLocaleString('es-CO')}</div>
-          </div>
-        </div>
-      `;
-    }
-    
-    // Llamar original para el resto
-    if (originalGenerarFactura) originalGenerarFactura();
-    
-    // Asegurar que el resumen colapsable muestre la info
-    setTimeout(() => {
-      const prodCountEl = document.getElementById('ticket-prod-count');
-      if (prodCountEl && state.productos) {
-        prodCountEl.textContent = state.productos.length + ' producto' + (state.productos.length !== 1 ? 's' : '');
-      }
-      const pagoResumen = document.getElementById('ticket-pago-resumen');
-      if (pagoResumen) {
-        pagoResumen.textContent = state.metodoPago === 'EFECTIVO' ? '💵 Efectivo' : '🏦 Transferencia';
-      }
-      const nombreResumen = document.getElementById('factura-nombre-resumen');
-      if (nombreResumen) nombreResumen.textContent = state.nombre || '—';
-      
-      // Abrir colapsable automáticamente
-      if (window.wilAbrirTicket) wilAbrirTicket();
-    }, 50);
-  };
-  
-  // ──────────────────────────────────────────────────────────────
-  // 8. MODIFICAR enviarPedido para incluir barrio en la dirección
-  // ──────────────────────────────────────────────────────────────
-  const originalEnviarPedido = window.enviarPedido;
-  window.enviarPedido = async function(tipo) {
-    // Si hay barrio seleccionado, agregarlo a la dirección
-    if (state.barrio && state.direccion && state.direccion.indexOf(state.barrio) === -1) {
-      state.direccion = `${state.direccion}, ${state.barrio}`;
-    }
-    
-    // Asegurar que precioDomicilio esté en state
-    if (barrioSeleccionado && !state.precioDomicilio) {
-      state.precioDomicilio = barrioSeleccionado.precio;
-    }
-    
-    return originalEnviarPedido.apply(this, [tipo]);
-  };
-  
-  // ──────────────────────────────────────────────────────────────
-  // 9. INICIAR
-  // ──────────────────────────────────────────────────────────────
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initNuevasVistas);
-  } else {
-    initNuevasVistas();
-  }
-  
-  console.log('[WIL] ✅ Parche de barrios con precios ACTIVADO');
+  });
 })();
+ 
+/* ── ¿Ya tienes el comercio? ── */
+function wilSelComercio(si){
+  window.WIL_LIBRE.comercio = si;
+  document.getElementById('yn-si').classList.toggle('sel', si);
+  document.getElementById('yn-no').classList.toggle('sel', !si);
+  document.getElementById('wil-comercio-field').classList.toggle('hidden', !si);
+  document.getElementById('wil-card-para-quien').style.display = 'block';
+  // reset destino al cambiar comercio
+  wilSelDestino(null);
+}
+ 
+/* ── ¿Para quién? ── */
+function wilSelDestino(d){
+  window.WIL_LIBRE.destino = d;
+  ['mi','otro'].forEach(x => {
+    document.getElementById('wil-opt-'+x)?.classList.toggle('sel', d===x);
+  });
+  document.getElementById('wil-sec-mi')?.classList.toggle('hidden',   d!=='mi');
+  document.getElementById('wil-sec-otro')?.classList.toggle('hidden', d!=='otro');
+  document.getElementById('wil-tarifa-mi')?.classList.add('hidden');
+  document.getElementById('wil-tarifa-otro')?.classList.add('hidden');
+}
+ 
+/* ── Mostrar tarifa del barrio seleccionado ── */
+function wilMostrarTarifa(quien){
+  const selId = quien === 'mi' ? 'wil-barrio-mi' : 'wil-barrio-otro';
+  const sel   = document.getElementById(selId);
+  const opt   = sel?.options[sel.selectedIndex];
+  const pill  = document.getElementById('wil-tarifa-' + quien);
+  const valEl = document.getElementById('wil-tarifa-' + quien + '-val');
+  if(!opt || !opt.dataset.precio){ pill?.classList.add('hidden'); return; }
+  const precio = parseInt(opt.dataset.precio);
+  valEl.textContent = '$' + precio.toLocaleString('es-CO');
+  pill?.classList.remove('hidden');
+  window.WIL_LIBRE.tarifaDomi  = precio;
+  window.WIL_LIBRE.barrio      = opt.value;
+}
+ 
+/* ── Validar y continuar ── */
+function wilGoLibre2(){
+  const L = window.WIL_LIBRE;
+ 
+  if(L.comercio === null){
+    alert('Por favor indica si ya tienes el comercio.'); return;
+  }
+  if(L.comercio){
+    L.comercioNombre = document.getElementById('comercio-nombre')?.value.trim() || '';
+    if(!L.comercioNombre){
+      alert('Escribe el nombre del comercio.'); return;
+    }
+  }
+  if(!L.destino){
+    alert('Indica si el domicilio es para ti o para alguien más.'); return;
+  }
+ 
+  if(L.destino === 'mi'){
+    const barEl = document.getElementById('wil-barrio-mi');
+    if(!barEl?.value){ alert('Selecciona tu barrio.'); return; }
+    L.barrio     = barEl.value;
+    L.tarifaDomi = parseInt(barEl.options[barEl.selectedIndex].dataset.precio || 0);
+ 
+  } else {
+    const barEl  = document.getElementById('wil-barrio-otro');
+    const dir    = document.getElementById('wil-dir-otro')?.value.trim();
+    const enNom  = document.getElementById('wil-envia-nombre')?.value.trim();
+    const enTel  = document.getElementById('wil-envia-tel')?.value.trim();
+    const rcNom  = document.getElementById('wil-recibe-nombre')?.value.trim();
+    const rcTel  = document.getElementById('wil-recibe-tel')?.value.trim();
+ 
+    if(!barEl?.value)  { alert('Selecciona el barrio de entrega.'); return; }
+    if(!dir)           { alert('Escribe la dirección de entrega.'); return; }
+    if(!enNom||!enTel) { alert('Completa los datos de quien envía.'); return; }
+    if(!rcNom||!rcTel) { alert('Completa los datos de quien recibe.'); return; }
+ 
+    L.barrio       = barEl.value;
+    L.tarifaDomi   = parseInt(barEl.options[barEl.selectedIndex].dataset.precio || 0);
+    L.direccion    = dir;
+    L.referencia   = document.getElementById('wil-ref-otro')?.value.trim() || '';
+    L.enviaNombre  = enNom;
+    L.enviaTel     = enTel;
+    L.recibeNombre = rcNom;
+    L.recibeTel    = rcTel;
+  }
+ 
+  /* ✅ Todo validado — ir al paso 2 */
+  goLibre2(); // ← tu función existente
+}
+ 
 
 </script>
 </body>
