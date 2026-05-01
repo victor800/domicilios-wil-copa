@@ -2016,7 +2016,7 @@ const SECCION_COLORS = {
 /* ═══════════════════════════════════════════════
    CONSTANTES
 ═══════════════════════════════════════════════ */
-const SHEET_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwbypqPgL16lssPdQsktDx9dHs0My_cMaS7YNQrMSkzY8Kw7HPmFgJHZeImkW2EJ48H7A/exec';
+const SHEET_SCRIPT_URL = 'https://script.google.com/macros/library/d/1II0KlakVS10fD1wr-aO_W-d6Hy9zvEH2Km79E4Ei51C07fRaKsHx420n/80';
 const SHEET_ID         = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
 const APP_LINK         = 'https://domicilios-wil.vercel.app/index.html';
 const OFERTAS_KEY      = 'wil_ofertas_v3';
@@ -6312,13 +6312,13 @@ async function loadMultas() {
   try {
     const text = await fetchSheetCSV('Multas', 10000);
     const lines = parseCSVText(text);
-    window._multasData = lines.map(c => ({
-      domi:  col(c, 0),
-      monto: parsePrecio(col(c, 1)),
-      tipo:  col(c, 2) || 'multa',
-      nota:  col(c, 3),
-      fecha: col(c, 4)
-    })).filter(m => m.domi && m.monto);
+window._multasData = lines.map(c => ({
+  domi:  col(c, 0),
+  monto: parsePrecio(col(c, 1)),
+  tipo:  col(c, 2) || 'multa',
+  nota:  col(c, 3),
+  fecha: col(c, 4)
+})).filter(m => m.domi && (m.monto || m.tipo === 'pyp'));
   } catch(e) {
     console.warn('[loadMultas]:', e.message);
     window._multasData = [];
@@ -6488,130 +6488,65 @@ function initContable() {
   `;
   document.querySelector('main.main').appendChild(pg);
  
-const st = document.createElement('style');
-st.textContent = `
-  #modal-caja-overlay { font-size:13px !important; }
- 
-  .caja-modal .om-label {
-    font-size:10px !important; margin-bottom:4px !important;
-    color:var(--text2) !important; font-weight:700 !important;
-    letter-spacing:.05em; text-transform:uppercase;
-  }
-  .caja-modal .om-input,
-  .caja-modal .om-select {
-    font-size:13px !important; padding:9px 12px !important;
-    border-radius:9px !important; color:var(--text) !important;
-  }
-  /* FIX: quitar el signo $ que aparecía encima del input */
-  .caja-modal .om-price-wrap .currency { display:none !important; }
-  .caja-modal .om-price-wrap .om-input { padding-left:12px !important; }
- 
-  .caja-modal .om-field { margin-bottom:12px !important; }
-  #caja-resumen-auto { padding:14px !important; margin-bottom:14px !important; border-radius:12px !important; }
-  #caja-diferencia-box { padding:10px 13px !important; border-radius:9px !important; margin-top:10px !important; }
-  #caja-novedades { min-height:55px !important; font-size:13px !important; padding:9px 12px !important; }
-  #btn-guardar-caja { padding:12px !important; font-size:13px !important; }
- 
-  /* Grid resumen turno — 4 columnas en desktop, 2 en móvil */
-  #caja-stats-grid {
-    display: grid;
-    grid-template-columns: repeat(4,1fr);
-    gap: 8px;
-  }
-  @media(max-width:540px){
-    #caja-stats-grid { grid-template-columns: repeat(2,1fr) !important; }
-  }
- 
-  /* Card del resumen automático */
-  .caja-sc {
-    background: rgba(255,255,255,.11);
-    border: 1px solid rgba(255,255,255,.2);
-    border-radius: 11px;
-    padding: 11px 8px 10px;
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-  }
-  .caja-sc-ico {
-    font-size: 15px !important;
-    display: block;
-    margin-bottom: 2px;
-  }
-  /* Número principal — grande y bien contrastado */
-  .caja-sc-num {
-    font-size: 15px;
-    font-weight: 800;
-    font-family: 'DM Mono', monospace;
-    line-height: 1.1;
-    word-break: break-all;
-  }
-  /* Subvalor (cantidad de pedidos) */
-  .caja-sc-sub {
-    font-size: 10px;
-    font-weight: 700;
-    opacity: .75;
-    line-height: 1;
-  }
-  /* Etiqueta inferior — siempre visible sobre fondo oscuro */
-  .caja-sc-lbl {
-    font-size: 9px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    color: rgba(255,255,255,.65) !important;
-    margin-top: 2px;
-  }
- 
-  /* Cierres en la sección contable */
-  .cierre-item {
-    background: var(--white);
-    border: 1.5px solid var(--border);
-    border-radius: 14px;
-    padding: 14px 16px;
-    margin-bottom: 10px;
-    transition: box-shadow .18s;
-  }
-  .cierre-item:hover { box-shadow: 0 4px 16px rgba(40,185,193,.09); }
-  .cierre-turno-badge { font-size:10px; font-weight:800; padding:3px 10px; border-radius:99px; }
-  .cierre-turno-1 { background:var(--orange-l); color:var(--orange); }
-  .cierre-turno-2 { background:var(--blue-l); color:var(--blue); }
- 
-  .cierre-kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(4,1fr);
-    gap: 7px;
-  }
-  @media(max-width:600px){
-    .cierre-kpi-grid { grid-template-columns: repeat(2,1fr) !important; }
-  }
-  .cierre-kpi {
-    background: var(--bg);
-    border-radius: 9px;
-    padding: 9px 7px;
-    text-align: center;
-  }
-  .cierre-kpi-val {
-    font-size: 12px;
-    font-weight: 800;
-    font-family: 'DM Mono', monospace;
-    margin-bottom: 3px;
-    word-break: break-all;
-  }
-  .cierre-kpi-lbl {
-    font-size: 8px;
-    color: var(--text3);
-    text-transform: uppercase;
-    letter-spacing: .06em;
-  }
- 
-  /* P&P y multas */
-  .pyp-aviso { display:none; align-items:center; gap:8px; background:var(--orange-l); border:1.5px solid rgba(217,119,6,.3); border-radius:11px; padding:10px 14px; font-size:12px; font-weight:700; color:#92400e; margin-bottom:14px; }
-  .pyp-aviso.show { display:flex; }
-  #multa-monto-wrap.pyp-hidden { display:none !important; }
-`;
-document.head.appendChild(st);
+  const style = document.createElement('style');
+  style.textContent = `
+    #pg-contable .kpi-card {
+      background:var(--white);border:1.5px solid var(--border);
+      border-radius:16px;padding:18px;position:relative;overflow:hidden;
+      transition:transform .2s,box-shadow .2s;
+    }
+    #pg-contable .kpi-card:hover { transform:translateY(-2px);box-shadow:0 8px 24px rgba(40,185,193,.09); }
+    #pg-contable .kpi-acc { position:absolute;top:0;left:0;right:0;height:3px;border-radius:16px 16px 0 0; }
+    #pg-contable .kpi-ico { width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:12px; }
+    #pg-contable .kpi-lbl { font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px; }
+    #pg-contable .kpi-val { font-size:24px;font-weight:800;line-height:1; }
+    #pg-contable .kpi-sub { font-size:10px;color:var(--text3);margin-top:5px; }
+    .base-item,.multa-item { display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border:1.5px solid var(--border);border-radius:12px;margin-bottom:8px;transition:border-color .15s; }
+    .base-item:hover,.multa-item:hover { border-color:var(--border2); }
+    .base-ico { width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+    .base-name { font-size:12px;font-weight:800;color:var(--text); }
+    .base-meta { font-size:10px;color:var(--text2);margin-top:2px; }
+    .base-monto { font-size:14px;font-weight:800;font-family:'DM Mono',monospace;margin-left:auto;flex-shrink:0; }
+    .base-del { width:26px;height:26px;border-radius:7px;background:var(--red-l);border:1px solid rgba(220,38,38,.2);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--red);font-size:13px;transition:all .15s;flex-shrink:0; }
+    .base-del:hover { background:var(--red);color:#fff; }
+    #modal-base-overlay,#modal-multa-overlay { position:fixed;inset:0;background:rgba(4,18,20,.82);backdrop-filter:blur(12px);z-index:300;display:none;align-items:center;justify-content:center;padding:16px; }
+    #modal-base-overlay.show,#modal-multa-overlay.show { display:flex; }
+    .cont-modal { background:var(--white);border-radius:20px;width:min(460px,100%);overflow:hidden;box-shadow:0 32px 80px rgba(4,18,20,.4);animation:invUp .3s cubic-bezier(.34,1.2,.64,1); }
+    .cont-modal-hdr { padding:20px 22px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px; }
+    .cont-modal-body { padding:20px 22px 24px; }
+    .cont-modal-footer { display:flex;gap:10px;margin-top:20px;padding-top:16px;border-top:1.5px solid var(--border); }
+    @media(max-width:768px){
+      #pg-contable [style*="grid-template-columns:repeat(4,1fr)"],
+      #pg-contable #cont-kpis {
+        grid-template-columns: 1fr 1fr !important;
+      }
+      #pg-contable [style*="grid-template-columns:1fr 1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+      }
+      #pg-contable [style*="grid-template-columns:1.6fr 1fr"] {
+        grid-template-columns: 1fr !important;
+      }
+      #pg-contable [style*="grid-template-columns:1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+      }
+
+    #modal-caja-overlay {
+      position:fixed;inset:0;background:rgba(4,18,20,.88);
+      backdrop-filter:blur(14px);z-index:400;
+      display:none;align-items:center;justify-content:center;padding:16px;
+    }
+    #modal-caja-overlay.show { display:flex; }
+    .caja-modal {
+      background:var(--white);border-radius:22px;width:min(560px,100%);
+      max-height:92vh;overflow-y:auto;
+      box-shadow:0 40px 100px rgba(4,18,20,.5);
+      animation:invUp .3s cubic-bezier(.34,1.2,.64,1);
+    }
+    .caja-modal::-webkit-scrollbar { width:3px; }
+    .caja-modal::-webkit-scrollbar-thumb { background:var(--border2);border-radius:99px; }
+    }
+  `;
+  document.head.appendChild(style);
  
   ['base','multa'].forEach(tipo => {
     const ov = document.createElement('div');
@@ -6838,61 +6773,7 @@ document.head.appendChild(st);
   let _multas = [];
   let _periodo = 'hoy';
 
-   window.editBase = function(idx) {
-  const _bases = window._basesData || [];
-  const b = _bases[idx];
-  if (!b) return;
- 
-  // Poblar select
-  const sel = document.getElementById('base-domi-select');
-  if (sel) {
-    sel.innerHTML = '<option value="">— Selecciona —</option>' +
-      (window.allDrivers || []).map(d =>
-        `<option value="${d.nombre}" ${d.nombre === b.domi ? 'selected' : ''}>${d.activo?'●':'○'} ${d.nombre}</option>`
-      ).join('');
-  }
-  const mEl = document.getElementById('base-monto');
-  const nEl = document.getElementById('base-nota');
-  const fEl = document.getElementById('base-fecha');
-  if (mEl) mEl.value = b.monto;
-  if (nEl) nEl.value = b.nota || '';
-  if (fEl) fEl.value = b.fecha || new Date().toISOString().slice(0,10);
- 
-  // Marcar índice para edición
-  document.getElementById('modal-base-overlay')._editIdx = idx;
-  document.getElementById('modal-base-overlay').classList.add('show');
-};
- 
- 
-/* ════════════════════════════════════
-   editMulta — abre modal con datos prellenados
-   AGREGAR fuera de initContable, como window.xxx
-════════════════════════════════════ */
-window.editMulta = function(idx) {
-  const _multas = window._multasData || [];
-  const m = _multas[idx];
-  if (!m) return;
- 
-  const sel = document.getElementById('multa-domi-select');
-  if (sel) {
-    sel.innerHTML = '<option value="">— Selecciona —</option>' +
-      (window.allDrivers || []).map(d =>
-        `<option value="${d.nombre}" ${d.nombre === m.domi ? 'selected' : ''}>${d.activo?'●':'○'} ${d.nombre}</option>`
-      ).join('');
-  }
-  const mEl  = document.getElementById('multa-monto');
-  const nEl  = document.getElementById('multa-nota');
-  const fEl  = document.getElementById('multa-fecha');
-  const tEl  = document.getElementById('multa-tipo-sel');
-  if (mEl) mEl.value = m.monto || 0;
-  if (nEl) nEl.value = m.nota  || '';
-  if (fEl) fEl.value = m.fecha || new Date().toISOString().slice(0,10);
-  if (tEl) { tEl.value = m.tipo || 'multa'; tEl.dispatchEvent(new Event('change')); }
- 
-  document.getElementById('modal-multa-overlay')._editIdx = idx;
-  document.getElementById('modal-multa-overlay').classList.add('show');
-};
-
+   
 
   async function saveBases(item) {
     try {
@@ -7182,144 +7063,123 @@ const promDiario     = Math.round(pedsEntregados.length / diasPeriodo);
   window.renderContable = renderContable;
  
   function renderBases() {
-  const _bases = window._basesData || [];
-  const el = document.getElementById('cont-bases-list');
-  if (!el) return;
- 
-  if (!_bases.length) {
-    el.innerHTML = `<div class="empty-state"><div style="font-size:28px;opacity:.2;margin-bottom:8px;">💵</div><p>Sin bases registradas</p></div>`;
-    return;
+      const _bases = window._basesData || [];
+    const el = document.getElementById('cont-bases-list'); if (!el) return;
+    const filtered = _bases.slice().reverse();
+    if (!filtered.length) { el.innerHTML=`<div class="empty-state"><div class="ico" style="font-size:28px;opacity:.2;">💵</div><p>Sin bases registradas</p></div>`; return; }
+    el.innerHTML = filtered.map((b,ri) => { const i=_bases.length-1-ri; return `<div class="base-item"><div class="base-ico" style="background:var(--orange-l);color:var(--orange);"><span class="material-symbols-rounded" style="font-size:17px;">account_balance_wallet</span></div><div style="flex:1;"><div class="base-name">${b.domi}</div><div class="base-meta">${b.nota||'Sin nota'} · ${b.fecha}</div></div><div class="base-monto" style="color:var(--orange);">${fmtMoney(b.monto)}</div><button class="base-del" onclick="deleteBase(${i})" title="Eliminar"><span class="material-symbols-rounded" style="font-size:13px;">delete</span></button></div>`; }).join('');
   }
  
-  el.innerHTML = _bases.slice().reverse().map((b, ri) => {
-    const i = _bases.length - 1 - ri;
-    return `
-    <div class="multa-item" style="margin-bottom:7px;">
-      <div class="base-ico" style="background:var(--orange-l);color:var(--orange);">
-        <span class="material-symbols-rounded" style="font-size:16px;">account_balance_wallet</span>
-      </div>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:12px;font-weight:800;color:var(--text);">
-          ${b.domi}
-          <span style="font-size:9px;font-weight:800;padding:1px 7px;border-radius:99px;
-                       background:var(--orange-l);color:var(--orange);margin-left:4px;">Base</span>
-        </div>
-        <div style="font-size:10px;color:var(--text2);margin-top:2px;">${b.nota||'Sin nota'} · ${b.fecha}</div>
-      </div>
-      <div style="font-size:13px;font-weight:800;font-family:'DM Mono',monospace;
-                  color:var(--orange);flex-shrink:0;">
-        ${fmtMoney(b.monto)}
-      </div>
-      <!-- Editar -->
-      <button class="base-del" style="background:var(--teal-l);color:var(--teal-d);border-color:var(--border2);"
-        onclick="editBase(${i})" title="Editar">
-        <span class="material-symbols-rounded" style="font-size:13px;">edit</span>
-      </button>
-      <!-- Eliminar -->
-      <button class="base-del" onclick="deleteBase(${i})" title="Eliminar">
-        <span class="material-symbols-rounded" style="font-size:13px;">delete</span>
-      </button>
-    </div>`;
-  }).join('');
-}
- 
-function renderMultas() {
+window.renderMultas = function renderMultas() {
   const _multas = window._multasData || [];
   const el = document.getElementById('cont-multas-list');
   if (!el) return;
  
   if (!_multas.length) {
-    el.innerHTML = `<div class="empty-state"><div style="font-size:28px;opacity:.2;margin-bottom:8px;">⚖️</div><p>Sin multas ni restricciones</p></div>`;
+    el.innerHTML = `
+      <div class="empty-state">
+        <div class="ico" style="font-size:28px;opacity:.2;">⚖️</div>
+        <p>Sin multas ni restricciones</p>
+      </div>`;
     return;
   }
  
-  const iconos  = { multa:'gavel', pyp:'traffic', otro:'info' };
-  const labels  = { multa:'Multa', pyp:'P&P', otro:'Descuento' };
-  const colores = {
-    multa: { bg:'var(--red-l)',    text:'var(--red)',    badgeBg:'var(--red)',    badgeText:'#fff' },
-    pyp:   { bg:'var(--orange-l)', text:'var(--orange)', badgeBg:'var(--orange)', badgeText:'#fff' },
-    otro:  { bg:'var(--blue-l)',   text:'var(--blue)',   badgeBg:'var(--blue)',   badgeText:'#fff' },
-  };
+  /* ── Separar P&P de multas con descuento ── */
+  const pyps   = _multas.filter(m => m.tipo === 'pyp');
+  const multas = _multas.filter(m => m.tipo !== 'pyp');
  
-  el.innerHTML = _multas.slice().reverse().map((m, ri) => {
-    const i    = _multas.length - 1 - ri;
-    const tipo = m.tipo || 'multa';
-    const ico  = iconos[tipo]  || 'gavel';
-    const lbl  = labels[tipo]  || 'Multa';
-    const col  = colores[tipo] || colores.multa;
-    const esPyP = tipo === 'pyp';
+  let html = '';
  
-    return `
-    <div class="multa-item" style="margin-bottom:7px;
-         border-color:${esPyP ? 'rgba(217,119,6,.35)' : 'rgba(220,38,38,.2)'};
-         background:${esPyP ? 'rgba(254,243,199,.35)' : 'var(--white)'};">
- 
-      <div class="base-ico" style="background:${col.bg};color:${col.text};">
-        <span class="material-symbols-rounded" style="font-size:16px;">${ico}</span>
-      </div>
- 
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:12px;font-weight:800;color:var(--text);">
-          ${m.domi}
-          <span style="font-size:9px;font-weight:800;padding:1px 8px;border-radius:99px;
-                       background:${col.badgeBg};color:${col.badgeText};margin-left:4px;">
-            ${lbl}
-          </span>
+  /* ── Bloque Pico & Placa ── */
+  if (pyps.length) {
+    html += `
+      <div style="margin-bottom:14px;">
+        <div style="font-size:9px;font-weight:800;color:var(--orange);
+                    text-transform:uppercase;letter-spacing:.1em;
+                    margin-bottom:7px;display:flex;align-items:center;gap:5px;">
+          <span class="material-symbols-rounded" style="font-size:14px;">traffic</span>
+          Pico &amp; Placa
         </div>
-        <div style="font-size:10px;color:var(--text2);margin-top:2px;">
-          ${m.nota||'Sin nota'} · ${m.fecha}
-        </div>
-      </div>
+        ${pyps.slice().reverse().map(m => {
+          const i = _multas.indexOf(m);
+          return `
+          <div class="multa-item"
+               style="border-color:rgba(217,119,6,.35);background:rgba(254,243,199,.4);">
+            <div class="base-ico" style="background:var(--orange-l);color:var(--orange);">
+              <span class="material-symbols-rounded" style="font-size:16px;">traffic</span>
+            </div>
+            <div style="flex:1;">
+              <div class="base-name" style="font-size:12px;font-weight:800;color:var(--text);">
+                ${m.domi}
+              </div>
+              <div class="base-meta" style="font-size:10px;color:var(--text2);margin-top:2px;">
+                ${m.nota||'Sin nota'} · ${m.fecha}
+              </div>
+            </div>
+            <!-- Badge P&P -->
+            <span style="font-size:9px;font-weight:800;padding:2px 9px;border-radius:99px;
+                         background:var(--orange);color:#fff;flex-shrink:0;white-space:nowrap;">
+              P&amp;P
+            </span>
+            <!-- Sin descuento -->
+            <div style="font-size:10px;font-weight:700;color:var(--orange);
+                        text-align:right;flex-shrink:0;white-space:nowrap;">
+              Sin descuento
+            </div>
+            <button class="base-del" onclick="deleteMulta(${i})" title="Eliminar">
+              <span class="material-symbols-rounded" style="font-size:13px;">delete</span>
+            </button>
+          </div>`;
+        }).join('')}
+      </div>`;
+  }
  
-      <!-- Monto: si P&P mostrar "Sin descuento", si no mostrar monto -->
-      <div style="font-size:${esPyP?'10px':'13px'};font-weight:800;
-                  font-family:'DM Mono',monospace;color:${col.text};
-                  flex-shrink:0;white-space:nowrap;text-align:right;">
-        ${esPyP ? 'Sin descuento' : '-' + fmtMoney(m.monto)}
-      </div>
- 
-      <!-- Editar -->
-      <button class="base-del"
-        style="background:var(--teal-l);color:var(--teal-d);border-color:var(--border2);"
-        onclick="editMulta(${i})" title="Editar">
-        <span class="material-symbols-rounded" style="font-size:13px;">edit</span>
-      </button>
- 
-      <!-- Eliminar -->
-      <button class="base-del" onclick="deleteMulta(${i})" title="Eliminar">
-        <span class="material-symbols-rounded" style="font-size:13px;">delete</span>
-      </button>
- 
-    </div>`;
-  }).join('');
-}
- 
-  /* ── Multas con descuento ── */
+  /* ── Bloque Multas y Descuentos ── */
   if (multas.length) {
     const iconos = { multa:'gavel', otro:'info' };
     const labels = { multa:'Multa', otro:'Descuento' };
-    html += `<div>
-      ${pyps.length ? `<div style="font-size:9px;font-weight:800;color:var(--red);text-transform:uppercase;letter-spacing:.1em;margin-bottom:7px;display:flex;align-items:center;gap:5px;"><span class="material-symbols-rounded" style="font-size:13px;">gavel</span>Multas / Descuentos</div>` : ''}
-      ${multas.slice().reverse().map(m => {
-        const i   = _multas.indexOf(m);
-        const ico = iconos[m.tipo] || 'gavel';
-        const lbl = labels[m.tipo] || 'Multa';
-        return `<div class="multa-item" style="margin-bottom:7px;">
-          <div class="base-ico" style="background:var(--red-l);color:var(--red);">
-            <span class="material-symbols-rounded" style="font-size:16px;">${ico}</span>
-          </div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:12px;font-weight:800;color:var(--text);">
-              ${m.domi}
-              <span style="font-size:9px;font-weight:800;padding:1px 7px;border-radius:99px;background:var(--red-l);color:var(--red);margin-left:4px;">${lbl}</span>
+ 
+    html += `
+      <div>
+        ${pyps.length ? `
+        <div style="font-size:9px;font-weight:800;color:var(--red);
+                    text-transform:uppercase;letter-spacing:.1em;
+                    margin-bottom:7px;display:flex;align-items:center;gap:5px;">
+          <span class="material-symbols-rounded" style="font-size:14px;">gavel</span>
+          Multas / Descuentos
+        </div>` : ''}
+ 
+        ${multas.slice().reverse().map(m => {
+          const i   = _multas.indexOf(m);
+          const ico = iconos[m.tipo] || 'gavel';
+          const lbl = labels[m.tipo] || 'Multa';
+          return `
+          <div class="multa-item">
+            <div class="base-ico" style="background:var(--red-l);color:var(--red);">
+              <span class="material-symbols-rounded" style="font-size:16px;">${ico}</span>
             </div>
-            <div style="font-size:10px;color:var(--text2);margin-top:2px;">${m.nota||'Sin nota'} · ${m.fecha}</div>
-          </div>
-          <div style="font-size:13px;font-weight:800;font-family:'DM Mono',monospace;color:var(--red);flex-shrink:0;">-${fmtMoney(m.monto)}</div>
-          <button class="base-del" onclick="deleteMulta(${i})"><span class="material-symbols-rounded" style="font-size:13px;">delete</span></button>
-        </div>`;
-      }).join('')}
-    </div>`;
+            <div style="flex:1;">
+              <div class="base-name" style="font-size:12px;font-weight:800;color:var(--text);">
+                ${m.domi}
+                <span style="font-size:9px;font-weight:800;padding:1px 7px;border-radius:99px;
+                             background:var(--red-l);color:var(--red);margin-left:4px;">
+                  ${lbl}
+                </span>
+              </div>
+              <div class="base-meta" style="font-size:10px;color:var(--text2);margin-top:2px;">
+                ${m.nota||'Sin nota'} · ${m.fecha}
+              </div>
+            </div>
+            <div class="base-monto" style="color:var(--red);font-size:13px;
+                                           font-family:'DM Mono',monospace;font-weight:800;">
+              -${fmtMoney(m.monto)}
+            </div>
+            <button class="base-del" onclick="deleteMulta(${i})" title="Eliminar">
+              <span class="material-symbols-rounded" style="font-size:13px;">delete</span>
+            </button>
+          </div>`;
+        }).join('')}
+      </div>`;
   }
  
   el.innerHTML = html;
@@ -7351,45 +7211,40 @@ window.openMultaModal = function() {
   if (ts) ts.value = 'multa';
   document.getElementById('modal-multa-overlay').classList.add('show');
 };
-window.saveBase = async function() {
-  const ov    = document.getElementById('modal-base-overlay');
+ window.saveBase = async function() {
   const domi  = document.getElementById('base-domi-select')?.value?.trim();
   const monto = parsePrecio(document.getElementById('base-monto')?.value || '');
   const nota  = (document.getElementById('base-nota')?.value || '').trim();
-  const fecha = document.getElementById('base-fecha')?.value || new Date().toISOString().slice(0,10);
- 
-  if (!domi)  { showToast('w','Falta domiciliario','Selecciona un domi'); return; }
+  const fechaEl = document.getElementById('base-fecha');
+  const fecha = fechaEl?.value || new Date().toISOString().slice(0,10);
+
+  if (!domi)  { showToast('w','Falta domiciliario','Selecciona un domiciliario'); return; }
   if (!monto) { showToast('w','Falta monto','Ingresa un monto válido'); return; }
- 
-  const btn = ov?.querySelector('.om-btn-save');
-  if (btn) { btn.disabled=true; btn.innerHTML='<span class="material-symbols-rounded" style="animation:spin .8s linear infinite;font-size:15px;">progress_activity</span> Guardando…'; }
- 
-  const editIdx = ov?._editIdx;
-  const esEdicion = editIdx !== undefined && editIdx !== null;
+
+  const btn = document.querySelector('#modal-base-overlay .om-btn-save');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-rounded" style="animation:spin .8s linear infinite">progress_activity</span> Guardando…'; }
+
   const item = { domi, monto, nota, fecha };
- 
   window._basesData = window._basesData || [];
-  if (esEdicion) {
-    window._basesData[editIdx] = item;
-    ov._editIdx = null;
-  } else {
-    window._basesData.push(item);
-  }
- 
-  ov?.classList.remove('show');
-  showToast('i', `${esEdicion?'Actualizando':'Guardando'} base para ${domi}…`, fmtMoney(monto));
- 
+  window._basesData.push(item);
+  renderBases(); renderContable();
+  document.getElementById('modal-base-overlay').classList.remove('show');
+  showToast('i', `Guardando base para ${domi}…`, fmtMoney(monto));
+
   try {
-    const accion = esEdicion ? 'editar-base' : 'crear-base';
-    const GAS = typeof SHEET_SCRIPT_URL !== 'undefined' ? SHEET_SCRIPT_URL : '';
-    await fetch(GAS, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({ accion, domi, monto, nota, fecha }) });
-    if (typeof loadBases === 'function') await loadBases();
-    if (typeof renderContable === 'function') renderContable();
-    showToast('s', `Base ${esEdicion?'actualizada':'guardada'}`, fmtMoney(monto) + (nota ? ' · '+nota : ''));
+    await fetch(SHEET_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ accion: 'crear-base', domi, monto, nota, fecha })
+    });
+    await loadBases();
+    window._basesData = window._basesData; // ya actualizado
+    renderBases(); renderContable();
+    showToast('s', `Base dada a ${domi}`, fmtMoney(monto) + (nota ? ' · ' + nota : ''));
   } catch(e) {
-    showToast('e','Error al guardar base', e.message.substring(0,60));
+    showToast('e', 'Error al guardar base', e.message.substring(0, 60));
   } finally {
-    if (btn) { btn.disabled=false; btn.innerHTML='<span class="material-symbols-rounded">savings</span>Dar base'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-rounded">savings</span>Dar base'; }
   }
 };
 
@@ -7695,71 +7550,96 @@ window.deleteMulta = async function(idx) {
       window._cierresData = window._cierresData || [];
     }
   }
+
 window.renderCierresCaja = function() {
   const el = document.getElementById('cont-cierres-list');
   if (!el) return;
   const cierres = (window._cierresData || []).slice(0, 20);
   if (!cierres.length) {
-    el.innerHTML = `<div class="empty-state"><div style="font-size:28px;opacity:.2;margin-bottom:8px;">🏦</div><p>Sin cierres registrados hoy</p></div>`;
+    el.innerHTML = `<div class="empty-state"><div style="font-size:28px;opacity:.2;margin-bottom:8px;">🏦</div><p>Sin cierres registrados</p></div>`;
     return;
   }
+
   const eCfg = {
-    ok:       { color:'var(--green)',  bg:'var(--green-l)',  ico:'check_circle', lbl:'Cuadre OK'  },
-    faltante: { color:'var(--red)',    bg:'var(--red-l)',    ico:'warning',       lbl:'Faltante'   },
-    sobrante: { color:'var(--orange)', bg:'var(--orange-l)', ico:'arrow_upward', lbl:'Sobrante'   },
+    ok:       { badge:`<span style="margin-left:auto;font-size:9px;font-weight:800;padding:3px 10px;border-radius:99px;background:#dcfce7;color:#166534;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;">✓ Caja OK</span>`, difColor:'#16a34a', difBg:'rgba(22,163,74,.08)', difBorder:'rgba(22,163,74,.2)', difLbl:'Cuadre ✓' },
+    faltante: { badge:`<span style="margin-left:auto;font-size:9px;font-weight:800;padding:3px 10px;border-radius:99px;background:#fee2e2;color:#991b1b;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;">⚠ Faltante</span>`, difColor:'#dc2626', difBg:'rgba(220,38,38,.08)', difBorder:'rgba(220,38,38,.2)', difLbl:'Faltante' },
+    sobrante: { badge:`<span style="margin-left:auto;font-size:9px;font-weight:800;padding:3px 10px;border-radius:99px;background:#fef3c7;color:#92400e;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;">↑ Sobrante</span>`, difColor:'#d97706', difBg:'rgba(217,119,6,.08)', difBorder:'rgba(217,119,6,.2)', difLbl:'Sobrante' },
   };
+  const tCfg = {
+    '1': { lbl:'T1 — Mañana',     bg:'#fef3c7', color:'#92400e' },
+    '2': { lbl:'T2 — Tarde/Noche', bg:'#dbeafe', color:'#1e40af' },
+  };
+
   el.innerHTML = cierres.map(c => {
-    const sc   = eCfg[c.estado] || eCfg.ok;
-    const tLbl = c.turno === '1' ? '☀️ T1 — Mañana' : '🌙 T2 — Tarde';
-    const dif  = parseFloat(c.diferencia) || 0;
-    const esOk = Math.abs(dif) < 500;
+    const sc  = eCfg[c.estado] || eCfg.ok;
+    const tc  = tCfg[c.turno]  || { lbl:'Turno ' + c.turno, bg:'#f1f5f9', color:'#334155' };
+    const dif = parseFloat(c.diferencia) || 0;
+    const difLabel = fmtMoney(Math.abs(dif));
+
+    const badgeHtml = (()=>{
+      const base = `margin-left:auto;font-size:9px;font-weight:800;padding:3px 10px;border-radius:99px;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;`;
+      if (c.estado === 'ok')       return `<span style="${base}background:#dcfce7;color:#166534;">✓ Caja OK</span>`;
+      if (c.estado === 'faltante') return `<span style="${base}background:#fee2e2;color:#991b1b;">⚠ Faltante ${difLabel}</span>`;
+      return `<span style="${base}background:#fef3c7;color:#92400e;">↑ Sobrante ${difLabel}</span>`;
+    })();
+
     return `
-    <div class="cierre-item">
- 
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-        <span class="cierre-turno-badge ${c.turno==='1'?'cierre-turno-1':'cierre-turno-2'}">${tLbl}</span>
-        <span style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${c.fecha||''} · ${c.hora||''}</span>
-        <span style="margin-left:auto;font-size:9px;font-weight:800;padding:2px 9px;border-radius:99px;background:${sc.bg};color:${sc.color};display:inline-flex;align-items:center;gap:3px;">
-          <span class="material-symbols-rounded" style="font-size:11px;">${sc.ico}</span>${sc.lbl}
+    <div style="background:var(--white,#fff);border:1.5px solid var(--border,#dde8ea);border-radius:16px;overflow:hidden;margin-bottom:12px;transition:box-shadow .18s;"
+         onmouseover="this.style.boxShadow='0 4px 16px rgba(40,185,193,.09)'"
+         onmouseout="this.style.boxShadow='none'">
+
+      <!-- Header: turno + fecha + badge -->
+      <div style="padding:11px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border,#eef3f4);flex-wrap:wrap;">
+        <span style="font-size:10px;font-weight:800;padding:3px 10px;border-radius:99px;background:${tc.bg};color:${tc.color};">
+          ${tc.lbl}
         </span>
+        <span style="font-size:11px;color:var(--text3,#7da0a4);font-family:'DM Mono',monospace;">
+          ${c.fecha || ''}${c.hora ? '  ·  ' + c.hora : ''}
+        </span>
+        ${badgeHtml}
       </div>
- 
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;background:var(--bg2);border-radius:9px;padding:9px 12px;">
+
+      <!-- Personas -->
+      <div style="display:flex;align-items:center;padding:10px 16px;background:var(--bg,#f8fbfc);border-bottom:1px solid var(--border,#eef3f4);">
         <div style="flex:1;text-align:center;">
-          <div style="font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;margin-bottom:2px;">Entrega</div>
-          <div style="font-size:12px;font-weight:800;color:var(--text);">${c.entrega||'—'}</div>
+          <div style="font-size:9px;font-weight:700;color:var(--text3,#7da0a4);text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px;">Entrega</div>
+          <div style="font-size:13px;font-weight:800;color:var(--text,#0c2225);">${c.entrega || '—'}</div>
         </div>
-        <span class="material-symbols-rounded" style="color:var(--teal);font-size:18px;">arrow_forward</span>
+        <span class="material-symbols-rounded" style="color:var(--teal,#28B9C1);font-size:20px;flex-shrink:0;padding:0 8px;">arrow_forward</span>
         <div style="flex:1;text-align:center;">
-          <div style="font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;margin-bottom:2px;">Recibe</div>
-          <div style="font-size:12px;font-weight:800;color:var(--text);">${c.recibe||'—'}</div>
+          <div style="font-size:9px;font-weight:700;color:var(--text3,#7da0a4);text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px;">Recibe</div>
+          <div style="font-size:13px;font-weight:800;color:var(--text,#0c2225);">${c.recibe || '—'}</div>
         </div>
       </div>
- 
-      <div class="cierre-kpi-grid" style="margin-bottom:${c.novedades?'10px':'0'};">
-        <div class="cierre-kpi">
-          <div class="cierre-kpi-val" style="color:var(--teal);">${c.pedidos||0}</div>
-          <div class="cierre-kpi-lbl">Pedidos</div>
+
+      <!-- KPIs: pedidos · efectivo · transferencia · diferencia -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:12px 16px;">
+        <div style="background:var(--bg,#f4f7f8);border-radius:10px;padding:10px 8px;text-align:center;">
+          <div style="font-size:15px;font-weight:800;color:var(--green,#16a34a);font-family:'DM Mono',monospace;margin-bottom:2px;">${c.pedidos || 0}</div>
+          <div style="font-size:9px;color:var(--text3,#7da0a4);text-transform:uppercase;letter-spacing:.06em;">Pedidos</div>
         </div>
-        <div class="cierre-kpi">
-          <div class="cierre-kpi-val" style="color:var(--green);">${fmtMoney(c.totalEf||0)}</div>
-          <div class="cierre-kpi-lbl">Efectivo</div>
+        <div style="background:var(--bg,#f4f7f8);border-radius:10px;padding:10px 8px;text-align:center;">
+          <div style="font-size:13px;font-weight:800;color:var(--green,#16a34a);font-family:'DM Mono',monospace;margin-bottom:2px;">${c.totalEf > 0 ? fmtMoney(c.totalEf) : '—'}</div>
+          <div style="font-size:9px;color:var(--text3,#7da0a4);text-transform:uppercase;letter-spacing:.06em;">Efectivo</div>
         </div>
-        <div class="cierre-kpi">
-          <div class="cierre-kpi-val" style="color:var(--blue);">${fmtMoney(c.totalTf||0)}</div>
-          <div class="cierre-kpi-lbl">Transferencia</div>
+        <div style="background:var(--bg,#f4f7f8);border-radius:10px;padding:10px 8px;text-align:center;">
+          <div style="font-size:13px;font-weight:800;color:var(--blue,#2563eb);font-family:'DM Mono',monospace;margin-bottom:2px;">${c.totalTf > 0 ? fmtMoney(c.totalTf) : '—'}</div>
+          <div style="font-size:9px;color:var(--text3,#7da0a4);text-transform:uppercase;letter-spacing:.06em;">Transf.</div>
         </div>
-        <div class="cierre-kpi" style="background:${sc.bg};">
-          <div class="cierre-kpi-val" style="color:${sc.color};">${dif<0?'-':''}${fmtMoney(Math.abs(dif))}</div>
-          <div class="cierre-kpi-lbl" style="color:${sc.color};opacity:.8;">${esOk?'OK ✓':dif<0?'Faltante':'Sobrante'}</div>
+        <div style="background:${sc.difBg};border:1.5px solid ${sc.difBorder};border-radius:10px;padding:10px 8px;text-align:center;">
+          <div style="font-size:13px;font-weight:800;color:${sc.difColor};font-family:'DM Mono',monospace;margin-bottom:2px;">${fmtMoney(Math.abs(dif))}</div>
+          <div style="font-size:9px;font-weight:700;color:${sc.difColor};text-transform:uppercase;letter-spacing:.06em;">${sc.difLbl}</div>
         </div>
       </div>
- 
-      ${c.novedades?`<div style="background:var(--orange-l);border:1px solid rgba(217,119,6,.2);border-radius:8px;padding:8px 12px;display:flex;align-items:flex-start;gap:7px;"><span class="material-symbols-rounded" style="font-size:14px;color:var(--orange);flex-shrink:0;margin-top:1px;">edit_note</span><span style="font-size:12px;color:var(--text2);line-height:1.5;">${c.novedades}</span></div>`:''}
+
+      ${c.novedades ? `
+      <div style="margin:0 16px 12px;background:#fef9ec;border:1px solid #f0d060;border-radius:10px;padding:9px 12px;display:flex;align-items:flex-start;gap:8px;">
+        <span class="material-symbols-rounded" style="font-size:15px;color:#d97706;flex-shrink:0;margin-top:1px;">edit_note</span>
+        <span style="font-size:12px;color:#92400e;line-height:1.5;">${c.novedades}</span>
+      </div>` : ''}
     </div>`;
   }).join('');
 };
- 
  
  
   function kpiCaj(ico, color, val, lbl) {
@@ -7782,7 +7662,7 @@ window.renderCierresCaja = function() {
       '<div style="font-size:8px;color:' + c2 + ';margin-top:2px;">' + (esOk ? 'OK ✓' : dif < 0 ? 'Faltante' : 'Sobrante') + '</div>' +
     '</div>';
   }
-
+}
  
   // Cargar cierres al iniciar
   loadCierresCaja().then(() => renderCierresCaja());
@@ -8405,7 +8285,7 @@ body.apro-fs #pg-actividad{position:fixed!important;inset:0!important;height:100
 ═══════════════════════════════════════════════ */
 (function patchContableV2() {
 
-  const GAS = 'https://script.google.com/macros/s/AKfycbwbypqPgL16lssPdQsktDx9dHs0My_cMaS7YNQrMSkzY8Kw7HPmFgJHZeImkW2EJ48H7A/exec';
+  const GAS = 'https://script.google.com/macros/library/d/1II0KlakVS10fD1wr-aO_W-d6Hy9zvEH2Km79E4Ei51C07fRaKsHx420n/80';
 
   /* ── 1. CSS crítico para móvil ── */
   const s = document.createElement('style');
@@ -8559,7 +8439,7 @@ body.apro-fs #pg-actividad{position:fixed!important;inset:0!important;height:100
 
     const item = { domi, monto, nota, tipo, fecha };
     window._multasData = window._multasData || [];
-    if (!esPyP) window._multasData.push(item); // P&P no afecta balance
+   window._multasData.push(item);// P&P no afecta balance
 
     document.getElementById('modal-multa-overlay').classList.remove('show');
     showToast('i', esPyP ? `🚦 P&P registrado para ${domi}` : `Guardando multa para ${domi}…`, esPyP ? 'Sin descuento de saldo' : fmtMoney(monto));
@@ -8853,86 +8733,66 @@ body.apro-fs #pg-actividad{position:fixed!important;inset:0!important;height:100
 
     /* ── CSS compacto para el modal ── */
     st.textContent = `
-  .kpi-card {
-    background: var(--white, #fff);
-    border: 1.5px solid var(--border, #dde8ea);
-    border-radius: 12px;
-    padding: 13px 14px;
-    display: flex;
-    align-items: flex-start;
-    gap: 11px;
-    position: relative;
-    overflow: hidden;
-    transition: box-shadow .18s;
-  }
-  .kpi-card:hover { box-shadow: 0 4px 14px rgba(40,185,193,.09); }
-  .kpi-acc {
-    position: absolute;
-    left: 0; top: 0; bottom: 0;
-    width: 3px;
-    border-radius: 12px 0 0 12px;
-  }
-  .kpi-ico {
-    width: 34px; height: 34px;
-    border-radius: 9px;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-    font-size: 16px;
-  }
-  .kpi-lbl {
-    font-size: 10px; font-weight: 700;
-    color: var(--text3, #7da0a4);
-    text-transform: uppercase; letter-spacing: .07em;
-    margin-bottom: 4px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .kpi-val {
-    font-size: 19px; font-weight: 800;
-    font-family: 'DM Mono', monospace;
-    line-height: 1; margin-bottom: 3px;
-  }
-  .kpi-sub { font-size: 10px; color: var(--text3, #7da0a4); }
-
-  /* ── Cards resumen caja ── */
-  #caja-stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
-  @media(max-width:520px){ #caja-stats-grid { grid-template-columns: repeat(2,1fr) !important; } }
-  .caja-sc {
-    background: rgba(255,255,255,.09);
-    border: 1px solid rgba(255,255,255,.16);
-    border-radius: 10px;
-    padding: 11px 9px; text-align: center;
-  }
-  .caja-sc-ico { font-size: 15px; display: block; margin-bottom: 4px; }
-  .caja-sc-num { font-size: 14px; font-weight: 800; font-family: 'DM Mono',monospace; line-height: 1.1; margin-bottom: 3px; }
-  .caja-sc-sub { font-size: 10px; font-weight: 600; opacity: .7; margin-bottom: 2px; }
-  .caja-sc-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: rgba(255,255,255,.55) !important; }
-
-  /* ── Multas / P&P ── */
-  #multa-monto-wrap.pyp-hidden { display: none !important; }
-  .pyp-aviso { display:none; align-items:center; gap:8px; background:var(--orange-l,#fef3c7); border:1.5px solid rgba(217,119,6,.3); border-radius:11px; padding:10px 14px; font-size:12px; font-weight:700; color:#92400e; margin-bottom:14px; }
-  .pyp-aviso.show { display:flex; }
-
-  /* ── Cierres en contable ── */
-  .cierre-item { background:var(--white,#fff); border:1.5px solid var(--border,#dde8ea); border-radius:14px; padding:14px 16px; margin-bottom:10px; transition:box-shadow .18s; }
-  .cierre-item:hover { box-shadow:0 4px 16px rgba(40,185,193,.09); }
-  .cierre-turno-badge { font-size:10px; font-weight:800; padding:3px 10px; border-radius:99px; }
-  .cierre-turno-1 { background:var(--orange-l,#fef3c7); color:var(--orange,#d97706); }
-  .cierre-turno-2 { background:var(--blue-l,#dbeafe); color:var(--blue,#2563eb); }
-  .cierre-kpi-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:7px; }
-  @media(max-width:600px){ .cierre-kpi-grid { grid-template-columns:repeat(2,1fr) !important; } }
-  .cierre-kpi { background:var(--bg,#f4f7f8); border-radius:9px; padding:9px 7px; text-align:center; }
-  .cierre-kpi-val { font-size:12px; font-weight:800; font-family:'DM Mono',monospace; margin-bottom:3px; }
-  .cierre-kpi-lbl { font-size:8px; color:var(--text3,#7da0a4); text-transform:uppercase; letter-spacing:.06em; }
-
   #modal-caja-overlay { font-size:13px !important; }
-  .caja-modal .om-label { font-size:10px !important; margin-bottom:4px !important; font-weight:700 !important; }
-  .caja-modal .om-input, .caja-modal .om-select { font-size:13px !important; padding:9px 12px !important; border-radius:9px !important; }
+ 
+  .caja-modal .om-label {
+    font-size:10px !important;
+    margin-bottom:4px !important;
+    color:var(--text2) !important;
+    font-weight:700 !important;
+  }
+  .caja-modal .om-input,
+  .caja-modal .om-select {
+    font-size:13px !important;
+    padding:9px 12px !important;
+    border-radius:9px !important;
+    color:var(--text) !important;
+  }
   .caja-modal .om-field { margin-bottom:12px !important; }
-  #caja-resumen-auto { padding:14px !important; margin-bottom:14px !important; border-radius:12px !important; }
-  #caja-diferencia-box { padding:10px 13px !important; border-radius:9px !important; margin-top:10px !important; }
-  #caja-novedades { min-height:55px !important; font-size:13px !important; padding:9px 12px !important; }
-  #btn-guardar-caja { padding:12px !important; font-size:13px !important; }
-
+ 
+  #caja-resumen-auto {
+    padding:14px !important;
+    margin-bottom:14px !important;
+    border-radius:12px !important;
+  }
+ 
+  #caja-stats-grid {
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:8px;
+  }
+  @media(max-width:520px){
+    #caja-stats-grid { grid-template-columns:repeat(2,1fr) !important; }
+  }
+ 
+  /* Cards del resumen: fondo oscuro con texto legible */
+  .caja-sc {
+    background:rgba(255,255,255,.10);
+    border:1px solid rgba(255,255,255,.18);
+    border-radius:10px;
+    padding:10px 8px;
+    text-align:center;
+  }
+  /* Valor principal — grande y visible */
+  .caja-sv {
+    font-size:14px;
+    font-weight:800;
+    font-family:'DM Mono',monospace;
+    line-height:1.1;
+    margin-bottom:4px;
+  }
+  /* Etiqueta inferior — blanca semitransparente, legible */
+  .caja-sl {
+    font-size:9px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:rgba(255,255,255,.70) !important;
+  }
+ 
+  #caja-diferencia-box  { padding:10px 13px !important; border-radius:9px !important; margin-top:10px !important; }
+  #caja-novedades       { min-height:55px !important; font-size:13px !important; padding:9px 12px !important; }
+  #btn-guardar-caja     { padding:12px !important; font-size:13px !important; }
  
   /* Multas / P&P */
   .pyp-aviso {
@@ -9018,83 +8878,72 @@ document.head.appendChild(st);
     }
 
     /* ── calcResumenTurno: lee allPedidos filtrando fecha + turno ── */
-window.calcResumenTurno = function() {
+    window.calcResumenTurno = function() {
   const turno = document.getElementById('caja-turno')?.value || '1';
-  /* SIEMPRE hoy — ignorar el campo fecha del modal para el resumen */
-  const hoy = new Date();
-  const hoyStr = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
- 
+  const fecha = document.getElementById('caja-fecha')?.value || new Date().toISOString().slice(0,10);
   const hiIni = turno === '1' ?  0 : 14;
   const hiFin = turno === '1' ? 14 : 24;
  
-  /* Filtrar por fecha actual (col N = p.fecha) */
+  /* ── Filtrar pedidos por fecha (col N del sheet = p.fecha) ── */
   const pedsDia = (window.allPedidos || []).filter(p => {
     const fn = (p.fecha || '').trim();
     if (!fn) return false;
     const d = typeof parseDate === 'function' ? parseDate(fn) : null;
     if (!d || isNaN(d)) return false;
-    const str = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    return str === hoyStr;
+    const yyyy = d.getFullYear();
+    const mm   = String(d.getMonth()+1).padStart(2,'0');
+    const dd   = String(d.getDate()).padStart(2,'0');
+    return `${yyyy}-${mm}-${dd}` === fecha;
   });
  
-  /* Filtrar por turno */
+  /* ── Filtrar por turno ── */
   const pedsT = pedsDia.filter(p => {
     if (!p.hora) return true;
     const h = parseInt((p.hora || '0:00').split(':')[0]);
     return h >= hiIni && h < hiFin;
   });
  
-  /* Conteos */
-  const ent    = pedsT.filter(p => p.estado === 'entregado').length;
-  const pend   = pedsT.filter(p => p.estado === 'pendiente').length;
-  const proc   = pedsT.filter(p => ['proceso','encamino','asignado'].includes(p.estado)).length;
+  /* ── Conteos por estado (col E) ── */
+  const ent  = pedsT.filter(p => p.estado === 'entregado').length;
+  const pend = pedsT.filter(p => p.estado === 'pendiente').length;
+  const proc = pedsT.filter(p => ['proceso','encamino','asignado'].includes(p.estado)).length;
+ 
+  /* ── Método de pago (col D = p.metodo) ── */
   const efPeds = pedsT.filter(p => /efecti/i.test(p.metodo || ''));
   const tfPeds = pedsT.filter(p => /transfer/i.test(p.metodo || ''));
   const totalEf = efPeds.reduce((s,p) => s + parsePrecio(p.total), 0);
   const totalTf = tfPeds.reduce((s,p) => s + parsePrecio(p.total), 0);
   const totalT  = totalEf + totalTf;
  
-  /* Render 4 cards — distribuidas horizontalmente */
+  /* ── Renderizar 4 cards de resumen (fondo oscuro del modal) ── */
   const grid = document.getElementById('caja-stats-grid');
   if (grid) {
-    const cards = [
-      {
-        ico: 'check_circle', color: '#4ade80',
-        num: String(ent),
-        sub: `${pend+proc} pendientes`,
-        lbl: 'Entregados'
-      },
-      {
-        ico: 'payments', color: '#86efac',
-        num: fmtMoney(totalEf),
-        sub: `${efPeds.length} pedido${efPeds.length!==1?'s':''}`,
-        lbl: 'Efectivo'
-      },
-      {
-        ico: 'account_balance', color: '#93c5fd',
-        num: fmtMoney(totalTf),
-        sub: `${tfPeds.length} pedido${tfPeds.length!==1?'s':''}`,
-        lbl: 'Transferencia'
-      },
-      {
-        ico: 'point_of_sale', color: 'var(--teal)',
-        num: fmtMoney(totalT),
-        sub: `${pedsT.length} total`,
-        lbl: 'Total caja'
-      },
-    ];
-    grid.innerHTML = cards.map(k => `
+    grid.innerHTML = [
+      { ico:'check_circle',    color:'#4ade80', val: String(ent),               lbl:`Entregados` },
+      { ico:'pending_actions', color:'#fbbf24', val: String(pend + proc),       lbl:`Pend/Proceso` },
+      /* Efectivo: número de pedidos + monto */
+      { ico:'payments',        color:'#86efac',
+        val: `${efPeds.length} · ${fmtMoney(totalEf)}`,
+        lbl:'Efectivo' },
+      /* Transferencias: número de pedidos + monto */
+      { ico:'account_balance', color:'#93c5fd',
+        val: `${tfPeds.length} · ${fmtMoney(totalTf)}`,
+        lbl:'Transferencia' },
+    ].map(k => `
       <div class="caja-sc">
-        <span class="material-symbols-rounded caja-sc-ico" style="color:${k.color};">${k.ico}</span>
-        <div class="caja-sc-num" style="color:${k.color};">${k.num}</div>
-        <div class="caja-sc-sub" style="color:${k.color};">${k.sub}</div>
-        <div class="caja-sc-lbl">${k.lbl}</div>
+        <span class="material-symbols-rounded"
+          style="font-size:14px;color:${k.color};display:block;margin-bottom:5px;">
+          ${k.ico}
+        </span>
+        <div class="caja-sv" style="color:${k.color};">${k.val}</div>
+        <div class="caja-sl">${k.lbl}</div>
       </div>`).join('');
   }
  
-  /* Prellenar sin sobrescribir si ya tienen valor */
+  /* ── Prellenar campos si están vacíos ── */
   const efInput = document.getElementById('caja-efectivo');
   if (efInput && !efInput.value) efInput.value = String(Math.round(totalEf));
+ 
   const basesTotal = (window._basesData || []).reduce((s,b) => s + b.monto, 0);
   const bInput = document.getElementById('caja-bases');
   if (bInput && !bInput.value) bInput.value = String(Math.round(basesTotal));
@@ -9207,6 +9056,86 @@ window.calcResumenTurno = function() {
   }
 
 })();
+</script>
+
+<script>
+/* ══ PARCHE: eliminar base/multa del sheet ══ */
+window.deleteBase = async function(idx) {
+  const _bases = window._basesData || [];
+  if (!confirm('¿Eliminar esta base?')) return;
+  const item = _bases[idx];
+  if (!item) return;
+
+  window._basesData.splice(idx, 1);
+  if (typeof renderBases === 'function') renderBases();
+  if (typeof renderContable === 'function') renderContable();
+  showToast('i', 'Eliminando base…', item.domi + ' · ' + fmtMoney(item.monto));
+
+  try {
+    const res = await fetch(SHEET_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        accion: 'eliminar-base',
+        domi:   item.domi,
+        monto:  item.monto,
+        fecha:  item.fecha
+      })
+    });
+    const json = await res.json();
+    if (json.ok !== false) {
+      showToast('s', 'Base eliminada del sheet ✓', item.domi);
+    } else {
+      showToast('e', 'Error en el sheet', json.error || '');
+    }
+  } catch(e) {
+    showToast('e', 'Error de red', e.message.substring(0, 60));
+  } finally {
+    if (typeof loadBases === 'function') {
+      await loadBases();
+      if (typeof renderContable === 'function') renderContable();
+    }
+  }
+};
+
+window.deleteMulta = async function(idx) {
+  const _multas = window._multasData || [];
+  if (!confirm('¿Eliminar este registro?')) return;
+  const item = _multas[idx];
+  if (!item) return;
+
+  window._multasData.splice(idx, 1);
+  if (typeof renderMultas === 'function') renderMultas();
+  if (typeof renderContable === 'function') renderContable();
+  showToast('i', 'Eliminando registro…', item.domi);
+
+  try {
+    const res = await fetch(SHEET_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        accion: 'eliminar-multa',
+        domi:   item.domi,
+        monto:  item.monto,
+        tipo:   item.tipo  || 'multa',
+        fecha:  item.fecha
+      })
+    });
+    const json = await res.json();
+    if (json.ok !== false) {
+      showToast('s', 'Registro eliminado del sheet ✓', item.domi);
+    } else {
+      showToast('e', 'Error en el sheet', json.error || '');
+    }
+  } catch(e) {
+    showToast('e', 'Error de red', e.message.substring(0, 60));
+  } finally {
+    if (typeof loadMultas === 'function') {
+      await loadMultas();
+      if (typeof renderContable === 'function') renderContable();
+    }
+  }
+};
 </script>
 
 </script>
