@@ -1010,9 +1010,14 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
         </div>
       </div>
  
+     
       <!-- Datos entrega PARA MÍ -->
       <div id="wil-sec-dir-mi" class="hidden" style="margin-top:10px">
         <div style="border-top:0.5px solid var(--bd,#e2e2de);margin:12px 0 10px"></div>
+        <div class="field">
+          <label>Tu nombre *</label>
+          <input type="text" id="wil-nombre-mi" placeholder="Tu nombre completo"/>
+        </div>
         <div class="field">
           <label>Dirección de entrega *</label>
           <input type="text" id="wil-dir-mi" placeholder="Calle 50 #45-23, Barrio El Centro"/>
@@ -4217,15 +4222,18 @@ function wilGoLibre2(){
   L.barrioEntrega  = hidE.value;
   L.tarifaDomi     = Math.max(pR, pE);
  
-  if(L.destino === 'mi'){
+ if(L.destino === 'mi'){
+    const nom = document.getElementById('wil-nombre-mi')?.value.trim();
     const dir = document.getElementById('wil-dir-mi')?.value.trim();
     const tel = document.getElementById('wil-tel-mi')?.value.trim();
-    if(!dir){ alert('Escribe tu dirección de entrega.'); return; }
-    if(!tel){ alert('Escribe tu teléfono.'); return; }
+    if(!nom){ mostrarToast('Escribe tu nombre.','person'); return; }
+    if(!dir){ mostrarToast('Escribe tu dirección de entrega.','location_on'); return; }
+    if(!tel){ mostrarToast('Escribe tu teléfono.','phone'); return; }
     L.direccion  = dir;
     L.referencia = document.getElementById('wil-ref-mi')?.value.trim() || '';
     L.recibeTel  = tel;
-    L.nombre     = '';   // se pedirá nombre en P3 si se quiere, o se usa el tel
+    L.nombre     = nom;
+    L.recibeNombre = nom;
   }
  
   if(L.destino === 'otro'){
@@ -4567,7 +4575,7 @@ async function confirmarPedidoDirecto(){
     state.nombre   = L.recibeNombre || L.enviaNombre || 'Cliente';
     state.telefono = L.recibeTel   || L.enviaTel    || '';
   } else {
-    state.nombre   = 'Cliente';
+    state.nombre   = L.nombre || L.recibeNombre || 'Cliente';
     state.telefono = L.recibeTel || '';
   }
 
@@ -4674,37 +4682,39 @@ async function confirmarPedidoDirecto(){
       'Pedido #'+id+' registrado. Un domiciliario WIL te contactará pronto al '+state.telefono+'.';
 
     /* Botón copiar código */
+    /* ── Botón COPIAR — cloneNode para limpiar listeners previos ── */
     var copiarBtn = document.getElementById('id-badge-copy-btn');
     if(copiarBtn){
-      copiarBtn.onclick = function(){
+      var copiarNew = copiarBtn.cloneNode(true);
+      copiarBtn.parentNode.replaceChild(copiarNew, copiarBtn);
+      copiarNew.addEventListener('click', function(){
         if(navigator.clipboard){
           navigator.clipboard.writeText(id).then(function(){
             mostrarToast('Código '+id+' copiado ✓','content_copy');
-          });
+          }).catch(function(){ _copiarFallback(id); });
         } else {
-          var ta = document.createElement('textarea');
-          ta.value = id; document.body.appendChild(ta);
-          ta.select(); document.execCommand('copy');
-          document.body.removeChild(ta);
-          mostrarToast('Código '+id+' copiado ✓','content_copy');
+          _copiarFallback(id);
         }
-      };
+      });
     }
 
-    /* Botón rastrear */
+    /* ── Botón RASTREAR — cloneNode para limpiar listeners previos ── */
     var rastrearBtn = document.getElementById('id-badge-rastrear-btn');
     if(rastrearBtn){
-      rastrearBtn.onclick = function(){
+      var rastrearNew = rastrearBtn.cloneNode(true);
+      rastrearBtn.parentNode.replaceChild(rastrearNew, rastrearBtn);
+      rastrearNew.addEventListener('click', function(){
         navTo('rastrear');
-        var inp = document.getElementById('rastrearInput');
-        if(inp){ inp.value = id; }
-        rtAbrirPopup();
-        setTimeout(rastrearPedido, 200);
-      };
+        setTimeout(function(){
+          var inp = document.getElementById('rastrearInput');
+          if(inp){ inp.value = id; }
+          rtAbrirPopup();
+          setTimeout(rastrearPedido, 300);
+        }, 250);
+      });
     }
 
     showView('view-confirmado');
-
   } catch(e){
     btn.disabled = false;
     btn.innerHTML = '<span class="sym f" style="font-size:17px">check_circle</span>Confirmar pedido';
