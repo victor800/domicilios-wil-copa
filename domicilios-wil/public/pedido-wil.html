@@ -2041,7 +2041,7 @@ async function enviarPedido(tipo){
   }
 
   /* ── GAS URL — mismo endpoint que pedido-farmacia ── */
-  var GAS_URL = 'https://script.google.com/macros/s/AKfycbxVgkSWg5l9GChSxxbF4HQua1xjFIGgv8wMHiYhDF76fuflhn9EOmpml-nK_M6KOn_HJg/exec';
+  var GAS_URL = 'https://script.google.com/macros/s/AKfycbwfuVFWQ-ZtSog7w95YUNCb3Z8y_5J7yw8In8pHcY71IxIzEgJ85_eK4YbFboA0Srbqig/exec';
 
   try{
     /* FIX CRÍTICO: POST directo al GAS con accion en el body,
@@ -2331,7 +2331,7 @@ async function enviarCalificacion(){
   if(!state.califActual||!state.pedidoRastreado)return;
   var btn=document.getElementById('btnCalificar');
   btn.textContent='Enviando…';btn.disabled=true;
-  var GAS_URL='https://script.google.com/macros/s/AKfycbxVgkSWg5l9GChSxxbF4HQua1xjFIGgv8wMHiYhDF76fuflhn9EOmpml-nK_M6KOn_HJg/exec';
+  var GAS_URL='https://script.google.com/macros/s/AKfycbwfuVFWQ-ZtSog7w95YUNCb3Z8y_5J7yw8In8pHcY71IxIzEgJ85_eK4YbFboA0Srbqig/exec';
   try{
     await fetch(GAS_URL,{
       method:'POST',
@@ -2368,6 +2368,57 @@ function toggleClienteChat(){cliChatAbierto=!cliChatAbierto;var box=document.get
 function cliEnviarMensaje(){var input=document.getElementById('cliInput'),txt=(input.value||'').trim();if(!txt||!cliPedidoId)return;input.value='';input.style.height='auto';var now=new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true});var m={tipo:'out',texto:txt,hora:now,leido:false};cliMensajes.push(m);_cliRenderDOM(m);document.getElementById('cliMsgs').scrollTop=99999;cliPersistir();var p=state.pedidoRastreado;fetch(API_BASE+'/wil?action=chat-mensaje-cliente',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idPedido:cliPedidoId,mensaje:txt,hora:now,cliente:p?(p.cliente||'Cliente'):'Cliente',telefono:p?(p.telefono||''):''})}).catch(function(){});}
 function cliAutoResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,70)+'px';}
 function cliEsc(t){return(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');}
+
+async function _cargarFotoDomiInmediata(nombreDomi) {
+  var SHEET_ID = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+  try {
+    var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
+            + '/gviz/tq?tqx=out:csv&sheet=Domiciliarios&cachebust=' + Date.now();
+    var res  = await fetch(url, { cache: 'no-store' });
+    var txt  = await res.text();
+    var lines = txt.trim().split('\n');
+
+    function _pc(line){
+      var r=[],cur='',q=false;
+      for(var i=0;i<line.length;i++){
+        var c=line[i];
+        if(c==='"'){if(q&&line[i+1]==='"'){cur+='"';i++;}else q=!q;}
+        else if(c===','&&!q){r.push(cur.trim());cur='';}
+        else cur+=c;
+      }
+      r.push(cur.trim());return r;
+    }
+
+    var nl = nombreDomi.replace(/\s*\([^)]+\)/,'').trim().toLowerCase();
+    for (var j = 1; j < lines.length; j++) {
+      var dc = _pc(lines[j]);
+      var dn = (dc[1]||'').trim().toLowerCase();
+      if (!dn) continue;
+      if (dn === nl || nl.indexOf(dn) !== -1 || dn.indexOf(nl) !== -1) {
+        var foto = (dc[4]||'').trim();           // col E = foto
+        if (!foto) break;
+        var avEl = document.getElementById('domiFotoWrap');
+        if (!avEl) break;
+        // Normalizar URL de Drive
+        var fotoUrl = foto;
+        if (foto.indexOf('drive.google.com') !== -1) {
+          var m = foto.match(/\/d\/([^/?\s]+)/);
+          if (m) fotoUrl = 'https://lh3.googleusercontent.com/d/' + m[1];
+        } else if (!foto.startsWith('http')) {
+          fotoUrl = 'icons/' + foto;
+        }
+        var ini = nl.charAt(0).toUpperCase();
+        avEl.innerHTML = '<img src="' + fotoUrl + '" '
+          + 'style="width:100%;height:100%;object-fit:cover;object-position:center 20%" '
+          + 'onerror="this.parentElement.textContent=\'' + ini + '\'">';
+        break;
+      }
+    }
+  } catch(e) { console.warn('[foto domi inmediata]', e.message); }
+}
+
+
+
 
 /* ── RASTREAR PEDIDO COMPLETO ── */
 async function rastrearPedido(){
@@ -2576,6 +2627,9 @@ try {
       }
     } else {
       dc.style.display = 'none';
+      if (p.domiciliario && p.domiciliario.trim()) {
+  _cargarFotoDomiInmediata(p.domiciliario);
+}
     }
 
     /* ── 7. Info grid (fecha, dirección, horas) ── */
@@ -2989,7 +3043,7 @@ verificarHorarioCliente();
 
 /* ── Crear zona nueva en la hoja Tarifas (no-cors) ── */
 function _crearZonaEnSheets(data) {
-  var GAS_URL = 'https://script.google.com/macros/s/AKfycbxVgkSWg5l9GChSxxbF4HQua1xjFIGgv8wMHiYhDF76fuflhn9EOmpml-nK_M6KOn_HJg/exec';
+  var GAS_URL = 'https://script.google.com/macros/s/AKfycbwfuVFWQ-ZtSog7w95YUNCb3Z8y_5J7yw8In8pHcY71IxIzEgJ85_eK4YbFboA0Srbqig/exec';
   fetch(GAS_URL, {
     method:  'POST',
     mode:    'no-cors',
