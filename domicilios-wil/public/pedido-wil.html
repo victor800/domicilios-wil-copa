@@ -554,6 +554,49 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
   margin-bottom:4px;
 }
 
+.wil-radio-opt{
+  border:1.5px solid var(--bd,#e2e2de);
+  border-radius:var(--r-md,10px);
+  padding:11px 14px;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  transition:border-color .15s, background .15s;
+}
+.wil-radio-opt.sel{
+  border-color:var(--p,#6c47ff);
+  background:var(--pl,#f0edff);
+}
+.wil-radio-dot{
+  width:16px; height:16px; flex-shrink:0;
+  border-radius:50%;
+  border:2px solid var(--bd,#e2e2de);
+  display:flex; align-items:center; justify-content:center;
+  transition:all .15s;
+}
+.wil-radio-opt.sel .wil-radio-dot{
+  border-color:var(--p,#6c47ff);
+  background:var(--p,#6c47ff);
+}
+.wil-radio-dot::after{
+  content:''; width:6px; height:6px;
+  border-radius:50%; background:#fff; opacity:0;
+}
+.wil-radio-opt.sel .wil-radio-dot::after{ opacity:1; }
+ 
+/* Tarifa pill */
+.wil-tarifa-pill{
+  display:flex; align-items:center; gap:8px;
+  background:#f0fdf4;
+  border:1px solid #86efac;
+  border-radius:var(--r-md,10px);
+  padding:10px 14px;
+  margin-top:8px;
+  margin-bottom:4px;
+}
+
+
 </style>
 </head>
 <body>
@@ -840,7 +883,7 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
   <div class="card">
     <div class="card-tit"><span class="sym f">storefront</span>¿Ya tienes el comercio?</div>
     <div class="yn-grid">
-      <button class="yn-btn" id="yn-si"  onclick="wilSelComercio(true)">
+      <button class="yn-btn" id="yn-si" onclick="wilSelComercio(true)">
         <span class="sym f" style="font-size:22px">check_circle</span>Sí, ya sé dónde
       </button>
       <button class="yn-btn" id="yn-no" onclick="wilSelComercio(false)">
@@ -854,12 +897,12 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
     </div>
   </div>
  
-  <!-- ── ¿PARA QUIÉN? (aparece tras elegir comercio) ── -->
+  <!-- ── ¿PARA QUIÉN? ── -->
   <div class="card" id="wil-card-para-quien" style="display:none">
     <div class="card-tit"><span class="sym f">group</span>¿El domicilio es para ti o envías a alguien?</div>
  
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
-      <div class="wil-radio-opt" id="wil-opt-mi"   onclick="wilSelDestino('mi')">
+      <div class="wil-radio-opt" id="wil-opt-mi" onclick="wilSelDestino('mi')">
         <div class="wil-radio-dot" id="wil-dot-mi"></div>
         <div>
           <div style="font-size:14px;font-weight:600">Para mí</div>
@@ -875,80 +918,72 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
       </div>
     </div>
  
-    <!-- PARA MÍ: solo barrio -->
-    <div id="wil-sec-mi" class="hidden">
-      <div class="field">
-        <label>Tu barrio</label>
-        <select id="wil-barrio-mi" onchange="wilMostrarTarifa('mi')">
-          <option value="">— Selecciona tu barrio —</option>
-        </select>
-      </div>
-      <div class="wil-tarifa-pill hidden" id="wil-tarifa-mi">
-        <span class="sym f" style="font-size:20px;color:#15803d">delivery_dining</span>
-        <div>
-          <div style="font-size:18px;font-weight:900;color:#15803d" id="wil-tarifa-mi-val">$0</div>
-          <div style="font-size:12px;color:#166534;font-weight:600">Tarifa de domicilio</div>
-        </div>
-      </div>
-    </div>
+    <!-- ── SECCIÓN COMÚN: barrio recogida + barrio entrega ── -->
+    <div id="wil-sec-barrios" class="hidden">
  
-    <!-- PARA ALGUIEN MÁS: barrio + dirección + contactos -->
-    <div id="wil-sec-otro" class="hidden">
+      <!-- Barrio recogida — SIN precio visible -->
+      <div class="field">
+        <label>Barrio de recogida</label>
+        <select id="wil-barrio-recogida" onchange="wilCalcTarifa()">
+          <option value="">— Selecciona el barrio del comercio —</option>
+        </select>
+        <div class="field-note">Barrio donde está el comercio o punto de origen</div>
+      </div>
+ 
+      <!-- Barrio entrega — SIN precio visible en la lista -->
       <div class="field">
         <label>Barrio de entrega</label>
-        <select id="wil-barrio-otro" onchange="wilMostrarTarifa('otro')">
-          <option value="">— Selecciona el barrio —</option>
+        <select id="wil-barrio-entrega" onchange="wilCalcTarifa()">
+          <option value="">— Selecciona el barrio de destino —</option>
         </select>
       </div>
-      <div class="wil-tarifa-pill hidden" id="wil-tarifa-otro">
+ 
+      <!-- Tarifa calculada (precio más alto de los dos) -->
+      <div class="wil-tarifa-pill hidden" id="wil-tarifa-calc">
         <span class="sym f" style="font-size:20px;color:#15803d">delivery_dining</span>
         <div>
-          <div style="font-size:18px;font-weight:900;color:#15803d" id="wil-tarifa-otro-val">$0</div>
+          <div style="font-size:18px;font-weight:900;color:#15803d" id="wil-tarifa-calc-val">$0</div>
           <div style="font-size:12px;color:#166534;font-weight:600">Tarifa de domicilio</div>
         </div>
       </div>
  
-      <div class="field" style="margin-top:10px">
-        <label>Dirección de entrega *</label>
-        <input type="text" id="wil-dir-otro"
-               placeholder="Calle 50 #45-23, Barrio El Centro"/>
-        <div class="field-note">Incluye calle, número y barrio</div>
-      </div>
-      <div class="field">
-        <label>Punto de referencia</label>
-        <input type="text" id="wil-ref-otro"
-               placeholder="Casa azul, frente al parque, piso 2…"/>
+      <!-- Dirección + referencia (solo para "alguien más") -->
+      <div id="wil-sec-dir-otro" class="hidden" style="margin-top:10px">
+        <div class="field">
+          <label>Dirección de entrega *</label>
+          <input type="text" id="wil-dir-otro"
+                 placeholder="Calle 50 #45-23, Barrio El Centro"/>
+          <div class="field-note">Incluye calle, número y barrio</div>
+        </div>
+        <div class="field">
+          <label>Punto de referencia</label>
+          <input type="text" id="wil-ref-otro"
+                 placeholder="Casa azul, frente al parque, piso 2…"/>
+        </div>
+ 
+        <div style="border-top:0.5px solid var(--bd,#e2e2de);margin:12px 0 10px"></div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--on3);margin-bottom:8px">Quien envía</div>
+        <div class="field">
+          <label>Tu nombre *</label>
+          <input type="text" id="wil-envia-nombre" placeholder="Tu nombre completo"/>
+        </div>
+        <div class="field">
+          <label>Tu teléfono *</label>
+          <input type="tel" id="wil-envia-tel" placeholder="310 123 4567"/>
+        </div>
+ 
+        <div style="border-top:0.5px solid var(--bd,#e2e2de);margin:12px 0 10px"></div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--on3);margin-bottom:8px">Quien recibe</div>
+        <div class="field">
+          <label>Nombre *</label>
+          <input type="text" id="wil-recibe-nombre" placeholder="Nombre del destinatario"/>
+        </div>
+        <div class="field">
+          <label>Teléfono *</label>
+          <input type="tel" id="wil-recibe-tel" placeholder="310 987 6543"/>
+        </div>
       </div>
  
-      <div style="border-top:0.5px solid var(--bd,#e2e2de);margin:12px 0 10px"></div>
- 
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;
-                  letter-spacing:.06em;color:var(--on3);margin-bottom:8px">
-        Quien envía
-      </div>
-      <div class="field">
-        <label>Tu nombre *</label>
-        <input type="text" id="wil-envia-nombre" placeholder="Tu nombre completo"/>
-      </div>
-      <div class="field">
-        <label>Tu teléfono *</label>
-        <input type="tel" id="wil-envia-tel" placeholder="310 123 4567"/>
-      </div>
- 
-      <div style="border-top:0.5px solid var(--bd,#e2e2de);margin:12px 0 10px"></div>
- 
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;
-                  letter-spacing:.06em;color:var(--on3);margin-bottom:8px">
-        Quien recibe
-      </div>
-      <div class="field">
-        <label>Nombre *</label>
-        <input type="text" id="wil-recibe-nombre" placeholder="Nombre del destinatario"/>
-      </div>
-      <div class="field">
-        <label>Teléfono *</label>
-        <input type="tel" id="wil-recibe-tel" placeholder="310 987 6543"/>
-      </div>
     </div>
   </div>
  
@@ -4005,6 +4040,131 @@ function wilGoLibre2(){
  
   /* ✅ Todo validado — ir al paso 2 */
   goLibre2(); // ← tu función existente
+}
+
+window.WIL_LIBRE = {
+  comercio: null,       // true=sí sabe / false=el domi busca
+  comercioNombre: '',
+  destino: null,        // 'mi' | 'otro'
+  barrioRecogida: '',
+  barrioEntrega: '',
+  tarifaDomi: 0,
+  direccion: '',
+  referencia: '',
+  enviaNombre: '',
+  enviaTel: '',
+  recibeNombre: '',
+  recibeTel: ''
+};
+ 
+/* Poblar selects al cargar — solo nombre, sin precio */
+(function wilInit(){
+  ['wil-barrio-recogida','wil-barrio-entrega'].forEach(id => {
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    WIL_BARRIOS.forEach(([nombre, precio]) => {
+      const opt = document.createElement('option');
+      opt.value = nombre;
+      opt.dataset.precio = precio;
+      opt.textContent = nombre;          // ← sin precio visible
+      sel.appendChild(opt);
+    });
+  });
+})();
+ 
+/* ── ¿Ya tienes el comercio? ── */
+function wilSelComercio(si){
+  window.WIL_LIBRE.comercio = si;
+  document.getElementById('yn-si').classList.toggle('sel', si);
+  document.getElementById('yn-no').classList.toggle('sel', !si);
+  document.getElementById('wil-comercio-field').classList.toggle('hidden', !si);
+  document.getElementById('wil-card-para-quien').style.display = 'block';
+  wilSelDestino(null);
+}
+ 
+/* ── ¿Para quién? ── */
+function wilSelDestino(d){
+  window.WIL_LIBRE.destino = d;
+  ['mi','otro'].forEach(x => {
+    document.getElementById('wil-opt-'+x)?.classList.toggle('sel', d===x);
+  });
+  const secBarrios = document.getElementById('wil-sec-barrios');
+  const secDirOtro = document.getElementById('wil-sec-dir-otro');
+  if(!d){ secBarrios?.classList.add('hidden'); return; }
+  secBarrios?.classList.remove('hidden');
+  secDirOtro?.classList.toggle('hidden', d !== 'otro');
+  // reset tarifa
+  document.getElementById('wil-tarifa-calc')?.classList.add('hidden');
+}
+ 
+/* ── Calcular tarifa = max(recogida, entrega) y mostrarla ── */
+function wilCalcTarifa(){
+  const selR = document.getElementById('wil-barrio-recogida');
+  const selE = document.getElementById('wil-barrio-entrega');
+  const optR = selR?.options[selR.selectedIndex];
+  const optE = selE?.options[selE.selectedIndex];
+  const pill = document.getElementById('wil-tarifa-calc');
+  const valEl = document.getElementById('wil-tarifa-calc-val');
+ 
+  const pR = optR?.dataset.precio ? parseInt(optR.dataset.precio) : 0;
+  const pE = optE?.dataset.precio ? parseInt(optE.dataset.precio) : 0;
+ 
+  if(!pR || !pE){ pill?.classList.add('hidden'); return; }
+ 
+  const tarifa = Math.max(pR, pE);
+  valEl.textContent = '$' + tarifa.toLocaleString('es-CO');
+  pill?.classList.remove('hidden');
+  window.WIL_LIBRE.tarifaDomi    = tarifa;
+  window.WIL_LIBRE.barrioRecogida = optR.value;
+  window.WIL_LIBRE.barrioEntrega  = optE.value;
+}
+ 
+/* ── Validar y continuar ── */
+function wilGoLibre2(){
+  const L = window.WIL_LIBRE;
+ 
+  if(L.comercio === null){
+    alert('Por favor indica si ya tienes el comercio.'); return;
+  }
+  if(L.comercio){
+    L.comercioNombre = document.getElementById('comercio-nombre')?.value.trim() || '';
+    if(!L.comercioNombre){ alert('Escribe el nombre del comercio.'); return; }
+  }
+  if(!L.destino){
+    alert('Indica si el domicilio es para ti o para alguien más.'); return;
+  }
+ 
+  const selR = document.getElementById('wil-barrio-recogida');
+  const selE = document.getElementById('wil-barrio-entrega');
+  if(!selR?.value){ alert('Selecciona el barrio de recogida.'); return; }
+  if(!selE?.value){ alert('Selecciona el barrio de entrega.'); return; }
+ 
+  const pR = parseInt(selR.options[selR.selectedIndex].dataset.precio || 0);
+  const pE = parseInt(selE.options[selE.selectedIndex].dataset.precio || 0);
+  L.barrioRecogida = selR.value;
+  L.barrioEntrega  = selE.value;
+  L.tarifaDomi     = Math.max(pR, pE);
+ 
+  if(L.destino === 'otro'){
+    const dir   = document.getElementById('wil-dir-otro')?.value.trim();
+    const enNom = document.getElementById('wil-envia-nombre')?.value.trim();
+    const enTel = document.getElementById('wil-envia-tel')?.value.trim();
+    const rcNom = document.getElementById('wil-recibe-nombre')?.value.trim();
+    const rcTel = document.getElementById('wil-recibe-tel')?.value.trim();
+    if(!dir)           { alert('Escribe la dirección de entrega.'); return; }
+    if(!enNom||!enTel) { alert('Completa los datos de quien envía.'); return; }
+    if(!rcNom||!rcTel) { alert('Completa los datos de quien recibe.'); return; }
+    L.direccion   = dir;
+    L.referencia  = document.getElementById('wil-ref-otro')?.value.trim() || '';
+    L.enviaNombre = enNom;
+    L.enviaTel    = enTel;
+    L.recibeNombre = rcNom;
+    L.recibeTel   = rcTel;
+  }
+ 
+  /* ✅ Todo validado — ir al paso 2 */
+  if(typeof goLibre2 === 'function') goLibre2();
+  if(typeof showView === 'function') showView('view-libre-2');
 }
  
 
