@@ -8139,6 +8139,257 @@ body.apro-fs #pg-actividad{position:fixed!important;inset:0!important;height:100
  
   document.addEventListener('keydown', e => { if(e.key==='Escape' && _fs) exitFS(); });
 })();
+
+/* ═══════════════════════════════════════════════
+   🔧 PARCHE CONTABLE — fix modales + envío GAS
+═══════════════════════════════════════════════ */
+(function patchContable() {
+
+  const GAS = 'https://script.google.com/macros/s/AKfycbwfuVFWQ-ZtSog7w95YUNCb3Z8y_5J7yw8In8pHcY71IxIzEgJ85_eK4YbFboA0Srbqig/exec';
+
+  /* ── 1. Fix CSS modales (botones clickeables y bien posicionados) ── */
+  const s = document.createElement('style');
+  s.textContent = `
+    #modal-base-overlay, #modal-multa-overlay {
+      position: fixed !important; inset: 0 !important;
+      background: rgba(4,18,20,.82) !important;
+      backdrop-filter: blur(12px) !important;
+      z-index: 500 !important;
+      display: none !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 16px !important;
+    }
+    #modal-base-overlay.show, #modal-multa-overlay.show {
+      display: flex !important;
+    }
+    .cont-modal {
+      background: #fff !important;
+      border-radius: 20px !important;
+      width: min(440px, 92vw) !important;
+      max-height: 88vh !important;
+      overflow-y: auto !important;
+      box-shadow: 0 32px 80px rgba(4,18,20,.4) !important;
+      position: relative !important;
+      z-index: 1 !important;
+    }
+    .cont-modal-hdr {
+      padding: 18px 20px 16px !important;
+      border-bottom: 1px solid var(--border) !important;
+      display: flex !important;
+      align-items: center !important;
+      gap: 10px !important;
+      border-radius: 20px 20px 0 0 !important;
+    }
+    .cont-modal-body {
+      padding: 18px 20px 20px !important;
+    }
+    .cont-modal-footer {
+      display: flex !important;
+      gap: 10px !important;
+      margin-top: 16px !important;
+      padding-top: 14px !important;
+      border-top: 1.5px solid var(--border) !important;
+    }
+    .cont-modal-footer .om-btn-cancel,
+    .cont-modal-footer .om-btn-save {
+      cursor: pointer !important;
+      pointer-events: auto !important;
+      position: relative !important;
+      z-index: 2 !important;
+    }
+    #modal-caja-overlay {
+      position: fixed !important; inset: 0 !important;
+      background: rgba(4,18,20,.82) !important;
+      backdrop-filter: blur(12px) !important;
+      z-index: 500 !important;
+      display: none !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 16px !important;
+    }
+    #modal-caja-overlay.show { display: flex !important; }
+    .caja-modal {
+      background: #fff !important;
+      border-radius: 20px !important;
+      width: min(480px, 94vw) !important;
+      max-height: 88vh !important;
+      overflow-y: auto !important;
+      box-shadow: 0 32px 80px rgba(4,18,20,.45) !important;
+      position: relative !important; z-index: 1 !important;
+    }
+  `;
+  document.head.appendChild(s);
+
+  /* ── 2. Fix envío Base al GAS real ── */
+  window.saveBase = async function() {
+    const domi  = document.getElementById('base-domi-select')?.value?.trim();
+    const monto = parsePrecio(document.getElementById('base-monto')?.value || '');
+    const nota  = (document.getElementById('base-nota')?.value || '').trim();
+    const fecha = document.getElementById('base-fecha')?.value || new Date().toISOString().slice(0,10);
+
+    if (!domi)  { showToast('w','Falta domiciliario','Selecciona un domiciliario'); return; }
+    if (!monto) { showToast('w','Falta monto','Ingresa un monto válido'); return; }
+
+    const btn = document.querySelector('#modal-base-overlay .om-btn-save');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-rounded" style="animation:spin .8s linear infinite">progress_activity</span> Guardando…'; }
+
+    const item = { domi, monto, nota, fecha };
+    window._basesData = window._basesData || [];
+    window._basesData.push(item);
+    document.getElementById('modal-base-overlay').classList.remove('show');
+    showToast('i', `Guardando base para ${domi}…`, fmtMoney(monto));
+
+    try {
+      await fetch(GAS, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accion: 'crear-base', domi, monto, nota, fecha })
+      });
+      await loadBases();
+      if (typeof window.renderContable === 'function') window.renderContable();
+      showToast('s', `Base dada a ${domi}`, fmtMoney(monto) + (nota ? ' · ' + nota : ''));
+    } catch(e) {
+      showToast('e', 'Error al guardar base', e.message.substring(0,60));
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-rounded">savings</span>Dar base'; }
+    }
+  };
+
+  /* ── 3. Fix envío Multa al GAS real ── */
+  window.saveMulta = async function() {
+    const domi  = document.getElementById('multa-domi-select')?.value?.trim();
+    const monto = parsePrecio(document.getElementById('multa-monto')?.value || '');
+    const nota  = (document.getElementById('multa-nota')?.value || '').trim();
+    const tipo  = document.getElementById('multa-tipo-sel')?.value || 'multa';
+    const fecha = document.getElementById('multa-fecha')?.value || new Date().toISOString().slice(0,10);
+
+    if (!domi)  { showToast('w','Falta domiciliario','Selecciona un domiciliario'); return; }
+    if (!monto) { showToast('w','Falta monto','Ingresa un monto válido'); return; }
+
+    const btn = document.querySelector('#modal-multa-overlay .om-btn-save');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-rounded" style="animation:spin .8s linear infinite">progress_activity</span> Guardando…'; }
+
+    const item = { domi, monto, nota, tipo, fecha };
+    window._multasData = window._multasData || [];
+    window._multasData.push(item);
+    document.getElementById('modal-multa-overlay').classList.remove('show');
+    showToast('i', `Guardando para ${domi}…`, fmtMoney(monto));
+
+    try {
+      await fetch(GAS, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accion: 'crear-multa', domi, monto, tipo, nota, fecha })
+      });
+      await loadMultas();
+      if (typeof window.renderContable === 'function') window.renderContable();
+      showToast('s', `Registrado para ${domi}`, fmtMoney(monto));
+    } catch(e) {
+      showToast('e', 'Error al guardar', e.message.substring(0,60));
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-rounded">gavel</span>Registrar'; }
+    }
+  };
+
+  /* ── 4. Fix delete Base ── */
+  window.deleteBase = async function(idx) {
+    const bases = window._basesData || [];
+    if (!confirm('¿Eliminar esta base?')) return;
+    const item = bases[idx];
+    window._basesData.splice(idx, 1);
+    if (typeof window.renderContable === 'function') window.renderContable();
+    showToast('i','Base eliminada','');
+    try {
+      await fetch(GAS, {
+        method: 'POST', mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accion: 'eliminar-base', domi: item.domi, fecha: item.fecha })
+      });
+      await loadBases();
+      if (typeof window.renderContable === 'function') window.renderContable();
+    } catch(e) { console.warn('[deleteBase]:', e.message); }
+  };
+
+  /* ── 5. Fix delete Multa ── */
+  window.deleteMulta = async function(idx) {
+    const multas = window._multasData || [];
+    if (!confirm('¿Eliminar este registro?')) return;
+    const item = multas[idx];
+    window._multasData.splice(idx, 1);
+    if (typeof window.renderContable === 'function') window.renderContable();
+    showToast('i','Registro eliminado','');
+    try {
+      await fetch(GAS, {
+        method: 'POST', mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accion: 'eliminar-multa', domi: item.domi, fecha: item.fecha })
+      });
+      await loadMultas();
+      if (typeof window.renderContable === 'function') window.renderContable();
+    } catch(e) { console.warn('[deleteMulta]:', e.message); }
+  };
+
+  /* ── 6. Fix cierre de caja ── */
+  window.guardarCierreCaja = async function() {
+    const turno     = document.getElementById('caja-turno')?.value;
+    const fecha     = document.getElementById('caja-fecha')?.value;
+    const hora      = document.getElementById('caja-hora')?.value;
+    const entrega   = document.getElementById('caja-entrega')?.value?.trim();
+    const recibe    = document.getElementById('caja-recibe')?.value?.trim();
+    const efectivo  = parsePrecio(document.getElementById('caja-efectivo')?.value || '0');
+    const bases     = parsePrecio(document.getElementById('caja-bases')?.value    || '0');
+    const novedades = (document.getElementById('caja-novedades')?.value || '').trim();
+
+    if (!entrega) { showToast('w','Falta quién entrega','Selecciona el responsable'); return; }
+    if (!recibe)  { showToast('w','Falta quién recibe', 'Selecciona quién recibe');   return; }
+
+    const btn = document.getElementById('btn-guardar-caja');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-rounded" style="animation:spin .8s linear infinite;font-size:17px;">progress_activity</span> Guardando…'; }
+
+    const diferencia = efectivo - bases;
+    const esOk = Math.abs(diferencia) < 500;
+    const resumen = typeof window.calcResumenTurno === 'function' ? window.calcResumenTurno() : {};
+
+    const cierre = {
+      id: 'CAJA-' + Date.now(),
+      turno, fecha, hora, entrega, recibe,
+      efectivo, bases, diferencia, novedades,
+      pedidos:  resumen?.ent     || 0,
+      totalEf:  resumen?.totalEf || 0,
+      totalTf:  resumen?.totalTf || 0,
+      totalT:   resumen?.totalT  || 0,
+      estado:   esOk ? 'ok' : diferencia < 0 ? 'faltante' : 'sobrante',
+      ts: new Date().toLocaleString('es-CO', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })
+    };
+
+    window._cierresData = window._cierresData || [];
+    window._cierresData.unshift(cierre);
+    document.getElementById('modal-caja-overlay').classList.remove('show');
+    showToast('i', `Guardando cierre turno ${turno}…`, `${entrega} → ${recibe}`);
+
+    try {
+      await fetch(GAS, {
+        method: 'POST', mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accion: 'crear-cierre-caja', ...cierre })
+      });
+      showToast('s', `✓ Cierre turno ${turno}`, `${entrega} → ${recibe} · ${esOk ? 'Caja OK ✓' : '⚠ Revisar diferencia'}`);
+      VOZ.hablar(`Cierre turno ${turno} registrado.`);
+    } catch(e) {
+      showToast('e', 'Error al guardar cierre', e.message.substring(0,60));
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:17px;">check_circle</span>Registrar cierre'; }
+    }
+  };
+
+  console.log('[PARCHE CONTABLE] ✅ Activo');
+})();
+
+
+
 </script>
 
 </script>
