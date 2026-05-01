@@ -1210,38 +1210,6 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 
         <!-- Card resumen total — diseño limpio -->
 
-        <!-- ════════════════════════════════════════════════════════
-             CORRECCIÓN BUG #2 (footer): Solo chat con badge de
-             notificación + llamada. Sin duplicar íconos del header.
-        ════════════════════════════════════════════════════════ -->
-        <div id="cliChatWrap" style="display:none;border-top:1px solid #f0f3f6">
-          <div id="cliDomiHdr" style="cursor:pointer;padding:10px 14px;background:rgba(0,105,112,.04);border-bottom:1px solid rgba(0,105,112,.08);display:flex;align-items:center;gap:10px" onclick="toggleClienteChat()">
-            <div class="cli-av" id="cliDomiAv">🛵</div>
-            <div style="flex:1;min-width:0">
-              <div style="display:flex;align-items:center;gap:5px"><span style="font-weight:800;font-size:12px;color:var(--on)" id="cliDomiNombre">Domiciliario WIL</span><span style="font-size:9px;font-weight:700;background:rgba(0,105,112,.1);color:#006970;padding:1px 6px;border-radius:99px">Chatear con el domi</span></div>
-              <div style="font-size:10px;color:var(--on3);display:flex;align-items:center;gap:4px;margin-top:1px"><span class="cli-s-dot offline" id="cliStatusDot"></span><span id="cliDomiEstado">Esperando asignación…</span></div>
-            </div>
-            <div style="display:flex;align-items:center;gap:6px">
-              <!-- Badge de mensajes pendientes -->
-              <div id="cliBadge" style="background:#dc2626;color:#fff;border-radius:10px;min-width:18px;height:18px;font-size:9px;font-weight:800;display:none;align-items:center;justify-content:center;padding:0 4px">0</div>
-              <!-- Llamada — solo aquí, no duplicada arriba -->
-              <a id="cliLlamarBtnChat" href="#" onclick="event.stopPropagation()" style="width:30px;height:30px;border-radius:50%;background:rgba(22,163,74,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;text-decoration:none"><span class="sym f" style="font-size:15px;color:#16a34a">phone</span></a>
-              <!-- Chat icon -->
-              <span class="sym" id="cliChatChevron" style="font-size:16px;color:#7a8fa6">expand_more</span>
-            </div>
-          </div>
-          <div id="cliBox" style="display:none;flex-direction:column;overflow:hidden;background:#fff;border:1.5px solid rgba(0,105,112,.15);border-top:none;border-radius:0 0 13px 13px">
-            <div id="cliMsgs"><div class="ccli-date"><span>Hoy</span></div></div>
-            <div id="cliTypingWrap"><div class="cmsg-av-s domi" style="width:20px;height:20px;font-size:.55rem">🛵</div><div style="background:#fff;border-radius:12px;padding:7px 11px;display:flex;gap:4px;box-shadow:0 1px 4px rgba(0,0,0,.06)"><div class="tdot"></div><div class="tdot"></div><div class="tdot"></div></div></div>
-            <div id="cliInputRow">
-              <button class="cli-img-btn" onclick="document.getElementById('cliImgInput').click()"><span class="sym f" style="font-size:16px;color:var(--on3)">image</span></button>
-              <input type="file" id="cliImgInput" accept="image/*"/>
-              <textarea id="cliInput" rows="1" placeholder="Escribe un mensaje…" oninput="cliAutoResize(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();cliEnviarMensaje()}"></textarea>
-              <button id="cliSendBtn" onclick="cliEnviarMensaje()"><span class="sym f" style="font-size:16px;color:#fff">send</span></button>
-            </div>
-          </div>
-        </div>
-      </div>
       <div id="seccionCalificar" style="display:none">
         <div class="rt-rating-wrap">
           <div style="font-size:14px;font-weight:800;color:#18222e;margin-bottom:4px">¿Cómo fue tu experiencia?</div>
@@ -2359,7 +2327,29 @@ function rtToggleVerMas(){
 }
 
 function setCalif(n){state.califActual=n;for(var i=1;i<=5;i++){var el=document.getElementById('se'+i);if(el)el.classList.toggle('on',i<=n);}var btn=document.getElementById('btnCalificar');btn.disabled=false;btn.style.opacity='1';}
-async function enviarCalificacion(){if(!state.califActual||!state.pedidoRastreado)return;var btn=document.getElementById('btnCalificar');btn.textContent='Enviando…';btn.disabled=true;try{await fetch(API_BASE+'/wil?action=calificar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:state.pedidoRastreado.id,calificacion:state.califActual})});document.getElementById('seccionCalificar').style.display='none';mostrarToast('¡Gracias! '+'⭐'.repeat(state.califActual),'star');}catch(e){btn.textContent='Enviar calificación';btn.disabled=false;}}
+async function enviarCalificacion(){
+  if(!state.califActual||!state.pedidoRastreado)return;
+  var btn=document.getElementById('btnCalificar');
+  btn.textContent='Enviando…';btn.disabled=true;
+  var GAS_URL='https://script.google.com/macros/s/AKfycbxVgkSWg5l9GChSxxbF4HQua1xjFIGgv8wMHiYhDF76fuflhn9EOmpml-nK_M6KOn_HJg/exec';
+  try{
+    await fetch(GAS_URL,{
+      method:'POST',
+      mode:'no-cors',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        accion:'calificacion',
+        id:state.pedidoRastreado.id,
+        calificacion:state.califActual
+      })
+    });
+    document.getElementById('seccionCalificar').style.display='none';
+    mostrarToast('¡Gracias! '+'⭐'.repeat(state.califActual),'star');
+  }catch(e){
+    btn.textContent='Enviar calificación';
+    btn.disabled=false;
+  }
+}
 function copiarId(){if(!state.idPedido)return;if(navigator.clipboard)navigator.clipboard.writeText(state.idPedido).then(function(){mostrarToast('Código copiado: '+state.idPedido,'content_copy');});else mostrarToast('Tu código: '+state.idPedido,'info');}
 function irARastrear(){navTo('rastrear');var inp=document.getElementById('rastrearInput');if(inp&&state.idPedido){inp.value=state.idPedido;rtAbrirPopup();setTimeout(rastrearPedido,200);}else rtAbrirPopup();}
 function formatCOP(n){return '$'+(n||0).toLocaleString('es-CO');}
