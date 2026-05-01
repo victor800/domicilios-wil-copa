@@ -2031,42 +2031,78 @@ function goLibre3(){showView('view-libre-3');}
 
 
 /* ── goLibre3Async: IA → revisión en view-libre-2b ── */
-async function goLibre3Async(){
+function goLibre3Async(){
   var txt=(document.getElementById('libreTextoLibre').value||'').trim();
   if(!txt){mostrarToast('Escribe qué necesitas pedir.','edit_note');return;}
-  var btn=document.getElementById('btnLibre2Sig');
+
   var statusEl=document.getElementById('libreAiStatus');
+  var btn=document.getElementById('btnLibre2Sig');
   btn.disabled=true;
   btn.innerHTML='<span class="spin"></span> Organizando…';
-  statusEl.innerHTML='<span class="spin dk"></span><span>Analizando tu pedido con IA…</span>';
+  statusEl.innerHTML='';
 
- function irRevision(){
-    wilRenderListaProductos();
-    wilPoblarResumenP3();
-    showView('view-libre-3');
-  }
+  var NUMS={'un':1,'una':1,'uno':1,'dos':2,'tres':3,'cuatro':4,'cinco':5,'seis':6,'siete':7,'ocho':8,'nueve':9,'diez':10,'media':0.5};
 
-  try{
-    var result=await extractProductsWithAI(txt);
-    state.productos=result.productos||[{nombre:txt,qty:1}];
-    if(!state.productos.length)state.productos=[{nombre:txt,qty:1}];
-    statusEl.innerHTML='<span class="sym f" style="font-size:15px;color:#16a34a">check_circle</span>'
-      +'<span style="color:#16a34a;font-weight:700">'+state.productos.length+' producto'+(state.productos.length!==1?'s':'')+' detectado'+(state.productos.length!==1?'s':'')+'</span>';
-    setTimeout(irRevision,350);
-  }catch(e){
-    state.productos=txt.split(/[,\n;]+/)
+  function cap(s){return(s||'').trim().replace(/^\w/,function(c){return c.toUpperCase();});}
+
+  function parsear(texto){
+    var productos=[];
+
+    // 1. Separar por delimitadores claros primero
+    var bloques=texto
+      .replace(/\r/g,'')
+      .split(/\n|,|;/)
       .map(function(s){return s.trim();})
-      .filter(function(s){return s.length>1;})
-      .map(function(s){return{nombre:s.charAt(0).toUpperCase()+s.slice(1),qty:1};});
-    if(!state.productos.length)state.productos=[{nombre:txt,qty:1}];
-    statusEl.innerHTML='<span class="sym f" style="font-size:14px;color:var(--am)">info</span>'
-      +'<span style="color:var(--am)">'+state.productos.length+' ítem(s) — modo básico</span>';
-    setTimeout(irRevision,350);
-  }finally{
-    btn.disabled=false;
-    btn.innerHTML='<span class="sym" style="font-size:17px">arrow_forward</span>Continuar';
+      .filter(function(s){return s.length>1;});
+
+    bloques.forEach(function(bloque){
+      // Dentro de cada bloque, detectar sub-items por número/palabra-número
+      // Ej: "1 hamburguesa 2 cervezas" → split donde empieza nuevo número
+      var subItems=bloque
+        .split(/(?=\b(?:\d+[xX]?|un[ao]?|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+\w)/i)
+        .map(function(s){return s.trim();})
+        .filter(function(s){return s.length>1;});
+
+      subItems.forEach(function(item){
+        // Detectar cantidad al inicio: "2x", "2 ", "dos "
+        var qty=1;
+        var nombre=item;
+
+        var mNum=item.match(/^(\d+)[xX]?\s+(.+)$/i);
+        var mPal=item.match(/^(un[ao]?|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+(.+)$/i);
+
+        if(mNum){
+          qty=parseInt(mNum[1])||1;
+          nombre=mNum[2];
+        } else if(mPal){
+          qty=NUMS[mPal[1].toLowerCase()]||1;
+          nombre=mPal[2];
+        }
+
+        nombre=cap(nombre.replace(/\s+/g,' '));
+        if(nombre.length>1){
+          productos.push({nombre:nombre,qty:qty});
+        }
+      });
+    });
+
+    return productos.length?productos:[{nombre:cap(texto),qty:1}];
   }
+
+  var prods=parsear(txt);
+  state.productos=prods;
+
+  statusEl.innerHTML='<span class="sym f" style="font-size:15px;color:#16a34a">check_circle</span>'
+    +'<span style="color:#16a34a;font-weight:700"> '+prods.length+' producto'+(prods.length!==1?'s':'')+' detectado'+(prods.length!==1?'s':'')+'</span>';
+
+  btn.disabled=false;
+  btn.innerHTML='<span class="sym" style="font-size:17px">arrow_forward</span>Continuar';
+
+  wilRenderListaProductos();
+  wilPoblarResumenP3();
+  showView('view-libre-3');
 }
+
 function selectPago(m){
   state.metodoPago=m;
   ['efectivo','transferencia'].forEach(function(t){
@@ -3976,7 +4012,8 @@ const WIL_BARRIOS = [
   ["FONTIDUEÑO",13000],["NAVARRA",14000],["NIQUIA PARTE BAJA",14000],
   ["UNIDADES DE NAVARRA",14000],["PARQUE DE GIRARDOTA",17000],
   ["TOLEDO CAMPESTRE",17000],["PARQUE DE BELLO",18000],
-  ["FABRICATO",19000],["UNIDADES DE MADERA",25000]
+  ["FABRICATO",19000],["UNIDADES DE MADERA",25000],
+  ["GUASIMALITO (PARTE BAJA)",10000],["GUASIMALITO (PARTE ALTA)",13000]
 ];
  
 /* ─── ESTADO GLOBAL ─── */
