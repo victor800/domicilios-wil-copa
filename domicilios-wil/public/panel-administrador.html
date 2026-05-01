@@ -8468,16 +8468,18 @@ body.apro-fs #pg-actividad{position:fixed!important;inset:0!important;height:100
 </style>
  
 <script>
+/* ════════════════════════════════════════════════════════
+   PARCHE CONTABLE V4 — REEMPLAZAR COMPLETAMENTE
+   Busca: (function PARCHE_CONTABLE_V4()
+   Hasta: })();  (el correspondiente al bloque)
+   ════════════════════════════════════════════════════════ */
 (function PARCHE_CONTABLE_V4() {
   'use strict';
- 
-  /* ─────────────────────────────────────────────────────────────
-     0. Esperamos a que initContable() haya corrido
-  ───────────────────────────────────────────────────────────── */
+
   const GAS = typeof SHEET_SCRIPT_URL !== 'undefined'
     ? SHEET_SCRIPT_URL
     : 'https://script.google.com/macros/s/AKfycbyzhaW7mdeiq_pNcSAKGxMHUNpREYhvWlUPfTabXs342AAbuAxff8bW0JRc9nhkd5DmmA/exec';
- 
+
   function whenReady(fn) {
     if (document.getElementById('modal-multa-overlay') &&
         document.getElementById('modal-caja-overlay')) {
@@ -8486,62 +8488,49 @@ body.apro-fs #pg-actividad{position:fixed!important;inset:0!important;height:100
       setTimeout(() => whenReady(fn), 300);
     }
   }
- 
+
   whenReady(() => {
     patchMultaModal();
     patchCierreCaja();
-    console.log('[PARCHE CONTABLE v4] ✅ Activo');
+    console.log('[PARCHE CONTABLE v4] OK');
   });
- 
- 
-  /* ═══════════════════════════════════════════════════════════
-     1. MULTA MODAL  —  Tipo ▸ Monto  +  P&P oculta monto
-  ═══════════════════════════════════════════════════════════ */
+
+
+  /* ════════════════════════════════════════════════════
+     1. MULTA MODAL — Tipo ▸ P&P oculta monto
+  ════════════════════════════════════════════════════ */
   function patchMultaModal() {
     const ov = document.getElementById('modal-multa-overlay');
     if (!ov || ov._patchedV4) return;
     ov._patchedV4 = true;
- 
-    /* Cada vez que se abre el modal reordenamos los campos */
+
     new MutationObserver(() => {
-      if (ov.classList.contains('show')) {
-        setTimeout(reordenarCampos, 60);
-      }
+      if (ov.classList.contains('show')) setTimeout(reordenarCampos, 60);
     }).observe(ov, { attributes: true, attributeFilter: ['class'] });
- 
+
     function reordenarCampos() {
       const body = ov.querySelector('.cont-modal-body');
       if (!body || body._reordenado) return;
-      body._reordenado = true;  // solo una vez
- 
-      /* Localizar los campos */
+      body._reordenado = true;
+
       const montoField = document.getElementById('multa-monto')?.closest('.om-field');
       const tipoField  = document.getElementById('multa-tipo-sel')?.closest('.om-field');
- 
       if (!montoField || !tipoField) return;
- 
-      /* Asignar IDs para controlarlos */
       montoField.id = 'multa-monto-wrap';
-      tipoField.id  = 'multa-tipo-wrap';
- 
-      /* Insertar el aviso de P&P si no existe */
+
       if (!document.getElementById('pyp-aviso')) {
         const aviso = document.createElement('div');
         aviso.id = 'pyp-aviso';
         aviso.className = 'pyp-aviso';
         aviso.innerHTML =
-          '<span class="material-symbols-rounded" style="font-size:17px;color:#d97706;flex-shrink:0;">traffic</span>' +
-          '<span>Pico &amp; Placa — solo se registra la restricción, <b>no se descuenta dinero</b>.</span>';
+          '<span class="material-symbols-rounded" style="font-size:15px;color:#d97706;flex-shrink:0;">traffic</span>' +
+          '<span>Pico &amp; Placa — solo registra la restricción, <b>no descuenta dinero</b>.</span>';
         tipoField.insertAdjacentElement('afterend', aviso);
       }
- 
-      /* Mover Monto DESPUÉS del aviso (Tipo → Aviso → Monto) */
+
       const aviso = document.getElementById('pyp-aviso');
-      if (aviso) {
-        aviso.insertAdjacentElement('afterend', montoField);
-      }
- 
-      /* Escuchar cambios en el select */
+      if (aviso) aviso.insertAdjacentElement('afterend', montoField);
+
       const sel = document.getElementById('multa-tipo-sel');
       if (sel && !sel._patchedChange) {
         sel._patchedChange = true;
@@ -8549,212 +8538,217 @@ body.apro-fs #pg-actividad{position:fixed!important;inset:0!important;height:100
         actualizarPyP();
       }
     }
- 
+
     function actualizarPyP() {
-      const sel    = document.getElementById('multa-tipo-sel');
-      const wrap   = document.getElementById('multa-monto-wrap');
-      const aviso  = document.getElementById('pyp-aviso');
-      const esPyP  = sel?.value === 'pyp';
- 
+      const sel   = document.getElementById('multa-tipo-sel');
+      const wrap  = document.getElementById('multa-monto-wrap');
+      const aviso = document.getElementById('pyp-aviso');
+      const esPyP = sel?.value === 'pyp';
       wrap?.classList.toggle('pyp-hidden', esPyP);
       aviso?.classList.toggle('show', esPyP);
     }
- 
-    /* Parchear saveMulta para que P&P envíe monto 0 */
+
     window.saveMulta = async function() {
-      const domi   = document.getElementById('multa-domi-select')?.value?.trim();
-      const tipo   = document.getElementById('multa-tipo-sel')?.value  || 'multa';
-      const nota   = (document.getElementById('multa-nota')?.value     || '').trim();
-      const fecha  = document.getElementById('multa-fecha')?.value
-                     || new Date().toISOString().slice(0, 10);
-      const esPyP  = tipo === 'pyp';
-      const monto  = esPyP
-        ? 0
-        : parsePrecio(document.getElementById('multa-monto')?.value || '');
- 
-      if (!domi)              { showToast('w','Falta domiciliario','Selecciona un domi'); return; }
-      if (!esPyP && !monto)   { showToast('w','Falta monto','Ingresa un valor válido'); return; }
- 
+      const domi  = document.getElementById('multa-domi-select')?.value?.trim();
+      const tipo  = document.getElementById('multa-tipo-sel')?.value || 'multa';
+      const nota  = (document.getElementById('multa-nota')?.value || '').trim();
+      const fecha = document.getElementById('multa-fecha')?.value || new Date().toISOString().slice(0,10);
+      const esPyP = tipo === 'pyp';
+      const monto = esPyP ? 0 : parsePrecio(document.getElementById('multa-monto')?.value || '');
+
+      if (!domi)           { showToast('w','Falta domiciliario','Selecciona un domi'); return; }
+      if (!esPyP && !monto){ showToast('w','Falta monto','Ingresa un valor válido'); return; }
+
       const btn = ov.querySelector('.om-btn-save');
       if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-rounded" style="animation:spin .8s linear infinite;font-size:15px;">progress_activity</span> Guardando…'; }
- 
-      const item = { domi, monto, nota, tipo, fecha };
- 
-      /* Solo afecta balance si NO es P&P */
+
       if (!esPyP) {
         window._multasData = window._multasData || [];
-        window._multasData.push(item);
+        window._multasData.push({ domi, monto, nota, tipo, fecha });
       }
- 
       ov.classList.remove('show');
-      showToast('i',
-        esPyP ? `🚦 P&P registrado — ${domi}` : `Guardando multa para ${domi}…`,
-        esPyP ? 'Sin descuento de saldo' : fmtMoney(monto)
-      );
- 
+      showToast('i', esPyP ? `Registrando P&P — ${domi}` : `Guardando multa — ${domi}…`, esPyP ? 'Sin descuento' : fmtMoney(monto));
+
       try {
-        const res  = await fetch(GAS, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ accion:'crear-multa', domi, monto, tipo, nota, fecha })
-        });
-        const json = await res.json().catch(() => ({ ok: true }));
- 
+        const res  = await fetch(GAS, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({ accion:'crear-multa', domi, monto, tipo, nota, fecha }) });
+        await res.json().catch(()=>({}));
         if (typeof loadMultas === 'function') await loadMultas();
         if (typeof renderContable === 'function') renderContable();
- 
-        showToast('s',
-          esPyP ? '🚦 Pico & Placa guardado' : `Multa registrada — ${domi}`,
-          esPyP ? domi : (fmtMoney(monto) + (nota ? ' · ' + nota : ''))
-        );
+        showToast('s', esPyP ? `P&P guardado — ${domi}` : `Multa registrada — ${domi}`, esPyP ? 'Solo registro' : fmtMoney(monto));
       } catch(e) {
-        showToast('e','Error al guardar', e.message.substring(0, 70));
+        showToast('e','Error al guardar', e.message.substring(0,60));
       } finally {
-        if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-rounded">gavel</span>Registrar'; }
-        /* Resetear reordenado para la próxima apertura */
+        if (btn) { btn.disabled=false; btn.innerHTML='<span class="material-symbols-rounded">gavel</span>Registrar'; }
         const b = ov.querySelector('.cont-modal-body');
         if (b) delete b._reordenado;
       }
     };
   }
- 
- 
-  /* ═══════════════════════════════════════════════════════════
-     2. CIERRE DE CAJA  —  Resumen real + envío con columnas exactas
-  ═══════════════════════════════════════════════════════════ */
+
+
+  /* ════════════════════════════════════════════════════
+     2. CIERRE DE CAJA
+  ════════════════════════════════════════════════════ */
   function patchCierreCaja() {
-    /* ── 2a. calcResumenTurno —— lee allPedidos filtrando por turno ── */
+
+    /* ── CSS compacto para el modal ── */
+    const st = document.createElement('style');
+    st.textContent = `
+      #modal-caja-overlay { font-size:12px !important; }
+      .caja-modal .om-label { font-size:9px !important; margin-bottom:3px !important; }
+      .caja-modal .om-input,
+      .caja-modal .om-select { font-size:12px !important; padding:7px 10px !important; border-radius:8px !important; }
+      .caja-modal .om-field  { margin-bottom:10px !important; }
+      #caja-resumen-auto     { padding:11px 13px !important; margin-bottom:12px !important; border-radius:11px !important; }
+      #caja-diferencia-box   { padding:8px 11px !important; border-radius:8px !important; margin-top:8px !important; }
+      #caja-novedades        { min-height:50px !important; font-size:12px !important; padding:7px 10px !important; }
+      #btn-guardar-caja      { padding:10px !important; font-size:12px !important; }
+      #caja-stats-grid       { display:grid; grid-template-columns:repeat(4,1fr); gap:7px; }
+      @media(max-width:520px){ #caja-stats-grid { grid-template-columns:repeat(2,1fr) !important; } }
+      .caja-sc { background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); border-radius:9px; padding:8px 6px; text-align:center; }
+      .caja-sv { font-size:13px; font-weight:800; font-family:'DM Mono',monospace; line-height:1; margin-bottom:3px; }
+      .caja-sl { font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; opacity:.5; }
+    `;
+    document.head.appendChild(st);
+
+    /* ── poblarSelectsCaja: domis + admin ── */
+    function poblarSelectsCaja() {
+      const opciones = [
+        '<option value="">— Selecciona —</option>',
+        '<option value="Hernán (Admin)">Hernán (Admin)</option>',
+        '<option value="Coordinador">Coordinador</option>',
+        ...(window.allDrivers || []).map(d =>
+          `<option value="${d.nombre}">${d.activo ? '● ' : '○ '}${d.nombre}</option>`
+        )
+      ].join('');
+
+      ['caja-entrega','caja-recibe'].forEach(id => {
+        const sel = document.getElementById(id);
+        if (sel) sel.innerHTML = opciones;
+      });
+    }
+
+    /* ── calcResumenTurno: lee allPedidos filtrando fecha + turno ── */
     window.calcResumenTurno = function() {
-      const turno   = document.getElementById('caja-turno')?.value  || '1';
-      const hiIni   = turno === '1' ?  0 : 14;
-      const hiFin   = turno === '1' ? 14 : 24;
- 
-      /* Filtrar pedidos del turno (por hora si existe, si no incluir todos) */
-      const pedsT = (window.allPedidos || []).filter(p => {
+      const turno  = document.getElementById('caja-turno')?.value || '1';
+      const fecha  = document.getElementById('caja-fecha')?.value || new Date().toISOString().slice(0,10);
+      const hiIni  = turno === '1' ?  0 : 14;
+      const hiFin  = turno === '1' ? 14 : 24;
+
+      /* Filtrar por fecha del día seleccionado */
+      const hoyStr = fecha; // YYYY-MM-DD
+      const pedsDia = (window.allPedidos || []).filter(p => {
+        /* Comparar col N (fecha del pedido) con la fecha elegida */
+        const fn = (p.fecha || '').trim();
+        if (!fn) return false;
+        /* Normalizar: si el sheet guarda "27 abr. 2025" parsear con parseDate */
+        const d = typeof parseDate === 'function' ? parseDate(fn) : null;
+        if (!d || isNaN(d)) return false;
+        const yyyy = d.getFullYear();
+        const mm   = String(d.getMonth()+1).padStart(2,'0');
+        const dd   = String(d.getDate()).padStart(2,'0');
+        return `${yyyy}-${mm}-${dd}` === hoyStr;
+      });
+
+      /* Filtrar por hora del turno */
+      const pedsT = pedsDia.filter(p => {
         if (!p.hora) return true;
         const h = parseInt((p.hora || '0:00').split(':')[0]);
         return h >= hiIni && h < hiFin;
       });
- 
-      const ent     = pedsT.filter(p => p.estado === 'entregado').length;
-      const pend    = pedsT.filter(p => p.estado === 'pendiente').length;
-      const proc    = pedsT.filter(p => ['proceso','encamino','asignado'].includes(p.estado)).length;
- 
-      const efPeds  = pedsT.filter(p => /efecti/i.test(p.metodo || ''));
-      const tfPeds  = pedsT.filter(p => /transfer/i.test(p.metodo || ''));
- 
-      const totalEf = efPeds.reduce((s,p) => s + parsePrecio(p.total), 0);
-      const totalTf = tfPeds.reduce((s,p) => s + parsePrecio(p.total), 0);
-      const totalT  = totalEf + totalTf;
- 
-      /* Rellenar la grid de stats del modal */
+
+      /* Conteos por estado (col E) */
+      const ent  = pedsT.filter(p => p.estado === 'entregado').length;
+      const pend = pedsT.filter(p => p.estado === 'pendiente').length;
+      const proc = pedsT.filter(p => ['proceso','encamino','asignado'].includes(p.estado)).length;
+
+      /* Método de pago (col D) */
+      const efPeds = pedsT.filter(p => /efecti/i.test(p.metodo || ''));
+      const tfPeds = pedsT.filter(p => /transfer/i.test(p.metodo || ''));
+      const otrPeds= pedsT.filter(p => !/efecti|transfer/i.test(p.metodo || '') && p.metodo);
+
+      const totalEf  = efPeds.reduce((s,p) => s + parsePrecio(p.total), 0);
+      const totalTf  = tfPeds.reduce((s,p) => s + parsePrecio(p.total), 0);
+      const totalT   = totalEf + totalTf;
+
+      /* Renderizar cards del resumen */
       const grid = document.getElementById('caja-stats-grid');
       if (grid) {
         grid.innerHTML = [
-          { ico:'check_circle',   color:'#4ade80', val: ent,              lbl:'Entregados'  },
-          { ico:'pending_actions',color:'#fbbf24', val: pend + proc,      lbl:'Pendientes'  },
-          { ico:'payments',       color:'#86efac', val: fmtMoney(totalEf),lbl:'Efectivo'    },
-          { ico:'account_balance',color:'#93c5fd', val: fmtMoney(totalTf),lbl:'Transf.'     },
+          { ico:'check_circle',    color:'#4ade80', val: ent,                   lbl:'Entregados'        },
+          { ico:'pending_actions', color:'#fbbf24', val: pend + proc,           lbl:'Pendientes/Proceso' },
+          { ico:'payments',        color:'#86efac', val: fmtMoney(totalEf),     lbl:`Efectivo (${efPeds.length})` },
+          { ico:'account_balance', color:'#93c5fd', val: fmtMoney(totalTf),     lbl:`Transf. (${tfPeds.length})`  },
         ].map(k => `
-          <div class="caja-stat-card">
-            <span class="material-symbols-rounded" style="font-size:14px;color:${k.color};display:block;margin-bottom:5px;">${k.ico}</span>
-            <div class="caja-stat-val" style="color:${k.color};">${k.val}</div>
-            <div class="caja-stat-lbl">${k.lbl}</div>
+          <div class="caja-sc">
+            <span class="material-symbols-rounded" style="font-size:13px;color:${k.color};display:block;margin-bottom:4px;">${k.ico}</span>
+            <div class="caja-sv" style="color:${k.color};">${k.val}</div>
+            <div class="caja-sl">${k.lbl}</div>
           </div>`).join('');
       }
- 
-      /* Prellenar efectivo si está vacío */
+
+      /* Prellenar efectivo esperado si está vacío */
       const efInput = document.getElementById('caja-efectivo');
       if (efInput && !efInput.value) efInput.value = String(Math.round(totalEf));
- 
+
       /* Prellenar bases del día si están vacías */
-      const basesHoy = (window._basesData || []).reduce((s, b) => s + b.monto, 0);
-      const bInput   = document.getElementById('caja-bases');
-      if (bInput && !bInput.value) bInput.value = String(Math.round(basesHoy));
- 
+      const basesTotal = (window._basesData || []).reduce((s,b) => s + b.monto, 0);
+      const bInput     = document.getElementById('caja-bases');
+      if (bInput && !bInput.value) bInput.value = String(Math.round(basesTotal));
+
       calcDiferenciaCaja();
-      return { ent, pend, proc, totalEf, totalTf, totalT, pedsT: pedsT.length };
+      return { ent, pend, proc, totalEf, totalTf, totalT, nPeds: pedsT.length };
     };
- 
-    /* ── 2b. calcDiferenciaCaja — diferencia efectivo vs físico ── */
-    window.calcDiferenciaCaja = function() {
-      const efInput  = document.getElementById('caja-efectivo');
-      const basInput = document.getElementById('caja-bases');
-      const difVal   = document.getElementById('caja-dif-valor');
-      const difBox   = document.getElementById('caja-diferencia-box');
-      const difTxt   = document.getElementById('caja-dif-detalle');
-      if (!efInput || !difVal) return;
- 
-      const ef     = parsePrecio(efInput.value  || '0');
-      const bases  = parsePrecio(basInput?.value || '0');
-      const dif    = ef - bases;   // lo que queda en caja tras dar bases
-      const esOk   = Math.abs(dif) < 500;
- 
-      difVal.textContent = fmtMoney(Math.abs(dif));
-      difVal.style.color = esOk ? 'var(--green)' : dif < 0 ? 'var(--red)' : 'var(--orange)';
- 
-      if (difBox) {
-        difBox.style.borderColor = esOk
-          ? 'rgba(22,163,74,.3)' : dif < 0
-          ? 'rgba(220,38,38,.3)' : 'rgba(217,119,6,.3)';
-        difBox.style.background  = esOk
-          ? 'rgba(22,163,74,.06)' : dif < 0
-          ? 'rgba(220,38,38,.06)' : 'rgba(217,119,6,.06)';
-      }
-      if (difTxt) {
-        difTxt.textContent = esOk
-          ? '✓ Cuadre exacto — caja OK'
-          : dif < 0
-            ? `⚠ Faltante de ${fmtMoney(Math.abs(dif))}`
-            : `↑ Sobrante de ${fmtMoney(dif)}`;
-      }
+
+    /* ── calcDiferenciaCaja ── */
+    window.calcDiferenciaCaja = function calcDiferenciaCaja() {
+      const ef    = parsePrecio(document.getElementById('caja-efectivo')?.value  || '0');
+      const bases = parsePrecio(document.getElementById('caja-bases')?.value     || '0');
+      const dif   = ef - bases;
+      const esOk  = Math.abs(dif) < 500;
+
+      const difVal = document.getElementById('caja-dif-valor');
+      const difBox = document.getElementById('caja-diferencia-box');
+      const difTxt = document.getElementById('caja-dif-detalle');
+
+      if (difVal) { difVal.textContent = fmtMoney(Math.abs(dif)); difVal.style.color = esOk ? 'var(--green)' : dif < 0 ? 'var(--red)' : 'var(--orange)'; }
+      if (difBox) { difBox.style.borderColor = esOk ? 'rgba(22,163,74,.3)' : dif < 0 ? 'rgba(220,38,38,.3)' : 'rgba(217,119,6,.3)'; difBox.style.background = esOk ? 'rgba(22,163,74,.06)' : dif < 0 ? 'rgba(220,38,38,.06)' : 'rgba(217,119,6,.06)'; }
+      if (difTxt) { difTxt.textContent = esOk ? '✓ Cuadre exacto — caja OK' : dif < 0 ? `Faltante de ${fmtMoney(Math.abs(dif))}` : `Sobrante de ${fmtMoney(dif)}`; }
     };
- 
-    /* ── 2c. abrirCierreCaja — prellenar modal ── */
+
+    /* ── abrirCierreCaja ── */
     window.abrirCierreCaja = function() {
       const ahora = new Date();
- 
-      /* Fecha y hora */
-      const fEl = document.getElementById('caja-fecha');
-      const hEl = document.getElementById('caja-hora');
-      if (fEl) fEl.value = ahora.toISOString().slice(0, 10);
-      if (hEl) hEl.value = ahora.toTimeString().slice(0, 5);
- 
-      /* Auto-seleccionar turno */
-      const tEl = document.getElementById('caja-turno');
+      const fEl   = document.getElementById('caja-fecha');
+      const hEl   = document.getElementById('caja-hora');
+      const tEl   = document.getElementById('caja-turno');
+
+      if (fEl) fEl.value = ahora.toISOString().slice(0,10);
+      if (hEl) hEl.value = ahora.toTimeString().slice(0,5);
       if (tEl) tEl.value = ahora.getHours() < 14 ? '1' : '2';
- 
-      /* Poblar selects de personal */
-      ['caja-entrega', 'caja-recibe'].forEach(id => {
-        const sel = document.getElementById(id);
-        if (!sel) return;
-        sel.innerHTML = '<option value="">— Selecciona —</option>' +
-          (window.allDrivers || []).map(d =>
-            `<option value="${d.nombre}">${d.activo ? '🟢' : '⚫'} ${d.nombre}</option>`
-          ).join('');
-      });
- 
-      /* Limpiar campos manuales */
-      ['caja-efectivo', 'caja-bases', 'caja-novedades'].forEach(id => {
+
+      /* ✅ Poblar con domis + admin */
+      poblarSelectsCaja();
+
+      ['caja-efectivo','caja-bases','caja-novedades'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
       });
- 
-      /* Abrir modal */
+
       document.getElementById('modal-caja-overlay').classList.add('show');
- 
-      /* Calcular resumen con pequeño delay (espera DOM) */
-      setTimeout(window.calcResumenTurno, 120);
+      setTimeout(window.calcResumenTurno, 150);
     };
- 
-    /* Escuchar cambio de turno */
-    const turnoSel = document.getElementById('caja-turno');
-    if (turnoSel && !turnoSel._patchedV4) {
-      turnoSel._patchedV4 = true;
-      turnoSel.addEventListener('change', () => setTimeout(window.calcResumenTurno, 50));
-    }
- 
-    /* ── 2d. guardarCierreCaja — envía a sheet con columnas exactas ── */
+
+    /* Escuchar cambio de turno y fecha */
+    ['caja-turno','caja-fecha'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && !el._patchedV4) {
+        el._patchedV4 = true;
+        el.addEventListener('change', () => setTimeout(window.calcResumenTurno, 50));
+      }
+    });
+
+    /* ── guardarCierreCaja ── */
     window.guardarCierreCaja = async function() {
       const turno     = document.getElementById('caja-turno')?.value    || '';
       const fecha     = document.getElementById('caja-fecha')?.value    || '';
@@ -8764,88 +8758,51 @@ body.apro-fs #pg-actividad{position:fixed!important;inset:0!important;height:100
       const efectivo  = parsePrecio(document.getElementById('caja-efectivo')?.value  || '0');
       const bases     = parsePrecio(document.getElementById('caja-bases')?.value     || '0');
       const novedades = (document.getElementById('caja-novedades')?.value || '').trim();
- 
+
       if (!entrega) { showToast('w','Falta quién entrega','Selecciona el responsable'); return; }
       if (!recibe)  { showToast('w','Falta quién recibe','Selecciona quién recibe');   return; }
- 
+
       const btn = document.getElementById('btn-guardar-caja');
-      if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<span class="material-symbols-rounded" style="animation:spin .8s linear infinite;font-size:17px;">progress_activity</span> Guardando…';
-      }
- 
-      /* Recalcular resumen para tener datos frescos */
+      if (btn) { btn.disabled=true; btn.innerHTML='<span class="material-symbols-rounded" style="animation:spin .8s linear infinite;font-size:16px;">progress_activity</span> Guardando…'; }
+
       const resumen    = window.calcResumenTurno();
       const diferencia = efectivo - bases;
       const esOk       = Math.abs(diferencia) < 500;
-      const ts         = new Date().toLocaleString('es-CO', {
-        day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'
-      });
- 
-      /* Objeto del cierre — exactamente las columnas del sheet */
+      const ts         = new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+
       const cierre = {
-        id:          'CAJA-' + Date.now(),   // ID
-        turno,                               // Turno
-        fecha,                               // Fecha
-        hora,                                // Hora
-        entrega,                             // Entrega
-        recibe,                              // Recibe
-        efectivo,                            // Efectivo
-        bases,                               // Bases
-        diferencia,                          // Diferencia
-        pedidos:     resumen.ent   || 0,     // Pedidos
-        totalEf:     resumen.totalEf || 0,   // TotalEf
-        totalTf:     resumen.totalTf || 0,   // TotalTf
-        totalT:      resumen.totalT  || 0,   // TotalT
-        estado:      esOk ? 'ok' : diferencia < 0 ? 'faltante' : 'sobrante', // Estado
-        novedades,                           // Novedades
-        ts                                   // Timestamp
+        id:        'CAJA-' + Date.now(),
+        turno, fecha, hora, entrega, recibe,
+        efectivo, bases, diferencia,
+        pedidos:   resumen.ent    || 0,
+        totalEf:   resumen.totalEf || 0,
+        totalTf:   resumen.totalTf || 0,
+        totalT:    resumen.totalT  || 0,
+        estado:    esOk ? 'ok' : diferencia < 0 ? 'faltante' : 'sobrante',
+        novedades, ts
       };
- 
-      /* Guardar en memoria para render inmediato */
+
       window._cierresData = window._cierresData || [];
       window._cierresData.unshift(cierre);
       if (typeof renderCierresCaja === 'function') renderCierresCaja();
- 
+
       document.getElementById('modal-caja-overlay').classList.remove('show');
       showToast('i', `Guardando cierre turno ${turno}…`, `${entrega} → ${recibe}`);
- 
+
       try {
-        /* Enviar al GAS con acción y todas las columnas */
-        const payload = { accion: 'crear-cierre-caja', ...cierre };
-        const res  = await fetch(GAS, {
-          method:  'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body:    JSON.stringify(payload)
-        });
-        const json = await res.json().catch(() => ({ ok: true }));
- 
-        /* Recargar desde sheet para tener ID real si el script lo sobreescribe */
-        if (typeof loadCierresCaja === 'function') {
-          await loadCierresCaja();
-          if (typeof renderCierresCaja === 'function') renderCierresCaja();
-        }
- 
-        showToast('s',
-          `✓ Cierre turno ${turno} registrado`,
-          `${entrega} → ${recibe} · ${esOk ? 'Caja OK ✓' : diferencia < 0 ? '⚠ Faltante' : '↑ Sobrante'}`
-        );
- 
-        if (typeof VOZ !== 'undefined') {
-          VOZ.hablar(`Cierre de caja turno ${turno} registrado. ${esOk ? 'Caja cuadrada.' : 'Revisar diferencia.'}`);
-        }
- 
+        const res  = await fetch(GAS, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({ accion:'crear-cierre-caja', ...cierre }) });
+        await res.json().catch(()=>({}));
+        if (typeof loadCierresCaja === 'function') { await loadCierresCaja(); if (typeof renderCierresCaja === 'function') renderCierresCaja(); }
+        showToast('s', `Cierre turno ${turno} registrado`, `${entrega} → ${recibe} · ${esOk ? 'Caja OK' : diferencia < 0 ? 'Faltante — revisar' : 'Sobrante'}`);
+        if (typeof VOZ !== 'undefined') VOZ.hablar(`Cierre turno ${turno} registrado. ${esOk ? 'Caja cuadrada.' : 'Revisar diferencia.'}`);
       } catch(e) {
-        showToast('e', 'Error al guardar cierre', e.message.substring(0, 70));
+        showToast('e','Error al guardar cierre', e.message.substring(0,70));
       } finally {
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:17px;">check_circle</span>Registrar cierre';
-        }
+        if (btn) { btn.disabled=false; btn.innerHTML='<span class="material-symbols-rounded" style="font-size:16px;">check_circle</span>Registrar cierre'; }
       }
     };
   }
- 
+
 })();
 </script>
 
