@@ -1651,30 +1651,58 @@ window._initMapResult=function(pedido){
 };
 
 async function trazarRutaResult(latO,lngO,latD,lngD,pedido){
- var url='https://routing.openstreetmap.de/routed-car/route/v1/driving/'+lngO+','+latO+';'+lngD+','+latD+'?overview=full&geometries=geojson';
+  var body=JSON.stringify({locations:[{lon:lngO,lat:latO},{lon:lngD,lat:latD}],costing:'auto'});
+  var url='https://valhalla1.openstreetmap.de/route?json='+encodeURIComponent(body);
+  var i=0;
+  while(i<3){
     try{
-      var r=await fetch(url,{cache:'no-store'});
+      var ctrl=new AbortController();
+      var t=setTimeout(function(){ctrl.abort();},8000);
+      var r=await fetch(url,{cache:'no-store',signal:ctrl.signal});
+      clearTimeout(t);
       var data=await r.json();
-      if(!data.paths||!data.paths[0])throw new Error('sin ruta');
-      var coords=data.paths[0].points.coordinates;
-      var latLngs=coords.map(function(c){return[c[1],c[0]];});
-      var dur=Math.round(data.paths[0].time/60000);
+      if(!data.trip||!data.trip.legs[0])throw new Error('sin ruta');
+      var latLngs=decodePolyline6(data.trip.legs[0].shape);
+      var dur=Math.round(data.trip.summary.time/60);
       if(routeLayerResult){mapResult.removeLayer(routeLayerResult);routeLayerResult=null;}
       if(routeLayerResultTop){mapResult.removeLayer(routeLayerResultTop);routeLayerResultTop=null;}
-      routeLayerResult=L.polyline(latLngs,{color:'#fff',weight:9,opacity:.6,lineCap:'round',lineJoin:'round'}).addTo(mapResult);
-      routeLayerResultTop=L.polyline(latLngs,{color:'#006970',weight:5,opacity:.92,lineCap:'round',lineJoin:'round'}).addTo(mapResult);
-      var etaOverlay=document.getElementById('rtMapEtaOverlay');
-      var etaMinEl=document.getElementById('rtMapEtaMins');
-      if(etaMinEl)etaMinEl.textContent=dur>0?dur:'¡Ya!';
-      if(etaOverlay)etaOverlay.style.display='flex';
+      routeLayerResult=L.polyline(latLngs,{color:'#000000',weight:14,opacity:.18,lineCap:'round',lineJoin:'round'}).addTo(mapResult);
+routeLayerResultTop=L.polyline(latLngs,{color:'#1a1a1a',weight:7,opacity:1,lineCap:'round',lineJoin:'round'}).addTo(mapResult);
+var etaMinEl=document.getElementById('rtMapEtaMins');
+var etaOverlay=document.getElementById('rtMapEtaOverlay');
+if(etaOverlay)etaOverlay.style.display='flex';
+clearInterval(window._etaTimer);
+var _remaining=dur;
+function _tickEta(){
+  if(_remaining<=0){etaMinEl.textContent='¡Ya!';clearInterval(window._etaTimer);return;}
+  etaMinEl.textContent=_remaining;
+  _remaining--;
+}
+_tickEta();
+window._etaTimer=setInterval(_tickEta,60000);
       var bounds=L.latLngBounds([[latO,lngO],[latD,lngD]]);
       mapResult.fitBounds(bounds,{paddingTopLeft:[20,80],paddingBottomRight:[20,20],maxZoom:16});
       return;
     }catch(e){
-      if(intento<2)await new Promise(function(r){setTimeout(r,2000*(intento+1));});
+      i++;
+      if(i<3)await new Promise(function(res){setTimeout(res,2000*i);});
     }
   }
+}
 
+function decodePolyline6(encoded){
+  var pts=[],idx=0,lat=0,lng=0;
+  while(idx<encoded.length){
+    var b,shift=0,res=0;
+    do{b=encoded.charCodeAt(idx++)-63;res|=(b&0x1f)<<shift;shift+=5;}while(b>=32);
+    lat+=(res&1)?~(res>>1):(res>>1);
+    shift=0;res=0;
+    do{b=encoded.charCodeAt(idx++)-63;res|=(b&0x1f)<<shift;shift+=5;}while(b>=32);
+    lng+=(res&1)?~(res>>1):(res>>1);
+    pts.push([lat/1e6,lng/1e6]);
+  }
+  return pts;
+}
 var _domiPollUbicTimer=null;
 function iniciarPollUbicacionDomi(pedido){
   clearInterval(_domiPollUbicTimer);
@@ -2706,9 +2734,9 @@ if (nuevoEstado === 'Entregado' || nuevoEstado === 'Cancelado') {
     /* Avatar con foto real */
     var avEl = document.getElementById('domiFotoWrap');
     var nombreDomiDisplay = nuevoDomi.replace(/\s*\([^)]+\)/,'').trim();
-    if(avEl && dFoto && dFoto.startsWith('http') && !avEl.querySelector('img')){
-      avEl.innerHTML = '<img src="'+dFoto+'" style="width:100%;height:100%;object-fit:cover;object-position:center 20%" '
-        +'onerror="this.parentElement.textContent=\''+nombreDomiDisplay.charAt(0).toUpperCase()+'\'">';
+    if(avEl && dFoto && !avEl.querySelector('img')){
+  var fotoUrl = dFoto.startsWith('http') ? dFoto : 'icons/'+dFoto;
+        avEl.innerHTML = '<img src="'+fotoUrl+'" style="width:100%;height:100%;object-fit:cover;object-position:center 20%" '
     }
 
     /* Card domi nombre + estado */
