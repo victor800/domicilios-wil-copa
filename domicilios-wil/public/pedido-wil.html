@@ -636,6 +636,20 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
   margin-bottom:4px;
 }
 
+.wil-sug-item{
+  padding:10px 14px;font-size:13px;font-weight:600;color:var(--on);
+  cursor:pointer;border-bottom:1px solid #f0f3f6;display:flex;
+  align-items:center;justify-content:space-between;gap:8px;
+  transition:background .12s;
+}
+.wil-sug-item:last-child{border-bottom:none}
+.wil-sug-item:active,.wil-sug-item:hover{background:var(--pl)}
+.wil-sug-match{color:var(--p);font-weight:800}
+.wil-sug-precio{font-size:11px;font-weight:700;color:#15803d;
+  background:#f0fdf4;border:1px solid #86efac;border-radius:6px;
+  padding:2px 7px;flex-shrink:0}
+.wil-sug-empty{padding:12px 14px;font-size:12px;color:var(--on3);text-align:center}
+
 </style>
 </head>
 <body>
@@ -962,17 +976,29 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
  
       <div class="field">
         <label>Barrio de recogida</label>
-        <select id="wil-barrio-recogida" onchange="wilCalcTarifa()">
-          <option value="">— Selecciona el barrio del comercio —</option>
-        </select>
+        <div style="position:relative">
+          <input type="text" id="wil-barrio-recogida-txt"
+            placeholder="Escribe el barrio del comercio…"
+            autocomplete="off"
+            oninput="wilBuscarBarrio('recogida',this.value)"
+            onblur="setTimeout(()=>wilCerrarSugs('recogida'),180)"/>
+          <input type="hidden" id="wil-barrio-recogida" data-precio="0"/>
+          <div id="wil-sugs-recogida" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:999;background:#fff;border:1.5px solid var(--plb);border-radius:var(--r-lg);box-shadow:var(--sh2);max-height:200px;overflow-y:auto;margin-top:4px"></div>
+        </div>
         <div class="field-note">Barrio donde está el comercio o punto de origen</div>
       </div>
- 
+
       <div class="field">
         <label>Barrio de entrega</label>
-        <select id="wil-barrio-entrega" onchange="wilCalcTarifa()">
-          <option value="">— Selecciona el barrio de destino —</option>
-        </select>
+        <div style="position:relative">
+          <input type="text" id="wil-barrio-entrega-txt"
+            placeholder="Escribe el barrio de destino…"
+            autocomplete="off"
+            oninput="wilBuscarBarrio('entrega',this.value)"
+            onblur="setTimeout(()=>wilCerrarSugs('entrega'),180)"/>
+          <input type="hidden" id="wil-barrio-entrega" data-precio="0"/>
+          <div id="wil-sugs-entrega" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:999;background:#fff;border:1.5px solid var(--plb);border-radius:var(--r-lg);box-shadow:var(--sh2);max-height:200px;overflow-y:auto;margin-top:4px"></div>
+        </div>
       </div>
  
       <!-- Tarifa calculada -->
@@ -1268,21 +1294,47 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 </div>
 
 <!-- CONFIRMADO -->
+<!-- CONFIRMADO -->
 <div class="view" id="view-confirmado">
   <div class="succ-wrap">
     <div class="succ-ring"><span class="sym f">check_circle</span></div>
     <div class="succ-tit">¡Pedido enviado! 🛵</div>
     <p class="succ-sub" id="success-msg">Tu pedido fue recibido. Un domiciliario te contactará pronto.</p>
   </div>
+
   <div class="id-badge">
     <div class="id-badge-lbl">Tu código de pedido</div>
     <div class="id-badge-code" id="idPedidoDisplay">—</div>
-    <div class="id-badge-sub">📸 Guárdalo para rastrear y chatear con el domi</div>
-    <button class="id-badge-copy" onclick="copiarId()"><span class="sym" style="font-size:15px">content_copy</span>Copiar código</button>
+    <div class="id-badge-sub">Guárdalo para rastrear tu pedido en cualquier momento</div>
+
+    <div style="display:flex;gap:10px;margin-top:14px;justify-content:center">
+      <!-- Copiar al portapapeles -->
+      <button id="id-badge-copy-btn"
+        style="display:flex;align-items:center;gap:6px;background:var(--p);border:none;border-radius:99px;padding:9px 18px;font-size:12px;font-weight:800;color:#fff;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;box-shadow:0 3px 10px rgba(0,105,112,.25)">
+        <span class="sym" style="font-size:15px">content_copy</span>Copiar código
+      </button>
+      <!-- Compartir (si está disponible) -->
+      <button id="id-badge-share-btn"
+        onclick="wilCompartirCodigo()"
+        style="display:flex;align-items:center;gap:6px;background:#f0f4f7;border:1.5px solid #dce3ea;border-radius:99px;padding:9px 18px;font-size:12px;font-weight:800;color:var(--on2);cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif">
+        <span class="sym" style="font-size:15px">share</span>Compartir
+      </button>
+    </div>
   </div>
+
+  <!-- Nota informativa -->
+  <div style="margin:0 16px 16px;padding:12px 14px;background:#fffbeb;border:1px solid rgba(217,119,6,.2);border-radius:var(--r-lg);font-size:12px;color:#92400e;line-height:1.55;display:flex;gap:8px">
+    <span style="font-size:16px;flex-shrink:0">📋</span>
+    <span>El domi te contactará pronto. Usa el código para <strong>rastrear tu pedido</strong> en tiempo real.</span>
+  </div>
+
   <div style="padding:0 16px 16px;display:flex;flex-direction:column;gap:10px">
-    <button class="btn-full gr" onclick="irARastrear()"><span class="sym" style="font-size:18px;color:#fff">search</span>Rastrear este pedido</button>
-    <button class="btn-full dk" onclick="showView('view-inicio');resetAll()"><span class="sym" style="font-size:18px">home</span>Volver al inicio</button>
+    <button class="btn-full gr" id="id-badge-rastrear-btn">
+      <span class="sym" style="font-size:18px;color:#fff">search</span>Rastrear este pedido
+    </button>
+    <button class="btn-full dk" onclick="showView('view-inicio');resetAll()">
+      <span class="sym" style="font-size:18px">home</span>Volver al inicio
+    </button>
   </div>
 </div>
 
@@ -4077,26 +4129,23 @@ function wilSelDestino(d){
  
 /* ─── CALCULAR TARIFA = max(recogida, entrega) ─── */
 function wilCalcTarifa(){
-  const selR  = document.getElementById('wil-barrio-recogida');
-  const selE  = document.getElementById('wil-barrio-entrega');
-  const optR  = selR?.options[selR.selectedIndex];
-  const optE  = selE?.options[selE.selectedIndex];
-  const pill  = document.getElementById('wil-tarifa-calc');
-  const valEl = document.getElementById('wil-tarifa-calc-val');
- 
-  const pR = optR?.dataset.precio ? parseInt(optR.dataset.precio) : 0;
-  const pE = optE?.dataset.precio ? parseInt(optE.dataset.precio) : 0;
- 
+  var hidR  = document.getElementById('wil-barrio-recogida');
+  var hidE  = document.getElementById('wil-barrio-entrega');
+  var pill  = document.getElementById('wil-tarifa-calc');
+  var valEl = document.getElementById('wil-tarifa-calc-val');
+
+  var pR = parseInt(hidR?.dataset.precio||0);
+  var pE = parseInt(hidE?.dataset.precio||0);
+
   if(!pR || !pE){ pill?.classList.add('hidden'); return; }
- 
-  const tarifa = Math.max(pR, pE);
+
+  var tarifa = Math.max(pR, pE);
   valEl.textContent = '$' + tarifa.toLocaleString('es-CO');
   pill?.classList.remove('hidden');
   window.WIL_LIBRE.tarifaDomi     = tarifa;
-  window.WIL_LIBRE.barrioRecogida = optR.value;
-  window.WIL_LIBRE.barrioEntrega  = optE.value;
- 
-  // mostrar campos según destino
+  window.WIL_LIBRE.barrioRecogida = hidR.value;
+  window.WIL_LIBRE.barrioEntrega  = hidE.value;
+
   if(window.WIL_LIBRE.destino === 'mi'){
     document.getElementById('wil-sec-dir-mi')?.classList.remove('hidden');
   } else if(window.WIL_LIBRE.destino === 'otro'){
@@ -4119,15 +4168,15 @@ function wilGoLibre2(){
     alert('Indica si el domicilio es para ti o para alguien más.'); return;
   }
  
-  const selR = document.getElementById('wil-barrio-recogida');
-  const selE = document.getElementById('wil-barrio-entrega');
-  if(!selR?.value){ alert('Selecciona el barrio de recogida.'); return; }
-  if(!selE?.value){ alert('Selecciona el barrio de entrega.'); return; }
+  var hidR = document.getElementById('wil-barrio-recogida');
+  var hidE = document.getElementById('wil-barrio-entrega');
+  if(!hidR?.value){ mostrarToast('Selecciona el barrio de recogida.','location_on'); return; }
+  if(!hidE?.value){ mostrarToast('Selecciona el barrio de entrega.','location_on'); return; }
  
-  const pR = parseInt(selR.options[selR.selectedIndex].dataset.precio || 0);
-  const pE = parseInt(selE.options[selE.selectedIndex].dataset.precio || 0);
-  L.barrioRecogida = selR.value;
-  L.barrioEntrega  = selE.value;
+  var pR = parseInt(hidR.dataset.precio||0);
+  var pE = parseInt(hidE.dataset.precio||0);
+  L.barrioRecogida = hidR.value;
+  L.barrioEntrega  = hidE.value;
   L.tarifaDomi     = Math.max(pR, pE);
  
   if(L.destino === 'mi'){
@@ -4208,7 +4257,12 @@ function wilGoLibre2(){
              <span style="color:var(--on3)">🛵 Tarifa domi</span>
              <span style="font-weight:900;color:#15803d;font-size:15px">${fmtPeso(L.tarifaDomi)}</span>
            </div>`;
+           html += `<div style="margin-top:10px;padding:10px 12px;background:#fef2f2;border:1px solid rgba(220,38,38,.2);border-radius:var(--r-md);font-size:11.5px;color:#dc2626;font-weight:600;line-height:1.5;display:flex;align-items:flex-start;gap:6px">
+             <span style="font-size:15px;flex-shrink:0">🧾</span>
+             <span><strong>Nota:</strong> El domi te adjuntará la factura al comprar tu pedido.</span>
+           </div>`;
   div.innerHTML = html;
+ 
 
   /* Productos listados */
   const card  = document.getElementById('wil-p3-prods-card');
@@ -4386,6 +4440,252 @@ function wilAgregarProducto(){
   wilRenderListaProductos();
 }
  
+/* ─── AUTOCOMPLETADO DE BARRIOS ─── */
+function wilNorm(s){
+  return(s||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+}
+
+function wilBuscarBarrio(campo, query){
+  var txt   = query.trim();
+  var sugEl = document.getElementById('wil-sugs-'+campo);
+  var hidEl = document.getElementById('wil-barrio-'+campo);
+
+  // Limpiar selección previa al escribir
+  hidEl.value = '';
+  hidEl.dataset.precio = '0';
+  wilCalcTarifa();
+
+  if(txt.length < 2){ sugEl.style.display='none'; return; }
+
+  var q = wilNorm(txt);
+  // Filtrar: coincidencia exacta primero, luego parcial
+  var exactas  = WIL_BARRIOS.filter(function(b){ return wilNorm(b[0]) === q; });
+  var parciales = WIL_BARRIOS.filter(function(b){
+    var n = wilNorm(b[0]);
+    return n !== q && (n.indexOf(q) !== -1 || q.split(' ').every(function(w){ return n.indexOf(w) !== -1; }));
+  });
+  var resultados = exactas.concat(parciales).slice(0, 8);
+
+  if(!resultados.length){
+    sugEl.innerHTML = '<div class="wil-sug-empty">Sin coincidencias para "'+escHTML(txt)+'"</div>';
+    sugEl.style.display = 'block';
+    return;
+  }
+
+  // Resaltar la parte que coincide
+  function resaltar(nombre, q){
+    var idx = wilNorm(nombre).indexOf(q);
+    if(idx === -1) return escHTML(nombre);
+    return escHTML(nombre.slice(0,idx))
+      +'<span class="wil-sug-match">'+escHTML(nombre.slice(idx,idx+q.length))+'</span>'
+      +escHTML(nombre.slice(idx+q.length));
+  }
+
+  sugEl.innerHTML = resultados.map(function(b){
+    return '<div class="wil-sug-item" onmousedown="wilSelBarrio(\''+campo+'\',\''+b[0].replace(/'/g,"\\'") +'\','+b[1]+')">'
+      +'<span>'+resaltar(b[0], q)+'</span>'
+      +'<span class="wil-sug-precio">$'+b[1].toLocaleString('es-CO')+'</span>'
+    +'</div>';
+  }).join('');
+  sugEl.style.display = 'block';
+}
+
+function wilSelBarrio(campo, nombre, precio){
+  // Escribir en el input visible
+  document.getElementById('wil-barrio-'+campo+'-txt').value = nombre;
+  // Guardar en el hidden
+  var hidEl = document.getElementById('wil-barrio-'+campo);
+  hidEl.value = nombre;
+  hidEl.dataset.precio = precio;
+  // Cerrar sugerencias
+  document.getElementById('wil-sugs-'+campo).style.display = 'none';
+  // Recalcular tarifa
+  wilCalcTarifa();
+}
+
+function wilCerrarSugs(campo){
+  var sugEl = document.getElementById('wil-sugs-'+campo);
+  if(sugEl) sugEl.style.display = 'none';
+}
+
+/* ─── CONFIRMAR DIRECTO DESDE P3 ─── */
+async function confirmarPedidoDirecto(){
+  var L = window.WIL_LIBRE || {};
+  if(!window._wilPago){
+    mostrarToast('Selecciona un método de pago.','payments'); return;
+  }
+
+  var btn = document.getElementById('btnConfirmarDirecto');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Enviando…';
+
+  state.metodoPago      = window._wilPago;
+  state.precioDomicilio = L.tarifaDomi || 0;
+  state.barrio          = L.barrioEntrega || '';
+
+  if(L.destino === 'otro'){
+    state.nombre   = L.recibeNombre || L.enviaNombre || 'Cliente';
+    state.telefono = L.recibeTel   || L.enviaTel    || '';
+  } else {
+    state.nombre   = 'Cliente';
+    state.telefono = L.recibeTel || '';
+  }
+
+  if(!state.telefono){
+    mostrarToast('Falta el teléfono de contacto.','person');
+    btn.disabled = false;
+    btn.innerHTML = '<span class="sym f" style="font-size:17px">check_circle</span>Confirmar pedido';
+    return;
+  }
+
+  var dirCompleta = L.direccion || '';
+  if(L.referencia)    dirCompleta += ' — Ref: ' + L.referencia;
+  if(L.barrioEntrega) dirCompleta += ', ' + L.barrioEntrega;
+  if(state.coords && state.coords.lat)
+    dirCompleta += ' ['+state.coords.lat.toFixed(5)+','+state.coords.lng.toFixed(5)+']';
+
+  state.direccion  = dirCompleta;
+  state.referencia = L.referencia || '';
+
+  var now   = new Date();
+  var hora  = now.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true});
+  var fecha = now.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
+  var id    = String(Math.floor(100 + Math.random() * 900));
+
+  var prods = (state.productos && state.productos.length)
+    ? state.productos
+    : [{nombre:'Pedido libre', qty:1}];
+
+  var comercioTxt = (L.comercio && L.comercioNombre) ? L.comercioNombre : 'El domi busca';
+
+  var rows = [];
+  prods.forEach(function(p, i){
+    if(i === 0){
+      rows.push([
+        id,                    /* A  ID_PEDIDO            */
+        state.nombre,          /* B  NOMBRE_CLI           */
+        state.telefono,        /* C  TELEFONO             */
+        state.metodoPago,      /* D  METODO_PAGO          */
+        'Pendiente',           /* E  ESTADO               */
+        '',                    /* F  IMAGEN_TRANSFERENCIA */
+        p.nombre,              /* G  PRODUCTOS            */
+        '',                    /* H  MARCA                */
+        p.qty || 1,            /* I  CANTIDAD             */
+        '',                    /* J  V/U                  */
+        '',                    /* K  V/TOTAL              */
+        dirCompleta,           /* L  DIRECCION            */
+        hora,                  /* M  HORA                 */
+        fecha,                 /* N  FECHA                */
+        '',                    /* O  TOTAL                */
+        '',                    /* P  NOMBRE_DOMI          */
+        '',                    /* Q  HORA_EN_PROCESO      */
+        '',                    /* R  HORA_EN_CAMINO       */
+        '',                    /* S  HORA_ENTREGO         */
+        state.precioDomicilio, /* T  VALOR_DOMICILIO      */
+        'DOMICILIO',           /* U  DOMICILIO O RECOGE   */
+        comercioTxt,           /* V  COMERCIO             */
+        ''                     /* W  CALIFICACION         */
+      ]);
+    } else {
+      rows.push([
+        '','','','','','',
+        p.nombre,'',p.qty||1,'','',
+        '','','','','','','','','','','',''
+      ]);
+    }
+  });
+
+  rows.push([
+    '','','','','','',
+    'Recogida: '+L.barrioRecogida+' → Entrega: '+L.barrioEntrega,
+    '','1','','',
+    '','','','','','','','','','','',''
+  ]);
+
+ var GAS_URL = 'https://script.google.com/macros/s/AKfycbwbypqPgL16lssPdQsktDx9dHs0My_cMaS7YNQrMSkzY8Kw7HPmFgJHZeImkW2EJ48H7A/exec';
+ try {
+    await fetch(GAS_URL, {
+      method:  'POST',
+      mode:    'no-cors',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        accion:     'pedido-farmacia',
+        rows:       rows,
+        id:         id,
+        sede:       'wil-libre',
+        comercio:   comercioTxt,
+        nombre:     state.nombre,
+        telefono:   state.telefono,
+        total:      0,
+        domicilio:  state.precioDomicilio,
+        zona:       L.barrioEntrega || 'Copacabana',
+        direccion:  dirCompleta,
+        metodoPago: state.metodoPago,
+        coords:     state.coords || null
+      })
+    });
+
+    /* mode:no-cors = opaque, asumir éxito igual que farmacia */
+    state.idPedido = id;
+
+    /* Pantalla confirmado */
+    document.getElementById('idPedidoDisplay').textContent = id;
+    document.getElementById('success-msg').textContent =
+      'Pedido #'+id+' registrado. Un domiciliario WIL te contactará pronto al '+state.telefono+'.';
+
+    /* Botón copiar código */
+    var copiarBtn = document.getElementById('id-badge-copy-btn');
+    if(copiarBtn){
+      copiarBtn.onclick = function(){
+        if(navigator.clipboard){
+          navigator.clipboard.writeText(id).then(function(){
+            mostrarToast('Código '+id+' copiado ✓','content_copy');
+          });
+        } else {
+          var ta = document.createElement('textarea');
+          ta.value = id; document.body.appendChild(ta);
+          ta.select(); document.execCommand('copy');
+          document.body.removeChild(ta);
+          mostrarToast('Código '+id+' copiado ✓','content_copy');
+        }
+      };
+    }
+
+    /* Botón rastrear */
+    var rastrearBtn = document.getElementById('id-badge-rastrear-btn');
+    if(rastrearBtn){
+      rastrearBtn.onclick = function(){
+        navTo('rastrear');
+        var inp = document.getElementById('rastrearInput');
+        if(inp){ inp.value = id; }
+        rtAbrirPopup();
+        setTimeout(rastrearPedido, 200);
+      };
+    }
+
+    showView('view-confirmado');
+
+  } catch(e){
+    btn.disabled = false;
+    btn.innerHTML = '<span class="sym f" style="font-size:17px">check_circle</span>Confirmar pedido';
+    mostrarToast('Error al enviar: '+e.message,'error');
+  }
+}
+
+function wilCompartirCodigo(){
+  var id = state.idPedido || document.getElementById('idPedidoDisplay').textContent;
+  if(!id || id==='—') return;
+  var txt = 'Mi pedido WIL #'+id+' — rastréalo en: https://domicilioswil.com';
+  if(navigator.share){
+    navigator.share({title:'Domicilios WIL',text:txt}).catch(function(){});
+  } else if(navigator.clipboard){
+    navigator.clipboard.writeText(id).then(function(){
+      mostrarToast('Código '+id+' copiado ✓','content_copy');
+    });
+  }
+}
 
 </script>
 </body>
