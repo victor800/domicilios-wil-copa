@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#006970"/>
+<title>Soporte — Domicilios WIL</title>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icons/icon-192.png"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --p:#006970;--p2:#00a3b4;--p3:#00bcc9;
+  --pl:rgba(0,105,112,.09);--plb:rgba(0,105,112,.18);
+  --surf:#f0f4f7;--w:#ffffff;--w2:#f8fafb;--w3:#eef1f5;
+  --on:#18222e;--on2:#3d5068;--on3:#7a8fa6;
+  --gr:#16a34a;--rd:#dc2626;--am:#d97706;
+  --r-2xl:22px;--r-xl:17px;--r-lg:13px;--r-md:10px;
+  --sh:0 2px 10px rgba(0,60,80,.07);
+  --sh2:0 6px 24px rgba(0,60,80,.11);
+  --sh3:0 12px 40px rgba(0,60,80,.15);
+}
+html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(--surf);color:var(--on);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+.sym{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;font-size:22px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;direction:ltr;-webkit-font-smoothing:antialiased;font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24}
+.sym.f{font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24}
+.hidden{display:none!important}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes rot{to{transform:rotate(360deg)}}
+@keyframes ping{0%{transform:scale(1);opacity:.7}70%{transform:scale(2.2);opacity:0}100%{opacity:0}}
+.spin{display:inline-block;width:16px;height:16px;border:2.5px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:rot .7s linear infinite;vertical-align:middle}
+.spin.dk{border-color:rgba(0,105,112,.2);border-top-color:var(--p)}
+
+/* HEADER */
+.hdr{position:fixed;top:0;left:0;right:0;z-index:200;height:56px;padding:0 14px;padding-top:env(safe-area-inset-top);display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.95);backdrop-filter:blur(24px);border-bottom:1px solid rgba(0,105,112,.08);box-shadow:0 1px 8px rgba(0,60,80,.06)}
+.hdr-back{width:34px;height:34px;border-radius:50%;border:none;background:var(--pl);color:var(--p);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s}
+.hdr-back:active{transform:scale(.88)}
+.hdr-logo{width:30px;height:30px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid rgba(0,105,112,.18)}
+.hdr-title{font-weight:800;font-size:15px;color:var(--on);flex:1;letter-spacing:-.01em}
+.hdr-badge{display:flex;align-items:center;gap:4px;background:rgba(22,163,74,.1);border:1px solid rgba(22,163,74,.2);border-radius:99px;padding:4px 10px;font-size:10px;font-weight:700;color:#16a34a}
+.hdr-badge-dot{width:6px;height:6px;border-radius:50%;background:#16a34a;position:relative;flex-shrink:0}
+.hdr-badge-dot::after{content:'';position:absolute;inset:-3px;border-radius:50%;background:rgba(22,163,74,.3);animation:ping 1.8s ease-in-out infinite}
+
+/* BOTTOM NAV */
+.bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;z-index:200;background:rgba(255,255,255,.97);backdrop-filter:blur(20px);border-top:1px solid rgba(0,105,112,.07);border-radius:20px 20px 0 0;display:flex;padding:6px 8px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -4px 24px rgba(0,60,80,.08)}
+.bi{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 4px;border-radius:12px;cursor:pointer;border:none;background:transparent;color:var(--on3);transition:.18s;text-decoration:none}
+.bi.active{background:var(--pl);color:var(--p)}
+.bi .sym{font-size:21px}
+.bi-lbl{font-size:9px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+
+/* MAIN */
+.main{padding-top:calc(56px + env(safe-area-inset-top));padding-bottom:calc(90px + env(safe-area-inset-bottom));max-width:480px;margin:0 auto}
+
+/* HERO SOPORTE */
+.sop-hero{margin:0;padding:0;position:relative;overflow:hidden}
+.sop-hero-bg{background:linear-gradient(145deg,#003d45 0%,#005a64 40%,#007a87 70%,#006970 100%);padding:28px 20px 36px;position:relative}
+.sop-hero-dots{position:absolute;inset:0;background-image:radial-gradient(circle,rgba(255,255,255,.05) 1px,transparent 1px);background-size:18px 18px;pointer-events:none}
+.sop-hero-shine{position:absolute;top:-40px;right:-60px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(0,188,201,.18),transparent 65%);pointer-events:none}
+.sop-hero-content{position:relative;z-index:1}
+.sop-hero-tag{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:99px;padding:4px 11px;font-size:10px;font-weight:700;color:rgba(255,255,255,.9);margin-bottom:12px}
+.sop-hero-tag .sym{font-size:12px}
+.sop-hero-h1{font-size:26px;font-weight:900;color:#fff;line-height:1.15;letter-spacing:-.02em;margin-bottom:6px}
+.sop-hero-sub{font-size:12.5px;color:rgba(255,255,255,.65);font-weight:500;line-height:1.55;margin-bottom:20px}
+.sop-agent-row{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:16px;padding:11px 14px}
+.sop-agent-av{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#006970,#00bcc9);border:2px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.sop-agent-info{flex:1;min-width:0}
+.sop-agent-name{font-size:13px;font-weight:800;color:#fff}
+.sop-agent-status{font-size:10px;color:rgba(255,255,255,.65);display:flex;align-items:center;gap:4px;margin-top:2px}
+.sop-agent-dot{width:6px;height:6px;border-radius:50%;background:#4ade80;flex-shrink:0}
+.sop-agent-wa{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;background:#25D366;text-decoration:none;flex-shrink:0;box-shadow:0 3px 12px rgba(37,211,102,.45);transition:.15s}
+.sop-agent-wa:active{transform:scale(.9)}
+
+/* QUICK ACTIONS */
+.quick-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:16px 16px 4px}
+.quick-card{background:var(--w);border:1.5px solid #e2eaef;border-radius:18px;padding:16px 14px;cursor:pointer;transition:transform .15s,box-shadow .15s,border-color .15s;box-shadow:var(--sh);display:flex;flex-direction:column;gap:8px;animation:fadeUp .3s ease both}
+.quick-card:active{transform:scale(.96);box-shadow:none}
+.quick-card.sel{border-color:var(--p);background:linear-gradient(135deg,rgba(0,105,112,.04),rgba(0,188,201,.04))}
+.quick-ico{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.quick-lbl{font-size:12px;font-weight:800;color:var(--on);line-height:1.3}
+.quick-sub{font-size:10px;color:var(--on3);font-weight:500;line-height:1.4}
+
+/* CONTACT CHANNELS */
+.ch-row{display:flex;gap:10px;padding:4px 16px 16px}
+.ch-btn{flex:1;display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:16px;border:1.5px solid #e2eaef;background:var(--w);cursor:pointer;text-decoration:none;box-shadow:var(--sh);transition:.15s}
+.ch-btn:active{transform:scale(.96);box-shadow:none}
+.ch-btn-ico{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ch-btn-lbl{font-size:11.5px;font-weight:800;color:var(--on)}
+.ch-btn-sub{font-size:9.5px;color:var(--on3);margin-top:1px}
+
+/* SECTION HEADERS */
+.sec-hdr{padding:4px 16px 10px;display:flex;align-items:center;gap:7px}
+.sec-hdr-ico{font-size:16px;color:var(--p)}
+.sec-hdr-lbl{font-size:13px;font-weight:800;color:var(--on)}
+
+/* FAQ ACCORDION */
+.faq-wrap{padding:0 16px 8px;display:flex;flex-direction:column;gap:8px}
+.faq-item{background:var(--w);border:1.5px solid #e2eaef;border-radius:16px;overflow:hidden;box-shadow:var(--sh);transition:.18s}
+.faq-item.open{border-color:var(--plb);box-shadow:0 4px 18px rgba(0,105,112,.1)}
+.faq-hdr{display:flex;align-items:center;gap:10px;padding:14px 14px;cursor:pointer;user-select:none}
+.faq-hdr:active{background:rgba(0,105,112,.03)}
+.faq-ico{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;transition:.2s}
+.faq-q{flex:1;font-size:12.5px;font-weight:800;color:var(--on);line-height:1.35}
+.faq-chevron{font-size:18px;color:var(--on3);transition:transform .3s;flex-shrink:0}
+.faq-item.open .faq-chevron{transform:rotate(180deg);color:var(--p)}
+.faq-body{max-height:0;overflow:hidden;transition:max-height .38s cubic-bezier(.22,1,.36,1)}
+.faq-item.open .faq-body{max-height:400px}
+.faq-ans{padding:0 14px 14px;font-size:12px;color:var(--on2);line-height:1.65;font-weight:500;border-top:1px solid #f0f3f6;padding-top:10px}
+.faq-ans strong{color:var(--on);font-weight:700}
+.faq-ans a{color:var(--p);font-weight:700;text-decoration:none}
+.faq-cta{display:inline-flex;align-items:center;gap:5px;margin-top:10px;background:var(--p);color:#fff;border-radius:99px;padding:7px 14px;font-size:11px;font-weight:800;cursor:pointer;border:none;font-family:'Plus Jakarta Sans',sans-serif;box-shadow:0 3px 10px rgba(0,105,112,.25);transition:.15s}
+.faq-cta:active{background:var(--p2)}
+.faq-cta .sym{font-size:14px}
+
+/* FORM CARD */
+.form-card{background:var(--w);border:1.5px solid #e2eaef;border-radius:var(--r-xl);margin:0 16px 16px;padding:18px;box-shadow:var(--sh2)}
+.form-card-hdr{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.form-card-ico{width:40px;height:40px;border-radius:14px;background:linear-gradient(135deg,var(--p),var(--p2));display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 12px rgba(0,105,112,.3)}
+.form-card-ico .sym{font-size:18px;color:#fff}
+.form-card-tit{font-size:14px;font-weight:800;color:var(--on)}
+.form-card-sub{font-size:11px;color:var(--on3);margin-top:1px}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:10.5px;font-weight:700;color:var(--on3);margin-bottom:5px;letter-spacing:.05em;text-transform:uppercase}
+.field input,.field select,.field textarea{width:100%;border:1.5px solid #dce3ea;border-radius:var(--r-lg);padding:11px 13px;font-size:13.5px;font-family:'Plus Jakarta Sans',sans-serif;color:var(--on);background:#fff;outline:none;transition:.15s;resize:none;-webkit-appearance:none}
+.field input::placeholder,.field textarea::placeholder{color:var(--on3)}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(0,105,112,.08)}
+.field select{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237a8fa6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center}
+.field textarea{min-height:90px}
+.field-note{font-size:10px;color:var(--on3);margin-top:4px;font-weight:500}
+.char-count{font-size:10px;color:var(--on3);text-align:right;margin-top:3px}
+.char-count.warn{color:var(--am)}
+
+/* SUBMIT BTN */
+.btn-submit{width:100%;padding:14px;border-radius:var(--r-lg);border:none;background:var(--p);font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:800;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 16px rgba(0,105,112,.3);transition:.15s;margin-top:4px}
+.btn-submit:active{transform:scale(.97)}
+.btn-submit:disabled{opacity:.55;pointer-events:none}
+.btn-submit .sym{font-size:17px}
+
+/* SUCCESS STATE */
+.succ-card{background:linear-gradient(135deg,rgba(22,163,74,.06),rgba(16,185,129,.04));border:1.5px solid rgba(22,163,74,.2);border-radius:var(--r-xl);margin:0 16px 16px;padding:24px 20px;text-align:center;display:none}
+.succ-ring{width:66px;height:66px;border-radius:50%;background:rgba(22,163,74,.1);border:2px solid rgba(22,163,74,.25);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;box-shadow:0 0 0 8px rgba(22,163,74,.05)}
+.succ-ring .sym{font-size:30px;color:#16a34a}
+.succ-tit{font-size:17px;font-weight:900;color:var(--on);margin-bottom:5px}
+.succ-sub{font-size:12px;color:var(--on3);line-height:1.6;max-width:260px;margin:0 auto 16px}
+.succ-code{background:var(--pl);border:1px dashed var(--plb);border-radius:10px;padding:10px 14px;display:inline-block;font-size:11px;color:var(--p);font-weight:700}
+.btn-reset{margin-top:14px;padding:10px 20px;border-radius:99px;border:1.5px solid var(--plb);background:var(--pl);font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;color:var(--p);cursor:pointer;transition:.15s}
+.btn-reset:active{background:var(--plb)}
+
+/* TOAST */
+.toast{position:fixed;bottom:calc(84px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(20px);z-index:3000;background:#18222e;color:#fff;border-radius:14px;padding:12px 18px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;box-shadow:0 8px 28px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;white-space:nowrap;max-width:calc(100vw - 40px)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast .sym{font-size:16px;color:#4ade80}
+
+/* INFO STRIP */
+.info-strip{margin:0 16px 12px;background:linear-gradient(135deg,rgba(0,105,112,.05),rgba(0,188,201,.03));border:1.5px solid var(--plb);border-radius:16px;padding:14px 15px;display:flex;align-items:flex-start;gap:11px}
+.info-strip .sym{font-size:18px;color:var(--p);flex-shrink:0;margin-top:1px}
+.info-strip-txt{font-size:11.5px;color:var(--on2);line-height:1.6;font-weight:500}
+.info-strip-txt strong{color:var(--on);font-weight:700}
+
+/* REDES */
+.redes-row{display:flex;gap:10px;padding:0 16px 20px;justify-content:center}
+.red-btn{display:flex;flex-direction:column;align-items:center;gap:5px;width:68px;cursor:pointer;text-decoration:none}
+.red-ico{width:48px;height:48px;border-radius:16px;display:flex;align-items:center;justify-content:center;transition:.15s}
+.red-btn:active .red-ico{transform:scale(.9)}
+.red-lbl{font-size:9px;font-weight:700;color:var(--on3);text-align:center}
+</style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <span class="sym f" id="toastIco">check_circle</span>
+  <span id="toastMsg">Mensaje</span>
+</div>
+
+<!-- HEADER -->
+<header class="hdr">
+  <button class="hdr-back" onclick="history.back()"><span class="sym" style="font-size:18px">arrow_back</span></button>
+  <img class="hdr-logo" src="icons/icon-192.png" alt="WIL" onerror="this.style.display='none'"/>
+  <span class="hdr-title">Soporte WIL</span>
+  <div class="hdr-badge">
+    <span class="hdr-badge-dot"></span>
+    En línea
+  </div>
+</header>
+
+<main class="main">
+
+  <!-- HERO -->
+  <div class="sop-hero">
+    <div class="sop-hero-bg">
+      <div class="sop-hero-dots"></div>
+      <div class="sop-hero-shine"></div>
+      <div class="sop-hero-content">
+        <div class="sop-hero-tag"><span class="sym f" style="font-size:12px">support_agent</span>Centro de ayuda</div>
+        <div class="sop-hero-h1">¿En qué podemos<br/>ayudarte? 🛵</div>
+        <p class="sop-hero-sub">Resolvemos tus dudas en minutos. Elige cómo prefieres contactarnos o encuentra la respuesta en las preguntas frecuentes.</p>
+        <!-- Agente online -->
+        <div class="sop-agent-row">
+          <div class="sop-agent-av">🧑‍💼</div>
+          <div class="sop-agent-info">
+            <div class="sop-agent-name">Equipo WIL</div>
+            <div class="sop-agent-status"><span class="sop-agent-dot"></span>Disponible ahora · Resp. en ~5 min</div>
+          </div>
+         <a class="sop-agent-wa"
+   href="#"
+   onclick="abrirWA('573193203440');return false;"
+   aria-label="WhatsApp">
+
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QUICK ACTIONS -->
+  <div style="padding:16px 16px 0">
+    <div style="font-size:11px;font-weight:700;color:var(--on3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px">¿Qué necesitas?</div>
+  </div>
+  <div class="quick-grid">
+    <div class="quick-card" style="animation-delay:.05s" onclick="seleccionarTema('olvidé mi código de pedido')">
+      <div class="quick-ico" style="background:#e0f2f1">🔍</div>
+      <div>
+        <div class="quick-lbl">Olvidé mi código</div>
+        <div class="quick-sub">Recupera tu número de pedido</div>
+      </div>
+    </div>
+    <div class="quick-card" style="animation-delay:.1s" onclick="seleccionarTema('quiero hacer una queja o reclamo')">
+      <div class="quick-ico" style="background:#fce4ec">😤</div>
+      <div>
+        <div class="quick-lbl">Queja o reclamo</div>
+        <div class="quick-sub">Algo salió mal con tu pedido</div>
+      </div>
+    </div>
+    <div class="quick-card" style="animation-delay:.15s" onclick="seleccionarTema('quiero hacer seguimiento a mi pedido')">
+      <div class="quick-ico" style="background:#e8f5e9">📦</div>
+      <div>
+        <div class="quick-lbl">Seguimiento</div>
+        <div class="quick-sub">¿Dónde está mi pedido?</div>
+      </div>
+    </div>
+    <div class="quick-card" style="animation-delay:.2s" onclick="seleccionarTema('quiero cancelar o modificar un pedido')">
+      <div class="quick-ico" style="background:#fff3e0">✏️</div>
+      <div>
+        <div class="quick-lbl">Cancelar / editar</div>
+        <div class="quick-sub">Cambios en tu pedido</div>
+      </div>
+    </div>
+    <div class="quick-card" style="animation-delay:.25s" onclick="seleccionarTema('tengo un problema con el cobro o pago')">
+      <div class="quick-ico" style="background:#ede7f6">💳</div>
+      <div>
+        <div class="quick-lbl">Cobros y pagos</div>
+        <div class="quick-sub">Preguntas sobre pagos</div>
+      </div>
+    </div>
+    <div class="quick-card" style="animation-delay:.3s" onclick="seleccionarTema('otra consulta o sugerencia')">
+      <div class="quick-ico" style="background:#e3f2fd">💬</div>
+      <div>
+        <div class="quick-lbl">Otra consulta</div>
+        <div class="quick-sub">Sugerencias y más</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHANNELS -->
+  <div class="ch-row">
+    <a class="ch-btn" href="https://wa.me/573193203440?text=Hola%20WIL,%20necesito%20ayuda" target="_blank">
+      <div class="ch-btn-ico" style="background:#25D366">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+      </div>
+      <div>
+        <div class="ch-btn-lbl">WhatsApp</div>
+        <div class="ch-btn-sub">Respuesta inmediata</div>
+      </div>
+    </a>
+   <a class="ch-btn"
+   href="#"
+   onclick="abrirWA('573193203440');return false;">
+      <div class="ch-btn-ico" style="background:linear-gradient(135deg,#006970,#00a3b4)">
+        <span class="sym f" style="font-size:18px;color:#fff">mail</span>
+      </div>
+      <div>
+        <div class="ch-btn-lbl">Correo</div>
+        <div class="ch-btn-sub">soporte@domicilioswil.com</div>
+      </div>
+    </a>
+  </div>
+
+  <!-- FAQ -->
+  <div class="sec-hdr">
+    <span class="sym f sec-hdr-ico">quiz</span>
+    <span class="sec-hdr-lbl">Preguntas frecuentes</span>
+  </div>
+
+  <div class="faq-wrap">
+
+    <div class="faq-item" onclick="toggleFaq(this)">
+      <div class="faq-hdr">
+        <div class="faq-ico" style="background:#e0f2f1">🔍</div>
+        <div class="faq-q">Olvidé mi código de pedido, ¿cómo lo recupero?</div>
+        <span class="sym faq-chevron">expand_more</span>
+      </div>
+      <div class="faq-body">
+        <div class="faq-ans">
+          Tu código de pedido es un número de <strong>3 dígitos</strong> que te enviamos cuando confirmaste el pedido. Puedes encontrarlo:<br/><br/>
+          • En la pantalla de <strong>confirmación</strong> del pedido<br/>
+          • En el <strong>historial de tu navegador</strong> si cerraste la app<br/>
+          • Contactando al domiciliario por <strong>WhatsApp</strong> con tu nombre y dirección<br/><br/>
+          Si ninguna de estas opciones funciona, escríbenos y buscamos tu pedido por nombre y teléfono.
+          <br/>
+          <button class="faq-cta" onclick="seleccionarTema('olvidé mi código de pedido');event.stopPropagation()">
+            <span class="sym f" style="font-size:14px">support_agent</span>Contactar soporte
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="faq-item" onclick="toggleFaq(this)">
+      <div class="faq-hdr">
+        <div class="faq-ico" style="background:#fce4ec">⏰</div>
+        <div class="faq-q">¿Cuánto tarda mi pedido en llegar?</div>
+        <span class="sym faq-chevron">expand_more</span>
+      </div>
+      <div class="faq-body">
+        <div class="faq-ans">
+          El tiempo varía según el tipo de pedido y la distancia:<br/><br/>
+          • <strong>Droguerías aliadas</strong> — 20 a 35 min desde confirmación<br/>
+          • <strong>Pedido libre</strong> (tienda/restaurante) — 30 a 50 min<br/>
+          • <strong>Paquetería metro</strong> — 45 min a 1.5 horas<br/><br/>
+          Puedes rastrear el estado en tiempo real desde la pestaña <strong>Rastrear</strong> usando tu código.
+        </div>
+      </div>
+    </div>
+
+    <div class="faq-item" onclick="toggleFaq(this)">
+      <div class="faq-hdr">
+        <div class="faq-ico" style="background:#fff3e0">💳</div>
+        <div class="faq-q">¿Cómo funciona el pago por transferencia?</div>
+        <span class="sym faq-chevron">expand_more</span>
+      </div>
+      <div class="faq-body">
+        <div class="faq-ans">
+          Al elegir transferencia, el proceso es así:<br/><br/>
+          1. El domiciliario hace la compra en el comercio<br/>
+          2. Te envía la <strong>foto de la factura real</strong> por WhatsApp<br/>
+          3. Tú <strong>apruebas el monto</strong> y realizas la transferencia<br/>
+          4. El domi confirma el pago y sale hacia ti<br/><br/>
+          <strong>Nunca pagas antes de ver la factura.</strong> La tarifa del domicilio se cobra junto al pedido.
+        </div>
+      </div>
+    </div>
+
+    <div class="faq-item" onclick="toggleFaq(this)">
+      <div class="faq-hdr">
+        <div class="faq-ico" style="background:#e8f5e9">❌</div>
+        <div class="faq-q">¿Puedo cancelar o modificar mi pedido?</div>
+        <span class="sym faq-chevron">expand_more</span>
+      </div>
+      <div class="faq-body">
+        <div class="faq-ans">
+          <strong>Sí, mientras el pedido esté en estado "Pendiente".</strong> Una vez que el domiciliario lo confirma y sale al comercio, ya no es posible modificarlo sin costo adicional.<br/><br/>
+          Para cancelar o modificar, contáctanos <strong>lo antes posible</strong> por WhatsApp con tu código de pedido. Si el domi ya realizó la compra, aplica un cargo por gestión.
+          <br/>
+          <button class="faq-cta" onclick="seleccionarTema('quiero cancelar o modificar un pedido');event.stopPropagation()">
+            <span class="sym f" style="font-size:14px">edit</span>Solicitar cambio
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="faq-item" onclick="toggleFaq(this)">
+      <div class="faq-hdr">
+        <div class="faq-ico" style="background:#ede7f6">🗺️</div>
+        <div class="faq-q">¿A qué zonas hacen domicilios?</div>
+        <span class="sym faq-chevron">expand_more</span>
+      </div>
+      <div class="faq-body">
+        <div class="faq-ans">
+          Tenemos cobertura en:<br/><br/>
+          • <strong>Copacabana</strong> — todos los barrios (Zona 1 a 5)<br/>
+          • <strong>Bello, Niquía, Madera</strong> — norte del área metro<br/>
+          • <strong>Medellín y municipios</strong> — paquetería y envíos<br/><br/>
+          La tarifa varía por zona. La puedes ver antes de confirmar en el resumen de tu pedido. Para zonas muy alejadas el domi confirma el valor exacto.
+        </div>
+      </div>
+    </div>
+
+    <div class="faq-item" onclick="toggleFaq(this)">
+      <div class="faq-hdr">
+        <div class="faq-ico" style="background:#e3f2fd">⭐</div>
+        <div class="faq-q">¿Cómo califico el servicio de mi domiciliario?</div>
+        <span class="sym faq-chevron">expand_more</span>
+      </div>
+      <div class="faq-body">
+        <div class="faq-ans">
+          Cuando tu pedido cambie al estado <strong>"Entregado"</strong>, aparece automáticamente la sección de calificación en la pestaña Rastrear. Puedes dar de 1 a 5 estrellas.<br/><br/>
+          Tu calificación es anónima y nos ayuda a mejorar el servicio. ¡Muchas gracias por tomarte el tiempo!
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FORMULARIO DE CONTACTO -->
+  <div style="height:12px"></div>
+  <div class="sec-hdr">
+    <span class="sym f sec-hdr-ico">mail</span>
+    <span class="sec-hdr-lbl">Envíanos un mensaje</span>
+  </div>
+
+  <!-- Form -->
+  <div class="form-card" id="formCard">
+    <div class="form-card-hdr">
+      <div class="form-card-ico"><span class="sym f">support_agent</span></div>
+      <div>
+        <div class="form-card-tit">Escríbenos</div>
+        <div class="form-card-sub">Te respondemos en menos de 2 horas</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Tu nombre *</label>
+      <input type="text" id="f-nombre" placeholder="Nombre completo"/>
+    </div>
+    <div class="field">
+      <label>Teléfono / WhatsApp *</label>
+      <input type="tel" id="f-telefono" placeholder="310 123 4567"/>
+    </div>
+    <div class="field">
+      <label>Correo electrónico</label>
+      <input type="email" id="f-email" placeholder="tucorreo@gmail.com"/>
+      <div class="field-note">Opcional, para enviarte respuesta por email</div>
+    </div>
+    <div class="field">
+      <label>Código de pedido</label>
+      <input type="text" id="f-codigo" placeholder="Ej: 456" maxlength="4" style="letter-spacing:.1em;font-weight:700;font-size:18px;color:var(--p)"/>
+    </div>
+    <div class="field">
+      <label>Tipo de solicitud *</label>
+      <select id="f-tipo">
+        <option value="">— Selecciona una opción —</option>
+        <option value="Olvidé mi código de pedido">🔍 Olvidé mi código</option>
+        <option value="Seguimiento de pedido">📦 Seguimiento de pedido</option>
+        <option value="Queja o reclamo">😤 Queja o reclamo</option>
+        <option value="Cancelar / modificar pedido">✏️ Cancelar / modificar</option>
+        <option value="Problema con cobro o pago">💳 Cobro o pago</option>
+        <option value="Pedido no llegó">❌ Pedido no llegó</option>
+        <option value="Producto incorrecto o faltante">🛍️ Producto incorrecto</option>
+        <option value="Sugerencia o mejora">💡 Sugerencia</option>
+        <option value="Otra consulta">💬 Otra consulta</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Mensaje *</label>
+      <textarea id="f-mensaje" placeholder="Cuéntanos con detalle qué pasó o qué necesitas. Mientras más detalle, más rápido podemos ayudarte…" oninput="updateCharCount(this)"></textarea>
+      <div class="char-count" id="charCount">0 / 500</div>
+    </div>
+
+    <div class="info-strip">
+      <span class="sym f">schedule</span>
+      <div class="info-strip-txt">Atención <strong>lun–sáb 7am–9pm</strong>. Los mensajes fuera de horario serán respondidos al siguiente día hábil.</div>
+    </div>
+
+    <button class="btn-submit" id="btnEnviar" onclick="enviarFormulario()">
+      <span class="sym f" style="font-size:17px">send</span>
+      Enviar mensaje
+    </button>
+  </div>
+
+  <!-- SUCCESS -->
+  <div class="succ-card" id="succCard">
+    <div class="succ-ring"><span class="sym f">mark_email_read</span></div>
+    <div class="succ-tit">¡Mensaje enviado! 🎉</div>
+    <p class="succ-sub" id="succMsg">Recibimos tu solicitud. Te contactaremos pronto por WhatsApp o al correo indicado.</p>
+    <div class="succ-code" id="succTicket">Ticket #—</div>
+    <br/>
+    <a href="#"
+   onclick="abrirWA('573012198994');return false;"
+   style="display:inline-flex;align-items:center;gap:7px;margin-top:14px;background:#25D366;color:#fff;border-radius:99px;padding:10px 18px;font-size:12.5px;font-weight:800;text-decoration:none;box-shadow:0 3px 12px rgba(37,211,102,.35)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+      Seguir en WhatsApp
+    </a>
+    <br/>
+    <button class="btn-reset" onclick="resetForm()">Enviar otra consulta</button>
+  </div>
+
+  <div style="height:8px"></div>
+</main>
+
+<!-- BOTTOM NAV -->
+<nav class="bnav">
+  <a class="bi" href="index.html"><span class="sym">home</span><span class="bi-lbl">Inicio</span></a>
+  <a class="bi" href="pedir.html"><span class="sym f">shopping_bag</span><span class="bi-lbl">Pedir</span></a>
+  <a class="bi" href="pedir.html#rastrear" onclick="history.back()"><span class="sym">search</span><span class="bi-lbl">Rastrear</span></a>
+  <a class="bi active" href="soporte.html"><span class="sym f">person</span><span class="bi-lbl">Soporte</span></a>
+</nav>
+
+<script>
+/* ── GAS URL (mismo de la app) ── */
+var GAS_URL = 'https://script.google.com/macros/s/AKfycbwfuVFWQ-ZtSog7w95YUNCb3Z8y_5J7yw8In8pHcY71IxIzEgJ85_eK4YbFboA0Srbqig/exec';
+/* ── Email WIL ── */
+var EMAIL_WIL = 'soporteDomiWil@gmail.com';
+var WA_WIL    = '573012198994';
+
+/* ── Toast ── */
+var _tt = null;
+function toast(msg, ico, dur) {
+  var t  = document.getElementById('toast');
+  var ti = document.getElementById('toastIco');
+  var tm = document.getElementById('toastMsg');
+  ti.textContent = ico || 'check_circle';
+  tm.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(_tt);
+  _tt = setTimeout(function(){ t.classList.remove('show'); }, dur || 3200);
+}
+
+/* ── FAQ toggle ── */
+function toggleFaq(item) {
+  var isOpen = item.classList.contains('open');
+  document.querySelectorAll('.faq-item.open').forEach(function(el) {
+    if (el !== item) el.classList.remove('open');
+  });
+  item.classList.toggle('open', !isOpen);
+  if (!isOpen) {
+    setTimeout(function(){
+      item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 200);
+  }
+}
+
+/* ── Quick action → pre-fill form ── */
+function seleccionarTema(tema) {
+  var sel = document.getElementById('f-tipo');
+  if (sel) {
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value.toLowerCase().indexOf(tema.split(' ')[0].toLowerCase()) !== -1
+          || tema.toLowerCase().indexOf(sel.options[i].value.toLowerCase().split(' ')[0]) !== -1) {
+        sel.value = sel.options[i].value;
+        break;
+      }
+    }
+    // fallback: buscar por coincidencia parcial
+    for (var j = 0; j < sel.options.length; j++) {
+      if (tema.toLowerCase().indexOf(sel.options[j].text.replace(/^[^\s]+\s/,'').toLowerCase().split(' ')[0]) !== -1) {
+        sel.value = sel.options[j].value;
+        break;
+      }
+    }
+  }
+  document.getElementById('formCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setTimeout(function(){
+    var nm = document.getElementById('f-nombre');
+    if (nm && !nm.value) nm.focus();
+  }, 500);
+}
+
+/* ── Char count ── */
+function updateCharCount(el) {
+  var n = el.value.length;
+  var cc = document.getElementById('charCount');
+  cc.textContent = n + ' / 500';
+  cc.classList.toggle('warn', n > 420);
+  if (el.value.length > 500) el.value = el.value.substring(0, 500);
+}
+
+/* ── Generar ticket ID ── */
+function genTicket() {
+  return 'WIL-' + Date.now().toString(36).toUpperCase().slice(-5);
+}
+
+/* ── Validar ── */
+function validar() {
+  var nombre   = document.getElementById('f-nombre').value.trim();
+  var telefono = document.getElementById('f-telefono').value.trim();
+  var tipo     = document.getElementById('f-tipo').value;
+  var mensaje  = document.getElementById('f-mensaje').value.trim();
+  if (!nombre)   { toast('Ingresa tu nombre.', 'person', 2800); return false; }
+  if (!telefono) { toast('Ingresa tu teléfono.', 'phone', 2800); return false; }
+  if (!tipo)     { toast('Selecciona el tipo de solicitud.', 'category', 2800); return false; }
+  if (mensaje.length < 10) { toast('Escribe un mensaje más detallado.', 'edit_note', 2800); return false; }
+  return true;
+}
+
+/* ══════════════════════════════════════════════════
+   ENVIAR FORMULARIO
+   1. Envía a GAS → hoja "Soporte" en Google Sheets
+   2. Envía copia al email WIL via GAS MailApp
+   3. Si el cliente puso email, también se le notifica
+══════════════════════════════════════════════════ */
+async function enviarFormulario() {
+  if (!validar()) return;
+
+  var btn = document.getElementById('btnEnviar');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Enviando…';
+
+  var ticket  = genTicket();
+  var nombre  = document.getElementById('f-nombre').value.trim();
+  var tel     = document.getElementById('f-telefono').value.trim();
+  var email   = document.getElementById('f-email').value.trim();
+  var codigo  = document.getElementById('f-codigo').value.trim();
+  var tipo    = document.getElementById('f-tipo').value;
+  var mensaje = document.getElementById('f-mensaje').value.trim();
+  var now     = new Date();
+  var fecha   = now.toLocaleDateString('es-CO', {day:'2-digit',month:'2-digit',year:'numeric'});
+  var hora    = now.toLocaleTimeString('es-CO', {hour:'2-digit',minute:'2-digit',hour12:true});
+
+  var payload = {
+    accion:    'soporte-email',
+    ticket:    ticket,
+    nombre:    nombre,
+    telefono:  tel,
+    email:     email,
+    codigo:    codigo || '—',
+    tipo:      tipo,
+    mensaje:   mensaje,
+    fecha:     fecha,
+    hora:      hora,
+    emailWil:  EMAIL_WIL
+  };
+
+  try {
+    await fetch(GAS_URL, {
+      method:  'POST',
+      mode:    'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload)
+    });
+
+    /* Mostrar éxito */
+    document.getElementById('formCard').style.display   = 'none';
+    var sc = document.getElementById('succCard');
+    sc.style.display = 'flex';
+    sc.style.flexDirection = 'column';
+    sc.style.alignItems = 'center';
+    document.getElementById('succTicket').textContent = 'Ticket ' + ticket;
+    document.getElementById('succMsg').textContent =
+      'Hola ' + nombre.split(' ')[0] + ', recibimos tu mensaje ('+ tipo +').'
+      + (email ? ' También te enviamos confirmación a ' + email + '.' : ' Te contactamos al ' + tel + '.')
+      + ' Respondemos en menos de 2 horas en horario de atención.';
+    sc.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  } catch(e) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="sym f" style="font-size:17px">send</span>Enviar mensaje';
+    toast('Error al enviar. Intenta por WhatsApp.', 'error', 3500);
+  }
+}
+
+/* ── Reset form ── */
+function resetForm() {
+  ['f-nombre','f-telefono','f-email','f-codigo','f-mensaje'].forEach(function(id){
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('f-tipo').value = '';
+  document.getElementById('charCount').textContent = '0 / 500';
+  document.getElementById('formCard').style.display = 'block';
+  var sc = document.getElementById('succCard');
+  sc.style.display = 'none';
+  var btn = document.getElementById('btnEnviar');
+  btn.disabled = false;
+  btn.innerHTML = '<span class="sym f" style="font-size:17px">send</span>Enviar mensaje';
+  document.getElementById('formCard').scrollIntoView({ behavior: 'smooth' });
+}
+
+/* ── Init: stagger quick cards ── */
+document.querySelectorAll('.quick-card').forEach(function(c,i){
+  c.style.animationDelay = (0.04 * i) + 's';
+});
+
+/* ── Saludo por hora ── */
+function saludoHora() {
+  var h = new Date().getHours();
+  if (h >= 6  && h < 12) return 'Buenos días';
+  if (h >= 12 && h < 19) return 'Buenas tardes';
+  return 'Buenas noches';
+}
+
+/* ── Texto WhatsApp con plantilla ── */
+function waURL(numeroBase) {
+  var saludo  = saludoHora();
+  var nombre  = (document.getElementById('f-nombre')?.value.trim()) || '';
+  var codigo  = (document.getElementById('f-codigo')?.value.trim()) || '';
+  var tipo    = (document.getElementById('f-tipo')?.value)           || '';
+
+  var linea1  = saludo + ', me comunico con el soporte de *Domicilios WIL*.';
+  var linea2  = nombre  ? '👤 *Nombre:* ' + nombre                  : '';
+  var linea3  = codigo  ? '🔢 *Código de pedido:* ' + codigo         : '';
+  var linea4  = tipo    ? '📋 *Motivo:* ' + tipo                     : '';
+  var linea5  = 'Quedo atento/a a su respuesta. Gracias. 🙏';
+
+  var partes  = [linea1, linea2, linea3, linea4, '', linea5]
+                  .filter(Boolean).join('\n');
+
+  return 'https://wa.me/' + numeroBase + '?text=' + encodeURIComponent(partes);
+}
+
+/* ── Abrir WA ── */
+function abrirWA(numero) {
+  window.open(waURL(numero), '_blank');
+}
+</script>
+</body>
+</html>
