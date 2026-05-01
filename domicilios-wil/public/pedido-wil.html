@@ -1071,7 +1071,7 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
     </div>
   </div>
  
-  <div class="act-row">
+ <div class="act-row">
     <button class="btn-b" onclick="showView('view-inicio')">Atrás</button>
     <button class="btn-n" onclick="wilGoLibre2()">
       <span class="sym" style="font-size:17px">arrow_forward</span>Continuar
@@ -1079,6 +1079,8 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
   </div>
 </div>
 <!-- FIN LIBRE P1 -->
+
+
 
 <!-- ════ LIBRE P2 ════ -->
 <div class="view" id="view-libre-2">
@@ -1165,6 +1167,7 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
     <button class="btn-n" id="btnConfirmarDirecto" onclick="confirmarPedidoDirecto()">
       <span class="sym f" style="font-size:17px">check_circle</span>Confirmar pedido
     </button>
+  </div>
   </div>
 <!-- FIN LIBRE P3 -->
  
@@ -2002,11 +2005,22 @@ function navTo(tab){
 }
 
 function showView(id){
-  document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
-  document.getElementById(id).classList.add('active');
-  if(historial[historial.length-1]!==id)historial.push(id);
-  window.scrollTo(0,0);updateHeader(id);syncNav(id);
-  if(id==='view-rastrear'&&mapEmpty){setTimeout(function(){mapEmpty.invalidateSize();},200);setTimeout(function(){mapEmpty.invalidateSize();},700);}
+  document.querySelectorAll('.view').forEach(function(v){
+    v.classList.remove('active');
+    v.style.animation = 'none'; // ← resetear animación
+  });
+  var el = document.getElementById(id);
+  el.classList.add('active');
+  void el.offsetHeight; // ← forzar reflow para reiniciar animación
+  el.style.animation = '';
+  if(historial[historial.length-1]!==id) historial.push(id);
+  window.scrollTo(0,0);
+  updateHeader(id);
+  syncNav(id);
+  if(id==='view-rastrear'&&mapEmpty){
+    setTimeout(function(){mapEmpty.invalidateSize();},200);
+    setTimeout(function(){mapEmpty.invalidateSize();},700);
+  }
 }
 
 function syncNav(id){
