@@ -3728,6 +3728,472 @@ function wilAbrirTicket() {
 
 }(window));
 
+/* ═══════════════════════════════════════════════════════════════
+   PARCHE URGENTE: BARRIOS CON PRECIOS EN PEDIDO LIBRE
+   ═══════════════════════════════════════════════════════════════ */
+
+(function() {
+  // ──────────────────────────────────────────────────────────────
+  // 1. DATOS DE BARRIOS CON PRECIOS (según tu lista)
+  // ──────────────────────────────────────────────────────────────
+  const BARRIOS_PRECIOS = [
+    { nombre: "ASUNCIÓN", precio: 5000 },
+    { nombre: "FÁTIMA", precio: 5000 },
+    { nombre: "MIRADOR AZUL", precio: 5000 },
+    { nombre: "AZULITA PARTE BAJA", precio: 5000 },
+    { nombre: "CRISTO REY ABAJO DE LA PISCINA", precio: 5000 },
+    { nombre: "HORIZONTES", precio: 5000 },
+    { nombre: "MIRAFLORES", precio: 5000 },
+    { nombre: "MISERICORDIA HASTA PRINCESS", precio: 5000 },
+    { nombre: "MOJÓN", precio: 5000 },
+    { nombre: "OBRERO", precio: 5000 },
+    { nombre: "PEDREGAL PARTE BAJA", precio: 5000 },
+    { nombre: "PEDRERA", precio: 5000 },
+    { nombre: "SAN FRANCISCO", precio: 5000 },
+    { nombre: "SHANGAY", precio: 5000 },
+    { nombre: "SIMÓN BOLÍVAR", precio: 5000 },
+    { nombre: "TOBÓN QUINTERO", precio: 5000 },
+    { nombre: "VEGAS PARTE BAJA", precio: 10000 },
+    { nombre: "MONTE VERDE", precio: 5000 },
+    { nombre: "REMANSO", precio: 5000 },
+    { nombre: "YARUMITO PARTE BAJA", precio: 5000 },
+    { nombre: "CANOAS HASTA LA TIENDA DEL CUSCO", precio: 5000 },
+    { nombre: "PIEDRAS BLANCAS", precio: 5000 },
+    { nombre: "PORVENIR", precio: 5000 },
+    { nombre: "RECREO", precio: 5000 },
+    { nombre: "CALORCOL", precio: 6000 },
+    { nombre: "AZULITA PARTE ALTA", precio: 6000 },
+    { nombre: "VILLAS DE COPACABANA", precio: 6000 },
+    { nombre: "TABLAZO", precio: 6000 },
+    { nombre: "CANOAS DESPUÉS DE LA TIENDA DEL CUSCO", precio: 6000 },
+    { nombre: "CRISTO REY DE LA PISCINA HACIA ARRIBA", precio: 6000 },
+    { nombre: "PEDREGAL PARTE ALTA", precio: 6000 },
+    { nombre: "COLINAS DEL PEDREGAL", precio: 6000 },
+    { nombre: "VEGAS INTERIORES IGLESIA MANANTIALES", precio: 6000 },
+    { nombre: "YARUMITO DESPUÉS DEL EMPEDRADO", precio: 6000 },
+    { nombre: "YARUMITO INTERIOR CANCHA NUEVA", precio: 6000 },
+    { nombre: "VEGAS PARTE ALTA", precio: 6000 },
+    { nombre: "EDIFICIOS AMARILLOS", precio: 6000 },
+    { nombre: "MONTESION", precio: 6000 },
+    { nombre: "JARDÍN DE LA MARGARITA", precio: 6000 },
+    { nombre: "RESERVAS DE SAN JUAN 1", precio: 6000 },
+    { nombre: "POSADA DEL VIENTO", precio: 6000 },
+    { nombre: "ROSA DE LOS VIENTOS", precio: 6000 },
+    { nombre: "VICENZA", precio: 6000 },
+    { nombre: "RESERVAS DE SAN JUAN 2", precio: 6000 },
+    { nombre: "BARRIO MARIA", precio: 7000 },
+    { nombre: "PORTERIA PARCELACIÓN EL PARAISO", precio: 7000 },
+    { nombre: "TORRE DEL BOSQUE", precio: 7000 },
+    { nombre: "EDIFICIO POBLADO NORTE", precio: 7000 },
+    { nombre: "SAN JUAN CAMPESTRE", precio: 7000 },
+    { nombre: "VIA MACHADO", precio: 8000 },
+    { nombre: "CANTERAS", precio: 8000 },
+    { nombre: "VILLANUEVA PARTE BAJA Y ALTA", precio: 8000 },
+    { nombre: "VILLA ROCA", precio: 8000 },
+    { nombre: "SAN JUAN", precio: 8000 },
+    { nombre: "GUASIMALITO", precio: 10000 },
+    { nombre: "MACHADO", precio: 10000 },
+    { nombre: "UNIDADES DE MACHADO", precio: 11000 },
+    { nombre: "ARBOLEDA DEL CAMPO", precio: 11000 },
+    { nombre: "FONTIDUEÑO", precio: 13000 },
+    { nombre: "NAVARRA", precio: 14000 },
+    { nombre: "NIQUIA PARTE BAJA", precio: 14000 },
+    { nombre: "UNIDADES DE NAVARRA", precio: 14000 },
+    { nombre: "PARQUE DE GIRARDOTA", precio: 17000 },
+    { nombre: "TOLEDO CAMPESTRE", precio: 17000 },
+    { nombre: "PARQUE DE BELLO", precio: 18000 },
+    { nombre: "FABRICATO", precio: 19000 },
+    { nombre: "UNIDADES DE MADERA", precio: 25000 }
+  ];
+
+  // ──────────────────────────────────────────────────────────────
+  // 2. CREAR NUEVA VISTA: SELECCIÓN DE TIPO (para mí / para otro)
+  // ──────────────────────────────────────────────────────────────
+  const main = document.querySelector('.main');
+  
+  // Vista 1.5: ¿Para quién es el pedido?
+  const viewTipo = document.createElement('div');
+  viewTipo.id = 'view-libre-tipo';
+  viewTipo.className = 'view';
+  viewTipo.innerHTML = `
+    <div style="padding:20px 16px 8px">
+      <div style="font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:4px">
+        Pedido Libre 🛍️
+      </div>
+      <div style="font-size:13px;color:var(--on3);font-weight:500">¿El pedido es para ti o para alguien más?</div>
+    </div>
+    <div class="card">
+      <div class="card-tit"><span class="sym f">person</span>¿Quién recibe el pedido?</div>
+      <div class="yn-grid">
+        <button class="yn-btn" id="tipo-para-mi">
+          <span class="sym f" style="font-size:22px">face</span>
+          Para mí
+          <span style="font-size:10px;color:var(--on3);display:block;margin-top:4px">Entrego en mi dirección</span>
+        </button>
+        <button class="yn-btn" id="tipo-para-otro">
+          <span class="sym f" style="font-size:22px">group</span>
+          Para alguien más
+          <span style="font-size:10px;color:var(--on3);display:block;margin-top:4px">Entrego en otra dirección</span>
+        </button>
+      </div>
+    </div>
+    <div class="act-row">
+      <button class="btn-b" onclick="window.goBackTipo ? window.goBackTipo() : showView('view-libre-2')">Atrás</button>
+      <button class="btn-n" id="btn-continuar-tipo" disabled style="opacity:0.5">Continuar</button>
+    </div>
+  `;
+  main.appendChild(viewTipo);
+
+  // Vista 1.6: Selector de barrios (tanto para mí como para otro)
+  const viewBarrios = document.createElement('div');
+  viewBarrios.id = 'view-libre-barrios';
+  viewBarrios.className = 'view';
+  viewBarrios.innerHTML = `
+    <div style="padding:20px 16px 8px">
+      <div style="font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:4px">
+        Pedido Libre 🛍️
+      </div>
+      <div style="font-size:13px;color:var(--on3);font-weight:500" id="barrio-subtitulo">Selecciona tu barrio</div>
+    </div>
+    <div class="card">
+      <div class="card-tit"><span class="sym f">location_city</span>Barrios de Copacabana con tarifa</div>
+      <div class="field">
+        <input type="text" id="buscar-barrio" placeholder="🔍 Buscar barrio..." style="margin-bottom:12px">
+      </div>
+      <div id="lista-barrios" style="max-height:400px;overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+      <div id="barrio-seleccionado-info" class="field-note" style="margin-top:12px;text-align:center;font-weight:700;"></div>
+    </div>
+    <div class="act-row">
+      <button class="btn-b" id="btn-atras-barrios">Atrás</button>
+      <button class="btn-n" id="btn-confirmar-barrio" disabled style="opacity:0.5">
+        <span class="sym" style="font-size:17px">check_circle</span>Continuar
+      </button>
+    </div>
+  `;
+  main.appendChild(viewBarrios);
+
+  // ──────────────────────────────────────────────────────────────
+  // 3. RENDERIZAR LISTA DE BARRIOS
+  // ──────────────────────────────────────────────────────────────
+  let barrioSeleccionado = null;
+  let tipoPedido = null; // 'mi' o 'otro'
+
+  function renderizarListaBarrios(filtro = '') {
+    const contenedor = document.getElementById('lista-barrios');
+    if (!contenedor) return;
+    
+    const filtroLower = filtro.toLowerCase();
+    const filtrados = BARRIOS_PRECIOS.filter(b => 
+      b.nombre.toLowerCase().includes(filtroLower)
+    );
+    
+    contenedor.innerHTML = filtrados.map(barrio => `
+      <div class="barrio-option" data-nombre="${barrio.nombre}" data-precio="${barrio.precio}"
+           style="background:${barrioSeleccionado?.nombre === barrio.nombre ? 'var(--pl)' : 'var(--w2)'};
+                  border:1.5px solid ${barrioSeleccionado?.nombre === barrio.nombre ? 'var(--p)' : '#e2eaef'};
+                  border-radius:12px;padding:12px;cursor:pointer;transition:all 0.15s">
+        <div style="font-weight:800;font-size:13px;color:var(--on)">${barrio.nombre}</div>
+        <div style="font-size:11px;color:var(--p);font-weight:700;margin-top:4px">
+          🛵 Domicilio: $${barrio.precio.toLocaleString('es-CO')}
+        </div>
+      </div>
+    `).join('');
+    
+    // Agregar event listeners a cada opción
+    document.querySelectorAll('.barrio-option').forEach(el => {
+      el.addEventListener('click', () => {
+        const nombre = el.dataset.nombre;
+        const precio = parseInt(el.dataset.precio);
+        barrioSeleccionado = { nombre, precio };
+        
+        // Actualizar UI
+        renderizarListaBarrios(filtro);
+        
+        const infoEl = document.getElementById('barrio-seleccionado-info');
+        if (infoEl) {
+          infoEl.innerHTML = `✅ Barrio seleccionado: <strong>${nombre}</strong> — Domicilio: <strong style="color:var(--p)">$${precio.toLocaleString('es-CO')}</strong>`;
+        }
+        
+        const btnConfirmar = document.getElementById('btn-confirmar-barrio');
+        if (btnConfirmar) {
+          btnConfirmar.disabled = false;
+          btnConfirmar.style.opacity = '1';
+        }
+      });
+    });
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // 4. CAPTURAR UBICACIÓN Y SUGERIR BARRIO
+  // ──────────────────────────────────────────────────────────────
+  async function sugerirBarrioPorGPS() {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        resolve(null);
+        return;
+      }
+      
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        
+        try {
+          // Usar Nominatim para obtener nombre del barrio
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=es`, {
+            headers: { 'User-Agent': 'DomiciliosWIL/1.0' }
+          });
+          const data = await res.json();
+          const barrioNombre = (data.address?.neighbourhood || data.address?.suburb || data.address?.village || '').toUpperCase();
+          
+          if (barrioNombre) {
+            const encontrado = BARRIOS_PRECIOS.find(b => 
+              b.nombre.includes(barrioNombre) || barrioNombre.includes(b.nombre.split(' ')[0])
+            );
+            resolve(encontrado || null);
+          } else {
+            resolve(null);
+          }
+        } catch(e) {
+          console.warn('Error reverse geocoding:', e);
+          resolve(null);
+        }
+      }, () => resolve(null), { timeout: 8000 });
+    });
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // 5. MODIFICAR goLibre2() para redirigir a la nueva pantalla
+  // ──────────────────────────────────────────────────────────────
+  const originalGoLibre2 = window.goLibre2;
+  window.goLibre2 = function() {
+    // Validar comercio igual que antes
+    if (state.comercioTiene === null) {
+      mostrarToast('¿Ya tienes el comercio o el domi busca?', 'help');
+      return;
+    }
+    state.comercioNombre = document.getElementById('comercio-nombre')?.value || '';
+    
+    // Ir a la nueva pantalla de tipo de pedido
+    showView('view-libre-tipo');
+  };
+  
+  window.goBackTipo = function() {
+    showView('view-libre-2');
+  };
+
+  // ──────────────────────────────────────────────────────────────
+  // 6. CONFIGURAR EVENTOS DE LAS NUEVAS VISTAS
+  // ──────────────────────────────────────────────────────────────
+  function initNuevasVistas() {
+    // Botones de tipo de pedido
+    const btnMi = document.getElementById('tipo-para-mi');
+    const btnOtro = document.getElementById('tipo-para-otro');
+    const btnContinuarTipo = document.getElementById('btn-continuar-tipo');
+    
+    let tipoTemp = null;
+    
+    if (btnMi) {
+      btnMi.addEventListener('click', () => {
+        tipoTemp = 'mi';
+        btnMi.classList.add('sel');
+        btnOtro?.classList.remove('sel');
+        if (btnContinuarTipo) {
+          btnContinuarTipo.disabled = false;
+          btnContinuarTipo.style.opacity = '1';
+        }
+      });
+    }
+    
+    if (btnOtro) {
+      btnOtro.addEventListener('click', () => {
+        tipoTemp = 'otro';
+        btnOtro.classList.add('sel');
+        btnMi?.classList.remove('sel');
+        if (btnContinuarTipo) {
+          btnContinuarTipo.disabled = false;
+          btnContinuarTipo.style.opacity = '1';
+        }
+      });
+    }
+    
+    if (btnContinuarTipo) {
+      btnContinuarTipo.addEventListener('click', async () => {
+        if (!tipoTemp) return;
+        tipoPedido = tipoTemp;
+        
+        // Actualizar subtítulo según tipo
+        const subtitulo = document.getElementById('barrio-subtitulo');
+        if (subtitulo) {
+          subtitulo.textContent = tipoPedido === 'mi' 
+            ? '📍 Selecciona tu barrio (GPS sugerido abajo)' 
+            : '📍 Selecciona el barrio de entrega';
+        }
+        
+        // Si es "Para mí", intentar GPS automático
+        if (tipoPedido === 'mi') {
+          mostrarToast('📍 Detectando tu ubicación...', 'my_location');
+          const sugerido = await sugerirBarrioPorGPS();
+          if (sugerido) {
+            barrioSeleccionado = sugerido;
+            mostrarToast(`📍 Detectamos: ${sugerido.nombre} — $${sugerido.precio.toLocaleString()}`, 'check_circle');
+            const infoEl = document.getElementById('barrio-seleccionado-info');
+            if (infoEl) {
+              infoEl.innerHTML = `📍 GPS detectó: <strong>${sugerido.nombre}</strong> — Domicilio: <strong style="color:var(--p)">$${sugerido.precio.toLocaleString()}</strong><br>
+              <span style="font-size:10px">¿No es correcto? Selecciona manualmente.</span>`;
+            }
+            const btnConfirmar = document.getElementById('btn-confirmar-barrio');
+            if (btnConfirmar) {
+              btnConfirmar.disabled = false;
+              btnConfirmar.style.opacity = '1';
+            }
+          } else {
+            mostrarToast('No pudimos detectar tu barrio, selecciónalo manualmente', 'info');
+          }
+        }
+        
+        renderizarListaBarrios('');
+        showView('view-libre-barrios');
+      });
+    }
+    
+    // Búsqueda de barrios
+    const buscarInput = document.getElementById('buscar-barrio');
+    if (buscarInput) {
+      buscarInput.addEventListener('input', (e) => {
+        renderizarListaBarrios(e.target.value);
+      });
+    }
+    
+    // Botón atrás en selector de barrios
+    const btnAtrasBarrios = document.getElementById('btn-atras-barrios');
+    if (btnAtrasBarrios) {
+      btnAtrasBarrios.addEventListener('click', () => {
+        barrioSeleccionado = null;
+        showView('view-libre-tipo');
+      });
+    }
+    
+    // Botón confirmar barrio
+    const btnConfirmarBarrio = document.getElementById('btn-confirmar-barrio');
+    if (btnConfirmarBarrio) {
+      btnConfirmarBarrio.addEventListener('click', () => {
+        if (!barrioSeleccionado) {
+          mostrarToast('Selecciona un barrio primero', 'warning');
+          return;
+        }
+        
+        // Guardar en state
+        state.barrio = barrioSeleccionado.nombre;
+        state.precioDomicilio = barrioSeleccionado.precio;
+        state.tarifaZonaStr = barrioSeleccionado.nombre;
+        
+        mostrarToast(`Barrio: ${barrioSeleccionado.nombre} — Domicilio: $${barrioSeleccionado.precio.toLocaleString()}`, 'check_circle');
+        
+        // Continuar al paso 2 (texto libre / productos)
+        showView('view-libre-2');
+        
+        // Si hay categoría preset, poner texto de ejemplo
+        if (state.categoriaPreset) {
+          const txtArea = document.getElementById('libreTextoLibre');
+          if (txtArea && !txtArea.value.trim()) {
+            txtArea.placeholder = `Ej: Pedido de ${state.categoriaPreset.toLowerCase()}...`;
+          }
+        }
+      });
+    }
+  }
+  
+  // ──────────────────────────────────────────────────────────────
+  // 7. MODIFICAR generarFacturaLibre para mostrar barrio y tarifa
+  // ──────────────────────────────────────────────────────────────
+  const originalGenerarFactura = window.generarFacturaLibre;
+  window.generarFacturaLibre = function() {
+    // Validaciones originales
+    const dir = document.getElementById('libre-direccion')?.value.trim();
+    const ref = document.getElementById('libre-referencia')?.value.trim();
+    const nom = document.getElementById('libre-nombre')?.value.trim();
+    const tel = document.getElementById('libre-telefono')?.value.trim();
+    
+    if (!dir) { mostrarToast('Ingresa la dirección completa.', 'location_on'); return; }
+    if (!nom || !tel) { mostrarToast('Completa tu nombre y teléfono.', 'person'); return; }
+    if (!state.metodoPago) { mostrarToast('Selecciona método de pago.', 'payments'); return; }
+    
+    state.direccion = dir;
+    state.referencia = ref;
+    state.nombre = nom;
+    state.telefono = tel;
+    
+    // Actualizar resumen con barrio y tarifa
+    const comercioVal = document.getElementById('factura-comercio-val');
+    if (comercioVal) {
+      comercioVal.textContent = state.comercioTiene && state.comercioNombre ? 
+        state.comercioNombre : (state.comercioTiene ? 'El domiciliario confirma' : 'El domiciliario busca');
+    }
+    
+    // Mostrar barrio y tarifa en el ticket
+    const tarifaContainer = document.getElementById('wil-ticket-tarifa-container');
+    if (tarifaContainer && state.barrio && state.precioDomicilio) {
+      tarifaContainer.innerHTML = `
+        <div class="wil-ticket-tarifa-row">
+          <div class="wil-ticket-tarifa-lbl">📍 Barrio</div>
+          <div class="wil-ticket-tarifa-val" style="color:var(--p)">
+            ${state.barrio}
+            <div class="wil-ticket-tarifa-sub">🛵 Domicilio: $${state.precioDomicilio.toLocaleString('es-CO')}</div>
+          </div>
+        </div>
+      `;
+    }
+    
+    // Llamar original para el resto
+    if (originalGenerarFactura) originalGenerarFactura();
+    
+    // Asegurar que el resumen colapsable muestre la info
+    setTimeout(() => {
+      const prodCountEl = document.getElementById('ticket-prod-count');
+      if (prodCountEl && state.productos) {
+        prodCountEl.textContent = state.productos.length + ' producto' + (state.productos.length !== 1 ? 's' : '');
+      }
+      const pagoResumen = document.getElementById('ticket-pago-resumen');
+      if (pagoResumen) {
+        pagoResumen.textContent = state.metodoPago === 'EFECTIVO' ? '💵 Efectivo' : '🏦 Transferencia';
+      }
+      const nombreResumen = document.getElementById('factura-nombre-resumen');
+      if (nombreResumen) nombreResumen.textContent = state.nombre || '—';
+      
+      // Abrir colapsable automáticamente
+      if (window.wilAbrirTicket) wilAbrirTicket();
+    }, 50);
+  };
+  
+  // ──────────────────────────────────────────────────────────────
+  // 8. MODIFICAR enviarPedido para incluir barrio en la dirección
+  // ──────────────────────────────────────────────────────────────
+  const originalEnviarPedido = window.enviarPedido;
+  window.enviarPedido = async function(tipo) {
+    // Si hay barrio seleccionado, agregarlo a la dirección
+    if (state.barrio && state.direccion && state.direccion.indexOf(state.barrio) === -1) {
+      state.direccion = `${state.direccion}, ${state.barrio}`;
+    }
+    
+    // Asegurar que precioDomicilio esté en state
+    if (barrioSeleccionado && !state.precioDomicilio) {
+      state.precioDomicilio = barrioSeleccionado.precio;
+    }
+    
+    return originalEnviarPedido.apply(this, [tipo]);
+  };
+  
+  // ──────────────────────────────────────────────────────────────
+  // 9. INICIAR
+  // ──────────────────────────────────────────────────────────────
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initNuevasVistas);
+  } else {
+    initNuevasVistas();
+  }
+  
+  console.log('[WIL] ✅ Parche de barrios con precios ACTIVADO');
+})();
 
 </script>
 </body>
