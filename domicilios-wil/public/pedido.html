@@ -270,6 +270,76 @@ const NEGOCIOS = {
   central:  { nombre: '🏥 Droguería Central',         tienda: 'CENTRAL' },
 };
 
+const BARRIOS = [
+  {nombre:'ASUNCIÓN',tarifa:5000},
+  {nombre:'FÁTIMA',tarifa:5000},
+  {nombre:'MIRADOR AZUL',tarifa:5000},
+  {nombre:'AZULITA PARTE BAJA',tarifa:5000},
+  {nombre:'CRISTO REY (ABAJO PISCINA)',tarifa:5000},
+  {nombre:'HORIZONTES',tarifa:5000},
+  {nombre:'MIRAFLORES',tarifa:5000},
+  {nombre:'MISERICORDIA HASTA PRINCESS',tarifa:5000},
+  {nombre:'MOJÓN',tarifa:5000},
+  {nombre:'OBRERO',tarifa:5000},
+  {nombre:'PEDREGAL PARTE BAJA',tarifa:5000},
+  {nombre:'PEDRERA',tarifa:5000},
+  {nombre:'SAN FRANCISCO',tarifa:5000},
+  {nombre:'SHANGAY',tarifa:5000},
+  {nombre:'SIMÓN BOLÍVAR',tarifa:5000},
+  {nombre:'TOBÓN QUINTERO',tarifa:5000},
+  {nombre:'MONTE VERDE',tarifa:5000},
+  {nombre:'REMANSO',tarifa:5000},
+  {nombre:'YARUMITO PARTE BAJA',tarifa:5000},
+  {nombre:'CANOAS HASTA TIENDA DEL CUSCO',tarifa:5000},
+  {nombre:'PIEDRAS BLANCAS',tarifa:5000},
+  {nombre:'PORVENIR',tarifa:5000},
+  {nombre:'RECREO',tarifa:5000},
+  {nombre:'CALORCOL',tarifa:6000},
+  {nombre:'AZULITA PARTE ALTA',tarifa:6000},
+  {nombre:'VILLAS DE COPACABANA',tarifa:6000},
+  {nombre:'TABLAZO',tarifa:6000},
+  {nombre:'CANOAS DESPUÉS TIENDA DEL CUSCO',tarifa:6000},
+  {nombre:'CRISTO REY (ARRIBA PISCINA)',tarifa:6000},
+  {nombre:'PEDREGAL PARTE ALTA',tarifa:6000},
+  {nombre:'COLINAS DEL PEDREGAL',tarifa:6000},
+  {nombre:'VEGAS INTERIORES / MANANTIALES',tarifa:6000},
+  {nombre:'YARUMITO DESPUÉS DEL EMPEDRADO',tarifa:6000},
+  {nombre:'YARUMITO INTERIOR CANCHA NUEVA',tarifa:6000},
+  {nombre:'VEGAS PARTE ALTA',tarifa:6000},
+  {nombre:'EDIFICIOS AMARILLOS',tarifa:6000},
+  {nombre:'MONTESIÓN',tarifa:6000},
+  {nombre:'JARDÍN DE LA MARGARITA',tarifa:6000},
+  {nombre:'RESERVAS DE SAN JUAN 1',tarifa:6000},
+  {nombre:'POSADA DEL VIENTO',tarifa:6000},
+  {nombre:'ROSA DE LOS VIENTOS',tarifa:6000},
+  {nombre:'VICENZA',tarifa:6000},
+  {nombre:'RESERVAS DE SAN JUAN 2',tarifa:6000},
+  {nombre:'BARRIO MARÍA',tarifa:7000},
+  {nombre:'PORTERÍA PARCELACIÓN EL PARAÍSO',tarifa:7000},
+  {nombre:'TORRE DEL BOSQUE',tarifa:7000},
+  {nombre:'EDIFICIO POBLADO NORTE',tarifa:7000},
+  {nombre:'SAN JUAN CAMPESTRE',tarifa:7000},
+  {nombre:'VÍA MACHADO',tarifa:8000},
+  {nombre:'CANTERAS',tarifa:8000},
+  {nombre:'VILLANUEVA (PARTE BAJA Y ALTA)',tarifa:8000},
+  {nombre:'VILLA ROCA',tarifa:8000},
+  {nombre:'SAN JUAN',tarifa:8000},
+  {nombre:'VEGAS PARTE BAJA',tarifa:10000},
+  {nombre:'GUASIMALITO',tarifa:10000},
+  {nombre:'MACHADO',tarifa:10000},
+  {nombre:'UNIDADES DE MACHADO',tarifa:11000},
+  {nombre:'ARBOLEDA DEL CAMPO',tarifa:11000},
+  {nombre:'FONTIDUEÑO',tarifa:13000},
+  {nombre:'NAVARRA',tarifa:14000},
+  {nombre:'NIQUÍA PARTE BAJA',tarifa:14000},
+  {nombre:'UNIDADES DE NAVARRA',tarifa:14000},
+  {nombre:'PARQUE DE GIRARDOTA',tarifa:17000},
+  {nombre:'TOLEDO CAMPESTRE',tarifa:17000},
+  {nombre:'PARQUE DE BELLO',tarifa:18000},
+  {nombre:'FABRICATO',tarifa:19000},
+  {nombre:'UNIDADES DE MADERA',tarifa:25000},
+];
+
 // ── Utilidades ────────────────────────────────────────────────
 function COP(n) {
   if (!n && n !== 0) return '$0';
@@ -525,10 +595,16 @@ function elegirNegocio(key) {
   S.negocioNombre = neg.nombre;
   S.tienda = neg.tienda;
   S.carrito = [];
-  S.paso = 'nombre';
 
   addMsg(neg.nombre, 'out');
-  botReply(`<strong>${neg.nombre}</strong><br><br>✏️ ¿Cuál es tu <strong>nombre completo</strong>?`);
+
+  if (key === 'wil') {
+    S.paso = 'barrio';
+    mostrarSelectorBarrio();
+  } else {
+    S.paso = 'nombre';
+    botReply(`<strong>${neg.nombre}</strong><br><br>✏️ ¿Cuál es tu <strong>nombre completo</strong>?`);
+  }
 }
 
 // ── Manejar texto libre ───────────────────────────────────────
@@ -604,6 +680,63 @@ async function manejarTexto(txt) {
   }
 }
 
+function mostrarSelectorBarrio() {
+  const grupos = {};
+  BARRIOS.forEach(b => {
+    const k = COP(b.tarifa);
+    if (!grupos[k]) grupos[k] = [];
+    grupos[k].push(b);
+  });
+
+  let html = `<p style="font-size:13px;margin-bottom:8px">
+    <strong>📍 ¿A qué barrio entregamos?</strong><br>
+    <span style="color:var(--txt2);font-size:12px">Selecciona tu barrio:</span>
+  </p>
+  <div class="search-wrap" style="margin-bottom:8px">
+    <span class="search-ico">🔍</span>
+    <input class="search-inp" id="barrio-search" placeholder="Buscar barrio..."
+      oninput="filtrarBarrios(this.value)">
+  </div>
+  <div id="barrio-lista" style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:4px">`;
+
+  Object.entries(grupos).forEach(([precio, lista]) => {
+    html += `<div class="date-chip" style="align-self:flex-start;margin:4px 0 2px">🛵 Domicilio ${precio}</div>`;
+    lista.forEach((b, i) => {
+      html += `<div class="prod-item" onclick="elegirBarrio('${b.nombre.replace(/'/g,"'")}',${b.tarifa})">
+        <span class="prod-nombre">${b.nombre}</span>
+        <span class="prod-precio">${COP(b.tarifa)}</span>
+      </div>`;
+    });
+  });
+
+  html += `</div>`;
+  addMsg(html, 'in');
+  setTimeout(() => document.getElementById('barrio-search')?.focus(), 300);
+}
+
+function filtrarBarrios(val) {
+  const lista = document.getElementById('barrio-lista');
+  if (!lista) return;
+  const q = val.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  lista.querySelectorAll('.prod-item').forEach(el => {
+    const txt = el.querySelector('.prod-nombre').textContent.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    el.style.display = txt.includes(q) ? '' : 'none';
+  });
+  lista.querySelectorAll('.date-chip').forEach(chip => {
+    const next = chip.nextElementSibling;
+    chip.style.display = (next && next.style.display !== 'none') ? '' : 'none';
+  });
+}
+
+function elegirBarrio(nombre, tarifa) {
+  S.barrioDetectado = nombre;
+  S.precioDomicilio  = tarifa;
+  S.paso = 'nombre';
+  addMsg(`📍 ${nombre} — ${COP(tarifa)}`, 'out');
+  botReply(`✅ Barrio: <strong>${nombre}</strong> | 🛵 Domicilio: <strong>${COP(tarifa)}</strong><br><br>✏️ ¿Cuál es tu <strong>nombre completo</strong>?`);
+}
+
 // ── Calcular tarifa con OSRM ──────────────────────────────────
 const SEDE_LAT = 6.3497, SEDE_LNG = -75.5078;
 const PRECIO_KM = 1800;
@@ -613,6 +746,8 @@ const MUNICIPIOS_FIJOS = ['itagüí','itagui','sabaneta','la estrella','caldas',
   'girardota','barbosa','rionegro','guarne','marinilla','el carmen de viboral',
   'la ceja','el retiro','bogotá','bogota','cali','manizales'];
 const TARIFA_FIJA_LEJANO = 50000;
+
+
 
 async function calcularTarifa(direccion) {
   showTyping();
