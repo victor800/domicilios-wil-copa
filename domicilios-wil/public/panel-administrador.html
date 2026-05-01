@@ -7070,82 +7070,120 @@ const promDiario     = Math.round(pedsEntregados.length / diasPeriodo);
     el.innerHTML = filtered.map((b,ri) => { const i=_bases.length-1-ri; return `<div class="base-item"><div class="base-ico" style="background:var(--orange-l);color:var(--orange);"><span class="material-symbols-rounded" style="font-size:17px;">account_balance_wallet</span></div><div style="flex:1;"><div class="base-name">${b.domi}</div><div class="base-meta">${b.nota||'Sin nota'} · ${b.fecha}</div></div><div class="base-monto" style="color:var(--orange);">${fmtMoney(b.monto)}</div><button class="base-del" onclick="deleteBase(${i})" title="Eliminar"><span class="material-symbols-rounded" style="font-size:13px;">delete</span></button></div>`; }).join('');
   }
  
-  function renderMultas() {
-  var _multas = window._multasData || [];
-  var el = document.getElementById('cont-multas-list');
+window.renderMultas = function renderMultas() {
+  const _multas = window._multasData || [];
+  const el = document.getElementById('cont-multas-list');
   if (!el) return;
  
   if (!_multas.length) {
-    el.innerHTML = '<div class="empty-state"><div class="ico" style="font-size:28px;opacity:.2;">⚖️</div><p>Sin multas ni restricciones</p></div>';
+    el.innerHTML = `
+      <div class="empty-state">
+        <div class="ico" style="font-size:28px;opacity:.2;">⚖️</div>
+        <p>Sin multas ni restricciones</p>
+      </div>`;
     return;
   }
  
-  /* Separar P&P de multas reales */
-  var multas = _multas.filter(function(m) { return m.tipo !== 'pyp'; });
-  var pyps   = _multas.filter(function(m) { return m.tipo === 'pyp'; });
+  /* ── Separar P&P de multas con descuento ── */
+  const pyps   = _multas.filter(m => m.tipo === 'pyp');
+  const multas = _multas.filter(m => m.tipo !== 'pyp');
  
-  var html = '';
+  let html = '';
  
   /* ── Bloque Pico & Placa ── */
   if (pyps.length) {
-    html += '<div style="margin-bottom:12px;">' +
-      '<div style="font-size:9px;font-weight:800;color:var(--orange);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;display:flex;align-items:center;gap:5px;">' +
-        '<span class="material-symbols-rounded" style="font-size:14px;">traffic</span>Pico &amp; Placa' +
-      '</div>' +
-      pyps.slice().reverse().map(function(m, ri) {
-        var i = _multas.indexOf(m);
-        return '<div class="multa-item" style="border-color:rgba(217,119,6,.3);background:var(--orange-l);">' +
-          '<div class="base-ico" style="background:rgba(217,119,6,.18);color:var(--orange);">' +
-            '<span class="material-symbols-rounded" style="font-size:16px;">traffic</span>' +
-          '</div>' +
-          '<div style="flex:1;">' +
-            '<div class="base-name">' + m.domi + '</div>' +
-            '<div class="base-meta">' + (m.nota||'Sin nota') + ' · ' + m.fecha + '</div>' +
-          '</div>' +
-          '<span style="font-size:9px;font-weight:800;padding:2px 9px;border-radius:99px;background:var(--orange);color:#fff;flex-shrink:0;white-space:nowrap;">P&amp;P</span>' +
-          '<button class="base-del" onclick="deleteMulta(' + i + ')" title="Eliminar">' +
-            '<span class="material-symbols-rounded" style="font-size:13px;">delete</span>' +
-          '</button>' +
-        '</div>';
-      }).join('') +
-    '</div>';
+    html += `
+      <div style="margin-bottom:14px;">
+        <div style="font-size:9px;font-weight:800;color:var(--orange);
+                    text-transform:uppercase;letter-spacing:.1em;
+                    margin-bottom:7px;display:flex;align-items:center;gap:5px;">
+          <span class="material-symbols-rounded" style="font-size:14px;">traffic</span>
+          Pico &amp; Placa
+        </div>
+        ${pyps.slice().reverse().map(m => {
+          const i = _multas.indexOf(m);
+          return `
+          <div class="multa-item"
+               style="border-color:rgba(217,119,6,.35);background:rgba(254,243,199,.4);">
+            <div class="base-ico" style="background:var(--orange-l);color:var(--orange);">
+              <span class="material-symbols-rounded" style="font-size:16px;">traffic</span>
+            </div>
+            <div style="flex:1;">
+              <div class="base-name" style="font-size:12px;font-weight:800;color:var(--text);">
+                ${m.domi}
+              </div>
+              <div class="base-meta" style="font-size:10px;color:var(--text2);margin-top:2px;">
+                ${m.nota||'Sin nota'} · ${m.fecha}
+              </div>
+            </div>
+            <!-- Badge P&P -->
+            <span style="font-size:9px;font-weight:800;padding:2px 9px;border-radius:99px;
+                         background:var(--orange);color:#fff;flex-shrink:0;white-space:nowrap;">
+              P&amp;P
+            </span>
+            <!-- Sin descuento -->
+            <div style="font-size:10px;font-weight:700;color:var(--orange);
+                        text-align:right;flex-shrink:0;white-space:nowrap;">
+              Sin descuento
+            </div>
+            <button class="base-del" onclick="deleteMulta(${i})" title="Eliminar">
+              <span class="material-symbols-rounded" style="font-size:13px;">delete</span>
+            </button>
+          </div>`;
+        }).join('')}
+      </div>`;
   }
  
-  /* ── Bloque Multas reales ── */
+  /* ── Bloque Multas y Descuentos ── */
   if (multas.length) {
-    var iconos  = { multa:'gavel', otro:'info' };
-    var labels  = { multa:'Multa', otro:'Descuento' };
-    html += '<div>' +
-      (pyps.length
-        ? '<div style="font-size:9px;font-weight:800;color:var(--red);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;display:flex;align-items:center;gap:5px;">' +
-            '<span class="material-symbols-rounded" style="font-size:14px;">gavel</span>Multas / Descuentos' +
-          '</div>'
-        : '') +
-      multas.slice().reverse().map(function(m) {
-        var i   = _multas.indexOf(m);
-        var ico = iconos[m.tipo] || 'gavel';
-        var lbl = labels[m.tipo] || 'Multa';
-        return '<div class="multa-item">' +
-          '<div class="base-ico" style="background:var(--red-l);color:var(--red);">' +
-            '<span class="material-symbols-rounded" style="font-size:16px;">' + ico + '</span>' +
-          '</div>' +
-          '<div style="flex:1;">' +
-            '<div class="base-name">' + m.domi +
-              ' <span style="font-size:9px;font-weight:800;padding:1px 7px;border-radius:99px;background:var(--red-l);color:var(--red);">' + lbl + '</span>' +
-            '</div>' +
-            '<div class="base-meta">' + (m.nota||'Sin nota') + ' · ' + m.fecha + '</div>' +
-          '</div>' +
-          '<div class="base-monto" style="color:var(--red);">-' + fmtMoney(m.monto) + '</div>' +
-          '<button class="base-del" onclick="deleteMulta(' + i + ')">' +
-            '<span class="material-symbols-rounded" style="font-size:13px;">delete</span>' +
-          '</button>' +
-        '</div>';
-      }).join('') +
-    '</div>';
+    const iconos = { multa:'gavel', otro:'info' };
+    const labels = { multa:'Multa', otro:'Descuento' };
+ 
+    html += `
+      <div>
+        ${pyps.length ? `
+        <div style="font-size:9px;font-weight:800;color:var(--red);
+                    text-transform:uppercase;letter-spacing:.1em;
+                    margin-bottom:7px;display:flex;align-items:center;gap:5px;">
+          <span class="material-symbols-rounded" style="font-size:14px;">gavel</span>
+          Multas / Descuentos
+        </div>` : ''}
+ 
+        ${multas.slice().reverse().map(m => {
+          const i   = _multas.indexOf(m);
+          const ico = iconos[m.tipo] || 'gavel';
+          const lbl = labels[m.tipo] || 'Multa';
+          return `
+          <div class="multa-item">
+            <div class="base-ico" style="background:var(--red-l);color:var(--red);">
+              <span class="material-symbols-rounded" style="font-size:16px;">${ico}</span>
+            </div>
+            <div style="flex:1;">
+              <div class="base-name" style="font-size:12px;font-weight:800;color:var(--text);">
+                ${m.domi}
+                <span style="font-size:9px;font-weight:800;padding:1px 7px;border-radius:99px;
+                             background:var(--red-l);color:var(--red);margin-left:4px;">
+                  ${lbl}
+                </span>
+              </div>
+              <div class="base-meta" style="font-size:10px;color:var(--text2);margin-top:2px;">
+                ${m.nota||'Sin nota'} · ${m.fecha}
+              </div>
+            </div>
+            <div class="base-monto" style="color:var(--red);font-size:13px;
+                                           font-family:'DM Mono',monospace;font-weight:800;">
+              -${fmtMoney(m.monto)}
+            </div>
+            <button class="base-del" onclick="deleteMulta(${i})" title="Eliminar">
+              <span class="material-symbols-rounded" style="font-size:13px;">delete</span>
+            </button>
+          </div>`;
+        }).join('')}
+      </div>`;
   }
  
   el.innerHTML = html;
-}
+};
  
  
   function poblarSelectCont(selId) {
@@ -7513,67 +7551,118 @@ window.deleteMulta = async function(idx) {
     }
   }
 
-  function renderCierresCaja() {
-  var el = document.getElementById('cont-cierres-list');
+  window.renderCierresCaja = function renderCierresCaja() {
+  const el = document.getElementById('cont-cierres-list');
   if (!el) return;
-  var cierres = (window._cierresData || []).slice(0, 20);
+  const cierres = (window._cierresData || []).slice(0, 20);
  
   if (!cierres.length) {
-    el.innerHTML = '<div class="empty-state"><div class="ico" style="font-size:28px;opacity:.2;">🏦</div><p>Sin cierres registrados</p></div>';
+    el.innerHTML = `
+      <div class="empty-state">
+        <div class="ico" style="font-size:28px;opacity:.2;">🏦</div>
+        <p>Sin cierres registrados hoy</p>
+      </div>`;
     return;
   }
  
-  var estadoConf = {
-    ok:       { color:'var(--green)',  bg:'var(--green-l)',  icon:'check_circle', lbl:'Cuadre OK'  },
-    faltante: { color:'var(--red)',    bg:'var(--red-l)',    icon:'warning',       lbl:'Faltante'   },
-    sobrante: { color:'var(--orange)', bg:'var(--orange-l)', icon:'arrow_upward', lbl:'Sobrante'   }
+  const eCfg = {
+    ok:       { color:'var(--green)',  bg:'var(--green-l)',  ico:'check_circle', lbl:'Cuadre OK'  },
+    faltante: { color:'var(--red)',    bg:'var(--red-l)',    ico:'warning',       lbl:'Faltante'   },
+    sobrante: { color:'var(--orange)', bg:'var(--orange-l)', ico:'arrow_upward', lbl:'Sobrante'   },
   };
  
-  el.innerHTML = cierres.map(function(c) {
-    var sc = estadoConf[c.estado] || estadoConf.ok;
-    var tLbl = c.turno === '1' ? '☀️ Turno 1 — Mañana' : '🌙 Turno 2 — Tarde';
-    return '<div class="cierre-item">' +
+  el.innerHTML = cierres.map(c => {
+    const sc = eCfg[c.estado] || eCfg.ok;
+    const tLbl = c.turno === '1' ? '☀️ Turno 1 — Mañana' : '🌙 Turno 2 — Tarde';
+    const dif  = parseFloat(c.diferencia) || 0;
+    const difAbs = Math.abs(dif);
+    const esOk   = difAbs < 500;
  
-      /* ── Cabecera: turno + fecha + estado ── */
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">' +
-        '<span class="cierre-turno-badge ' + (c.turno === '1' ? 'cierre-turno-1' : 'cierre-turno-2') + '">' + tLbl + '</span>' +
-        '<span style="font-size:10px;color:var(--text3);font-family:\'DM Mono\',monospace;">' + (c.fecha||'') + ' · ' + (c.hora||'') + '</span>' +
-        '<span style="margin-left:auto;font-size:9px;font-weight:800;padding:2px 9px;border-radius:99px;background:' + sc.bg + ';color:' + sc.color + ';display:inline-flex;align-items:center;gap:3px;">' +
-          '<span class="material-symbols-rounded" style="font-size:11px;">' + sc.icon + '</span>' + sc.lbl +
-        '</span>' +
-      '</div>' +
+    return `
+    <div class="cierre-item">
  
-      /* ── Entrega → Recibe ── */
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;background:var(--bg2);border-radius:9px;padding:8px 11px;">' +
-        '<div style="flex:1;text-align:center;">' +
-          '<div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase;margin-bottom:2px;">Entrega</div>' +
-          '<div style="font-size:11px;font-weight:800;color:var(--text);">' + (c.entrega||'—') + '</div>' +
-        '</div>' +
-        '<span class="material-symbols-rounded" style="color:var(--teal);font-size:18px;">arrow_forward</span>' +
-        '<div style="flex:1;text-align:center;">' +
-          '<div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase;margin-bottom:2px;">Recibe</div>' +
-          '<div style="font-size:11px;font-weight:800;color:var(--text);">' + (c.recibe||'—') + '</div>' +
-        '</div>' +
-      '</div>' +
+      <!-- cabecera: turno + fecha + badge estado -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+        <span class="cierre-turno-badge ${c.turno==='1'?'cierre-turno-1':'cierre-turno-2'}">
+          ${tLbl}
+        </span>
+        <span style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">
+          ${c.fecha||''} · ${c.hora||''}
+        </span>
+        <span style="margin-left:auto;font-size:9px;font-weight:800;padding:2px 9px;
+                     border-radius:99px;background:${sc.bg};color:${sc.color};
+                     display:inline-flex;align-items:center;gap:3px;">
+          <span class="material-symbols-rounded" style="font-size:11px;">${sc.ico}</span>
+          ${sc.lbl}
+        </span>
+      </div>
  
-      /* ── KPIs del cierre ── */
-      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:' + (c.novedades ? '10px' : '0') + ';">' +
-        kpiCaj('check_circle', '#4ade80', c.pedidos||0,         'Pedidos') +
-        kpiCaj('payments',     '#86efac', fmtMoney(c.totalEf||0), 'Efectivo') +
-        kpiCaj('account_balance','#93c5fd', fmtMoney(c.totalTf||0),'Transf.') +
-        kpiCajDif(sc.color, sc.bg, c.diferencia||0) +
-      '</div>' +
+      <!-- entrega → recibe -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;
+                  background:var(--bg2);border-radius:9px;padding:9px 12px;">
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:9px;color:var(--text3);font-weight:700;
+                      text-transform:uppercase;margin-bottom:2px;">Entrega</div>
+          <div style="font-size:12px;font-weight:800;color:var(--text);">${c.entrega||'—'}</div>
+        </div>
+        <span class="material-symbols-rounded" style="color:var(--teal);font-size:18px;">
+          arrow_forward
+        </span>
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:9px;color:var(--text3);font-weight:700;
+                      text-transform:uppercase;margin-bottom:2px;">Recibe</div>
+          <div style="font-size:12px;font-weight:800;color:var(--text);">${c.recibe||'—'}</div>
+        </div>
+      </div>
  
-      /* ── Novedades ── */
-      (c.novedades
-        ? '<div style="background:var(--orange-l);border:1px solid rgba(217,119,6,.2);border-radius:8px;padding:7px 11px;display:flex;align-items:flex-start;gap:6px;">' +
-            '<span class="material-symbols-rounded" style="font-size:13px;color:var(--orange);flex-shrink:0;margin-top:1px;">edit_note</span>' +
-            '<span style="font-size:11px;color:var(--text2);line-height:1.5;">' + c.novedades + '</span>' +
-          '</div>'
-        : '') +
+      <!-- KPIs del cierre: pedidos, efectivo, transferencia, diferencia -->
+      <div class="cierre-kpi-grid" style="margin-bottom:${c.novedades?'10px':'0'};">
  
-    '</div>';
+        <div class="cierre-kpi">
+          <div class="cierre-kpi-val" style="color:var(--teal);">${c.pedidos||0}</div>
+          <div class="cierre-kpi-lbl">Pedidos</div>
+        </div>
+ 
+        <div class="cierre-kpi">
+          <div class="cierre-kpi-val" style="color:var(--green);">${fmtMoney(c.totalEf||0)}</div>
+          <div class="cierre-kpi-lbl">Efectivo</div>
+        </div>
+ 
+        <div class="cierre-kpi">
+          <div class="cierre-kpi-val" style="color:var(--blue);">${fmtMoney(c.totalTf||0)}</div>
+          <div class="cierre-kpi-lbl">Transferencia</div>
+        </div>
+ 
+        <!-- diferencia con color semántico -->
+        <div class="cierre-kpi" style="background:${sc.bg};">
+          <div class="cierre-kpi-val" style="color:${sc.color};">
+            ${dif < 0 ? '-' : ''}${fmtMoney(difAbs)}
+          </div>
+          <div class="cierre-kpi-lbl" style="color:${sc.color};opacity:.8;">
+            ${esOk ? 'OK ✓' : dif < 0 ? 'Faltante' : 'Sobrante'}
+          </div>
+        </div>
+ 
+      </div>
+ 
+      <!-- novedades -->
+      ${c.novedades ? `
+        <div style="background:var(--orange-l);border:1px solid rgba(217,119,6,.2);
+                    border-radius:8px;padding:8px 12px;
+                    display:flex;align-items:flex-start;gap:7px;">
+          <span class="material-symbols-rounded"
+            style="font-size:14px;color:var(--orange);flex-shrink:0;margin-top:1px;">
+            edit_note
+          </span>
+          <span style="font-size:12px;color:var(--text2);line-height:1.5;">
+            ${c.novedades}
+          </span>
+        </div>` : ''}
+ 
+    </div>`;
   }).join('');
+};
+ 
  
   function kpiCaj(ico, color, val, lbl) {
     return '<div style="background:var(--bg);border-radius:8px;padding:8px 6px;text-align:center;">' +
@@ -7621,7 +7710,7 @@ window.deleteMulta = async function(idx) {
     a.click(); URL.revokeObjectURL(a.href);
     showToast('s','Excel exportado',peds.length+' registros');
   };
-  } 
+  
 
 
 
@@ -8665,24 +8754,133 @@ body.apro-fs #pg-actividad{position:fixed!important;inset:0!important;height:100
   function patchCierreCaja() {
 
     /* ── CSS compacto para el modal ── */
-    const st = document.createElement('style');
     st.textContent = `
-      #modal-caja-overlay { font-size:12px !important; }
-      .caja-modal .om-label { font-size:9px !important; margin-bottom:3px !important; }
-      .caja-modal .om-input,
-      .caja-modal .om-select { font-size:12px !important; padding:7px 10px !important; border-radius:8px !important; }
-      .caja-modal .om-field  { margin-bottom:10px !important; }
-      #caja-resumen-auto     { padding:11px 13px !important; margin-bottom:12px !important; border-radius:11px !important; }
-      #caja-diferencia-box   { padding:8px 11px !important; border-radius:8px !important; margin-top:8px !important; }
-      #caja-novedades        { min-height:50px !important; font-size:12px !important; padding:7px 10px !important; }
-      #btn-guardar-caja      { padding:10px !important; font-size:12px !important; }
-      #caja-stats-grid       { display:grid; grid-template-columns:repeat(4,1fr); gap:7px; }
-      @media(max-width:520px){ #caja-stats-grid { grid-template-columns:repeat(2,1fr) !important; } }
-      .caja-sc { background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); border-radius:9px; padding:8px 6px; text-align:center; }
-      .caja-sv { font-size:13px; font-weight:800; font-family:'DM Mono',monospace; line-height:1; margin-bottom:3px; }
-      .caja-sl { font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; opacity:.5; }
-    `;
-    document.head.appendChild(st);
+  #modal-caja-overlay { font-size:13px !important; }
+ 
+  .caja-modal .om-label {
+    font-size:10px !important;
+    margin-bottom:4px !important;
+    color:var(--text2) !important;
+    font-weight:700 !important;
+  }
+  .caja-modal .om-input,
+  .caja-modal .om-select {
+    font-size:13px !important;
+    padding:9px 12px !important;
+    border-radius:9px !important;
+    color:var(--text) !important;
+  }
+  .caja-modal .om-field { margin-bottom:12px !important; }
+ 
+  #caja-resumen-auto {
+    padding:14px !important;
+    margin-bottom:14px !important;
+    border-radius:12px !important;
+  }
+ 
+  #caja-stats-grid {
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:8px;
+  }
+  @media(max-width:520px){
+    #caja-stats-grid { grid-template-columns:repeat(2,1fr) !important; }
+  }
+ 
+  /* Cards del resumen: fondo oscuro con texto legible */
+  .caja-sc {
+    background:rgba(255,255,255,.10);
+    border:1px solid rgba(255,255,255,.18);
+    border-radius:10px;
+    padding:10px 8px;
+    text-align:center;
+  }
+  /* Valor principal — grande y visible */
+  .caja-sv {
+    font-size:14px;
+    font-weight:800;
+    font-family:'DM Mono',monospace;
+    line-height:1.1;
+    margin-bottom:4px;
+  }
+  /* Etiqueta inferior — blanca semitransparente, legible */
+  .caja-sl {
+    font-size:9px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:rgba(255,255,255,.70) !important;
+  }
+ 
+  #caja-diferencia-box  { padding:10px 13px !important; border-radius:9px !important; margin-top:10px !important; }
+  #caja-novedades       { min-height:55px !important; font-size:13px !important; padding:9px 12px !important; }
+  #btn-guardar-caja     { padding:12px !important; font-size:13px !important; }
+ 
+  /* Multas / P&P */
+  .pyp-aviso {
+    display:none;
+    align-items:center;
+    gap:8px;
+    background:var(--orange-l);
+    border:1.5px solid rgba(217,119,6,.3);
+    border-radius:11px;
+    padding:10px 14px;
+    font-size:12px;
+    font-weight:700;
+    color:#92400e;
+    margin-bottom:14px;
+  }
+  .pyp-aviso.show { display:flex; }
+  #multa-monto-wrap.pyp-hidden { display:none !important; }
+ 
+  /* Cierres de caja en la sección contable */
+  .cierre-item {
+    background:var(--white);
+    border:1.5px solid var(--border);
+    border-radius:14px;
+    padding:14px 16px;
+    margin-bottom:10px;
+    transition:box-shadow .18s;
+  }
+  .cierre-item:hover { box-shadow:0 4px 16px rgba(40,185,193,.09); }
+  .cierre-turno-badge {
+    font-size:10px;
+    font-weight:800;
+    padding:3px 10px;
+    border-radius:99px;
+  }
+  .cierre-turno-1 { background:var(--orange-l); color:var(--orange); }
+  .cierre-turno-2 { background:var(--blue-l);   color:var(--blue); }
+ 
+  /* Grid de KPIs del cierre en la sección contable */
+  .cierre-kpi-grid {
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:7px;
+  }
+  @media(max-width:600px){
+    .cierre-kpi-grid { grid-template-columns:repeat(2,1fr) !important; }
+  }
+  .cierre-kpi {
+    background:var(--bg);
+    border-radius:9px;
+    padding:9px 7px;
+    text-align:center;
+  }
+  .cierre-kpi-val {
+    font-size:12px;
+    font-weight:800;
+    font-family:'DM Mono',monospace;
+    margin-bottom:3px;
+  }
+  .cierre-kpi-lbl {
+    font-size:8px;
+    color:var(--text3);
+    text-transform:uppercase;
+    letter-spacing:.06em;
+  }
+`;
+document.head.appendChild(st);
 
     /* ── poblarSelectsCaja: domis + admin ── */
     function poblarSelectsCaja() {
@@ -8703,75 +8901,78 @@ body.apro-fs #pg-actividad{position:fixed!important;inset:0!important;height:100
 
     /* ── calcResumenTurno: lee allPedidos filtrando fecha + turno ── */
     window.calcResumenTurno = function() {
-      const turno  = document.getElementById('caja-turno')?.value || '1';
-      const fecha  = document.getElementById('caja-fecha')?.value || new Date().toISOString().slice(0,10);
-      const hiIni  = turno === '1' ?  0 : 14;
-      const hiFin  = turno === '1' ? 14 : 24;
-
-      /* Filtrar por fecha del día seleccionado */
-      const hoyStr = fecha; // YYYY-MM-DD
-      const pedsDia = (window.allPedidos || []).filter(p => {
-        /* Comparar col N (fecha del pedido) con la fecha elegida */
-        const fn = (p.fecha || '').trim();
-        if (!fn) return false;
-        /* Normalizar: si el sheet guarda "27 abr. 2025" parsear con parseDate */
-        const d = typeof parseDate === 'function' ? parseDate(fn) : null;
-        if (!d || isNaN(d)) return false;
-        const yyyy = d.getFullYear();
-        const mm   = String(d.getMonth()+1).padStart(2,'0');
-        const dd   = String(d.getDate()).padStart(2,'0');
-        return `${yyyy}-${mm}-${dd}` === hoyStr;
-      });
-
-      /* Filtrar por hora del turno */
-      const pedsT = pedsDia.filter(p => {
-        if (!p.hora) return true;
-        const h = parseInt((p.hora || '0:00').split(':')[0]);
-        return h >= hiIni && h < hiFin;
-      });
-
-      /* Conteos por estado (col E) */
-      const ent  = pedsT.filter(p => p.estado === 'entregado').length;
-      const pend = pedsT.filter(p => p.estado === 'pendiente').length;
-      const proc = pedsT.filter(p => ['proceso','encamino','asignado'].includes(p.estado)).length;
-
-      /* Método de pago (col D) */
-      const efPeds = pedsT.filter(p => /efecti/i.test(p.metodo || ''));
-      const tfPeds = pedsT.filter(p => /transfer/i.test(p.metodo || ''));
-      const otrPeds= pedsT.filter(p => !/efecti|transfer/i.test(p.metodo || '') && p.metodo);
-
-      const totalEf  = efPeds.reduce((s,p) => s + parsePrecio(p.total), 0);
-      const totalTf  = tfPeds.reduce((s,p) => s + parsePrecio(p.total), 0);
-      const totalT   = totalEf + totalTf;
-
-      /* Renderizar cards del resumen */
-      const grid = document.getElementById('caja-stats-grid');
-      if (grid) {
-        grid.innerHTML = [
-          { ico:'check_circle',    color:'#4ade80', val: ent,                   lbl:'Entregados'        },
-          { ico:'pending_actions', color:'#fbbf24', val: pend + proc,           lbl:'Pendientes/Proceso' },
-          { ico:'payments',        color:'#86efac', val: fmtMoney(totalEf),     lbl:`Efectivo (${efPeds.length})` },
-          { ico:'account_balance', color:'#93c5fd', val: fmtMoney(totalTf),     lbl:`Transf. (${tfPeds.length})`  },
-        ].map(k => `
-          <div class="caja-sc">
-            <span class="material-symbols-rounded" style="font-size:13px;color:${k.color};display:block;margin-bottom:4px;">${k.ico}</span>
-            <div class="caja-sv" style="color:${k.color};">${k.val}</div>
-            <div class="caja-sl">${k.lbl}</div>
-          </div>`).join('');
-      }
-
-      /* Prellenar efectivo esperado si está vacío */
-      const efInput = document.getElementById('caja-efectivo');
-      if (efInput && !efInput.value) efInput.value = String(Math.round(totalEf));
-
-      /* Prellenar bases del día si están vacías */
-      const basesTotal = (window._basesData || []).reduce((s,b) => s + b.monto, 0);
-      const bInput     = document.getElementById('caja-bases');
-      if (bInput && !bInput.value) bInput.value = String(Math.round(basesTotal));
-
-      calcDiferenciaCaja();
-      return { ent, pend, proc, totalEf, totalTf, totalT, nPeds: pedsT.length };
-    };
+  const turno = document.getElementById('caja-turno')?.value || '1';
+  const fecha = document.getElementById('caja-fecha')?.value || new Date().toISOString().slice(0,10);
+  const hiIni = turno === '1' ?  0 : 14;
+  const hiFin = turno === '1' ? 14 : 24;
+ 
+  /* ── Filtrar pedidos por fecha (col N del sheet = p.fecha) ── */
+  const pedsDia = (window.allPedidos || []).filter(p => {
+    const fn = (p.fecha || '').trim();
+    if (!fn) return false;
+    const d = typeof parseDate === 'function' ? parseDate(fn) : null;
+    if (!d || isNaN(d)) return false;
+    const yyyy = d.getFullYear();
+    const mm   = String(d.getMonth()+1).padStart(2,'0');
+    const dd   = String(d.getDate()).padStart(2,'0');
+    return `${yyyy}-${mm}-${dd}` === fecha;
+  });
+ 
+  /* ── Filtrar por turno ── */
+  const pedsT = pedsDia.filter(p => {
+    if (!p.hora) return true;
+    const h = parseInt((p.hora || '0:00').split(':')[0]);
+    return h >= hiIni && h < hiFin;
+  });
+ 
+  /* ── Conteos por estado (col E) ── */
+  const ent  = pedsT.filter(p => p.estado === 'entregado').length;
+  const pend = pedsT.filter(p => p.estado === 'pendiente').length;
+  const proc = pedsT.filter(p => ['proceso','encamino','asignado'].includes(p.estado)).length;
+ 
+  /* ── Método de pago (col D = p.metodo) ── */
+  const efPeds = pedsT.filter(p => /efecti/i.test(p.metodo || ''));
+  const tfPeds = pedsT.filter(p => /transfer/i.test(p.metodo || ''));
+  const totalEf = efPeds.reduce((s,p) => s + parsePrecio(p.total), 0);
+  const totalTf = tfPeds.reduce((s,p) => s + parsePrecio(p.total), 0);
+  const totalT  = totalEf + totalTf;
+ 
+  /* ── Renderizar 4 cards de resumen (fondo oscuro del modal) ── */
+  const grid = document.getElementById('caja-stats-grid');
+  if (grid) {
+    grid.innerHTML = [
+      { ico:'check_circle',    color:'#4ade80', val: String(ent),               lbl:`Entregados` },
+      { ico:'pending_actions', color:'#fbbf24', val: String(pend + proc),       lbl:`Pend/Proceso` },
+      /* Efectivo: número de pedidos + monto */
+      { ico:'payments',        color:'#86efac',
+        val: `${efPeds.length} · ${fmtMoney(totalEf)}`,
+        lbl:'Efectivo' },
+      /* Transferencias: número de pedidos + monto */
+      { ico:'account_balance', color:'#93c5fd',
+        val: `${tfPeds.length} · ${fmtMoney(totalTf)}`,
+        lbl:'Transferencia' },
+    ].map(k => `
+      <div class="caja-sc">
+        <span class="material-symbols-rounded"
+          style="font-size:14px;color:${k.color};display:block;margin-bottom:5px;">
+          ${k.ico}
+        </span>
+        <div class="caja-sv" style="color:${k.color};">${k.val}</div>
+        <div class="caja-sl">${k.lbl}</div>
+      </div>`).join('');
+  }
+ 
+  /* ── Prellenar campos si están vacíos ── */
+  const efInput = document.getElementById('caja-efectivo');
+  if (efInput && !efInput.value) efInput.value = String(Math.round(totalEf));
+ 
+  const basesTotal = (window._basesData || []).reduce((s,b) => s + b.monto, 0);
+  const bInput = document.getElementById('caja-bases');
+  if (bInput && !bInput.value) bInput.value = String(Math.round(basesTotal));
+ 
+  calcDiferenciaCaja();
+  return { ent, pend, proc, totalEf, totalTf, totalT, nPeds: pedsT.length };
+};
 
     /* ── calcDiferenciaCaja ── */
     window.calcDiferenciaCaja = function calcDiferenciaCaja() {
