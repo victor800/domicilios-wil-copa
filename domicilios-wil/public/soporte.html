@@ -29,6 +29,7 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @keyframes rot{to{transform:rotate(360deg)}}
 @keyframes ping{0%{transform:scale(1);opacity:.7}70%{transform:scale(2.2);opacity:0}100%{opacity:0}}
+@keyframes slideUpSheet{from{transform:translateY(80px);opacity:0}to{transform:translateY(0);opacity:1}}
 .spin{display:inline-block;width:16px;height:16px;border:2.5px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:rot .7s linear infinite;vertical-align:middle}
 .spin.dk{border-color:rgba(0,105,112,.2);border-top-color:var(--p)}
 
@@ -38,9 +39,15 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 .hdr-back:active{transform:scale(.88)}
 .hdr-logo{width:30px;height:30px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid rgba(0,105,112,.18)}
 .hdr-title{font-weight:800;font-size:15px;color:var(--on);flex:1;letter-spacing:-.01em}
-.hdr-badge{display:flex;align-items:center;gap:4px;background:rgba(22,163,74,.1);border:1px solid rgba(22,163,74,.2);border-radius:99px;padding:4px 10px;font-size:10px;font-weight:700;color:#16a34a}
-.hdr-badge-dot{width:6px;height:6px;border-radius:50%;background:#16a34a;position:relative;flex-shrink:0}
-.hdr-badge-dot::after{content:'';position:absolute;inset:-3px;border-radius:50%;background:rgba(22,163,74,.3);animation:ping 1.8s ease-in-out infinite}
+
+/* Badge disponibilidad — cambia color según horario */
+.hdr-badge{display:flex;align-items:center;gap:4px;border-radius:99px;padding:4px 10px;font-size:10px;font-weight:700;transition:.3s}
+.hdr-badge.disponible{background:rgba(22,163,74,.1);border:1px solid rgba(22,163,74,.2);color:#16a34a}
+.hdr-badge.no-disponible{background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.18);color:#dc2626}
+.hdr-badge-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;position:relative}
+.hdr-badge.disponible .hdr-badge-dot{background:#16a34a}
+.hdr-badge.no-disponible .hdr-badge-dot{background:#dc2626}
+.hdr-badge.disponible .hdr-badge-dot::after{content:'';position:absolute;inset:-3px;border-radius:50%;background:rgba(22,163,74,.3);animation:ping 1.8s ease-in-out infinite}
 
 /* BOTTOM NAV */
 .bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;z-index:200;background:rgba(255,255,255,.97);backdrop-filter:blur(20px);border-top:1px solid rgba(0,105,112,.07);border-radius:20px 20px 0 0;display:flex;padding:6px 8px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -4px 24px rgba(0,60,80,.08)}
@@ -67,7 +74,9 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 .sop-agent-info{flex:1;min-width:0}
 .sop-agent-name{font-size:13px;font-weight:800;color:#fff}
 .sop-agent-status{font-size:10px;color:rgba(255,255,255,.65);display:flex;align-items:center;gap:4px;margin-top:2px}
-.sop-agent-dot{width:6px;height:6px;border-radius:50%;background:#4ade80;flex-shrink:0}
+.sop-agent-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.sop-agent-dot.on{background:#4ade80}
+.sop-agent-dot.off{background:#f87171}
 .sop-agent-wa{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;background:#25D366;text-decoration:none;flex-shrink:0;box-shadow:0 3px 12px rgba(37,211,102,.45);transition:.15s}
 .sop-agent-wa:active{transform:scale(.9)}
 
@@ -80,11 +89,14 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 .quick-lbl{font-size:12px;font-weight:800;color:var(--on);line-height:1.3}
 .quick-sub{font-size:10px;color:var(--on3);font-weight:500;line-height:1.4}
 
-/* CONTACT CHANNELS */
+/* ══ CONTACT CHANNELS — botones del mismo tamaño ══ */
 .ch-row{display:flex;gap:10px;padding:4px 16px 16px}
-.ch-btn{flex:1;display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:16px;border:1.5px solid #e2eaef;background:var(--w);cursor:pointer;text-decoration:none;box-shadow:var(--sh);transition:.15s}
+.ch-btn{flex:1;display:flex;align-items:center;gap:10px;padding:14px;border-radius:16px;border:1.5px solid #e2eaef;background:var(--w);cursor:pointer;text-decoration:none;box-shadow:var(--sh);transition:.15s;min-height:68px}
 .ch-btn:active{transform:scale(.96);box-shadow:none}
-.ch-btn-ico{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+/* Icono mismo tamaño en ambos botones */
+.ch-btn-ico{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ch-btn-ico svg{width:22px;height:22px}
+.ch-btn-ico .sym{font-size:22px;color:#fff}
 .ch-btn-lbl{font-size:11.5px;font-weight:800;color:var(--on)}
 .ch-btn-sub{font-size:9.5px;color:var(--on3);margin-top:1px}
 
@@ -157,12 +169,23 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 .info-strip-txt{font-size:11.5px;color:var(--on2);line-height:1.6;font-weight:500}
 .info-strip-txt strong{color:var(--on);font-weight:700}
 
-/* REDES */
-.redes-row{display:flex;gap:10px;padding:0 16px 20px;justify-content:center}
-.red-btn{display:flex;flex-direction:column;align-items:center;gap:5px;width:68px;cursor:pointer;text-decoration:none}
-.red-ico{width:48px;height:48px;border-radius:16px;display:flex;align-items:center;justify-content:center;transition:.15s}
-.red-btn:active .red-ico{transform:scale(.9)}
-.red-lbl{font-size:9px;font-weight:700;color:var(--on3);text-align:center}
+/* ══ MODAL CORREO — bottom sheet ══ */
+.modal-overlay{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.52);backdrop-filter:blur(4px);display:flex;align-items:flex-end;justify-content:center;padding-bottom:env(safe-area-inset-bottom)}
+.modal-overlay.hidden{display:none!important}
+.modal-sheet{width:100%;max-width:480px;background:#fff;border-radius:26px 26px 0 0;max-height:90dvh;display:flex;flex-direction:column;box-shadow:0 -10px 50px rgba(0,0,0,.22);animation:slideUpSheet .3s cubic-bezier(.22,1,.36,1)}
+.modal-handle{width:36px;height:4px;background:#e0e4e8;border-radius:4px;margin:13px auto 0;flex-shrink:0}
+.modal-hdr{padding:14px 18px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f0f3f6;flex-shrink:0}
+.modal-hdr-tit{font-size:16px;font-weight:900;color:var(--on);display:flex;align-items:center;gap:7px}
+.modal-hdr-tit .sym{font-size:18px;color:var(--p)}
+.modal-close-btn{width:32px;height:32px;border-radius:50%;border:none;background:#f0f4f7;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.modal-close-btn .sym{font-size:16px;color:var(--on3)}
+.modal-body{overflow-y:auto;padding:16px 18px 24px;flex:1}
+.modal-body::-webkit-scrollbar{width:3px}
+.modal-body::-webkit-scrollbar-thumb{background:#c8d4dc;border-radius:3px}
+
+/* Banner no disponible en hero */
+.hero-nodisponible{display:none;margin-top:12px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.25);border-radius:12px;padding:10px 13px;display:flex;align-items:center;gap:8px;font-size:11.5px;color:#fca5a5;font-weight:600}
+.hero-nodisponible .sym{font-size:14px;color:#f87171;flex-shrink:0}
 </style>
 </head>
 <body>
@@ -173,14 +196,98 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
   <span id="toastMsg">Mensaje</span>
 </div>
 
+<!-- ══ MODAL CORREO ELECTRÓNICO ══ -->
+<div class="modal-overlay hidden" id="modalCorreo" onclick="if(event.target===this)cerrarModalCorreo()">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-hdr">
+      <div class="modal-hdr-tit">
+        <span class="sym f">mail</span>Enviar correo a WIL
+      </div>
+      <button class="modal-close-btn" onclick="cerrarModalCorreo()">
+        <span class="sym">close</span>
+      </button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Estado éxito dentro del modal -->
+      <div id="modalSucc" style="display:none;text-align:center;padding:20px 0">
+        <div style="width:60px;height:60px;border-radius:50%;background:rgba(22,163,74,.1);border:2px solid rgba(22,163,74,.25);display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
+          <span class="sym f" style="font-size:28px;color:#16a34a">mark_email_read</span>
+        </div>
+        <div style="font-size:17px;font-weight:900;color:var(--on);margin-bottom:6px">¡Correo enviado! 🎉</div>
+        <p style="font-size:12px;color:var(--on3);line-height:1.6;max-width:240px;margin:0 auto 16px" id="modalSuccMsg">Recibimos tu mensaje.</p>
+        <div style="background:var(--pl);border:1px dashed var(--plb);border-radius:10px;padding:10px 14px;display:inline-block;font-size:11px;color:var(--p);font-weight:700" id="modalSuccTicket">Ticket #—</div>
+        <br/>
+        <button class="btn-reset" style="margin-top:16px" onclick="resetModalCorreo()">Enviar otro mensaje</button>
+      </div>
+
+      <!-- Formulario correo -->
+      <div id="modalForm">
+        <div style="background:linear-gradient(135deg,rgba(0,105,112,.05),rgba(0,188,201,.03));border:1.5px solid var(--plb);border-radius:14px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px;margin-bottom:16px">
+          <span class="sym f" style="font-size:16px;color:var(--p);margin-top:1px;flex-shrink:0">info</span>
+          <span style="font-size:11.5px;color:var(--on2);line-height:1.55;font-weight:500">Te respondemos al correo indicado en menos de <strong style="color:var(--on)">2 horas</strong> en horario de atención (Lun–Dom 9am–10:30pm).</span>
+        </div>
+
+        <div class="field">
+          <label>Tu nombre *</label>
+          <input type="text" id="mc-nombre" placeholder="Nombre completo"/>
+        </div>
+        <div class="field">
+          <label>Correo electrónico *</label>
+          <input type="email" id="mc-email" placeholder="tucorreo@gmail.com"/>
+        </div>
+        <div class="field">
+          <label>Teléfono / WhatsApp</label>
+          <input type="tel" id="mc-telefono" placeholder="310 123 4567"/>
+          <div class="field-note">Para contactarte por WA si es urgente</div>
+        </div>
+        <div class="field">
+          <label>Código de pedido</label>
+          <input type="text" id="mc-codigo" placeholder="Ej: 456" maxlength="4"
+            style="letter-spacing:.1em;font-weight:700;font-size:18px;color:var(--p)"/>
+        </div>
+        <div class="field">
+          <label>Tipo de solicitud *</label>
+          <select id="mc-tipo">
+            <option value="">— Selecciona —</option>
+            <option value="Olvidé mi código de pedido">🔍 Olvidé mi código</option>
+            <option value="Seguimiento de pedido">📦 Seguimiento de pedido</option>
+            <option value="Queja o reclamo">😤 Queja o reclamo</option>
+            <option value="Cancelar / modificar pedido">✏️ Cancelar / modificar</option>
+            <option value="Problema con cobro o pago">💳 Cobro o pago</option>
+            <option value="Pedido no llegó">❌ Pedido no llegó</option>
+            <option value="Producto incorrecto o faltante">🛍️ Producto incorrecto</option>
+            <option value="Sugerencia o mejora">💡 Sugerencia</option>
+            <option value="Otra consulta">💬 Otra consulta</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Mensaje *</label>
+          <textarea id="mc-mensaje" placeholder="Cuéntanos con detalle qué pasó o qué necesitas…" oninput="mcCharCount(this)"></textarea>
+          <div class="char-count" id="mcCharCount">0 / 500</div>
+        </div>
+
+        <button class="btn-submit" id="btnEnviarCorreo" onclick="enviarCorreoModal()">
+          <span class="sym f" style="font-size:17px">send</span>
+          Enviar correo
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- HEADER -->
 <header class="hdr">
-  <button class="hdr-back" onclick="history.back()"><span class="sym" style="font-size:18px">arrow_back</span></button>
+  <button class="hdr-back" onclick="history.back()">
+    <span class="sym" style="font-size:18px">arrow_back</span>
+  </button>
   <img class="hdr-logo" src="icons/icon-192.png" alt="WIL" onerror="this.style.display='none'"/>
   <span class="hdr-title">Soporte WIL</span>
-  <div class="hdr-badge">
+  <!-- Badge dinámico — JS lo actualiza al cargar -->
+  <div class="hdr-badge disponible" id="hdrBadge">
     <span class="hdr-badge-dot"></span>
-    En línea
+    <span id="hdrBadgeTxt">En línea</span>
   </div>
 </header>
 
@@ -192,23 +299,33 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
       <div class="sop-hero-dots"></div>
       <div class="sop-hero-shine"></div>
       <div class="sop-hero-content">
-        <div class="sop-hero-tag"><span class="sym f" style="font-size:12px">support_agent</span>Centro de ayuda</div>
+        <div class="sop-hero-tag">
+          <span class="sym f" style="font-size:12px">support_agent</span>Centro de ayuda
+        </div>
         <div class="sop-hero-h1">¿En qué podemos<br/>ayudarte? 🛵</div>
         <p class="sop-hero-sub">Resolvemos tus dudas en minutos. Elige cómo prefieres contactarnos o encuentra la respuesta en las preguntas frecuentes.</p>
-        <!-- Agente online -->
+
+        <!-- Agente online / fuera de horario -->
         <div class="sop-agent-row">
           <div class="sop-agent-av">🧑‍💼</div>
           <div class="sop-agent-info">
             <div class="sop-agent-name">Equipo WIL</div>
-            <div class="sop-agent-status"><span class="sop-agent-dot"></span>Disponible ahora · Resp. en ~5 min</div>
+            <div class="sop-agent-status">
+              <span class="sop-agent-dot on" id="agentDot"></span>
+              <span id="agentStatusTxt">Disponible ahora · Resp. en ~5 min</span>
+            </div>
           </div>
-         <a class="sop-agent-wa"
-   href="#"
-   onclick="abrirWA('573193203440');return false;"
-   aria-label="WhatsApp">
-
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+          <a class="sop-agent-wa" href="#"
+             onclick="abrirWA('573012198994');return false;"
+             aria-label="WhatsApp">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
           </a>
+        </div>
+
+        <!-- Banner fuera de horario (oculto por defecto, JS lo muestra) -->
+        <div id="bannerNoDisp" style="display:none;margin-top:12px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.25);border-radius:12px;padding:10px 13px;align-items:center;gap:8px">
+          <span class="sym f" style="font-size:14px;color:#f87171">schedule</span>
+          <span style="font-size:11.5px;color:#fca5a5;font-weight:600">Fuera de horario — Atención Lun–Dom 9:00am–10:30pm.<br/>Dejanos tu mensaje y te respondemos al abrir.</span>
         </div>
       </div>
     </div>
@@ -221,64 +338,46 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
   <div class="quick-grid">
     <div class="quick-card" style="animation-delay:.05s" onclick="seleccionarTema('olvidé mi código de pedido')">
       <div class="quick-ico" style="background:#e0f2f1">🔍</div>
-      <div>
-        <div class="quick-lbl">Olvidé mi código</div>
-        <div class="quick-sub">Recupera tu número de pedido</div>
-      </div>
+      <div><div class="quick-lbl">Olvidé mi código</div><div class="quick-sub">Recupera tu número de pedido</div></div>
     </div>
     <div class="quick-card" style="animation-delay:.1s" onclick="seleccionarTema('quiero hacer una queja o reclamo')">
       <div class="quick-ico" style="background:#fce4ec">😤</div>
-      <div>
-        <div class="quick-lbl">Queja o reclamo</div>
-        <div class="quick-sub">Algo salió mal con tu pedido</div>
-      </div>
+      <div><div class="quick-lbl">Queja o reclamo</div><div class="quick-sub">Algo salió mal con tu pedido</div></div>
     </div>
     <div class="quick-card" style="animation-delay:.15s" onclick="seleccionarTema('quiero hacer seguimiento a mi pedido')">
       <div class="quick-ico" style="background:#e8f5e9">📦</div>
-      <div>
-        <div class="quick-lbl">Seguimiento</div>
-        <div class="quick-sub">¿Dónde está mi pedido?</div>
-      </div>
+      <div><div class="quick-lbl">Seguimiento</div><div class="quick-sub">¿Dónde está mi pedido?</div></div>
     </div>
     <div class="quick-card" style="animation-delay:.2s" onclick="seleccionarTema('quiero cancelar o modificar un pedido')">
       <div class="quick-ico" style="background:#fff3e0">✏️</div>
-      <div>
-        <div class="quick-lbl">Cancelar / editar</div>
-        <div class="quick-sub">Cambios en tu pedido</div>
-      </div>
+      <div><div class="quick-lbl">Cancelar / editar</div><div class="quick-sub">Cambios en tu pedido</div></div>
     </div>
     <div class="quick-card" style="animation-delay:.25s" onclick="seleccionarTema('tengo un problema con el cobro o pago')">
       <div class="quick-ico" style="background:#ede7f6">💳</div>
-      <div>
-        <div class="quick-lbl">Cobros y pagos</div>
-        <div class="quick-sub">Preguntas sobre pagos</div>
-      </div>
+      <div><div class="quick-lbl">Cobros y pagos</div><div class="quick-sub">Preguntas sobre pagos</div></div>
     </div>
     <div class="quick-card" style="animation-delay:.3s" onclick="seleccionarTema('otra consulta o sugerencia')">
       <div class="quick-ico" style="background:#e3f2fd">💬</div>
-      <div>
-        <div class="quick-lbl">Otra consulta</div>
-        <div class="quick-sub">Sugerencias y más</div>
-      </div>
+      <div><div class="quick-lbl">Otra consulta</div><div class="quick-sub">Sugerencias y más</div></div>
     </div>
   </div>
 
-  <!-- CHANNELS -->
+  <!-- ══ CHANNELS — mismo tamaño de ícono ══ -->
   <div class="ch-row">
-    <a class="ch-btn" href="https://wa.me/573012198994?text=Hola%20WIL,%20necesito%20ayuda" target="_blank">
+    <!-- WhatsApp -->
+    <a class="ch-btn" href="#" onclick="abrirWA('573012198994');return false;">
       <div class="ch-btn-ico" style="background:#25D366">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+        <svg viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
       </div>
       <div>
         <div class="ch-btn-lbl">WhatsApp</div>
         <div class="ch-btn-sub">Respuesta inmediata</div>
       </div>
     </a>
-   <a class="ch-btn"
-   href="#"
-   onclick="abrirWA('57573012198994');return false;">
+    <!-- Correo → abre popup modal -->
+    <a class="ch-btn" href="#" onclick="abrirModalCorreo();return false;">
       <div class="ch-btn-ico" style="background:linear-gradient(135deg,#006970,#00a3b4)">
-        <span class="sym f" style="font-size:18px;color:#fff">mail</span>
+        <span class="sym f" style="font-size:22px;color:#fff">mail</span>
       </div>
       <div>
         <div class="ch-btn-lbl">Correo</div>
@@ -402,14 +501,13 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 
   </div>
 
-  <!-- FORMULARIO DE CONTACTO -->
+  <!-- FORMULARIO DE CONTACTO PRINCIPAL -->
   <div style="height:12px"></div>
   <div class="sec-hdr">
     <span class="sym f sec-hdr-ico">mail</span>
     <span class="sec-hdr-lbl">Envíanos un mensaje</span>
   </div>
 
-  <!-- Form -->
   <div class="form-card" id="formCard">
     <div class="form-card-hdr">
       <div class="form-card-ico"><span class="sym f">support_agent</span></div>
@@ -434,7 +532,8 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
     </div>
     <div class="field">
       <label>Código de pedido</label>
-      <input type="text" id="f-codigo" placeholder="Ej: 456" maxlength="4" style="letter-spacing:.1em;font-weight:700;font-size:18px;color:var(--p)"/>
+      <input type="text" id="f-codigo" placeholder="Ej: 456" maxlength="4"
+        style="letter-spacing:.1em;font-weight:700;font-size:18px;color:var(--p)"/>
     </div>
     <div class="field">
       <label>Tipo de solicitud *</label>
@@ -459,7 +558,7 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 
     <div class="info-strip">
       <span class="sym f">schedule</span>
-      <div class="info-strip-txt">Atención <strong>Lun–Dom 09:00am–10:30pm</strong>. Los mensajes fuera de horario serán respondidos al siguiente día hábil.</div>
+      <div class="info-strip-txt">Atención <strong>Lun–Dom 9:00am–10:30pm</strong>. Los mensajes fuera de horario serán respondidos al siguiente día hábil.</div>
     </div>
 
     <button class="btn-submit" id="btnEnviar" onclick="enviarFormulario()">
@@ -472,12 +571,11 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
   <div class="succ-card" id="succCard">
     <div class="succ-ring"><span class="sym f">mark_email_read</span></div>
     <div class="succ-tit">¡Mensaje enviado! 🎉</div>
-    <p class="succ-sub" id="succMsg">Recibimos tu solicitud. Te contactaremos pronto por WhatsApp o al correo indicado.</p>
+    <p class="succ-sub" id="succMsg">Recibimos tu solicitud. Te contactaremos pronto.</p>
     <div class="succ-code" id="succTicket">Ticket #—</div>
     <br/>
-    <a href="#"
-   onclick="abrirWA('573012198994');return false;"
-   style="display:inline-flex;align-items:center;gap:7px;margin-top:14px;background:#25D366;color:#fff;border-radius:99px;padding:10px 18px;font-size:12.5px;font-weight:800;text-decoration:none;box-shadow:0 3px 12px rgba(37,211,102,.35)">
+    <a href="#" onclick="abrirWA('573012198994');return false;"
+       style="display:inline-flex;align-items:center;gap:7px;margin-top:14px;background:#25D366;color:#fff;border-radius:99px;padding:10px 18px;font-size:12.5px;font-weight:800;text-decoration:none;box-shadow:0 3px 12px rgba(37,211,102,.35)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
       Seguir en WhatsApp
     </a>
@@ -492,31 +590,79 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 <nav class="bnav">
   <a class="bi" href="index.html"><span class="sym">home</span><span class="bi-lbl">Inicio</span></a>
   <a class="bi" href="pedir.html"><span class="sym f">shopping_bag</span><span class="bi-lbl">Pedir</span></a>
-  <a class="bi" href="pedir.html#rastrear" onclick="history.back()"><span class="sym">search</span><span class="bi-lbl">Rastrear</span></a>
+  <a class="bi" href="pedir.html#rastrear"><span class="sym">search</span><span class="bi-lbl">Rastrear</span></a>
   <a class="bi active" href="soporte.html"><span class="sym f">person</span><span class="bi-lbl">Soporte</span></a>
 </nav>
 
 <script>
-/* ── GAS URL (mismo de la app) ── */
-var GAS_URL = 'https://script.google.com/macros/s/AKfycbwfuVFWQ-ZtSog7w95YUNCb3Z8y_5J7yw8In8pHcY71IxIzEgJ85_eK4YbFboA0Srbqig/exec';
-/* ── Email WIL ── */
+/* ══════════════════════════════════════════
+   CONFIG
+══════════════════════════════════════════ */
+var GAS_URL   = 'https://script.google.com/macros/s/AKfycbwfuVFWQ-ZtSog7w95YUNCb3Z8y_5J7yw8In8pHcY71IxIzEgJ85_eK4YbFboA0Srbqig/exec';
 var EMAIL_WIL = 'soporteDomiWil@gmail.com';
-var WA_WIL    = '573012198994';
+var WA_NUM    = '573012198994';
 
-/* ── Toast ── */
+/* Horario de atención: Lun–Dom 09:00–22:30 */
+var HORA_ABRE = 9;      /* 9:00 am */
+var HORA_CIERRA_H = 22; /* 10:30 pm */
+var HORA_CIERRA_M = 30;
+
+/* ══════════════════════════════════════════
+   1. DISPONIBILIDAD POR HORARIO
+══════════════════════════════════════════ */
+function estaDisponible() {
+  var now  = new Date();
+  var h    = now.getHours();
+  var m    = now.getMinutes();
+  var mins = h * 60 + m;
+  var abre  = HORA_ABRE * 60;
+  var cierra = HORA_CIERRA_H * 60 + HORA_CIERRA_M;
+  return mins >= abre && mins < cierra;
+}
+
+function actualizarEstadoHorario() {
+  var ok       = estaDisponible();
+  var badge    = document.getElementById('hdrBadge');
+  var badgeTxt = document.getElementById('hdrBadgeTxt');
+  var dot      = document.getElementById('agentDot');
+  var statusTxt = document.getElementById('agentStatusTxt');
+  var banner   = document.getElementById('bannerNoDisp');
+
+  if (ok) {
+    badge.className = 'hdr-badge disponible';
+    badgeTxt.textContent = 'En línea';
+    dot.className = 'sop-agent-dot on';
+    statusTxt.textContent = 'Disponible ahora · Resp. en ~5 min';
+    banner.style.display = 'none';
+  } else {
+    badge.className = 'hdr-badge no-disponible';
+    badgeTxt.textContent = 'No disponible';
+    dot.className = 'sop-agent-dot off';
+    statusTxt.textContent = 'Fuera de horario · Resp. próxima apertura';
+    banner.style.display = 'flex';
+  }
+}
+
+/* Ejecutar al cargar y revisar cada minuto */
+actualizarEstadoHorario();
+setInterval(actualizarEstadoHorario, 60000);
+
+/* ══════════════════════════════════════════
+   2. TOAST
+══════════════════════════════════════════ */
 var _tt = null;
 function toast(msg, ico, dur) {
   var t  = document.getElementById('toast');
-  var ti = document.getElementById('toastIco');
-  var tm = document.getElementById('toastMsg');
-  ti.textContent = ico || 'check_circle';
-  tm.textContent = msg;
+  document.getElementById('toastIco').textContent = ico || 'check_circle';
+  document.getElementById('toastMsg').textContent = msg;
   t.classList.add('show');
   clearTimeout(_tt);
   _tt = setTimeout(function(){ t.classList.remove('show'); }, dur || 3200);
 }
 
-/* ── FAQ toggle ── */
+/* ══════════════════════════════════════════
+   3. FAQ TOGGLE
+══════════════════════════════════════════ */
 function toggleFaq(item) {
   var isOpen = item.classList.contains('open');
   document.querySelectorAll('.faq-item.open').forEach(function(el) {
@@ -530,22 +676,21 @@ function toggleFaq(item) {
   }
 }
 
-/* ── Quick action → pre-fill form ── */
+/* ══════════════════════════════════════════
+   4. QUICK ACTIONS → pre-fill form
+══════════════════════════════════════════ */
 function seleccionarTema(tema) {
   var sel = document.getElementById('f-tipo');
   if (sel) {
     for (var i = 0; i < sel.options.length; i++) {
       if (sel.options[i].value.toLowerCase().indexOf(tema.split(' ')[0].toLowerCase()) !== -1
           || tema.toLowerCase().indexOf(sel.options[i].value.toLowerCase().split(' ')[0]) !== -1) {
-        sel.value = sel.options[i].value;
-        break;
+        sel.value = sel.options[i].value; break;
       }
     }
-    // fallback: buscar por coincidencia parcial
     for (var j = 0; j < sel.options.length; j++) {
       if (tema.toLowerCase().indexOf(sel.options[j].text.replace(/^[^\s]+\s/,'').toLowerCase().split(' ')[0]) !== -1) {
-        sel.value = sel.options[j].value;
-        break;
+        sel.value = sel.options[j].value; break;
       }
     }
   }
@@ -556,21 +701,262 @@ function seleccionarTema(tema) {
   }, 500);
 }
 
-/* ── Char count ── */
+/* ══════════════════════════════════════════
+   5. SALUDO POR HORA
+══════════════════════════════════════════ */
+function saludoHora() {
+  var h = new Date().getHours();
+  if (h >= 6  && h < 12) return '¡Buenos días';
+  if (h >= 12 && h < 19) return '¡Buenas tardes';
+  return '¡Buenas noches';
+}
+
+/* ══════════════════════════════════════════
+   6. WHATSAPP — MENSAJE PERSONALIZADO POR MOTIVO
+══════════════════════════════════════════ */
+var WA_PLANTILLAS = {
+  'Olvidé mi código de pedido': {
+    emoji: '🔍',
+    intro: 'Hice un pedido con WIL y no recuerdo el código que me asignaron. ¿Podrían ayudarme a recuperarlo?',
+    extra: 'Les puedo dar mi nombre y número de teléfono para que lo busquen.'
+  },
+  'Seguimiento de pedido': {
+    emoji: '📦',
+    intro: 'Quiero saber el estado de mi pedido. ¿Podría indicarme en qué va?',
+    extra: ''
+  },
+  'Queja o reclamo': {
+    emoji: '😤',
+    intro: 'Tuve un inconveniente con mi pedido y necesito poner una queja o reclamo.',
+    extra: 'Quisiera que lo revisen y me den una solución lo antes posible.'
+  },
+  'Cancelar / modificar pedido': {
+    emoji: '✏️',
+    intro: 'Necesito cancelar o hacer un cambio en mi pedido antes de que sea confirmado.',
+    extra: 'Por favor, atendan este mensaje lo antes posible.'
+  },
+  'Problema con cobro o pago': {
+    emoji: '💳',
+    intro: 'Tengo una duda o problema con el cobro de mi pedido.',
+    extra: 'Quisiera aclarar este punto antes de cerrar cualquier inconveniente.'
+  },
+  'Pedido no llegó': {
+    emoji: '❌',
+    intro: 'Mi pedido ya debería haber llegado y aún no lo he recibido. ¿Qué está pasando?',
+    extra: 'Por favor, comuníquense conmigo lo antes posible.'
+  },
+  'Producto incorrecto o faltante': {
+    emoji: '🛍️',
+    intro: 'Recibí un producto incorrecto o me faltó algo en mi pedido.',
+    extra: 'Quisiera que lo revisen y me indiquen cómo proceder.'
+  },
+  'Sugerencia o mejora': {
+    emoji: '💡',
+    intro: 'Tengo una sugerencia para mejorar el servicio de Domicilios WIL.',
+    extra: ''
+  },
+  'Otra consulta': {
+    emoji: '💬',
+    intro: 'Tengo una consulta general que quisiera resolver con el equipo de soporte.',
+    extra: ''
+  }
+};
+
+function waURL(numeroBase) {
+  var saludo  = saludoHora();
+  var nombre  = (document.getElementById('f-nombre')  ? document.getElementById('f-nombre').value.trim()  : '') ||
+                (document.getElementById('mc-nombre') ? document.getElementById('mc-nombre').value.trim() : '');
+  var codigo  = (document.getElementById('f-codigo')  ? document.getElementById('f-codigo').value.trim()  : '') ||
+                (document.getElementById('mc-codigo') ? document.getElementById('mc-codigo').value.trim() : '');
+  var tipo    = (document.getElementById('f-tipo')    ? document.getElementById('f-tipo').value            : '') ||
+                (document.getElementById('mc-tipo')   ? document.getElementById('mc-tipo').value           : '');
+
+  var plantilla = WA_PLANTILLAS[tipo] || { emoji: '📋', intro: 'Me comunico con el soporte de Domicilios WIL.', extra: '' };
+
+  /* Construir mensaje natural y cálido */
+  var lineas = [];
+
+  /* Saludo personalizado */
+  if (nombre) {
+    lineas.push(saludo + '! 👋 Mi nombre es *' + nombre + '* y me comunico con el soporte de *Domicilios WIL*.');
+  } else {
+    lineas.push(saludo + '! 👋 Me comunico con el soporte de *Domicilios WIL*.');
+  }
+
+  /* Intro según motivo */
+  lineas.push('');
+  lineas.push(plantilla.emoji + ' ' + plantilla.intro);
+
+  /* Datos del pedido */
+  if (codigo) {
+    lineas.push('');
+    lineas.push('🔢 *Código de pedido:* #' + codigo);
+  }
+  if (tipo) {
+    lineas.push('📋 *Motivo:* ' + tipo);
+  }
+
+  /* Texto adicional si aplica */
+  if (plantilla.extra) {
+    lineas.push('');
+    lineas.push(plantilla.extra);
+  }
+
+  /* Cierre */
+  lineas.push('');
+  lineas.push('Quedo atento/a. ¡Gracias! 🙏');
+
+  return 'https://wa.me/' + numeroBase + '?text=' + encodeURIComponent(lineas.join('\n'));
+}
+
+function abrirWA(numero) {
+  window.open(waURL(numero), '_blank');
+}
+
+/* ══════════════════════════════════════════
+   7. MODAL CORREO — abrir / cerrar / reset
+══════════════════════════════════════════ */
+function abrirModalCorreo() {
+  /* Pre-rellenar con datos ya escritos en el form principal */
+  var mNombre = document.getElementById('mc-nombre');
+  var mEmail  = document.getElementById('mc-email');
+  var mTel    = document.getElementById('mc-telefono');
+  var mCodigo = document.getElementById('mc-codigo');
+  var mTipo   = document.getElementById('mc-tipo');
+
+  var fNombre = document.getElementById('f-nombre').value.trim();
+  var fEmail  = document.getElementById('f-email').value.trim();
+  var fTel    = document.getElementById('f-telefono').value.trim();
+  var fCodigo = document.getElementById('f-codigo').value.trim();
+  var fTipo   = document.getElementById('f-tipo').value;
+
+  if (fNombre && !mNombre.value) mNombre.value = fNombre;
+  if (fEmail  && !mEmail.value)  mEmail.value  = fEmail;
+  if (fTel    && !mTel.value)    mTel.value    = fTel;
+  if (fCodigo && !mCodigo.value) mCodigo.value = fCodigo;
+  if (fTipo   && !mTipo.value)   mTipo.value   = fTipo;
+
+  document.getElementById('modalCorreo').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  setTimeout(function(){ document.getElementById('mc-nombre').focus(); }, 350);
+}
+
+function cerrarModalCorreo() {
+  document.getElementById('modalCorreo').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+function resetModalCorreo() {
+  ['mc-nombre','mc-email','mc-telefono','mc-codigo','mc-mensaje'].forEach(function(id){
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('mc-tipo').value = '';
+  document.getElementById('mcCharCount').textContent = '0 / 500';
+  document.getElementById('modalSucc').style.display  = 'none';
+  document.getElementById('modalForm').style.display  = 'block';
+  var btn = document.getElementById('btnEnviarCorreo');
+  btn.disabled = false;
+  btn.innerHTML = '<span class="sym f" style="font-size:17px">send</span>Enviar correo';
+}
+
+/* ── Char count modal ── */
+function mcCharCount(el) {
+  var n = el.value.length;
+  var cc = document.getElementById('mcCharCount');
+  cc.textContent = n + ' / 500';
+  cc.classList.toggle('warn', n > 420);
+  if (n > 500) el.value = el.value.substring(0, 500);
+}
+
+/* ── Validar modal correo ── */
+function validarModal() {
+  var nombre  = document.getElementById('mc-nombre').value.trim();
+  var email   = document.getElementById('mc-email').value.trim();
+  var tipo    = document.getElementById('mc-tipo').value;
+  var mensaje = document.getElementById('mc-mensaje').value.trim();
+  if (!nombre)  { toast('Ingresa tu nombre.', 'person', 2800);        return false; }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    toast('Ingresa un correo válido.', 'mail', 2800); return false;
+  }
+  if (!tipo)    { toast('Selecciona el tipo de solicitud.', 'category', 2800); return false; }
+  if (mensaje.length < 10) { toast('Escribe un mensaje más detallado.', 'edit_note', 2800); return false; }
+  return true;
+}
+
+/* ══════════════════════════════════════════
+   8. ENVIAR CORREO DESDE MODAL
+══════════════════════════════════════════ */
+async function enviarCorreoModal() {
+  if (!validarModal()) return;
+
+  var btn = document.getElementById('btnEnviarCorreo');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Enviando…';
+
+  var ticket  = 'WIL-' + Date.now().toString(36).toUpperCase().slice(-5);
+  var nombre  = document.getElementById('mc-nombre').value.trim();
+  var email   = document.getElementById('mc-email').value.trim();
+  var tel     = document.getElementById('mc-telefono').value.trim();
+  var codigo  = document.getElementById('mc-codigo').value.trim();
+  var tipo    = document.getElementById('mc-tipo').value;
+  var mensaje = document.getElementById('mc-mensaje').value.trim();
+  var now     = new Date();
+  var fecha   = now.toLocaleDateString('es-CO', {day:'2-digit',month:'2-digit',year:'numeric'});
+  var hora    = now.toLocaleTimeString('es-CO', {hour:'2-digit',minute:'2-digit',hour12:true});
+
+  var payload = {
+    accion:   'soporte-email',
+    ticket:   ticket,
+    nombre:   nombre,
+    telefono: tel || '—',
+    email:    email,
+    codigo:   codigo || '—',
+    tipo:     tipo,
+    mensaje:  mensaje,
+    fecha:    fecha,
+    hora:     hora,
+    emailWil: EMAIL_WIL
+  };
+
+  try {
+    await fetch(GAS_URL, {
+      method:  'POST',
+      mode:    'no-cors',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify(payload)
+    });
+
+    /* Mostrar éxito dentro del modal */
+    document.getElementById('modalForm').style.display = 'none';
+    var succ = document.getElementById('modalSucc');
+    succ.style.display = 'block';
+    document.getElementById('modalSuccTicket').textContent = 'Ticket ' + ticket;
+    document.getElementById('modalSuccMsg').textContent =
+      'Hola ' + nombre.split(' ')[0] + ', recibimos tu solicitud de soporte (' + tipo + ').'
+      + ' Te responderemos a ' + email + ' en menos de 2 horas en horario de atención.';
+
+  } catch(e) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="sym f" style="font-size:17px">send</span>Enviar correo';
+    toast('Error al enviar. Intenta por WhatsApp.', 'error', 3500);
+  }
+}
+
+/* ══════════════════════════════════════════
+   9. FORM PRINCIPAL — char count, validar, enviar
+══════════════════════════════════════════ */
 function updateCharCount(el) {
   var n = el.value.length;
   var cc = document.getElementById('charCount');
   cc.textContent = n + ' / 500';
   cc.classList.toggle('warn', n > 420);
-  if (el.value.length > 500) el.value = el.value.substring(0, 500);
+  if (n > 500) el.value = el.value.substring(0, 500);
 }
 
-/* ── Generar ticket ID ── */
 function genTicket() {
   return 'WIL-' + Date.now().toString(36).toUpperCase().slice(-5);
 }
 
-/* ── Validar ── */
 function validar() {
   var nombre   = document.getElementById('f-nombre').value.trim();
   var telefono = document.getElementById('f-telefono').value.trim();
@@ -583,12 +969,6 @@ function validar() {
   return true;
 }
 
-/* ══════════════════════════════════════════════════
-   ENVIAR FORMULARIO
-   1. Envía a GAS → hoja "Soporte" en Google Sheets
-   2. Envía copia al email WIL via GAS MailApp
-   3. Si el cliente puso email, también se le notifica
-══════════════════════════════════════════════════ */
 async function enviarFormulario() {
   if (!validar()) return;
 
@@ -608,36 +988,35 @@ async function enviarFormulario() {
   var hora    = now.toLocaleTimeString('es-CO', {hour:'2-digit',minute:'2-digit',hour12:true});
 
   var payload = {
-    accion:    'soporte-email',
-    ticket:    ticket,
-    nombre:    nombre,
-    telefono:  tel,
-    email:     email,
-    codigo:    codigo || '—',
-    tipo:      tipo,
-    mensaje:   mensaje,
-    fecha:     fecha,
-    hora:      hora,
-    emailWil:  EMAIL_WIL
+    accion:   'soporte-email',
+    ticket:   ticket,
+    nombre:   nombre,
+    telefono: tel,
+    email:    email,
+    codigo:   codigo || '—',
+    tipo:     tipo,
+    mensaje:  mensaje,
+    fecha:    fecha,
+    hora:     hora,
+    emailWil: EMAIL_WIL
   };
 
   try {
     await fetch(GAS_URL, {
       method:  'POST',
       mode:    'no-cors',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {'Content-Type': 'application/json'},
       body:    JSON.stringify(payload)
     });
 
-    /* Mostrar éxito */
-    document.getElementById('formCard').style.display   = 'none';
+    document.getElementById('formCard').style.display = 'none';
     var sc = document.getElementById('succCard');
     sc.style.display = 'flex';
     sc.style.flexDirection = 'column';
     sc.style.alignItems = 'center';
     document.getElementById('succTicket').textContent = 'Ticket ' + ticket;
     document.getElementById('succMsg').textContent =
-      'Hola ' + nombre.split(' ')[0] + ', recibimos tu mensaje ('+ tipo +').'
+      'Hola ' + nombre.split(' ')[0] + ', recibimos tu mensaje (' + tipo + ').'
       + (email ? ' También te enviamos confirmación a ' + email + '.' : ' Te contactamos al ' + tel + '.')
       + ' Respondemos en menos de 2 horas en horario de atención.';
     sc.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -649,7 +1028,6 @@ async function enviarFormulario() {
   }
 }
 
-/* ── Reset form ── */
 function resetForm() {
   ['f-nombre','f-telefono','f-email','f-codigo','f-mensaje'].forEach(function(id){
     document.getElementById(id).value = '';
@@ -657,50 +1035,17 @@ function resetForm() {
   document.getElementById('f-tipo').value = '';
   document.getElementById('charCount').textContent = '0 / 500';
   document.getElementById('formCard').style.display = 'block';
-  var sc = document.getElementById('succCard');
-  sc.style.display = 'none';
+  document.getElementById('succCard').style.display = 'none';
   var btn = document.getElementById('btnEnviar');
   btn.disabled = false;
   btn.innerHTML = '<span class="sym f" style="font-size:17px">send</span>Enviar mensaje';
   document.getElementById('formCard').scrollIntoView({ behavior: 'smooth' });
 }
 
-/* ── Init: stagger quick cards ── */
-document.querySelectorAll('.quick-card').forEach(function(c,i){
+/* ── Init stagger cards ── */
+document.querySelectorAll('.quick-card').forEach(function(c, i){
   c.style.animationDelay = (0.04 * i) + 's';
 });
-
-/* ── Saludo por hora ── */
-function saludoHora() {
-  var h = new Date().getHours();
-  if (h >= 6  && h < 12) return 'Buenos días';
-  if (h >= 12 && h < 19) return 'Buenas tardes';
-  return 'Buenas noches';
-}
-
-/* ── Texto WhatsApp con plantilla ── */
-function waURL(numeroBase) {
-  var saludo  = saludoHora();
-  var nombre  = (document.getElementById('f-nombre')?.value.trim()) || '';
-  var codigo  = (document.getElementById('f-codigo')?.value.trim()) || '';
-  var tipo    = (document.getElementById('f-tipo')?.value)           || '';
-
-  var linea1  = saludo + ', me comunico con el soporte de *Domicilios WIL*.';
-  var linea2  = nombre  ? '👤 *Nombre:* ' + nombre                  : '';
-  var linea3  = codigo  ? '🔢 *Código de pedido:* ' + codigo         : '';
-  var linea4  = tipo    ? '📋 *Motivo:* ' + tipo                     : '';
-  var linea5  = 'Quedo atento/a a su respuesta. Gracias. 🙏';
-
-  var partes  = [linea1, linea2, linea3, linea4, '', linea5]
-                  .filter(Boolean).join('\n');
-
-  return 'https://wa.me/' + numeroBase + '?text=' + encodeURIComponent(partes);
-}
-
-/* ── Abrir WA ── */
-function abrirWA(numero) {
-  window.open(waURL(numero), '_blank');
-}
 </script>
 </body>
 </html>
