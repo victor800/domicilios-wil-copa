@@ -7071,13 +7071,82 @@ const promDiario     = Math.round(pedsEntregados.length / diasPeriodo);
   }
  
   function renderMultas() {
-      const _multas = window._multasData || [];
-    const el = document.getElementById('cont-multas-list'); if (!el) return;
-    const filtered = _multas.slice().reverse();
-    if (!filtered.length) { el.innerHTML=`<div class="empty-state"><div class="ico" style="font-size:28px;opacity:.2;">⚖️</div><p>Sin multas ni restricciones</p></div>`; return; }
-    const iconos={multa:'gavel',pyp:'traffic',otro:'info'}, labels={multa:'Multa',pyp:'Pico & Placa',otro:'Descuento'};
-    el.innerHTML = filtered.map((m,ri) => { const i=_multas.length-1-ri; const ico=iconos[m.tipo]||'gavel', lbl=labels[m.tipo]||'Multa'; return `<div class="multa-item"><div class="base-ico" style="background:var(--red-l);color:var(--red);"><span class="material-symbols-rounded" style="font-size:17px;">${ico}</span></div><div style="flex:1;"><div class="base-name">${m.domi} <span style="font-size:9px;font-weight:800;padding:1px 7px;border-radius:99px;background:var(--red-l);color:var(--red);">${lbl}</span></div><div class="base-meta">${m.nota||'Sin nota'} · ${m.fecha}</div></div><div class="base-monto" style="color:var(--red);">-${fmtMoney(m.monto)}</div><button class="base-del" onclick="deleteMulta(${i})"><span class="material-symbols-rounded" style="font-size:13px;">delete</span></button></div>`; }).join('');
+  var _multas = window._multasData || [];
+  var el = document.getElementById('cont-multas-list');
+  if (!el) return;
+ 
+  if (!_multas.length) {
+    el.innerHTML = '<div class="empty-state"><div class="ico" style="font-size:28px;opacity:.2;">⚖️</div><p>Sin multas ni restricciones</p></div>';
+    return;
   }
+ 
+  /* Separar P&P de multas reales */
+  var multas = _multas.filter(function(m) { return m.tipo !== 'pyp'; });
+  var pyps   = _multas.filter(function(m) { return m.tipo === 'pyp'; });
+ 
+  var html = '';
+ 
+  /* ── Bloque Pico & Placa ── */
+  if (pyps.length) {
+    html += '<div style="margin-bottom:12px;">' +
+      '<div style="font-size:9px;font-weight:800;color:var(--orange);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;display:flex;align-items:center;gap:5px;">' +
+        '<span class="material-symbols-rounded" style="font-size:14px;">traffic</span>Pico &amp; Placa' +
+      '</div>' +
+      pyps.slice().reverse().map(function(m, ri) {
+        var i = _multas.indexOf(m);
+        return '<div class="multa-item" style="border-color:rgba(217,119,6,.3);background:var(--orange-l);">' +
+          '<div class="base-ico" style="background:rgba(217,119,6,.18);color:var(--orange);">' +
+            '<span class="material-symbols-rounded" style="font-size:16px;">traffic</span>' +
+          '</div>' +
+          '<div style="flex:1;">' +
+            '<div class="base-name">' + m.domi + '</div>' +
+            '<div class="base-meta">' + (m.nota||'Sin nota') + ' · ' + m.fecha + '</div>' +
+          '</div>' +
+          '<span style="font-size:9px;font-weight:800;padding:2px 9px;border-radius:99px;background:var(--orange);color:#fff;flex-shrink:0;white-space:nowrap;">P&amp;P</span>' +
+          '<button class="base-del" onclick="deleteMulta(' + i + ')" title="Eliminar">' +
+            '<span class="material-symbols-rounded" style="font-size:13px;">delete</span>' +
+          '</button>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+  }
+ 
+  /* ── Bloque Multas reales ── */
+  if (multas.length) {
+    var iconos  = { multa:'gavel', otro:'info' };
+    var labels  = { multa:'Multa', otro:'Descuento' };
+    html += '<div>' +
+      (pyps.length
+        ? '<div style="font-size:9px;font-weight:800;color:var(--red);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;display:flex;align-items:center;gap:5px;">' +
+            '<span class="material-symbols-rounded" style="font-size:14px;">gavel</span>Multas / Descuentos' +
+          '</div>'
+        : '') +
+      multas.slice().reverse().map(function(m) {
+        var i   = _multas.indexOf(m);
+        var ico = iconos[m.tipo] || 'gavel';
+        var lbl = labels[m.tipo] || 'Multa';
+        return '<div class="multa-item">' +
+          '<div class="base-ico" style="background:var(--red-l);color:var(--red);">' +
+            '<span class="material-symbols-rounded" style="font-size:16px;">' + ico + '</span>' +
+          '</div>' +
+          '<div style="flex:1;">' +
+            '<div class="base-name">' + m.domi +
+              ' <span style="font-size:9px;font-weight:800;padding:1px 7px;border-radius:99px;background:var(--red-l);color:var(--red);">' + lbl + '</span>' +
+            '</div>' +
+            '<div class="base-meta">' + (m.nota||'Sin nota') + ' · ' + m.fecha + '</div>' +
+          '</div>' +
+          '<div class="base-monto" style="color:var(--red);">-' + fmtMoney(m.monto) + '</div>' +
+          '<button class="base-del" onclick="deleteMulta(' + i + ')">' +
+            '<span class="material-symbols-rounded" style="font-size:13px;">delete</span>' +
+          '</button>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+  }
+ 
+  el.innerHTML = html;
+}
+ 
  
   function poblarSelectCont(selId) {
     const sel = document.getElementById(selId); if (!sel) return;
@@ -7445,85 +7514,89 @@ window.deleteMulta = async function(idx) {
   }
 
   function renderCierresCaja() {
-    const el = document.getElementById('cont-cierres-list');
-    if (!el) return;
-    const cierres = (window._cierresData || []).slice(0, 20);
-    if (!cierres.length) {
-      el.innerHTML = `<div class="empty-state"><div class="ico" style="font-size:28px;opacity:.2;">🏦</div><p>Sin cierres registrados</p></div>`;
-      return;
-    }
-    const estadoConf = {
-      ok:       { color:'var(--green)',  bg:'var(--green-l)',   icon:'check_circle',  lbl:'Cuadre OK'  },
-      faltante: { color:'var(--red)',    bg:'var(--red-l)',     icon:'warning',        lbl:'Faltante'   },
-      sobrante: { color:'var(--orange)', bg:'var(--orange-l)', icon:'arrow_upward',   lbl:'Sobrante'   },
-    };
-    el.innerHTML = cierres.map(c => {
-      const sc = estadoConf[c.estado] || estadoConf.ok;
-      const turnoLabel = c.turno === '1' ? '☀️ Turno 1 — Mañana' : '🌙 Turno 2 — Tarde';
-      return `
-        <div class="cierre-item">
-          <!-- Cabecera -->
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
-            <span class="cierre-turno-badge ${c.turno === '1' ? 'cierre-turno-1' : 'cierre-turno-2'}">
-              ${turnoLabel}
-            </span>
-            <span style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;">
-              ${c.fecha} · ${c.hora}
-            </span>
-            <span style="margin-left:auto;font-size:9px;font-weight:800;padding:3px 10px;border-radius:99px;
-                         background:${sc.bg};color:${sc.color};display:flex;align-items:center;gap:4px;">
-              <span class="material-symbols-rounded" style="font-size:11px;">${sc.icon}</span>${sc.lbl}
-            </span>
-          </div>
-
-          <!-- Entrega → Recibe -->
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;
-                      background:var(--bg2);border-radius:10px;padding:9px 12px;">
-            <div style="flex:1;text-align:center;">
-              <div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase;margin-bottom:2px;">Entrega</div>
-              <div style="font-size:12px;font-weight:800;color:var(--text);">${c.entrega}</div>
-            </div>
-            <span class="material-symbols-rounded" style="color:var(--teal);font-size:20px;">arrow_forward</span>
-            <div style="flex:1;text-align:center;">
-              <div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase;margin-bottom:2px;">Recibe</div>
-              <div style="font-size:12px;font-weight:800;color:var(--text);">${c.recibe}</div>
-            </div>
-          </div>
-
-          <!-- KPIs del cierre -->
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:${c.novedades ? '12px' : '0'};">
-            <div style="background:var(--bg);border-radius:9px;padding:9px;text-align:center;">
-              <div style="font-size:15px;font-weight:800;color:var(--teal);">${c.pedidos}</div>
-              <div style="font-size:8px;color:var(--text3);margin-top:2px;">Pedidos</div>
-            </div>
-            <div style="background:var(--bg);border-radius:9px;padding:9px;text-align:center;">
-              <div style="font-size:11px;font-weight:800;color:var(--green);font-family:'DM Mono',monospace;">${fmtMoney(c.totalEf)}</div>
-              <div style="font-size:8px;color:var(--text3);margin-top:2px;">Efectivo</div>
-            </div>
-            <div style="background:var(--bg);border-radius:9px;padding:9px;text-align:center;">
-              <div style="font-size:11px;font-weight:800;color:var(--blue);font-family:'DM Mono',monospace;">${fmtMoney(c.totalTf)}</div>
-              <div style="font-size:8px;color:var(--text3);margin-top:2px;">Transferencia</div>
-            </div>
-            <div style="background:${sc.bg};border-radius:9px;padding:9px;text-align:center;
-                        border:1px solid ${sc.bg};">
-              <div style="font-size:11px;font-weight:800;color:${sc.color};font-family:'DM Mono',monospace;">
-                ${c.diferencia >= 0 ? '' : '-'}${fmtMoney(Math.abs(c.diferencia))}
-              </div>
-              <div style="font-size:8px;color:${sc.color};margin-top:2px;">Diferencia</div>
-            </div>
-          </div>
-
-          <!-- Novedades -->
-          ${c.novedades ? `
-            <div style="margin-top:0;background:var(--orange-l);border:1px solid rgba(217,119,6,.2);
-                        border-radius:9px;padding:8px 12px;display:flex;align-items:flex-start;gap:7px;">
-              <span class="material-symbols-rounded" style="font-size:14px;color:var(--orange);flex-shrink:0;margin-top:1px;">edit_note</span>
-              <span style="font-size:11px;color:var(--text2);line-height:1.5;">${c.novedades}</span>
-            </div>` : ''}
-        </div>`;
-    }).join('');
+  var el = document.getElementById('cont-cierres-list');
+  if (!el) return;
+  var cierres = (window._cierresData || []).slice(0, 20);
+ 
+  if (!cierres.length) {
+    el.innerHTML = '<div class="empty-state"><div class="ico" style="font-size:28px;opacity:.2;">🏦</div><p>Sin cierres registrados</p></div>';
+    return;
   }
-
+ 
+  var estadoConf = {
+    ok:       { color:'var(--green)',  bg:'var(--green-l)',  icon:'check_circle', lbl:'Cuadre OK'  },
+    faltante: { color:'var(--red)',    bg:'var(--red-l)',    icon:'warning',       lbl:'Faltante'   },
+    sobrante: { color:'var(--orange)', bg:'var(--orange-l)', icon:'arrow_upward', lbl:'Sobrante'   }
+  };
+ 
+  el.innerHTML = cierres.map(function(c) {
+    var sc = estadoConf[c.estado] || estadoConf.ok;
+    var tLbl = c.turno === '1' ? '☀️ Turno 1 — Mañana' : '🌙 Turno 2 — Tarde';
+    return '<div class="cierre-item">' +
+ 
+      /* ── Cabecera: turno + fecha + estado ── */
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">' +
+        '<span class="cierre-turno-badge ' + (c.turno === '1' ? 'cierre-turno-1' : 'cierre-turno-2') + '">' + tLbl + '</span>' +
+        '<span style="font-size:10px;color:var(--text3);font-family:\'DM Mono\',monospace;">' + (c.fecha||'') + ' · ' + (c.hora||'') + '</span>' +
+        '<span style="margin-left:auto;font-size:9px;font-weight:800;padding:2px 9px;border-radius:99px;background:' + sc.bg + ';color:' + sc.color + ';display:inline-flex;align-items:center;gap:3px;">' +
+          '<span class="material-symbols-rounded" style="font-size:11px;">' + sc.icon + '</span>' + sc.lbl +
+        '</span>' +
+      '</div>' +
+ 
+      /* ── Entrega → Recibe ── */
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;background:var(--bg2);border-radius:9px;padding:8px 11px;">' +
+        '<div style="flex:1;text-align:center;">' +
+          '<div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase;margin-bottom:2px;">Entrega</div>' +
+          '<div style="font-size:11px;font-weight:800;color:var(--text);">' + (c.entrega||'—') + '</div>' +
+        '</div>' +
+        '<span class="material-symbols-rounded" style="color:var(--teal);font-size:18px;">arrow_forward</span>' +
+        '<div style="flex:1;text-align:center;">' +
+          '<div style="font-size:8px;color:var(--text3);font-weight:700;text-transform:uppercase;margin-bottom:2px;">Recibe</div>' +
+          '<div style="font-size:11px;font-weight:800;color:var(--text);">' + (c.recibe||'—') + '</div>' +
+        '</div>' +
+      '</div>' +
+ 
+      /* ── KPIs del cierre ── */
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:' + (c.novedades ? '10px' : '0') + ';">' +
+        kpiCaj('check_circle', '#4ade80', c.pedidos||0,         'Pedidos') +
+        kpiCaj('payments',     '#86efac', fmtMoney(c.totalEf||0), 'Efectivo') +
+        kpiCaj('account_balance','#93c5fd', fmtMoney(c.totalTf||0),'Transf.') +
+        kpiCajDif(sc.color, sc.bg, c.diferencia||0) +
+      '</div>' +
+ 
+      /* ── Novedades ── */
+      (c.novedades
+        ? '<div style="background:var(--orange-l);border:1px solid rgba(217,119,6,.2);border-radius:8px;padding:7px 11px;display:flex;align-items:flex-start;gap:6px;">' +
+            '<span class="material-symbols-rounded" style="font-size:13px;color:var(--orange);flex-shrink:0;margin-top:1px;">edit_note</span>' +
+            '<span style="font-size:11px;color:var(--text2);line-height:1.5;">' + c.novedades + '</span>' +
+          '</div>'
+        : '') +
+ 
+    '</div>';
+  }).join('');
+ 
+  function kpiCaj(ico, color, val, lbl) {
+    return '<div style="background:var(--bg);border-radius:8px;padding:8px 6px;text-align:center;">' +
+      '<span class="material-symbols-rounded" style="font-size:12px;color:' + color + ';display:block;margin-bottom:3px;">' + ico + '</span>' +
+      '<div style="font-size:11px;font-weight:800;color:' + color + ';font-family:\'DM Mono\',monospace;">' + val + '</div>' +
+      '<div style="font-size:8px;color:var(--text3);margin-top:2px;">' + lbl + '</div>' +
+    '</div>';
+  }
+ 
+  function kpiCajDif(color, bg, dif) {
+    var abs = Math.abs(dif);
+    var esOk = abs < 500;
+    var c2 = esOk ? 'var(--green)' : color;
+    var bg2= esOk ? 'var(--green-l)' : bg;
+    return '<div style="background:' + bg2 + ';border-radius:8px;padding:8px 6px;text-align:center;">' +
+      '<div style="font-size:11px;font-weight:800;color:' + c2 + ';font-family:\'DM Mono\',monospace;">' +
+        (dif < 0 ? '-' : '') + fmtMoney(abs) +
+      '</div>' +
+      '<div style="font-size:8px;color:' + c2 + ';margin-top:2px;">' + (esOk ? 'OK ✓' : dif < 0 ? 'Faltante' : 'Sobrante') + '</div>' +
+    '</div>';
+  }
+}
+ 
   // Cargar cierres al iniciar
   loadCierresCaja().then(() => renderCierresCaja());
 
