@@ -2683,59 +2683,64 @@ if(p.domiciliario && p.domiciliario.trim()){
   }
 }
 
-async function cargarFotoDomiReal(nombreDomi, avEl) {
+async function cargarFotoDomi(nombreDomi, avEl) {
   var SHEET_ID = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
   var nombreBuscar = nombreDomi.trim().toLowerCase();
-  var inicial = nombreDomi.charAt(0).toUpperCase();
   
   try {
     var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
             + '/gviz/tq?tqx=out:csv&sheet=Domiciliarios&cachebust=' + Date.now();
     var res = await fetch(url, { cache: 'no-store' });
     var txt = await res.text();
-    var lines = txt.split('\n');
+    var lines = txt.trim().split('\n');
     
-    function parseRow(line) {
-      var cols = [], cur = '', inQ = false;
+    function parseCsvLine(line) {
+      var result = [], cur = '', inQ = false;
       for (var i = 0; i < line.length; i++) {
         var c = line[i];
-        if (c === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
-        else if (c === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+        if (c === '"') {
+          if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+          else inQ = !inQ;
+        }
+        else if (c === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
         else cur += c;
       }
-      cols.push(cur.trim());
-      return cols;
+      result.push(cur.trim());
+      return result;
     }
     
     for (var i = 1; i < lines.length; i++) {
-      var cols = parseRow(lines[i]);
+      var cols = parseCsvLine(lines[i]);
       var nombreSheet = (cols[1] || '').trim().toLowerCase();
       if (!nombreSheet) continue;
       
+      // Comparar nombres (puede contener parte del nombre)
       if (nombreSheet === nombreBuscar || 
           nombreBuscar.indexOf(nombreSheet) !== -1 || 
           nombreSheet.indexOf(nombreBuscar) !== -1) {
         
-        var foto = (cols[4] || '').trim(); // Columna E = FOTO
-        
-        if (foto && foto.length > 0) {
-          // ✅ Construir ruta local a la imagen
-          var fotoUrl = 'icons/' + foto;
+        var foto = (cols[4] || '').trim(); // columna FOTO
+        if (foto) {
+          // Normalizar URL de Drive
+          var fotoUrl = foto;
+          if (foto.indexOf('drive.google.com') !== -1) {
+            var match = foto.match(/\/d\/([^/?\s]+)/);
+            if (match) fotoUrl = 'https://lh3.googleusercontent.com/d/' + match[1];
+          } else if (!foto.startsWith('http')) {
+            fotoUrl = 'icons/' + foto;
+          }
           
-          // Mostrar la imagen desde la carpeta icons/
           avEl.innerHTML = `<img src="${fotoUrl}" 
-            style="width:100%;height:100%;object-fit:cover;object-position:center 20%;border-radius:50%;"
-            onerror="this.parentElement.innerHTML='<div style=width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff;background:linear-gradient(135deg,#006970,#00a3b4);border-radius:50%;>${inicial}</div>'">`;
-          return;
+            style="width:100%;height:100%;object-fit:cover;object-position:center 20%"
+            onerror="this.parentElement.innerHTML='<div style=width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff;>${nombreDomi.charAt(0).toUpperCase()}</div>'">`;
         }
+        break;
       }
     }
   } catch(e) {
-    console.warn('[foto domi]', e.message);
+    console.warn('[cargarFotoDomi]', e.message);
+    // Si hay error, mantener la inicial
   }
-  
-  // Fallback: mostrar inicial
-  avEl.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff;background:linear-gradient(135deg,#006970,#00a3b4);border-radius:50%;">${inicial}</div>`;
 }
 
 function cliVerImagen(src){var ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';ov.onclick=function(){document.body.removeChild(ov);};var img=document.createElement('img');img.src=src;img.style.cssText='max-width:100%;max-height:90dvh;border-radius:12px';ov.appendChild(img);document.body.appendChild(ov);}
@@ -2848,18 +2853,15 @@ if (nuevoEstado === 'Entregado' || nuevoEstado === 'Cancelado') {
     var dFoto      = (domiRow[4]||'').trim();
     var dActividad = (domiRow[6]||'').trim(); /* G: "6.252900,-75.564600|10:40:38|±1m" */
 
-var dc = document.getElementById('domiCard');
+    /* Avatar con foto real */
+    var dc = document.getElementById('domiCard');
 if(p.domiciliario && p.domiciliario.trim()){
   dc.style.display = 'block';
   var nombreDomi = p.domiciliario.replace(/\s*\([^)]+\)/,'').trim();
   document.getElementById('domiNombre').textContent = nombreDomi;
   
+  // ✅ Cargar FOTO real desde el sheet
   var avEl = document.getElementById('domiFotoWrap');
-  // Mostrar inicial mientras carga
-  avEl.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff;background:linear-gradient(135deg,#006970,#00a3b4);border-radius:50%;">${nombreDomi.charAt(0).toUpperCase()}</div>`;
-  
-  // ✅ CARGAR LA FOTO DESDE icons/
-  cargarFotoDomiReal(nombreDomi, avEl);
   // Mostrar inicial mientras carga
   avEl.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff;">${nombreDomi.charAt(0).toUpperCase()}</div>`;
     }
