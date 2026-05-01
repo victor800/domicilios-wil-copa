@@ -596,6 +596,45 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
   margin-bottom:4px;
 }
 
+.wil-radio-opt{
+  border:1.5px solid var(--bd,#e2e2de);
+  border-radius:var(--r-md,10px);
+  padding:11px 14px;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  transition:border-color .15s,background .15s;
+}
+.wil-radio-opt.sel{
+  border-color:var(--p,#6c47ff);
+  background:var(--pl,#f0edff);
+}
+.wil-radio-dot{
+  width:16px;height:16px;flex-shrink:0;
+  border-radius:50%;
+  border:2px solid var(--bd,#e2e2de);
+  display:flex;align-items:center;justify-content:center;
+  transition:all .15s;
+}
+.wil-radio-opt.sel .wil-radio-dot{
+  border-color:var(--p,#6c47ff);
+  background:var(--p,#6c47ff);
+}
+.wil-radio-dot::after{
+  content:'';width:6px;height:6px;
+  border-radius:50%;background:#fff;opacity:0;
+}
+.wil-radio-opt.sel .wil-radio-dot::after{opacity:1;}
+.wil-tarifa-pill{
+  display:flex;align-items:center;gap:8px;
+  background:#f0fdf4;
+  border:1px solid #86efac;
+  border-radius:var(--r-md,10px);
+  padding:10px 14px;
+  margin-top:8px;
+  margin-bottom:4px;
+}
 
 </style>
 </head>
@@ -879,7 +918,7 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
     </div>
   </div>
  
-  <!-- ── ¿YA TIENES EL COMERCIO? ── -->
+  <!-- ¿YA TIENES EL COMERCIO? -->
   <div class="card">
     <div class="card-tit"><span class="sym f">storefront</span>¿Ya tienes el comercio?</div>
     <div class="yn-grid">
@@ -891,26 +930,26 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
       </button>
     </div>
     <div id="wil-comercio-field" class="field hidden">
-      <label>Datos de Recogida</label>
+      <label>Nombre del comercio</label>
       <input type="text" id="comercio-nombre"
-             placeholder="Ingresa Dirección o Datos de Recogida…"/>
+             placeholder="Ej: Éxito Copacabana, Tienda Don Pedro…"/>
     </div>
   </div>
  
-  <!-- ── ¿PARA QUIÉN? ── -->
+  <!-- ¿PARA QUIÉN? -->
   <div class="card" id="wil-card-para-quien" style="display:none">
     <div class="card-tit"><span class="sym f">group</span>¿El domicilio es para ti o envías a alguien?</div>
  
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
       <div class="wil-radio-opt" id="wil-opt-mi" onclick="wilSelDestino('mi')">
-        <div class="wil-radio-dot" id="wil-dot-mi"></div>
+        <div class="wil-radio-dot"></div>
         <div>
           <div style="font-size:14px;font-weight:600">Para mí</div>
           <div style="font-size:12px;color:var(--on3)">El domi me lo entrega a mí</div>
         </div>
       </div>
       <div class="wil-radio-opt" id="wil-opt-otro" onclick="wilSelDestino('otro')">
-        <div class="wil-radio-dot" id="wil-dot-otro"></div>
+        <div class="wil-radio-dot"></div>
         <div>
           <div style="font-size:14px;font-weight:600">Envío a alguien más</div>
           <div style="font-size:12px;color:var(--on3)">Indicas la dirección de otra persona</div>
@@ -918,10 +957,9 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
       </div>
     </div>
  
-    <!-- ── SECCIÓN COMÚN: barrio recogida + barrio entrega ── -->
+    <!-- BARRIOS + TARIFA (común para ambos destinos) -->
     <div id="wil-sec-barrios" class="hidden">
  
-      <!-- Barrio recogida — SIN precio visible -->
       <div class="field">
         <label>Barrio de recogida</label>
         <select id="wil-barrio-recogida" onchange="wilCalcTarifa()">
@@ -930,7 +968,6 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
         <div class="field-note">Barrio donde está el comercio o punto de origen</div>
       </div>
  
-      <!-- Barrio entrega — SIN precio visible en la lista -->
       <div class="field">
         <label>Barrio de entrega</label>
         <select id="wil-barrio-entrega" onchange="wilCalcTarifa()">
@@ -938,7 +975,7 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
         </select>
       </div>
  
-      <!-- Tarifa calculada (precio más alto de los dos) -->
+      <!-- Tarifa calculada -->
       <div class="wil-tarifa-pill hidden" id="wil-tarifa-calc">
         <span class="sym f" style="font-size:20px;color:#15803d">delivery_dining</span>
         <div>
@@ -947,18 +984,34 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
         </div>
       </div>
  
-      <!-- Dirección + referencia (solo para "alguien más") -->
-      <div id="wil-sec-dir-otro" class="hidden" style="margin-top:10px">
+      <!-- Datos entrega PARA MÍ -->
+      <div id="wil-sec-dir-mi" class="hidden" style="margin-top:10px">
+        <div style="border-top:0.5px solid var(--bd,#e2e2de);margin:12px 0 10px"></div>
         <div class="field">
           <label>Dirección de entrega *</label>
-          <input type="text" id="wil-dir-otro"
-                 placeholder="Calle 50 #45-23, Barrio El Centro"/>
+          <input type="text" id="wil-dir-mi" placeholder="Calle 50 #45-23, Barrio El Centro"/>
           <div class="field-note">Incluye calle, número y barrio</div>
         </div>
         <div class="field">
           <label>Punto de referencia</label>
-          <input type="text" id="wil-ref-otro"
-                 placeholder="Casa azul, frente al parque, piso 2…"/>
+          <input type="text" id="wil-ref-mi" placeholder="Casa azul, frente al parque, piso 2…"/>
+        </div>
+        <div class="field">
+          <label>Tu teléfono *</label>
+          <input type="tel" id="wil-tel-mi" placeholder="310 123 4567"/>
+        </div>
+      </div>
+ 
+      <!-- Datos entrega PARA ALGUIEN MÁS -->
+      <div id="wil-sec-dir-otro" class="hidden" style="margin-top:10px">
+        <div class="field">
+          <label>Dirección de entrega *</label>
+          <input type="text" id="wil-dir-otro" placeholder="Calle 50 #45-23, Barrio El Centro"/>
+          <div class="field-note">Incluye calle, número y barrio</div>
+        </div>
+        <div class="field">
+          <label>Punto de referencia</label>
+          <input type="text" id="wil-ref-otro" placeholder="Casa azul, frente al parque, piso 2…"/>
         </div>
  
         <div style="border-top:0.5px solid var(--bd,#e2e2de);margin:12px 0 10px"></div>
@@ -994,53 +1047,72 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
     </button>
   </div>
 </div>
+<!-- FIN LIBRE P1 -->
 
-<!-- ════ LIBRE P3 — UBICACIÓN + DATOS + PAGO ════ -->
+<!-- ════ LIBRE P2 ════ -->
+<div class="view" id="view-libre-2">
+  <div style="padding:20px 16px 8px">
+    <div style="font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:4px">
+      Pedido Libre 🛍️
+    </div>
+    <div style="font-size:13px;color:var(--on3);font-weight:500">Paso 2 de 3 — ¿Qué necesitas?</div>
+  </div>
+
+  <div class="card">
+    <div class="card-tit"><span class="sym f">edit_note</span>Escribe tu pedido</div>
+    <div class="field">
+      <label>¿Qué necesitas?</label>
+      <textarea class="libre-txt-area" id="libreTextoLibre"
+        placeholder="Ej: 2 hamburguesas con queso, una coca cola 600ml, papas grandes…"></textarea>
+      <div class="field-note">Escribe todo en texto libre, la IA organiza tu pedido.</div>
+    </div>
+    <div class="libre-ai-status" id="libreAiStatus"></div>
+  </div>
+
+  <!-- Lista de productos detectados por IA -->
+  <div class="card" id="wil-lista-productos-card" style="display:none">
+    <div class="card-tit"><span class="sym f">shopping_cart</span>Productos detectados</div>
+    <div class="prod-list" id="wil-lista-productos"></div>
+    <div class="add-row">
+      <input class="add-inp" id="wil-nuevo-prod" type="text" placeholder="Agregar producto…"/>
+      <button class="add-btn" onclick="wilAgregarProducto()"><span class="sym">add</span></button>
+    </div>
+  </div>
+
+  <div class="act-row">
+    <button class="btn-b" onclick="showView('view-libre-1')">Atrás</button>
+    <button class="btn-n" id="btnLibre2Sig" onclick="goLibre3Async()">
+      <span class="sym" style="font-size:17px">arrow_forward</span>Continuar
+    </button>
+  </div>
+</div>
+<!-- FIN LIBRE P2 -->
+ 
+ 
+<!-- ════════════════════════════════════════════════════════
+     LIBRE P3 — Pago (dirección ya capturada en P1)
+     ════════════════════════════════════════════════════════ -->
 <div class="view" id="view-libre-3">
   <div style="padding:20px 16px 8px">
     <div style="font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:4px">
       Pedido Libre 🛍️
     </div>
-    <div style="font-size:13px;color:var(--on3);font-weight:500">Paso 3 de 3 — ¿Dónde te entregamos?</div>
+    <div style="font-size:13px;color:var(--on3);font-weight:500">Paso 3 de 3 — ¿Cómo pagas?</div>
+  </div>
+ 
+ <!-- RESUMEN RÁPIDO de entrega (rellenado por JS) -->
+  <div class="card" id="wil-p3-resumen-card">
+    <div class="card-tit"><span class="sym f">local_shipping</span>Resumen de entrega</div>
+    <div id="wil-p3-resumen-body" style="font-size:13px;color:var(--on2);line-height:1.9"></div>
   </div>
 
-  <!-- TARJETA: UBICACIÓN GPS -->
-  <div class="card">
-    <div class="card-tit"><span class="sym f">location_on</span>Tu ubicación</div>
-    <div class="loc-strip" onclick="captarUbicacion()" style="margin-bottom:14px">
-      <div class="loc-ico"><span class="sym">my_location</span></div>
-      <div style="flex:1">
-        <div class="loc-tit">Captar ubicación GPS</div>
-        <div class="loc-sub" id="locBannerSub">Toca para detectar automáticamente</div>
-      </div>
-      <span class="loc-st" id="locStatus">→</span>
-    </div>
-    <div class="field">
-      <label>Dirección completa *</label>
-      <input type="text" id="libre-direccion" placeholder="Calle 50 #45-23, Barrio El Centro"/>
-      <div class="field-note">Incluye calle, número y barrio</div>
-    </div>
-    <div class="field">
-      <label>Punto de referencia</label>
-      <input type="text" id="libre-referencia" placeholder="Casa azul con reja, frente al parque, piso 2, portón negro..."/>
-      <div class="field-note">Ayuda al domiciliario a encontrarte más rápido</div>
-    </div>
+  <!-- PRODUCTOS LISTADOS EN P3 -->
+  <div class="card" id="wil-p3-prods-card" style="display:none">
+    <div class="card-tit"><span class="sym f">shopping_cart</span>Productos del pedido</div>
+    <div class="prod-list" id="wil-p3-prods-lista"></div>
   </div>
-
-  <!-- TARJETA: DATOS DE CONTACTO -->
-  <div class="card">
-    <div class="card-tit"><span class="sym f">person</span>¿Quién recibe?</div>
-    <div class="field">
-      <label>Tu nombre *</label>
-      <input type="text" id="libre-nombre" placeholder="Nombre completo"/>
-    </div>
-    <div class="field">
-      <label>Teléfono *</label>
-      <input type="tel" id="libre-telefono" placeholder="310 123 4567"/>
-    </div>
-  </div>
-
-  <!-- TARJETA: MÉTODO DE PAGO -->
+ 
+  <!-- MÉTODO DE PAGO -->
   <div class="card">
     <div class="card-tit"><span class="sym f">payments</span>¿Cómo pagas?</div>
     <div class="pago-ticket-grid">
@@ -1056,17 +1128,19 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
       </div>
     </div>
   </div>
-
+ 
   <div class="act-row">
     <button class="btn-b" onclick="showView('view-libre-2')">Atrás</button>
-    <button class="btn-n" onclick="generarFacturaLibre()">
-      <span class="sym" style="font-size:17px">receipt_long</span>Ver resumen
+    <button class="btn-n" id="btnConfirmarDirecto" onclick="confirmarPedidoDirecto()">
+      <span class="sym f" style="font-size:17px">check_circle</span>Confirmar pedido
     </button>
   </div>
-</div>
-
-
-<!-- ════ FACTURA LIBRE — TICKET WIL ════ -->
+<!-- FIN LIBRE P3 -->
+ 
+ 
+<!-- ════════════════════════════════════════════════════════
+     FACTURA LIBRE — TICKET WIL
+     ════════════════════════════════════════════════════════ -->
 <div class="view" id="view-factura-libre">
   <div style="padding:20px 16px 8px">
     <div style="font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:4px">
@@ -1074,13 +1148,12 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
     </div>
     <div style="font-size:13px;color:var(--on3);font-weight:500">Revisa bien antes de confirmar</div>
   </div>
-
+ 
   <div class="wil-ticket">
-    <!-- Cabecera estilo ticket -->
+ 
     <div class="wil-ticket-header">
       <div class="wil-ticket-logo-row">
-        <img class="wil-ticket-logo" src="icons/icon-192.png" alt="WIL"
-          onerror="this.style.display='none'"/>
+        <img class="wil-ticket-logo" src="icons/icon-192.png" alt="WIL" onerror="this.style.display='none'"/>
         <span class="wil-ticket-brand">DOMICILIOS WIL</span>
       </div>
       <div class="wil-ticket-sub">Copacabana · Área Metro</div>
@@ -1089,89 +1162,69 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
         <span id="factura-fecha">Pedido nuevo</span>
       </div>
     </div>
-
-    <!-- Cuerpo ticket -->
-   <!-- HEADER COLAPSABLE RESUMEN -->
-<div class="wil-ticket-collapse-header" onclick="wilToggleTicket(this)" id="ticketCollapseHdr">
-  <div class="wil-ticket-collapse-summary">
-    <div class="wil-ticket-collapse-summary-title" id="ticket-resumen-titulo">
-      Pedido de <span id="factura-nombre-resumen">—</span>
-    </div>
-    <div class="wil-ticket-collapse-summary-sub" id="ticket-resumen-sub">
-      <span id="ticket-prod-count">—</span> · <span id="ticket-pago-resumen">—</span>
-    </div>
-  </div>
-  <div class="wil-ticket-collapse-toggle" id="ticketCollapseBtn">
-    <span>Ver detalles</span>
-    <span class="sym">expand_more</span>
-  </div>
-</div>
-
-<!-- CUERPO COLAPSABLE -->
-<div class="wil-ticket-body-colapsable" id="ticketBodyColapsable">
-  <div class="wil-ticket-body">
-
-    <div class="wil-ticket-row">
-      <div class="wil-ticket-lbl">🏪 Comercio</div>
-      <div class="wil-ticket-val" id="factura-comercio-val">—</div>
-    </div>
-    <div class="wil-ticket-row">
-      <div class="wil-ticket-lbl">💰 Presupuesto</div>
-      <div class="wil-ticket-val" id="factura-presupuesto">—</div>
-    </div>
-
-    <hr class="wil-ticket-divider"/>
-
-    <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--on3);margin-bottom:6px;display:flex;align-items:center;gap:5px">
-      <span class="sym f" style="font-size:13px;color:var(--p)">shopping_cart</span>Productos del pedido
-    </div>
-    <div class="wil-ticket-prods" id="factura-productos-list"></div>
-
-    <hr class="wil-ticket-divider"/>
-
-    <div class="wil-ticket-row">
-      <div class="wil-ticket-lbl">📍 Dirección</div>
-      <div class="wil-ticket-val" id="factura-direccion">—</div>
-    </div>
-    <div class="wil-ticket-row">
-      <div class="wil-ticket-lbl">🗺️ Referencia</div>
-      <div class="wil-ticket-val" id="factura-referencia">—</div>
-    </div>
-    <div class="wil-ticket-row">
-      <div class="wil-ticket-lbl">👤 Recibe</div>
-      <div class="wil-ticket-val" id="factura-nombre">—</div>
-    </div>
-    <div class="wil-ticket-row">
-      <div class="wil-ticket-lbl">📱 Teléfono</div>
-      <div class="wil-ticket-val" id="factura-telefono">—</div>
-    </div>
-
-    <hr class="wil-ticket-divider"/>
-
-    <!-- TARIFA DOMICILIO (inyectada por JS) -->
-    <div id="wil-ticket-tarifa-container"></div>
-
-    <div style="text-align:center;padding:4px 0 10px">
-      <div class="wil-ticket-pago-badge" id="factura-pago-badge">
-        💳 <span id="factura-pago">—</span>
+ 
+    <!-- HEADER COLAPSABLE -->
+    <div class="wil-ticket-collapse-header" onclick="wilToggleTicket(this)" id="ticketCollapseHdr">
+      <div class="wil-ticket-collapse-summary">
+        <div class="wil-ticket-collapse-summary-title" id="ticket-resumen-titulo">
+          Pedido de <span id="factura-nombre-resumen">—</span>
+        </div>
+        <div class="wil-ticket-collapse-summary-sub" id="ticket-resumen-sub">
+          <span id="ticket-prod-count">—</span> · <span id="ticket-pago-resumen">—</span>
+        </div>
+      </div>
+      <div class="wil-ticket-collapse-toggle" id="ticketCollapseBtn">
+        <span>Ver detalles</span>
+        <span class="sym">expand_more</span>
       </div>
     </div>
-
-    <div class="wil-ticket-nota">
-      <span class="sym">verified</span>
-      <span>El domiciliario confirmará disponibilidad y te enviará la <strong>foto de la factura real</strong> antes del cobro. <strong>Tú apruebas.</strong></span>
+ 
+    <!-- CUERPO COLAPSABLE -->
+    <div class="wil-ticket-body-colapsable" id="ticketBodyColapsable">
+      <div class="wil-ticket-body">
+ 
+        <div class="wil-ticket-row">
+          <div class="wil-ticket-lbl">🏪 Comercio</div>
+          <div class="wil-ticket-val" id="factura-comercio-val">—</div>
+        </div>
+ 
+        <hr class="wil-ticket-divider"/>
+ 
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--on3);margin-bottom:6px;display:flex;align-items:center;gap:5px">
+          <span class="sym f" style="font-size:13px;color:var(--p)">shopping_cart</span>Productos del pedido
+        </div>
+        <div class="wil-ticket-prods" id="factura-productos-list"></div>
+ 
+        <hr class="wil-ticket-divider"/>
+ 
+        <!-- BLOQUE DE ENTREGA — inyectado dinámicamente -->
+        <div id="wil-ticket-entrega-container"></div>
+ 
+        <hr class="wil-ticket-divider"/>
+ 
+        <!-- TARIFA + BARRIOS — inyectado dinámicamente -->
+        <div id="wil-ticket-tarifa-container"></div>
+ 
+        <div style="text-align:center;padding:4px 0 10px">
+          <div class="wil-ticket-pago-badge" id="factura-pago-badge">
+            💳 <span id="factura-pago">—</span>
+          </div>
+        </div>
+ 
+        <div class="wil-ticket-nota">
+          <span class="sym">verified</span>
+          <span>El domiciliario confirmará disponibilidad y te enviará la <strong>foto de la factura real</strong> antes del cobro. <strong>Tú apruebas.</strong></span>
+        </div>
+      </div>
     </div>
-  </div>
-</div>
-
-    <!-- Footer ticket -->
+ 
     <div class="wil-ticket-footer">
       <div class="wil-ticket-footer-brand">DOMICILIOS WIL</div>
       <div class="wil-ticket-footer-dots">· · · · · · · · · · · · · · · · ·</div>
       <div style="font-size:10px;color:var(--on3);margin-top:2px">Copacabana, Antioquia</div>
     </div>
   </div>
-
+ 
   <div class="act-row">
     <button class="btn-b" onclick="showView('view-libre-3')">Editar</button>
     <button class="btn-n" id="btnConfirmarLibre" onclick="enviarPedido('libre')">
@@ -1413,16 +1466,21 @@ async function extractProductsWithAI(texto) {
       max_tokens: 1000,
       messages: [{
         role: 'user',
-        content: `Eres un asistente de una app de domicilios colombiana. Extrae los productos del siguiente pedido en texto libre y devuelve SOLO un JSON válido, sin texto adicional, sin bloques de código, sin explicaciones. Formato exacto:
-{"productos":[{"nombre":"Nombre del producto","qty":1}]}
- 
-Reglas:
-- Infiere cantidades (una=1, dos=2, 2x=2, etc.)
-- Normaliza nombres (ej: "hambuguesa" → "Hamburguesa")
-- Si hay modificadores (con queso, grande, etc.) incorpóralos al nombre
-- Si menciona comercio/tienda, ignóralo como producto
-- Mínimo 1 producto aunque el texto sea vago
- 
+        content: `Eres un asistente de una app de domicilios colombiana. Tu única tarea es separar productos individuales del texto y devolver JSON.
+
+REGLAS CRÍTICAS:
+- Cada producto DIFERENTE va en su propio objeto del array
+- "1 hamburguesa 1 coca cola" = DOS productos separados
+- "2 cervezas y una gaseosa" = DOS productos separados  
+- Infiere cantidades: "una"=1, "dos"=2, "2x"=2, "par de"=2
+- Normaliza nombres con mayúscula inicial
+- Incluye modificadores en el nombre: "Hamburguesa con queso doble"
+- NUNCA juntes dos productos distintos en un mismo nombre
+- Si mencionan comercio/tienda, ignóralo
+
+Devuelve SOLO este JSON sin texto adicional ni markdown:
+{"productos":[{"nombre":"Nombre producto","qty":1}]}
+
 Texto del pedido:
 ${texto}`
       }]
@@ -1982,20 +2040,10 @@ async function goLibre3Async(){
   btn.innerHTML='<span class="spin"></span> Organizando…';
   statusEl.innerHTML='<span class="spin dk"></span><span>Analizando tu pedido con IA…</span>';
 
-  function irRevision(){
-    var refEl=document.getElementById('rl-ref-txt');
-    if(refEl)refEl.textContent=txt.length>120?txt.substring(0,120)+'…':txt;
-    if(typeof window._rlRenderLista==='function')
-      window._rlRenderLista(state.productos);
-    var dest=document.getElementById('view-libre-2b');
-    if(dest){
-      document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
-      dest.classList.add('active');
-      window.scrollTo(0,0);
-      updateHeader('view-libre-2b');
-    } else {
-      showView('view-libre-3');
-    }
+ function irRevision(){
+    wilRenderListaProductos();
+    wilPoblarResumenP3();
+    showView('view-libre-3');
   }
 
   try{
@@ -2030,12 +2078,19 @@ function selectPago(m){
 function generarFacturaLibre(){
   var dir=document.getElementById('libre-direccion').value.trim();
   var ref=document.getElementById('libre-referencia').value.trim();
-  var nom=document.getElementById('libre-nombre').value.trim();
-  var tel=document.getElementById('libre-telefono').value.trim();
+ var L = window.WIL_LIBRE || {};
+var nom = L.destino==='otro' ? (L.recibeNombre||L.enviaNombre||'') : '';
+var tel = L.recibeTel || '';
+var nom_final = nom || L.enviaNombre || 'Cliente';
   if(!dir){mostrarToast('Ingresa la dirección completa.','location_on');return;}
-  if(!nom||!tel){mostrarToast('Completa tu nombre y teléfono.','person');return;}
+  if(!tel){ mostrarToast('Falta el teléfono de contacto.','person'); return; }
   if(!state.metodoPago){mostrarToast('Selecciona método de pago.','payments');return;}
-  state.direccion=dir;state.referencia=ref;state.nombre=nom;state.telefono=tel;
+  state.nombre = nom_final;
+state.telefono = tel;
+state.direccion = L.direccion || '';
+state.referencia = L.referencia || '';
+state.metodoPago = window._wilPago || state.metodoPago;
+state.precioDomicilio = L.tarifaDomi || 0;
  
   /* Comercio */
   document.getElementById('factura-comercio-val').textContent=
@@ -3924,140 +3979,24 @@ const WIL_BARRIOS = [
   ["FABRICATO",19000],["UNIDADES DE MADERA",25000]
 ];
  
-/* Estado global del paso 1 */
+/* ─── ESTADO GLOBAL ─── */
 window.WIL_LIBRE = {
-  comercio: null,      // true=sí sabe / false=el domi busca
+  comercio: null,        // true | false
   comercioNombre: '',
-  destino: null,       // 'mi' | 'otro'
-  barrio: '',
-  tarifaDomi: 0,
-  direccion: '',
-  referencia: '',
-  enviaNombre: '',
-  enviaTel: '',
-  recibeNombre: '',
-  recibeTel: ''
-};
- 
-/* Poblar selects al cargar */
-(function wilInit(){
-  ['wil-barrio-mi','wil-barrio-otro'].forEach(id => {
-    const sel = document.getElementById(id);
-    if(!sel) return;
-    WIL_BARRIOS.forEach(([nombre, precio]) => {
-      const opt = document.createElement('option');
-      opt.value = nombre;
-      opt.dataset.precio = precio;
-      opt.textContent = nombre + ' — $' + precio.toLocaleString('es-CO');
-      sel.appendChild(opt);
-    });
-  });
-})();
- 
-/* ── ¿Ya tienes el comercio? ── */
-function wilSelComercio(si){
-  window.WIL_LIBRE.comercio = si;
-  document.getElementById('yn-si').classList.toggle('sel', si);
-  document.getElementById('yn-no').classList.toggle('sel', !si);
-  document.getElementById('wil-comercio-field').classList.toggle('hidden', !si);
-  document.getElementById('wil-card-para-quien').style.display = 'block';
-  // reset destino al cambiar comercio
-  wilSelDestino(null);
-}
- 
-/* ── ¿Para quién? ── */
-function wilSelDestino(d){
-  window.WIL_LIBRE.destino = d;
-  ['mi','otro'].forEach(x => {
-    document.getElementById('wil-opt-'+x)?.classList.toggle('sel', d===x);
-  });
-  document.getElementById('wil-sec-mi')?.classList.toggle('hidden',   d!=='mi');
-  document.getElementById('wil-sec-otro')?.classList.toggle('hidden', d!=='otro');
-  document.getElementById('wil-tarifa-mi')?.classList.add('hidden');
-  document.getElementById('wil-tarifa-otro')?.classList.add('hidden');
-}
- 
-/* ── Mostrar tarifa del barrio seleccionado ── */
-function wilMostrarTarifa(quien){
-  const selId = quien === 'mi' ? 'wil-barrio-mi' : 'wil-barrio-otro';
-  const sel   = document.getElementById(selId);
-  const opt   = sel?.options[sel.selectedIndex];
-  const pill  = document.getElementById('wil-tarifa-' + quien);
-  const valEl = document.getElementById('wil-tarifa-' + quien + '-val');
-  if(!opt || !opt.dataset.precio){ pill?.classList.add('hidden'); return; }
-  const precio = parseInt(opt.dataset.precio);
-  valEl.textContent = '$' + precio.toLocaleString('es-CO');
-  pill?.classList.remove('hidden');
-  window.WIL_LIBRE.tarifaDomi  = precio;
-  window.WIL_LIBRE.barrio      = opt.value;
-}
- 
-/* ── Validar y continuar ── */
-function wilGoLibre2(){
-  const L = window.WIL_LIBRE;
- 
-  if(L.comercio === null){
-    alert('Por favor indica si ya tienes el comercio.'); return;
-  }
-  if(L.comercio){
-    L.comercioNombre = document.getElementById('comercio-nombre')?.value.trim() || '';
-    if(!L.comercioNombre){
-      alert('Escribe el nombre del comercio.'); return;
-    }
-  }
-  if(!L.destino){
-    alert('Indica si el domicilio es para ti o para alguien más.'); return;
-  }
- 
-  if(L.destino === 'mi'){
-    const barEl = document.getElementById('wil-barrio-mi');
-    if(!barEl?.value){ alert('Selecciona tu barrio.'); return; }
-    L.barrio     = barEl.value;
-    L.tarifaDomi = parseInt(barEl.options[barEl.selectedIndex].dataset.precio || 0);
- 
-  } else {
-    const barEl  = document.getElementById('wil-barrio-otro');
-    const dir    = document.getElementById('wil-dir-otro')?.value.trim();
-    const enNom  = document.getElementById('wil-envia-nombre')?.value.trim();
-    const enTel  = document.getElementById('wil-envia-tel')?.value.trim();
-    const rcNom  = document.getElementById('wil-recibe-nombre')?.value.trim();
-    const rcTel  = document.getElementById('wil-recibe-tel')?.value.trim();
- 
-    if(!barEl?.value)  { alert('Selecciona el barrio de entrega.'); return; }
-    if(!dir)           { alert('Escribe la dirección de entrega.'); return; }
-    if(!enNom||!enTel) { alert('Completa los datos de quien envía.'); return; }
-    if(!rcNom||!rcTel) { alert('Completa los datos de quien recibe.'); return; }
- 
-    L.barrio       = barEl.value;
-    L.tarifaDomi   = parseInt(barEl.options[barEl.selectedIndex].dataset.precio || 0);
-    L.direccion    = dir;
-    L.referencia   = document.getElementById('wil-ref-otro')?.value.trim() || '';
-    L.enviaNombre  = enNom;
-    L.enviaTel     = enTel;
-    L.recibeNombre = rcNom;
-    L.recibeTel    = rcTel;
-  }
- 
-  /* ✅ Todo validado — ir al paso 2 */
-  goLibre2(); // ← tu función existente
-}
-
-window.WIL_LIBRE = {
-  comercio: null,       // true=sí sabe / false=el domi busca
-  comercioNombre: '',
-  destino: null,        // 'mi' | 'otro'
+  destino: null,         // 'mi' | 'otro'
   barrioRecogida: '',
   barrioEntrega: '',
   tarifaDomi: 0,
   direccion: '',
   referencia: '',
+  recibeTel: '',
   enviaNombre: '',
   enviaTel: '',
   recibeNombre: '',
-  recibeTel: ''
+  nombre: ''             // nombre para el resumen (quien recibe o quien envía)
 };
  
-/* Poblar selects al cargar — solo nombre, sin precio */
+/* ─── INIT: poblar selects sin precio ─── */
 (function wilInit(){
   ['wil-barrio-recogida','wil-barrio-entrega'].forEach(id => {
     const sel = document.getElementById(id);
@@ -4066,13 +4005,13 @@ window.WIL_LIBRE = {
       const opt = document.createElement('option');
       opt.value = nombre;
       opt.dataset.precio = precio;
-      opt.textContent = nombre;          // ← sin precio visible
+      opt.textContent = nombre;
       sel.appendChild(opt);
     });
   });
 })();
  
-/* ── ¿Ya tienes el comercio? ── */
+/* ─── ¿YA TIENES EL COMERCIO? ─── */
 function wilSelComercio(si){
   window.WIL_LIBRE.comercio = si;
   document.getElementById('yn-si').classList.toggle('sel', si);
@@ -4082,28 +4021,30 @@ function wilSelComercio(si){
   wilSelDestino(null);
 }
  
-/* ── ¿Para quién? ── */
+/* ─── ¿PARA QUIÉN? ─── */
 function wilSelDestino(d){
   window.WIL_LIBRE.destino = d;
   ['mi','otro'].forEach(x => {
     document.getElementById('wil-opt-'+x)?.classList.toggle('sel', d===x);
   });
   const secBarrios = document.getElementById('wil-sec-barrios');
-  const secDirOtro = document.getElementById('wil-sec-dir-otro');
   if(!d){ secBarrios?.classList.add('hidden'); return; }
   secBarrios?.classList.remove('hidden');
-  secDirOtro?.classList.toggle('hidden', d !== 'otro');
-  // reset tarifa
+  document.getElementById('wil-sec-dir-mi')?.classList.add('hidden');
+  document.getElementById('wil-sec-dir-otro')?.classList.add('hidden');
   document.getElementById('wil-tarifa-calc')?.classList.add('hidden');
+  // reset selects
+  document.getElementById('wil-barrio-recogida').value = '';
+  document.getElementById('wil-barrio-entrega').value  = '';
 }
  
-/* ── Calcular tarifa = max(recogida, entrega) y mostrarla ── */
+/* ─── CALCULAR TARIFA = max(recogida, entrega) ─── */
 function wilCalcTarifa(){
-  const selR = document.getElementById('wil-barrio-recogida');
-  const selE = document.getElementById('wil-barrio-entrega');
-  const optR = selR?.options[selR.selectedIndex];
-  const optE = selE?.options[selE.selectedIndex];
-  const pill = document.getElementById('wil-tarifa-calc');
+  const selR  = document.getElementById('wil-barrio-recogida');
+  const selE  = document.getElementById('wil-barrio-entrega');
+  const optR  = selR?.options[selR.selectedIndex];
+  const optE  = selE?.options[selE.selectedIndex];
+  const pill  = document.getElementById('wil-tarifa-calc');
   const valEl = document.getElementById('wil-tarifa-calc-val');
  
   const pR = optR?.dataset.precio ? parseInt(optR.dataset.precio) : 0;
@@ -4114,12 +4055,19 @@ function wilCalcTarifa(){
   const tarifa = Math.max(pR, pE);
   valEl.textContent = '$' + tarifa.toLocaleString('es-CO');
   pill?.classList.remove('hidden');
-  window.WIL_LIBRE.tarifaDomi    = tarifa;
+  window.WIL_LIBRE.tarifaDomi     = tarifa;
   window.WIL_LIBRE.barrioRecogida = optR.value;
   window.WIL_LIBRE.barrioEntrega  = optE.value;
+ 
+  // mostrar campos según destino
+  if(window.WIL_LIBRE.destino === 'mi'){
+    document.getElementById('wil-sec-dir-mi')?.classList.remove('hidden');
+  } else if(window.WIL_LIBRE.destino === 'otro'){
+    document.getElementById('wil-sec-dir-otro')?.classList.remove('hidden');
+  }
 }
  
-/* ── Validar y continuar ── */
+/* ─── VALIDAR P1 Y PASAR A P2 ─── */
 function wilGoLibre2(){
   const L = window.WIL_LIBRE;
  
@@ -4145,6 +4093,17 @@ function wilGoLibre2(){
   L.barrioEntrega  = selE.value;
   L.tarifaDomi     = Math.max(pR, pE);
  
+  if(L.destino === 'mi'){
+    const dir = document.getElementById('wil-dir-mi')?.value.trim();
+    const tel = document.getElementById('wil-tel-mi')?.value.trim();
+    if(!dir){ alert('Escribe tu dirección de entrega.'); return; }
+    if(!tel){ alert('Escribe tu teléfono.'); return; }
+    L.direccion  = dir;
+    L.referencia = document.getElementById('wil-ref-mi')?.value.trim() || '';
+    L.recibeTel  = tel;
+    L.nombre     = '';   // se pedirá nombre en P3 si se quiere, o se usa el tel
+  }
+ 
   if(L.destino === 'otro'){
     const dir   = document.getElementById('wil-dir-otro')?.value.trim();
     const enNom = document.getElementById('wil-envia-nombre')?.value.trim();
@@ -4154,17 +4113,238 @@ function wilGoLibre2(){
     if(!dir)           { alert('Escribe la dirección de entrega.'); return; }
     if(!enNom||!enTel) { alert('Completa los datos de quien envía.'); return; }
     if(!rcNom||!rcTel) { alert('Completa los datos de quien recibe.'); return; }
-    L.direccion   = dir;
-    L.referencia  = document.getElementById('wil-ref-otro')?.value.trim() || '';
-    L.enviaNombre = enNom;
-    L.enviaTel    = enTel;
+    L.direccion    = dir;
+    L.referencia   = document.getElementById('wil-ref-otro')?.value.trim() || '';
+    L.enviaNombre  = enNom;
+    L.enviaTel     = enTel;
     L.recibeNombre = rcNom;
-    L.recibeTel   = rcTel;
+    L.recibeTel    = rcTel;
+    L.nombre       = rcNom;
   }
  
-  /* ✅ Todo validado — ir al paso 2 */
+  /* ir al paso 2 (textarea de productos con IA) */
   if(typeof goLibre2 === 'function') goLibre2();
-  if(typeof showView === 'function') showView('view-libre-2');
+  showView('view-libre-2');
+}
+ function wilPoblarResumenP3(){
+  const L   = window.WIL_LIBRE || {};
+  const div = document.getElementById('wil-p3-resumen-body');
+  if(!div) return;
+
+  const fmtPeso = v => '$' + (v||0).toLocaleString('es-CO');
+
+  let html = '';
+  html += `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f5f7">
+             <span style="color:var(--on3)">🗺️ Recogida</span>
+             <span style="font-weight:700">${escHTML(L.barrioRecogida||'—')}</span>
+           </div>`;
+  html += `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f5f7">
+             <span style="color:var(--on3)">📍 Entrega</span>
+             <span style="font-weight:700">${escHTML(L.barrioEntrega||'—')}</span>
+           </div>`;
+  html += `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f5f7">
+             <span style="color:var(--on3)">🏠 Dirección</span>
+             <span style="font-weight:700;text-align:right;max-width:60%">${escHTML(L.direccion||'—')}</span>
+           </div>`;
+  if(L.referencia){
+    html += `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f5f7">
+               <span style="color:var(--on3)">🗝️ Referencia</span>
+               <span style="font-weight:700;text-align:right;max-width:60%">${escHTML(L.referencia)}</span>
+             </div>`;
+  }
+  if(L.destino === 'otro'){
+    html += `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f5f7">
+               <span style="color:var(--on3)">📦 Envía</span>
+               <span style="font-weight:700">${escHTML(L.enviaNombre)} · ${escHTML(L.enviaTel)}</span>
+             </div>
+             <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f5f7">
+               <span style="color:var(--on3)">🎁 Recibe</span>
+               <span style="font-weight:700">${escHTML(L.recibeNombre)} · ${escHTML(L.recibeTel)}</span>
+             </div>`;
+  } else {
+    html += `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f5f7">
+               <span style="color:var(--on3)">📱 Teléfono</span>
+               <span style="font-weight:700">${escHTML(L.recibeTel||'—')}</span>
+             </div>`;
+  }
+  html += `<div style="display:flex;justify-content:space-between;padding:5px 0;margin-top:2px">
+             <span style="color:var(--on3)">🛵 Tarifa domi</span>
+             <span style="font-weight:900;color:#15803d;font-size:15px">${fmtPeso(L.tarifaDomi)}</span>
+           </div>`;
+  div.innerHTML = html;
+
+  /* Productos listados */
+  const card  = document.getElementById('wil-p3-prods-card');
+  const lista = document.getElementById('wil-p3-prods-lista');
+  const prods = state.productos || [];
+  if(card && lista && prods.length){
+    card.style.display = 'block';
+   lista.innerHTML = prods.map(function(p, i){
+      return '<div class="prod-item">'
+        +'<div style="display:flex;align-items:center;gap:8px;width:100%">'
+          +'<div style="width:28px;height:28px;border-radius:8px;background:rgba(0,105,112,.08);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">🛒</div>'
+          +'<div class="prod-name" style="font-size:13px;font-weight:600;flex:1;line-height:1.3">'+escHTML(p.nombre)+'</div>'
+          +'<div class="qty-row">'
+            +'<button class="qty-btn" onclick="wilCambiarQtyP3('+i+',-1)">−</button>'
+            +'<span class="qty-n">'+(p.qty||1)+'</span>'
+            +'<button class="qty-btn" onclick="wilCambiarQtyP3('+i+',1)">+</button>'
+          +'</div>'
+        +'</div>'
+      +'</div>';
+    }).join('');
+
+function wilCambiarQtyP3(i, delta){
+  if(!state.productos[i]) return;
+  state.productos[i].qty = Math.max(1,(state.productos[i].qty||1)+delta);
+  wilPoblarResumenP3();
+} 
+/* ─── GENERAR FACTURA LIBRE (reemplaza tu función existente) ─── */
+function generarFacturaLibre(){
+  const L    = window.WIL_LIBRE;
+  const pago = window._wilPago || document.querySelector('.pago-ticket-c.sel')?.querySelector('.pago-ticket-lbl')?.textContent?.toUpperCase() || '';
+ 
+  if(!pago){ alert('Selecciona un método de pago.'); return; }
+ 
+  /* Fecha */
+  const ahora = new Date();
+  document.getElementById('factura-fecha').textContent =
+    ahora.toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'}) + ' ' +
+    ahora.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+ 
+  /* Nombre para resumen */
+  const nombreResumen = L.destino === 'otro'
+    ? (L.recibeNombre || L.enviaNombre || '—')
+    : (L.recibeTel || '—');
+  document.getElementById('factura-nombre-resumen').textContent = nombreResumen;
+ 
+  /* Conteo productos */
+  const prods = document.querySelectorAll('#factura-productos-list .wil-prod-item');
+  const nProd = prods.length || (document.getElementById('factura-productos-list')?.children?.length || 0);
+  document.getElementById('ticket-prod-count').textContent = nProd + ' producto' + (nProd!==1?'s':'');
+  document.getElementById('ticket-pago-resumen').textContent = pago;
+ 
+  /* Comercio */
+  document.getElementById('factura-comercio-val').textContent =
+    L.comercio ? (L.comercioNombre || '—') : 'El domi busca';
+ 
+  /* BLOQUE ENTREGA */
+  const entregaContainer = document.getElementById('wil-ticket-entrega-container');
+  if(entregaContainer){
+    let ehtml = '';
+    ehtml += `<div class="wil-ticket-row">
+                <div class="wil-ticket-lbl">📍 Dirección</div>
+                <div class="wil-ticket-val">${L.direccion || '—'}</div>
+              </div>`;
+    if(L.referencia){
+      ehtml += `<div class="wil-ticket-row">
+                  <div class="wil-ticket-lbl">🗺️ Referencia</div>
+                  <div class="wil-ticket-val">${L.referencia}</div>
+                </div>`;
+    }
+    if(L.destino === 'otro'){
+      ehtml += `<div class="wil-ticket-row">
+                  <div class="wil-ticket-lbl">📦 Envía</div>
+                  <div class="wil-ticket-val">${L.enviaNombre} · ${L.enviaTel}</div>
+                </div>
+                <div class="wil-ticket-row">
+                  <div class="wil-ticket-lbl">🎁 Recibe</div>
+                  <div class="wil-ticket-val">${L.recibeNombre} · ${L.recibeTel}</div>
+                </div>`;
+    } else {
+      ehtml += `<div class="wil-ticket-row">
+                  <div class="wil-ticket-lbl">📱 Teléfono</div>
+                  <div class="wil-ticket-val">${L.recibeTel}</div>
+                </div>`;
+    }
+    entregaContainer.innerHTML = ehtml;
+  }
+ 
+  /* BLOQUE TARIFA + BARRIOS */
+  const tarifaContainer = document.getElementById('wil-ticket-tarifa-container');
+  if(tarifaContainer){
+    tarifaContainer.innerHTML = `
+      <div class="wil-ticket-row">
+        <div class="wil-ticket-lbl">🗺️ Recogida</div>
+        <div class="wil-ticket-val">${L.barrioRecogida}</div>
+      </div>
+      <div class="wil-ticket-row">
+        <div class="wil-ticket-lbl">📍 Barrio entrega</div>
+        <div class="wil-ticket-val">${L.barrioEntrega}</div>
+      </div>
+      <div class="wil-ticket-row">
+        <div class="wil-ticket-lbl">🛵 Domicilio</div>
+        <div class="wil-ticket-val" style="font-weight:900;color:#15803d;font-size:15px">
+          $${L.tarifaDomi.toLocaleString('es-CO')}
+        </div>
+      </div>
+    `;
+  }
+ 
+  /* PAGO BADGE */
+  const pagoIco = pago === 'EFECTIVO' ? '💵' : '🏦';
+  document.getElementById('factura-pago').textContent = pago;
+  document.getElementById('factura-pago-badge').innerHTML = pagoIco + ' <span id="factura-pago">' + pago + '</span>';
+ 
+  /* Abrir ticket colapsado por defecto */
+  const body = document.getElementById('ticketBodyColapsable');
+  const btn  = document.getElementById('ticketCollapseBtn');
+  if(body){ body.style.display = 'none'; }
+  if(btn) { btn.innerHTML = '<span>Ver detalles</span><span class="sym">expand_more</span>'; }
+ 
+  showView('view-factura-libre');
+}
+ 
+/* ─── selectPago — guarda el pago seleccionado ─── */
+/* Si ya tienes selectPago() en tu código, reemplázala por esta */
+function selectPago(tipo){
+  window._wilPago = tipo;
+  ['pago-efectivo','pago-transferencia'].forEach(id => {
+    document.getElementById(id)?.classList.remove('sel');
+  });
+  const map = { 'EFECTIVO':'pago-efectivo', 'TRANSFERENCIA':'pago-transferencia' };
+  document.getElementById(map[tipo])?.classList.add('sel');
+}
+
+/* ─── RENDER LISTA PRODUCTOS EN P2 ─── */
+function wilRenderListaProductos(){
+  var card  = document.getElementById('wil-lista-productos-card');
+  var lista = document.getElementById('wil-lista-productos');
+  if(!card || !lista) return;
+  var prods = state.productos || [];
+  if(!prods.length){ card.style.display='none'; return; }
+  card.style.display='block';
+  lista.innerHTML = prods.map(function(p, i){
+    return '<div class="prod-item" id="wil-prod-'+i+'">'
+      +'<div class="prod-name" style="font-size:13px;font-weight:600;flex:1;line-height:1.3">'+escHTML(p.nombre)+'</div>'
+      +'<div class="qty-row">'
+        +'<button class="qty-btn" onclick="wilCambiarQty('+i+',-1)">−</button>'
+        +'<span class="qty-n">'+(p.qty||1)+'</span>'
+        +'<button class="qty-btn" onclick="wilCambiarQty('+i+',1)">+</button>'
+      +'</div>'
+      +'<button class="prod-del" onclick="wilEliminarProd('+i+')"><span class="sym">delete</span></button>'
+    +'</div>';
+  }).join('');
+}
+
+function wilCambiarQty(i, delta){
+  if(!state.productos[i]) return;
+  state.productos[i].qty = Math.max(1, (state.productos[i].qty||1) + delta);
+  wilRenderListaProductos();
+}
+
+function wilEliminarProd(i){
+  state.productos.splice(i,1);
+  wilRenderListaProductos();
+}
+
+function wilAgregarProducto(){
+  var inp = document.getElementById('wil-nuevo-prod');
+  var txt = (inp.value||'').trim();
+  if(!txt) return;
+  state.productos = state.productos || [];
+  state.productos.push({nombre: txt.charAt(0).toUpperCase()+txt.slice(1), qty:1});
+  inp.value='';
+  wilRenderListaProductos();
 }
  
 
