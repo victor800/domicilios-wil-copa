@@ -2375,10 +2375,48 @@ async function enviarPedido(tipo){
     });
 
     /* mode:no-cors siempre devuelve opaque — asumimos éxito igual que farmacia */
+  /* Pantalla confirmado */
     state.idPedido = id;
-    document.getElementById('idPedidoDisplay').textContent  = id;
+    document.getElementById('idPedidoDisplay').textContent = id;
     document.getElementById('success-msg').textContent =
-      'Pedido #' + id + ' registrado. Un domiciliario te contactará al ' + state.telefono + '.';
+      'Pedido #'+id+' registrado. Un domiciliario WIL te contactará pronto al '+state.telefono+'.';
+
+    /* ── Botón COPIAR ── */
+    var copiarBtn = document.getElementById('id-badge-copy-btn');
+    if(copiarBtn){
+      // Clonar para eliminar listeners anteriores
+      var copiarNew = copiarBtn.cloneNode(true);
+      copiarBtn.parentNode.replaceChild(copiarNew, copiarBtn);
+      copiarNew.addEventListener('click', function(){
+        var texto = id;
+        if(navigator.clipboard){
+          navigator.clipboard.writeText(texto).then(function(){
+            mostrarToast('Código ' + texto + ' copiado ✓','content_copy');
+          }).catch(function(){
+            _copiarFallback(texto);
+          });
+        } else {
+          _copiarFallback(texto);
+        }
+      });
+    }
+
+    /* ── Botón RASTREAR ── */
+    var rastrearBtn = document.getElementById('id-badge-rastrear-btn');
+    if(rastrearBtn){
+      var rastrearNew = rastrearBtn.cloneNode(true);
+      rastrearBtn.parentNode.replaceChild(rastrearNew, rastrearBtn);
+      rastrearNew.addEventListener('click', function(){
+        navTo('rastrear');
+        setTimeout(function(){
+          var inp = document.getElementById('rastrearInput');
+          if(inp){ inp.value = id; }
+          rtAbrirPopup();
+          setTimeout(rastrearPedido, 300);
+        }, 250);
+      });
+    }
+
     showView('view-confirmado');
 
   } catch(e){
@@ -4685,6 +4723,17 @@ function wilCompartirCodigo(){
       mostrarToast('Código '+id+' copiado ✓','content_copy');
     });
   }
+}
+
+function _copiarFallback(txt){
+  var ta = document.createElement('textarea');
+  ta.value = txt;
+  ta.style.cssText = 'position:fixed;opacity:0';
+  document.body.appendChild(ta);
+  ta.select();
+  try{ document.execCommand('copy'); mostrarToast('Código '+txt+' copiado ✓','content_copy'); }
+  catch(e){ mostrarToast('Tu código: '+txt,'info'); }
+  document.body.removeChild(ta);
 }
 
 </script>
