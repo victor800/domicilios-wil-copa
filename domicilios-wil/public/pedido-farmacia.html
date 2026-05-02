@@ -3779,145 +3779,25 @@ function wcEnviar() {
    → Aquí inyectarás la IA. Cada bloque tiene su marca.
    → Sustituye wcMsgFarm(respuesta) por la llamada a la API.
 ══════════════════════════════════════════════════════════ */
-var _wcNombre = '';
-var _wcFase = 'nombre';
-var _wcTiendaChat = '';
-var _wcIntencion = '';
-var _wcProductoBuscado = '';
-
 function wcProcesar(txt) {
   var cfg = window._wcCFG;
-  var tl = txt.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  var tl  = txt.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 
+  /* ── FASE: capturar nombre ── */
   if (_wcFase === 'nombre') {
     _wcNombre = txt.replace(/^(soy|me llamo|mi nombre es)\s*/i,'').trim();
     _wcNombre = _wcNombre.charAt(0).toUpperCase() + _wcNombre.slice(1);
     localStorage.setItem('wil_nombre_cliente', _wcNombre);
     _wcFase = 'chat';
 
-    wcMsgFarm('¡Mucho gusto, *' + _wcNombre + '*! 😊 ¿En qué te puedo ayudar hoy?');
-    setTimeout(function () {
+    // [IA] → reemplaza wcMsgFarm por respuesta generada
+    wcMsgFarm('Mucho gusto *' + _wcNombre + '*! 😊 ¿En qué te puedo ayudar hoy?');
+    setTimeout(function(){
       document.getElementById('wc-wa-footer').style.display = 'block';
-      wcMostrarOpts([
-        '💊 Necesito un medicamento',
-        '🛒 Quiero hacer un pedido',
-        '💰 Consultar un precio',
-        '📦 Ver disponibilidad'
-      ]);
-    }, 900);
+      wcMostrarOpts(['💊 Necesito un medicamento','🛒 Quiero hacer un pedido','💰 Consultar un precio','📦 Ver disponibilidad']);
+    }, 1000);
     return;
   }
-
-  if (_wcFase === 'chat') {
-    document.getElementById('wc-opts').style.display = 'none';
-
-    if (_wcIntencion === 'disponibilidad') {
-      _wcProductoBuscado = txt.trim();
-      wcMsgFarm('Sí, claro *' + _wcNombre + '* 📦 Busco *' + _wcProductoBuscado + '* en el stock de *' + cfg.nombre + '*...');
-      consultarStock(_wcProductoBuscado);
-      _wcIntencion = '';
-      return;
-    }
-
-    if (tl.includes('medicamento') || tl.includes('medicina')) {
-      _wcIntencion = 'medicamento';
-      wcMsgFarm('Sí, claro *' + _wcNombre + '* 😊 Dime el nombre del medicamento que necesitas.');
-      return;
-    }
-
-    if (tl.includes('pedido') || tl.includes('compra') || tl.includes('pedir')) {
-      _wcIntencion = 'pedido';
-      wcMsgFarm('Sí, claro *' + _wcNombre + '* 🛒 Dime qué productos necesitas y te ayudo a armar tu pedido.');
-      return;
-    }
-
-    if (tl.includes('precio') || tl.includes('valor') || tl.includes('costo') || tl.includes('cuanto')) {
-      _wcIntencion = 'precio';
-      wcMsgFarm('Sí, claro *' + _wcNombre + '* 💰 Dime el nombre del producto y te doy el precio.');
-      return;
-    }
-
-    if (tl.includes('disponib') || tl.includes('stock') || tl.includes('hay') || tl.includes('tienen')) {
-      _wcIntencion = 'disponibilidad';
-      wcMsgFarm('Sí, claro *' + _wcNombre + '* 📦 Dime qué producto buscas y reviso disponibilidad en el stock.');
-      return;
-    }
-
-    if (tl.includes('horario') || tl.includes('hora') || tl.includes('abierto') || tl.includes('abren')) {
-      wcMsgFarm('Sí, claro *' + _wcNombre + '* 🕐 Nuestro horario es de *7am a 9pm* todos los días.');
-      return;
-    }
-
-    if (tl.includes('domicilio') || tl.includes('envio') || tl.includes('entrega') || tl.includes('llevar')) {
-      wcMsgFarm('Sí, claro *' + _wcNombre + '* 🛵 Sí contamos con domicilio. Puedes hacer tu pedido y te lo enviamos.');
-      return;
-    }
-
-    if (tl.includes('gracias') || tl.includes('listo') || tl.includes('ok') || tl.includes('perfecto')) {
-      wcMsgFarm('Con gusto, *' + _wcNombre + '* 😊 ¿Deseas consultar algo más?');
-      setTimeout(function () {
-        wcMostrarOpts([
-          '💊 Necesito un medicamento',
-          '🛒 Quiero hacer un pedido',
-          '💰 Consultar un precio',
-          '📦 Ver disponibilidad'
-        ]);
-      }, 900);
-      return;
-    }
-
-    if (tl.includes('whatsapp') || tl.includes('continuar')) {
-      wcAbrirWAReal();
-      return;
-    }
-
-    wcMsgFarm('Sí, claro *' + _wcNombre + '* 😊 Puedo ayudarte con medicamentos, precios, disponibilidad y pedidos. ¿Qué necesitas?');
-    setTimeout(function () {
-      wcMostrarOpts([
-        '💊 Necesito un medicamento',
-        '🛒 Quiero hacer un pedido',
-        '💰 Consultar un precio',
-        '📦 Ver disponibilidad'
-      ]);
-    }, 1100);
-  }
-}
-
-function consultarStock(producto) {
-  var url = 'https://script.google.com/macros/s/AKfycbwbypqPgL16lssPdQsktDx9dHs0My_cMaS7YNQrMSkzY8Kw7HPmFgJHZeImkW2EJ48H7A/exec';
-
-  fetch(url + '?tienda=' + encodeURIComponent(_wcTiendaChat) + '&q=' + encodeURIComponent(producto))
-    .then(function (r) { return r.json(); })
-    .then(function (data) {
-      if (!data || !data.ok) {
-        wcMsgFarm('No encontré *' + producto + '* en el stock de la farmacia seleccionada.');
-        return;
-      }
-
-      var texto = 'Sí, encontré *' + data.descripcion + '*.\n';
-      texto += 'Laboratorio: *' + (data.laboratorio || 'N/D') + '*\n';
-      texto += 'Unidad: *' + (data.unidad || 'N/D') + '*\n';
-      texto += 'Precio: *' + (data.precio || 'N/D') + '*\n';
-      texto += 'Precio unitario: *' + (data.precioUnitario || 'N/D') + '*';
-
-      if ((data.unidad || '').toLowerCase().includes('caja')) {
-        texto += '\nSe maneja en caja y puede evaluarse por unidad si el stock lo permite.';
-      }
-
-      wcMsgFarm(texto);
-      setTimeout(function () {
-        wcMostrarOpts([
-          '💊 Otro medicamento',
-          '💰 Consultar otro precio',
-          '📦 Ver otra disponibilidad',
-          '📱 Continuar en WhatsApp'
-        ]);
-      }, 900);
-    })
-    .catch(function () {
-      wcMsgFarm('Ocurrió un problema al consultar el stock. Intenta de nuevo en unos segundos.');
-    });
-}
 
   /* ── FASE: chat activo ── */
   if (_wcFase === 'chat') {
@@ -3946,7 +3826,7 @@ function consultarStock(producto) {
 
     } else if (tl.includes('gracias') || tl.includes('listo') || tl.includes('ok') || tl.includes('perfecto')) {
       wcMsgFarm('¡Con mucho gusto *' + _wcNombre + '*! Si necesitas algo más, aquí estoy. 😊');
-      
+      setTimeout(function(){ wcMostrarOpts(['💊 Otra consulta','📱 Continuar en WhatsApp']); }, 1100);
       return;
 
     } else if (tl.includes('whatsapp') || tl.includes('continuar')) {
@@ -3958,8 +3838,11 @@ function consultarStock(producto) {
       wcMsgFarm('Entendido *' + _wcNombre + '*! Puedo ayudarte con medicamentos, precios, disponibilidad y pedidos. ¿Qué necesitas? 😊');
     }
 
+    setTimeout(function(){
+      wcMostrarOpts(['💊 Otra consulta','📱 Continuar en WhatsApp']);
+    }, 1400);
   }
-
+}
 
 function wcAbrirWAReal() {
   var cfg = window._wcCFG;
