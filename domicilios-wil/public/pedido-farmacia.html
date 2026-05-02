@@ -207,6 +207,7 @@ mark{background:#dbeafe;color:#1e40af;border-radius:3px;padding:0 2px}
 /* skeleton loader */
 .skel{background:linear-gradient(90deg,#f0f0f0 25%,#e0e8ff 50%,#f0f0f0 75%);background-size:200% 100%;animation:skelShimmer 1.2s infinite}
 @keyframes skelShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
 </style>
 </head>
 <body>
@@ -677,9 +678,20 @@ mark{background:#dbeafe;color:#1e40af;border-radius:3px;padding:0 2px}
     <button onclick="closeCart()" style="width:100%;background:var(--gray-l);color:var(--text3);border:none;cursor:pointer;padding:12px;border-radius:12px;font-size:13px;font-weight:600">Seguir comprando</button>
   </div>
 </div>
-
-
 </div>
+
+<a id="wa-fab"
+   href="javascript:void(0)"
+   onclick="abrirWAFarmacia()"
+   style="position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 62px);left:16px;z-index:800;
+          width:52px;height:52px;border-radius:50%;background:#25D366;
+          display:flex;align-items:center;justify-content:center;
+          box-shadow:0 6px 20px rgba(37,211,102,.5);text-decoration:none;transition:.15s">
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="#fff">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+  </svg>
+</a>
+
 
 <!-- FAB carrito -->
 <div id="cart-fab" onclick="openCart()" style="position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 62px);right:16px;z-index:800;cursor:pointer">
@@ -3659,7 +3671,241 @@ function abrirPopupSheet(key){
   }, 400);
 
 })();
+// ── CHAT FARMACIA ──
+var _wcNombre = '', _wcFase = 'nombre', _wcTiendaChat = '';
+
+function abrirWAFarmacia() {
+  _wcTiendaChat = tienda;
+  var cfg = {
+    expertos: { nombre:'Farma Expertos',    numero:'573XXXXXXXXXX' },
+    central:  { nombre:'Droguería Central', numero:'573XXXXXXXXXX' }
+  };
+  window._wcCFG = cfg[_wcTiendaChat];
+  document.getElementById('wc-farm-name').textContent = window._wcCFG.nombre;
+  document.getElementById('wil-msgs').innerHTML = '<div style="text-align:center"><span style="background:#dde6ec;color:#6b7280;font-size:9px;font-weight:700;padding:2px 12px;border-radius:20px">Hoy</span></div>';
+  document.getElementById('wc-opts').style.display = 'none';
+  document.getElementById('wc-wa-footer').style.display = 'none';
+  document.getElementById('wil-input').value = '';
+  _wcNombre = localStorage.getItem('wil_nombre_cliente') || '';
+  document.getElementById('wil-chat-ov').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+
+  if (_wcNombre) {
+    _wcFase = 'chat';
+    wcMsgFarm(wcSaludo() + ' *' + _wcNombre + '*! 😊 Bienvenido/a a *' + window._wcCFG.nombre + '*. ¿En qué te puedo ayudar hoy?');
+    setTimeout(function(){
+      document.getElementById('wc-wa-footer').style.display = 'block';
+      wcMostrarOpts(['💊 Necesito un medicamento','🛒 Quiero hacer un pedido','💰 Consultar un precio','📦 Ver disponibilidad']);
+    }, 1000);
+  } else {
+    _wcFase = 'nombre';
+    wcMsgFarm(wcSaludo() + '! 👋 Bienvenido/a a *' + window._wcCFG.nombre + '*. Con gusto te ayudo. ¿Con quién tengo el gusto?');
+  }
+
+  setTimeout(function(){ document.getElementById('wil-input').focus(); }, 400);
+}
+
+/* ── Saludo según hora ── */
+function wcSaludo() {
+  var h = new Date().getHours();
+  return h >= 5 && h < 12 ? '¡Buenos días'
+       : h >= 12 && h < 18 ? '¡Buenas tardes'
+       : '¡Buenas noches';
+}
+
+function wilCerrarChat() {
+  document.getElementById('wil-chat-ov').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function wcMsgFarm(txt) {
+  var el = document.getElementById('wc-typing');
+  el.style.display = 'flex';
+  document.getElementById('wil-msgs').scrollTop = 99999;
+  setTimeout(function(){
+    el.style.display = 'none';
+    var msgs = document.getElementById('wil-msgs');
+    var d = document.createElement('div');
+    d.style.cssText = 'display:flex;align-items:flex-end;gap:6px;animation:msgIn .22s ease';
+    d.innerHTML =
+      '<div style="width:28px;height:28px;border-radius:50%;background:#003f87;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">💊</div>'
+      + '<div style="max-width:75%;padding:9px 13px 7px;border-radius:16px 16px 16px 4px;background:#fff;color:#111827;font-size:13px;font-weight:500;line-height:1.5;box-shadow:0 1px 4px rgba(0,0,0,.07)">'
+      + wcFmt(txt)
+      + '<div style="font-size:9px;color:rgba(0,0,0,.35);margin-top:3px;text-align:right">' + wcHora() + '</div>'
+      + '</div>';
+    msgs.appendChild(d);
+    msgs.scrollTop = msgs.scrollHeight;
+  }, 900 + Math.random() * 300);
+}
+
+function wcMsgUser(txt) {
+  var msgs = document.getElementById('wil-msgs');
+  var d = document.createElement('div');
+  d.style.cssText = 'display:flex;flex-direction:row-reverse;align-items:flex-end;gap:6px;animation:msgIn .22s ease';
+  d.innerHTML =
+    '<div style="max-width:75%;padding:9px 13px 7px;border-radius:16px 16px 4px 16px;background:#003f87;color:#fff;font-size:13px;font-weight:500;line-height:1.5">'
+    + wcFmt(txt)
+    + '<div style="font-size:9px;color:rgba(255,255,255,.6);margin-top:3px;text-align:right">' + wcHora() + ' ✓✓</div>'
+    + '</div>';
+  msgs.appendChild(d);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function wcMostrarOpts(ops) {
+  var el = document.getElementById('wc-opts');
+  el.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;padding:6px 14px 10px;background:#f0f4f7';
+  el.innerHTML = ops.map(function(o){
+    return '<button onclick="wcSelOpt(\'' + o + '\')" style="border:1.5px solid #003f87;background:#fff;color:#003f87;border-radius:99px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:\'Manrope\',sans-serif;white-space:nowrap">' + o + '</button>';
+  }).join('');
+}
+
+function wcSelOpt(txt) {
+  document.getElementById('wc-opts').style.display = 'none';
+  wcMsgUser(txt);
+  wcProcesar(txt);
+}
+
+function wcEnviar() {
+  var inp = document.getElementById('wil-input');
+  var txt = (inp.value || '').trim();
+  if (!txt) return;
+  inp.value = ''; inp.style.height = 'auto';
+  wcMsgUser(txt);
+  wcProcesar(txt);
+}
+
+/* ══════════════════════════════════════════════════════════
+   LÓGICA DE CONVERSACIÓN
+   → Aquí inyectarás la IA. Cada bloque tiene su marca.
+   → Sustituye wcMsgFarm(respuesta) por la llamada a la API.
+══════════════════════════════════════════════════════════ */
+function wcProcesar(txt) {
+  var cfg = window._wcCFG;
+  var tl  = txt.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+
+  /* ── FASE: capturar nombre ── */
+  if (_wcFase === 'nombre') {
+    _wcNombre = txt.replace(/^(soy|me llamo|mi nombre es)\s*/i,'').trim();
+    _wcNombre = _wcNombre.charAt(0).toUpperCase() + _wcNombre.slice(1);
+    localStorage.setItem('wil_nombre_cliente', _wcNombre);
+    _wcFase = 'chat';
+
+    // [IA] → reemplaza wcMsgFarm por respuesta generada
+    wcMsgFarm('Mucho gusto *' + _wcNombre + '*! 😊 ¿En qué te puedo ayudar hoy?');
+    setTimeout(function(){
+      document.getElementById('wc-wa-footer').style.display = 'block';
+      wcMostrarOpts(['💊 Necesito un medicamento','🛒 Quiero hacer un pedido','💰 Consultar un precio','📦 Ver disponibilidad']);
+    }, 1000);
+    return;
+  }
+
+  /* ── FASE: chat activo ── */
+  if (_wcFase === 'chat') {
+    document.getElementById('wc-opts').style.display = 'none';
+
+    // [IA] → punto de entrada para llamada a API con contexto:
+    // { farmacia: cfg.nombre, cliente: _wcNombre, mensaje: txt }
+
+    if (tl.includes('medicamento') || tl.includes('medicina') || tl.includes('ver')) {
+      wcMsgFarm('Claro *' + _wcNombre + '*, cuéntame qué medicamento necesitas y te confirmo disponibilidad y precio. 💊');
+
+    } else if (tl.includes('pedido') || tl.includes('compra') || tl.includes('pedir')) {
+      wcMsgFarm('¡Con mucho gusto! Dime qué productos necesitas y te ayudo a armar el pedido. También puedes agregarlo directo desde el catálogo. 🛒');
+
+    } else if (tl.includes('precio') || tl.includes('valor') || tl.includes('costo') || tl.includes('cuanto')) {
+      wcMsgFarm('Dime el nombre del medicamento o producto *' + _wcNombre + '* y te doy el precio exacto. 💰');
+
+    } else if (tl.includes('disponib') || tl.includes('stock') || tl.includes('hay') || tl.includes('tienen')) {
+      wcMsgFarm('Dime qué producto buscas y verifico disponibilidad ahora mismo. 📦');
+
+    } else if (tl.includes('horario') || tl.includes('hora') || tl.includes('abierto') || tl.includes('abren')) {
+      wcMsgFarm('Nuestro horario es de *7am a 9pm* todos los días. ¿Hay algo más en lo que te pueda ayudar? 🕐');
+
+    } else if (tl.includes('domicilio') || tl.includes('envio') || tl.includes('entrega') || tl.includes('llevar')) {
+      wcMsgFarm('Sí contamos con domicilio a través de *Domicilios WIL*. Puedes hacer el pedido desde el catálogo y un mensajero te lo lleva. 🛵');
+
+    } else if (tl.includes('gracias') || tl.includes('listo') || tl.includes('ok') || tl.includes('perfecto')) {
+      wcMsgFarm('¡Con mucho gusto *' + _wcNombre + '*! Si necesitas algo más, aquí estoy. 😊');
+      setTimeout(function(){ wcMostrarOpts(['💊 Otra consulta','📱 Continuar en WhatsApp']); }, 1100);
+      return;
+
+    } else if (tl.includes('whatsapp') || tl.includes('continuar')) {
+      wcAbrirWAReal();
+      return;
+
+    } else {
+      // [IA] → respuesta genérica mientras no hay API
+      wcMsgFarm('Entendido *' + _wcNombre + '*! Puedo ayudarte con medicamentos, precios, disponibilidad y pedidos. ¿Qué necesitas? 😊');
+    }
+
+    setTimeout(function(){
+      wcMostrarOpts(['💊 Otra consulta','📱 Continuar en WhatsApp']);
+    }, 1400);
+  }
+}
+
+function wcAbrirWAReal() {
+  var cfg = window._wcCFG;
+  var msg = wcSaludo() + ', soy *' + (_wcNombre || 'un cliente') + '* y estoy buscando asesoría en *' + cfg.nombre + '*. ¿Me pueden ayudar?';
+  window.open('https://wa.me/' + cfg.numero + '?text=' + encodeURIComponent(msg), '_blank');
+  wilCerrarChat();
+}
+
+/* ── Helpers ── */
+function wcFmt(t) {
+  return (t || '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*(.*?)\*/g,'<strong>$1</strong>')
+    .replace(/\n/g,'<br>');
+}
+function wcHora() {
+  return new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true});
+}
+function wcAutoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 80) + 'px';
+}
 
 </script>
+<!-- ── POPUP CHAT FARMACIA ── -->
+<div id="wil-chat-ov" onclick="if(event.target===this)wilCerrarChat()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);z-index:9000;display:none;align-items:flex-end;justify-content:center;padding-bottom:env(safe-area-inset-bottom,0)">
+  <div id="wil-chat-sheet" style="width:100%;max-width:420px;background:#fff;border-radius:26px 26px 0 0;max-height:92dvh;display:flex;flex-direction:column;box-shadow:0 -12px 50px rgba(0,0,0,.22);overflow:hidden;animation:slideUp .35s cubic-bezier(.22,1,.36,1)">
+    <div style="background:linear-gradient(135deg,#003f87,#1a56db,#3b82f6);padding:16px 18px 14px;display:flex;align-items:center;gap:12px;flex-shrink:0;position:relative;overflow:hidden">
+      <div style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;z-index:1">💊</div>
+      <div style="flex:1;z-index:1">
+        <div id="wc-farm-name" style="font-size:15px;font-weight:900;color:#fff">Farma Expertos</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.75);font-weight:600;margin-top:2px;display:flex;align-items:center;gap:4px">
+          <span style="width:6px;height:6px;border-radius:50%;background:#4ade80;flex-shrink:0"></span>En línea · Responde rápido
+        </div>
+      </div>
+      <button onclick="wilCerrarChat()" style="width:34px;height:34px;border-radius:50%;border:none;background:rgba(255,255,255,.18);cursor:pointer;color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;z-index:1;flex-shrink:0">✕</button>
+    </div>
+    <div id="wil-msgs" style="flex:1;overflow-y:auto;padding:16px 14px 8px;display:flex;flex-direction:column;gap:8px;background:#f0f4f7;min-height:200px;max-height:52dvh;scrollbar-width:none">
+      <div style="text-align:center"><span style="background:#dde6ec;color:#6b7280;font-size:9px;font-weight:700;padding:2px 12px;border-radius:20px">Hoy</span></div>
+    </div>
+    <div id="wc-typing" style="display:none;align-items:center;gap:6px;padding:4px 14px 6px;background:#f0f4f7">
+      <div style="width:28px;height:28px;border-radius:50%;background:#003f87;display:flex;align-items:center;justify-content:center;font-size:13px">💊</div>
+      <div style="background:#fff;border-radius:14px;padding:8px 12px;display:flex;gap:4px;box-shadow:0 1px 4px rgba(0,0,0,.07)">
+        <span style="width:5px;height:5px;border-radius:50%;background:#9ca3af;animation:td 1.2s ease-in-out infinite;display:block"></span>
+        <span style="width:5px;height:5px;border-radius:50%;background:#9ca3af;animation:td 1.2s ease-in-out infinite .2s;display:block"></span>
+        <span style="width:5px;height:5px;border-radius:50%;background:#9ca3af;animation:td 1.2s ease-in-out infinite .4s;display:block"></span>
+      </div>
+    </div>
+    <div id="wc-opts" style="display:none;flex-wrap:wrap;gap:6px;padding:6px 14px 10px;background:#f0f4f7"></div>
+    <div style="padding:10px 12px;background:#fff;border-top:1px solid #f0f3f6;display:flex;gap:8px;align-items:flex-end;flex-shrink:0">
+      <textarea id="wil-input" rows="1" placeholder="Escribe un mensaje…" style="flex:1;border:1.5px solid #e5e7eb;border-radius:20px;padding:9px 14px;font-size:13px;font-family:'Manrope',sans-serif;outline:none;resize:none;max-height:80px;overflow-y:auto;line-height:1.45;color:#111827;background:#f8fafb;transition:.15s" oninput="wcAutoResize(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();wcEnviar()}"></textarea>
+      <button onclick="wcEnviar()" style="width:38px;height:38px;border-radius:50%;border:none;background:#003f87;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 3px 10px rgba(0,63,135,.3)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+      </button>
+    </div>
+    <div id="wc-wa-footer" style="padding:12px 16px;background:#fff;border-top:1px solid #f0f3f6;flex-shrink:0;display:none">
+      <button onclick="wcAbrirWAReal()" style="width:100%;background:#25D366;color:#fff;border:none;border-radius:14px;padding:13px;font-family:'Manrope',sans-serif;font-size:13px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 14px rgba(37,211,102,.35)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+        Continuar en WhatsApp real
+      </button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
