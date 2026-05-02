@@ -3141,155 +3141,479 @@ async function _rtPollCiclo() {
   }
 
   try {
-    /* ── A. Estado del pedido ── */
+    /* ── A. Leer hoja Pedidos ── */
     var urlP = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
              + '/gviz/tq?tqx=out:csv&sheet=Pedidos&cachebust=' + Date.now();
     var resP = await fetch(urlP, { cache: 'no-store' });
     var txtP = await resP.text();
     var linesP = txtP.trim().split('\n');
 
+    /* Buscar fila principal por ID */
     var f0 = null;
-    for(var i = 1; i < linesP.length; i++){
+    for (var i = 1; i < linesP.length; i++) {
       var cols = parseCsvLine(linesP[i]);
-      if((cols[0]||'').trim() === p.id){ f0 = cols; break; }
+      if ((cols[0]||'').replace(/^#+/,'').trim() === p.id) { f0 = cols; break; }
     }
-    if(!f0) return;
+    if (!f0) return;
 
-    var nuevoEstado      = f0[4]  || p.estado;
-    var nuevoDomi        = f0[15] || p.domiciliario;
-    var nuevaHoraProceso = f0[16] || p.horaEnProceso;
-    var nuevaHoraCamino  = f0[17] || p.horaEnCamino;
-    var nuevaHoraEntrega = f0[18] || p.horaEntrego;
+    var nuevoEstado      = (f0[4]  || '').trim() || p.estado;
+    var nuevoDomi        = (f0[15] || '').trim() || p.domiciliario;
+    var nuevaHoraProceso = (f0[16] || '').trim();
+    var nuevaHoraCamino  = (f0[17] || '').trim();
+    var nuevaHoraEntrega = (f0[18] || '').trim();
 
-    /* ── Actualizar estado sin tocar "ver más" ── */
-    if(nuevoEstado !== p.estado){
-      p.estado = nuevoEstado;
-      var COLS2 = {'Pendiente':'#f59e0b','Confirmado':'#3b82f6','En camino':'#8b5cf6','Entregado':'#16a34a','Cancelado':'#dc2626'};
+    /* ── B. Actualizar estado si cambió ── */
+    if (nuevoEstado !== p.estado) {
+      p.estado          = nuevoEstado;
+      p.horaEnProceso   = nuevaHoraProceso || p.horaEnProceso;
+      p.horaEnCamino    = nuevaHoraCamino  || p.horaEnCamino;
+      p.horaEntrego     = nuevaHoraEntrega || p.horaEntrego;
+
+      var COLS2 = {
+        'Pendiente':  '#f59e0b',
+        'Confirmado': '#3b82f6',
+        'En camino':  '#8b5cf6',
+        'Entregado':  '#16a34a',
+        'Cancelado':  '#dc2626'
+      };
       var col2 = COLS2[nuevoEstado] || '#006970';
+
       var pb2 = document.getElementById('estadoPingBase');
       var pp2 = document.getElementById('estadoPing');
-      if(pb2) pb2.style.background = col2;
-      if(pp2){ pp2.style.background = col2; pp2.style.animation = (nuevoEstado==='En camino'||nuevoEstado==='Confirmado')?'pingDot 1.5s ease-in-out infinite':'none'; }
-      var ELABELS = {'Pendiente':'⏳ Recibido','Confirmado':'✅ Confirmado','En camino':'🛵 En camino','Entregado':'🏠 Entregado','Cancelado':'❌ Cancelado'};
+      if (pb2) pb2.style.background = col2;
+      if (pp2) {
+        pp2.style.background = col2;
+        pp2.style.animation = (nuevoEstado === 'En camino' || nuevoEstado === 'Confirmado')
+          ? 'pingDot 1.5s ease-in-out infinite' : 'none';
+      }
+
+      var ELABELS = {
+        'Pendiente':  '⏳ Recibido',
+        'Confirmado': '✅ Confirmado',
+        'En camino':  '🛵 En camino',
+        'Entregado':  '🏠 Entregado',
+        'Cancelado':  '❌ Cancelado'
+      };
       var elLbl = document.getElementById('estadoLabel');
-      if(elLbl){ elLbl.textContent = ELABELS[nuevoEstado]||nuevoEstado; elLbl.style.color = col2; }
-      /* Steps sin tocar scroll ni ver-más */
+      if (elLbl) { elLbl.textContent = ELABELS[nuevoEstado]||nuevoEstado; elLbl.style.color = col2; }
+
+      /* Stepper con horas actualizadas */
       rtActualizarStepper(nuevoEstado, {
-  hora: p.hora,
-  horaEnProceso: nuevaHoraProceso,
-  horaEnCamino:  nuevaHoraCamino,
-  horaEntrego:   nuevaHoraEntrega
-});
+        hora:          p.hora,
+        horaEnProceso: p.horaEnProceso,
+        horaEnCamino:  p.horaEnCamino,
+        horaEntrego:   p.horaEntrego
+      });
+
       mostrarToast('Estado: ' + nuevoEstado, 'update');
+
       var secCal = document.getElementById('seccionCalificar');
-      if(secCal) secCal.style.display = (nuevoEstado==='Entregado') ? 'block' : 'none';
-      // ✅ Detener rastreo nativo cuando el pedido termina
-if (nuevoEstado === 'Entregado' || nuevoEstado === 'Cancelado') {
-  rtDetenerPolling();
-}
+      if (secCal) secCal.style.display = (nuevoEstado === 'Entregado') ? 'block' : 'none';
+
+      if (nuevoEstado === 'Entregado' || nuevoEstado === 'Cancelado') {
+        rtDetenerPolling();
+      }
+
+    } else {
+      /* Estado igual — actualizar horas si llegaron nuevas */
+      var horasCambiaron = (
+        (nuevaHoraProceso && nuevaHoraProceso !== p.horaEnProceso) ||
+        (nuevaHoraCamino  && nuevaHoraCamino  !== p.horaEnCamino)  ||
+        (nuevaHoraEntrega && nuevaHoraEntrega !== p.horaEntrego)
+      );
+      if (horasCambiaron) {
+        p.horaEnProceso = nuevaHoraProceso || p.horaEnProceso;
+        p.horaEnCamino  = nuevaHoraCamino  || p.horaEnCamino;
+        p.horaEntrego   = nuevaHoraEntrega || p.horaEntrego;
+        rtActualizarStepper(p.estado, {
+          hora:          p.hora,
+          horaEnProceso: p.horaEnProceso,
+          horaEnCamino:  p.horaEnCamino,
+          horaEntrego:   p.horaEntrego
+        });
+      }
     }
 
-    p.horaEnProceso = nuevaHoraProceso;
-    p.horaEnCamino  = nuevaHoraCamino;
-    p.horaEntrego   = nuevaHoraEntrega;
+    /* ── C. Actualizar nombre del domi en state ── */
+    if (nuevoDomi && nuevoDomi !== p.domiciliario) {
+      p.domiciliario = nuevoDomi;
+    }
 
-    /* ── B. Hoja Domiciliarios ── */
-    if(!nuevoDomi || !nuevoDomi.trim()) return;
-    p.domiciliario = nuevoDomi;
+    if (!nuevoDomi || !nuevoDomi.trim()) return;
 
+    /* ── D. Leer hoja Domiciliarios ── */
     var urlD = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
              + '/gviz/tq?tqx=out:csv&sheet=Domiciliarios&cachebust=' + Date.now();
     var resD = await fetch(urlD, { cache: 'no-store' });
     var txtD = await resD.text();
     var linesD = txtD.trim().split('\n');
 
+    /* CORRECCIÓN CLAVE: nombreDomiDisplay definido aquí */
+    var nombreDomiDisplay = nuevoDomi.replace(/\s*\([^)]+\)/g, '').trim();
+    var nombreDomiLower   = nombreDomiDisplay.toLowerCase();
+
     var domiRow = null;
-    var nombreDomiLower = nuevoDomi.replace(/\s*\([^)]+\)/,'').trim().toLowerCase();
-    for(var j = 1; j < linesD.length; j++){
-      var dcols = parseCsvLine(linesD[j]);
-      var dnombre = (dcols[1]||'').trim().toLowerCase();
-      if(dnombre && (dnombre === nombreDomiLower || nombreDomiLower.indexOf(dnombre) !== -1)){
-        domiRow = dcols; break;
+    for (var j = 1; j < linesD.length; j++) {
+      var dcols   = parseCsvLine(linesD[j]);
+      var dnombre = (dcols[1] || '').trim().toLowerCase();
+      if (dnombre && (
+        dnombre === nombreDomiLower ||
+        nombreDomiLower.indexOf(dnombre) !== -1 ||
+        dnombre.indexOf(nombreDomiLower) !== -1
+      )) {
+        domiRow = dcols;
+        break;
       }
     }
-    if(!domiRow) return;
 
-    var dFoto      = (domiRow[4]||'').trim();
-    var dActividad = (domiRow[6]||'').trim(); /* G: "6.252900,-75.564600|10:40:38|±1m" */
-
-    /* Avatar con foto real */
+    /* ── E. Actualizar card del domi ── */
     var dc = document.getElementById('domiCard');
-if(p.domiciliario && p.domiciliario.trim()){
-  dc.style.display = 'block';
-  var nombreDomi = p.domiciliario.replace(/\s*\([^)]+\)/,'').trim();
-  document.getElementById('domiNombre').textContent = nombreDomi;
-  
-  // ✅ Cargar FOTO real desde el sheet
-  var avEl = document.getElementById('domiFotoWrap');
-  // Mostrar inicial mientras carga
-  avEl.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff;">${nombreDomi.charAt(0).toUpperCase()}</div>`;
-    }
+    if (dc && nombreDomiDisplay) {
+      dc.style.display = 'block';
 
-      cargarFotoDomiReal(nombreDomi, avEl);
+      var dcNombre = document.getElementById('domiNombre');
+      if (dcNombre) dcNombre.textContent = nombreDomiDisplay;
 
+      /* Foto: solo cargar si no hay imagen ya puesta */
+      var avEl = document.getElementById('domiFotoWrap');
+      if (avEl && !avEl.querySelector('img')) {
+        avEl.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;'
+          + 'justify-content:center;font-size:20px;font-weight:900;color:#fff;">'
+          + nombreDomiDisplay.charAt(0).toUpperCase() + '</div>';
+        cargarFotoDomi(nombreDomiDisplay, avEl);
+      }
 
-    /* Card domi nombre + estado */
-    var dcNombre = document.getElementById('domiNombre');
-    if(dcNombre) dcNombre.textContent = nombreDomiDisplay;
-    var estadoTxtMap = {
-      'En camino':'En camino hacia ti 🛵','Confirmado':'Pedido confirmado ✅',
-      'Entregado':'Entregado 🏠','Pendiente':'Asignando…'
-    };
-    var horaClave = nuevaHoraCamino || nuevaHoraProceso || '';
-    var domiEstEl = document.getElementById('domiEstadoTxt');
-    if(domiEstEl){
-      domiEstEl.textContent = (estadoTxtMap[p.estado]||p.estado) + (horaClave ? '  ·  '+horaClave : '');
-    }
-    var dc = document.getElementById('domiCard');
-    if(dc && nombreDomiDisplay) dc.style.display = 'block';
+      /* Texto de estado del domi */
+      var estadoTxtMap = {
+        'En camino':  'En camino hacia ti 🛵',
+        'Confirmado': 'Pedido confirmado ✅',
+        'Entregado':  'Entregado 🏠',
+        'Pendiente':  'Asignando…'
+      };
+      var horaClave = p.horaEnCamino || p.horaEnProceso || '';
+      var domiEstEl = document.getElementById('domiEstadoTxt');
+      if (domiEstEl) {
+        domiEstEl.textContent = (estadoTxtMap[p.estado] || p.estado)
+          + (horaClave ? '  ·  ' + horaClave : '');
+      }
 
-    /* ── C. GPS real desde columna Actividad ── */
-    /* Formato: "6.252900,-75.564600|10:40:38|±1m" */
-    if(dActividad){
-      var coordMatch = dActividad.match(/(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
-      if(coordMatch){
-        var dLat = parseFloat(coordMatch[1]);
-        var dLng = parseFloat(coordMatch[2]);
-        if(!isNaN(dLat) && !isNaN(dLng) && mapResult){
-          /* Mover marcador domi suavemente */
-          if(domiMarkerResult){
-            domiMarkerResult.setLatLng([dLat, dLng]);
-          } else {
-            domiMarkerResult = L.marker([dLat, dLng],{
-              icon: iconDomi(nombreDomiDisplay, true), zIndexOffset:1000
-            }).addTo(mapResult);
+      /* WhatsApp y llamada si hay teléfono en el sheet */
+      if (domiRow) {
+        var dTel = (domiRow[2] || '').trim();
+        if (dTel) {
+          var waNum   = dTel.replace(/\D/g, '');
+          var waBtn   = document.getElementById('domiWABtn');
+          var callBtn = document.getElementById('domiCallBtn');
+          if (waBtn) {
+            waBtn.href = 'https://wa.me/57' + waNum
+              + '?text=' + encodeURIComponent('Hola, soy tu cliente. Pedido #' + p.id);
+            waBtn.style.display = 'flex';
           }
-          /* Re-trazar ruta real desde posición domi → destino */
-          var dirRaw = p.direccion || '';
-          var coordsDestM = dirRaw.match(/\[(-?\d+\.\d+),\s*(-?\d+\.\d+)\]/);
-          if(coordsDestM){
-            trazarRutaResult(dLat, dLng,
-              parseFloat(coordsDestM[1]), parseFloat(coordsDestM[2]), p);
-            /* Recentrar mapa en ambos puntos */
-            var bounds = L.latLngBounds([[dLat,dLng],[parseFloat(coordsDestM[1]),parseFloat(coordsDestM[2])]]);
-            mapResult.fitBounds(bounds,{paddingTopLeft:[20,60],paddingBottomRight:[20,20],maxZoom:16});
-          } else {
-            /* Sin coords destino: centrar en domi */
-            mapResult.setView([dLat, dLng], 15);
+          if (callBtn) {
+            callBtn.href = 'tel:+57' + waNum;
+            callBtn.style.display = 'flex';
+          }
+        }
+
+        /* ── F. GPS desde columna Actividad (col G = índice 6) ── */
+        var dActividad = (domiRow[6] || '').trim();
+        if (dActividad && mapResult) {
+          var coordMatch = dActividad.match(/(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
+          if (coordMatch) {
+            var dLat = parseFloat(coordMatch[1]);
+            var dLng = parseFloat(coordMatch[2]);
+            if (!isNaN(dLat) && !isNaN(dLng)) {
+              if (domiMarkerResult) {
+                domiMarkerResult.setLatLng([dLat, dLng]);
+              } else {
+                domiMarkerResult = L.marker([dLat, dLng], {
+                  icon: iconDomi(nombreDomiDisplay, true), zIndexOffset: 1000
+                }).addTo(mapResult);
+              }
+              var dirRaw = p.direccion || '';
+              var coordsDestM = dirRaw.match(/\[(-?\d+\.\d+),\s*(-?\d+\.\d+)\]/);
+              if (coordsDestM) {
+                trazarRutaResult(dLat, dLng,
+                  parseFloat(coordsDestM[1]), parseFloat(coordsDestM[2]), p);
+                var bounds = L.latLngBounds([
+                  [dLat, dLng],
+                  [parseFloat(coordsDestM[1]), parseFloat(coordsDestM[2])]
+                ]);
+                mapResult.fitBounds(bounds, {
+                  paddingTopLeft: [20, 60], paddingBottomRight: [20, 20], maxZoom: 16
+                });
+              } else {
+                mapResult.setView([dLat, dLng], 15);
+              }
+            }
           }
         }
       }
     }
 
-  } catch(e){
+  } catch(e) {
     console.warn('[poll error — ciclo ignorado]', e.message);
-    /* No relanzar — el setInterval sigue corriendo */
   }
 }
 
-function rtIniciarPolling(){
+/* ═══════════════════════════════════════════════════════════
+   REEMPLAZA las funciones rtIniciarPolling y _rtPollCiclo
+   que están en tu <script>.
+   
+   BUSCA:   function rtIniciarPolling(){
+   REEMPLAZA hasta el final de _rtPollCiclo (el try/catch grande)
+═══════════════════════════════════════════════════════════ */
+
+function rtIniciarPolling() {
   clearInterval(_rtPollTimer);
-  _rtPollTimer = setInterval(_rtPollCiclo, 5000);
+  /* Primera lectura INMEDIATA sin esperar el intervalo */
+  _rtPollCiclo();
+  /* Luego cada 3 segundos */
+  _rtPollTimer = setInterval(_rtPollCiclo, 3000);
+}
+
+async function _rtPollCiclo() {
+  var p = state.pedidoRastreado;
+  if (!p || !p.id) return;
+
+  var SHEET_ID = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+
+  /* ── CLAVE: query SQL en lugar de CSV completo.
+     Google ejecuta la query en tiempo real → sin caché ── */
+  var ts   = Date.now();
+  var rand = Math.random().toString(36).slice(2);
+  var tq   = "select * where A='" + p.id + "' limit 1";
+  var urlP = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
+           + '/gviz/tq?tqx=out:csv'
+           + '&sheet=Pedidos'
+           + '&tq=' + encodeURIComponent(tq)
+           + '&_=' + ts + rand;
+
+  function parseCsvLine(line) {
+    var result = [], cur = '', inQ = false;
+    for (var i = 0; i < line.length; i++) {
+      var c = line[i];
+      if (c === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+      else if (c === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
+      else cur += c;
+    }
+    result.push(cur.trim());
+    return result;
+  }
+
+  try {
+    var resP = await fetch(urlP, {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache, no-store' }
+    });
+    var txtP = await resP.text();
+    var linesP = txtP.trim().split('\n');
+
+    /* Con query SQL: línea 0 = encabezado, línea 1 = dato */
+    /* Si no hay dato, linesP.length < 2 */
+    var f0 = null;
+    if (linesP.length >= 2 && linesP[1].trim()) {
+      f0 = parseCsvLine(linesP[1]);
+    }
+    /* Fallback: buscar sin query por si el sheet no permite queries */
+    if (!f0) {
+      /* Intentar leer CSV plano como último recurso */
+      var urlFb = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
+                + '/gviz/tq?tqx=out:csv&sheet=Pedidos&cachebust=' + ts + rand;
+      var resFb = await fetch(urlFb, { cache: 'no-store' });
+      var txtFb = await resFb.text();
+      var linesFb = txtFb.trim().split('\n');
+      for (var i = 1; i < linesFb.length; i++) {
+        var cols = parseCsvLine(linesFb[i]);
+        if ((cols[0]||'').replace(/^#+/,'').trim() === p.id) { f0 = cols; break; }
+      }
+    }
+
+    if (!f0) return;
+
+    var nuevoEstado      = (f0[4]  || '').trim();
+    var nuevoDomi        = (f0[15] || '').trim();
+    var nuevaHoraProceso = (f0[16] || '').trim();
+    var nuevaHoraCamino  = (f0[17] || '').trim();
+    var nuevaHoraEntrega = (f0[18] || '').trim();
+
+    if (!nuevoEstado) return;
+
+    /* ── Detectar cambios ── */
+    var estadoCambio = nuevoEstado !== p.estado;
+    var horasCambio  = (
+      (nuevaHoraProceso && nuevaHoraProceso !== p.horaEnProceso) ||
+      (nuevaHoraCamino  && nuevaHoraCamino  !== p.horaEnCamino)  ||
+      (nuevaHoraEntrega && nuevaHoraEntrega !== p.horaEntrego)
+    );
+
+    if (estadoCambio || horasCambio) {
+      p.estado        = nuevoEstado;
+      p.horaEnProceso = nuevaHoraProceso || p.horaEnProceso;
+      p.horaEnCamino  = nuevaHoraCamino  || p.horaEnCamino;
+      p.horaEntrego   = nuevaHoraEntrega || p.horaEntrego;
+
+      /* Colores por estado */
+      var COLS2 = {
+        'Pendiente':  '#f59e0b',
+        'Confirmado': '#3b82f6',
+        'En camino':  '#8b5cf6',
+        'Entregado':  '#16a34a',
+        'Cancelado':  '#dc2626'
+      };
+      var col2 = COLS2[nuevoEstado] || '#006970';
+
+      /* Ping dot */
+      var pb2 = document.getElementById('estadoPingBase');
+      var pp2 = document.getElementById('estadoPing');
+      if (pb2) pb2.style.background = col2;
+      if (pp2) {
+        pp2.style.background = col2;
+        pp2.style.animation  = (nuevoEstado === 'En camino' || nuevoEstado === 'Confirmado')
+          ? 'pingDot 1.5s ease-in-out infinite' : 'none';
+      }
+
+      /* Label estado */
+      var ELABELS = {
+        'Pendiente':  '⏳ Recibido',
+        'Confirmado': '✅ Confirmado',
+        'En camino':  '🛵 En camino',
+        'Entregado':  '🏠 Entregado',
+        'Cancelado':  '❌ Cancelado'
+      };
+      var elLbl = document.getElementById('estadoLabel');
+      if (elLbl) { elLbl.textContent = ELABELS[nuevoEstado] || nuevoEstado; elLbl.style.color = col2; }
+
+      /* Stepper */
+      rtActualizarStepper(nuevoEstado, {
+        hora:          p.hora,
+        horaEnProceso: p.horaEnProceso,
+        horaEnCamino:  p.horaEnCamino,
+        horaEntrego:   p.horaEntrego
+      });
+
+      /* Toast + vibrar solo si cambió el estado */
+      if (estadoCambio) {
+        mostrarToast('Estado: ' + nuevoEstado, 'update');
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+      }
+
+      /* Calificar */
+      var secCal = document.getElementById('seccionCalificar');
+      if (secCal) secCal.style.display = (nuevoEstado === 'Entregado') ? 'block' : 'none';
+
+      /* Detener si terminó */
+      if (nuevoEstado === 'Entregado' || nuevoEstado === 'Cancelado') {
+        rtDetenerPolling();
+        return;
+      }
+    }
+
+    /* ── Domi asignado ── */
+    if (nuevoDomi && nuevoDomi !== p.domiciliario) p.domiciliario = nuevoDomi;
+    if (!nuevoDomi || !nuevoDomi.trim()) return;
+
+    /* ── Leer Domiciliarios con query SQL anti-caché ── */
+    var nombreDomiDisplay = nuevoDomi.replace(/\s*\([^)]+\)/g, '').trim();
+    var primerNombre      = nombreDomiDisplay.split(' ')[0].toLowerCase();
+    var tqD  = "select * where lower(B) contains '" + primerNombre + "' limit 5";
+    var urlD = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
+             + '/gviz/tq?tqx=out:csv'
+             + '&sheet=Domiciliarios'
+             + '&tq=' + encodeURIComponent(tqD)
+             + '&_=' + Date.now() + Math.random();
+
+    var resD  = await fetch(urlD, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+    var txtD  = await resD.text();
+    var linesD = txtD.trim().split('\n');
+
+    var nombreLower = nombreDomiDisplay.toLowerCase();
+    var domiRow = null;
+    for (var j = 1; j < linesD.length; j++) {
+      var dc  = parseCsvLine(linesD[j]);
+      var dn  = (dc[1] || '').trim().toLowerCase();
+      if (dn && (dn === nombreLower || nombreLower.indexOf(dn) !== -1 || dn.indexOf(nombreLower) !== -1)) {
+        domiRow = dc; break;
+      }
+    }
+
+    /* ── Actualizar card domi ── */
+    var dc = document.getElementById('domiCard');
+    if (dc && nombreDomiDisplay) {
+      dc.style.display = 'block';
+
+      var dcNombre = document.getElementById('domiNombre');
+      if (dcNombre) dcNombre.textContent = nombreDomiDisplay;
+
+      /* Foto solo si no hay img ya */
+      var avEl = document.getElementById('domiFotoWrap');
+      if (avEl && !avEl.querySelector('img')) {
+        avEl.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;'
+          + 'justify-content:center;font-size:20px;font-weight:900;color:#fff;">'
+          + nombreDomiDisplay.charAt(0).toUpperCase() + '</div>';
+        cargarFotoDomi(nombreDomiDisplay, avEl);
+      }
+
+      /* Estado texto del domi */
+      var etMap = {
+        'En camino':  'En camino hacia ti 🛵',
+        'Confirmado': 'Pedido confirmado ✅',
+        'Entregado':  'Entregado 🏠',
+        'Pendiente':  'Asignando…'
+      };
+      var horaClave = p.horaEnCamino || p.horaEnProceso || '';
+      var domiEstEl = document.getElementById('domiEstadoTxt');
+      if (domiEstEl) {
+        domiEstEl.textContent = (etMap[p.estado] || p.estado)
+          + (horaClave ? '  ·  ' + horaClave : '');
+      }
+
+      /* WhatsApp + llamada */
+      if (domiRow) {
+        var dTel = (domiRow[2] || '').trim();
+        if (dTel) {
+          var waNum   = dTel.replace(/\D/g, '');
+          var waBtn   = document.getElementById('domiWABtn');
+          var callBtn = document.getElementById('domiCallBtn');
+          if (waBtn)   { waBtn.href = 'https://wa.me/57' + waNum + '?text=' + encodeURIComponent('Hola, soy tu cliente. Pedido #' + p.id); waBtn.style.display = 'flex'; }
+          if (callBtn) { callBtn.href = 'tel:+57' + waNum; callBtn.style.display = 'flex'; }
+        }
+
+        /* GPS col G (índice 6) */
+        var dActividad = (domiRow[6] || '').trim();
+        if (dActividad && mapResult) {
+          var coordMatch = dActividad.match(/(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
+          if (coordMatch) {
+            var dLat = parseFloat(coordMatch[1]);
+            var dLng = parseFloat(coordMatch[2]);
+            if (!isNaN(dLat) && !isNaN(dLng)) {
+              if (domiMarkerResult) {
+                domiMarkerResult.setLatLng([dLat, dLng]);
+              } else {
+                domiMarkerResult = L.marker([dLat, dLng], {
+                  icon: iconDomi(nombreDomiDisplay, true), zIndexOffset: 1000
+                }).addTo(mapResult);
+              }
+              var dirRaw2     = p.direccion || '';
+              var coordsDestM = dirRaw2.match(/\[(-?\d+\.\d+),\s*(-?\d+\.\d+)\]/);
+              if (coordsDestM) {
+                trazarRutaResult(dLat, dLng, parseFloat(coordsDestM[1]), parseFloat(coordsDestM[2]), p);
+                mapResult.fitBounds(
+                  L.latLngBounds([[dLat,dLng],[parseFloat(coordsDestM[1]),parseFloat(coordsDestM[2])]]),
+                  {paddingTopLeft:[20,60],paddingBottomRight:[20,20],maxZoom:16}
+                );
+              } else {
+                mapResult.setView([dLat, dLng], 15);
+              }
+            }
+          }
+        }
+      }
+    }
+
+  } catch(e) {
+    console.warn('[poll — ciclo ignorado]', e.message);
+  }
 }
 
 // ✅ DESPUÉS
@@ -4759,6 +5083,8 @@ function _copiarFallback(txt){
   catch(e){ mostrarToast('Tu código: '+txt,'info'); }
   document.body.removeChild(ta);
 }
+
+
 
 </script>
 </body>
