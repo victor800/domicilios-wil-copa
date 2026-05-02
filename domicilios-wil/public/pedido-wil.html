@@ -5084,7 +5084,466 @@ function _copiarFallback(txt){
   document.body.removeChild(ta);
 }
 
+/**
+ * WIL RASTREAR — PARCHE QUIRÚRGICO v1.0
+ * ─────────────────────────────────────
+ * Bug 1: Estado no se actualiza en tiempo real (caché de Sheets + intervalo dormido)
+ * Bug 2: Foto del domi no carga al ver el pedido
+ *
+ * INSTRUCCIONES: Pega este bloque <script> justo antes de </body> en pedir.html
+ */
 
+(function WIL_PATCH() {
+  'use strict';
+
+  var SHEET_ID = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+  var POLL_MS  = 3000;   // cada 3 segundos
+  var _timer   = null;
+  var _corriendo = false;
+
+  /* ══════════════════════════════════════════════════════════
+     UTILIDAD: fetch SIN CACHÉ a Google Sheets
+     Combina 4 técnicas anti-caché para máxima efectividad:
+     1. Headers Cache-Control + Pragma
+     2. Query param _ts con timestamp
+     3. Query param _r con random
+     4. fetch con cache:'no-store'
+  ══════════════════════════════════════════════════════════ */
+  function sheetUrl(hoja, tq) {
+    var ts   = Date.now();
+    var rand = Math.random().toString(36).slice(2, 8);
+    var url  = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
+             + '/gviz/tq?tqx=out:csv'
+             + '&sheet=' + encodeURIComponent(hoja)
+             + '&_ts=' + ts
+             + '&_r=' + rand;
+    if (tq) url += '&tq=' + encodeURIComponent(tq);
+    return url;
+  }
+
+  function fetchSheet(hoja, tq) {
+    return fetch(sheetUrl(hoja, tq), {
+      cache:   'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma':        'no-cache'
+      }
+    }).then(function(r) { return r.text(); });
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     CSV PARSER
+  ══════════════════════════════════════════════════════════ */
+  function parseCsv(line) {
+    var res = [], cur = '', q = false;
+    for (var i = 0; i < line.length; i++) {
+      var c = line[i];
+      if (c === '"') {
+        if (q && line[i + 1] === '"') { cur += '"'; i++; }
+        else q = !q;
+      } else if (c === ',' && !q) { res.push(cur.trim()); cur = ''; }
+      else cur += c;
+    }
+    res.push(cur.trim());
+    return res;
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     CICLO DE POLLING — reemplaza _rtPollCiclo global
+  ══════════════════════════════════════════════════════════ */
+  async function ciclo() {
+    var p = window.state && window.state.pedidoRastreado;
+    if (!p || !p.id) return;
+
+    /* ── Leer fila del pedido por ID ── */
+    var tqPedido = "select * where A='" + p.id + "' limit 1";
+    var txtP;
+    try {
+      txtP = await fetchSheet('Pedidos', tqPedido);
+    } catch (e) {
+      /* Si falla la query SQL, leer CSV completo como fallback */
+      try { txtP = await fetchSheet('Pedidos'); } catch (e2) { return; }
+    }
+
+    var linesP = txtP.trim().split('\n');
+    var f0 = null;
+
+    /* Con query: línea 1 es el dato */
+    if (linesP.length >= 2 && linesP[1].trim()) {
+      var tmp = parseCsv(linesP[1]);
+      /* Validar que sea realmente nuestra fila (la query a veces devuelve encabezado) */
+      if ((tmp[0] || '').replace(/^#+/, '').trim() === p.id) f0 = tmp;
+    }
+
+    /* Si la query no devolvió resultado útil, buscar en CSV completo */
+    if (!f0) {
+      for (var i = 1; i < linesP.length; i++) {
+        var cols = parseCsv(linesP[i]);
+        if ((cols[0] || '').replace(/^#+/, '').trim() === p.id) { f0 = cols; break; }
+      }
+    }
+
+    if (!f0) return;
+
+    /* ── Extraer campos ── */
+    var nuevoEstado       = (f0[4]  || '').trim();
+    var nuevoDomi         = (f0[15] || '').trim();
+    var nuevaHoraProceso  = (f0[16] || '').trim();
+    var nuevaHoraCamino   = (f0[17] || '').trim();
+    var nuevaHoraEntrega  = (f0[18] || '').trim();
+
+    if (!nuevoEstado) return;
+
+    /* ── Detectar cambios ── */
+    var estadoCambio = nuevoEstado !== p.estado;
+    var horasCambio  = (
+      (nuevaHoraProceso && nuevaHoraProceso !== p.horaEnProceso) ||
+      (nuevaHoraCamino  && nuevaHoraCamino  !== p.horaEnCamino)  ||
+      (nuevaHoraEntrega && nuevaHoraEntrega !== p.horaEntrego)
+    );
+    var domiCambio = nuevoDomi && nuevoDomi !== p.domiciliario;
+
+    /* Sin cambios → salir rápido */
+    if (!estadoCambio && !horasCambio && !domiCambio) return;
+
+    /* ── Actualizar state ── */
+    p.estado        = nuevoEstado;
+    p.horaEnProceso = nuevaHoraProceso || p.horaEnProceso;
+    p.horaEnCamino  = nuevaHoraCamino  || p.horaEnCamino;
+    p.horaEntrego   = nuevaHoraEntrega || p.horaEntrego;
+    if (domiCambio) p.domiciliario = nuevoDomi;
+
+    /* ── Paleta de colores ── */
+    var COLS = {
+      'Pendiente':  '#f59e0b',
+      'Confirmado': '#3b82f6',
+      'En camino':  '#8b5cf6',
+      'Entregado':  '#16a34a',
+      'Cancelado':  '#dc2626'
+    };
+    var col = COLS[nuevoEstado] || '#006970';
+
+    /* ── Ping dot ── */
+    var pb = document.getElementById('estadoPingBase');
+    var pp = document.getElementById('estadoPing');
+    if (pb) pb.style.background = col;
+    if (pp) {
+      pp.style.background = col;
+      pp.style.animation  = (nuevoEstado === 'En camino' || nuevoEstado === 'Confirmado')
+        ? 'pingDot 1.5s ease-in-out infinite' : 'none';
+    }
+
+    /* ── Label estado ── */
+    var ELABELS = {
+      'Pendiente':  '⏳ Recibido',
+      'Confirmado': '✅ Confirmado',
+      'En camino':  '🛵 En camino',
+      'Entregado':  '🏠 Entregado',
+      'Cancelado':  '❌ Cancelado'
+    };
+    var elLbl = document.getElementById('estadoLabel');
+    if (elLbl) { elLbl.textContent = ELABELS[nuevoEstado] || nuevoEstado; elLbl.style.color = col; }
+
+    /* ── Stepper ── */
+    if (typeof window.rtActualizarStepper === 'function') {
+      window.rtActualizarStepper(nuevoEstado, {
+        hora:          p.hora,
+        horaEnProceso: p.horaEnProceso,
+        horaEnCamino:  p.horaEnCamino,
+        horaEntrego:   p.horaEntrego
+      });
+    }
+
+    /* ── Toast + vibración solo si cambió el estado ── */
+    if (estadoCambio) {
+      if (typeof window.mostrarToast === 'function') {
+        window.mostrarToast('Estado: ' + nuevoEstado, 'update');
+      }
+      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+    }
+
+    /* ── Calificar ── */
+    var secCal = document.getElementById('seccionCalificar');
+    if (secCal) secCal.style.display = (nuevoEstado === 'Entregado') ? 'block' : 'none';
+
+    /* ── Detener si terminó ── */
+    if (nuevoEstado === 'Entregado' || nuevoEstado === 'Cancelado') {
+      detener(); return;
+    }
+
+    /* ── Si hay nuevo domi, actualizar card + foto + GPS ── */
+    if (nuevoDomi && nuevoDomi.trim()) {
+      actualizarCardDomi(p, nuevoDomi);
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     ACTUALIZAR CARD DEL DOMI (foto + estado + GPS)
+  ══════════════════════════════════════════════════════════ */
+  async function actualizarCardDomi(p, nombreDomi) {
+    var nombreDisplay = (nombreDomi || '').replace(/\s*\([^)]+\)/g, '').trim();
+    if (!nombreDisplay) return;
+
+    var dc = document.getElementById('domiCard');
+    if (!dc) return;
+    dc.style.display = 'block';
+
+    /* Nombre */
+    var dcNombre = document.getElementById('domiNombre');
+    if (dcNombre) dcNombre.textContent = nombreDisplay;
+
+    /* Foto: solo si no hay img cargada aún */
+    var avEl = document.getElementById('domiFotoWrap');
+    if (avEl && !avEl.querySelector('img')) {
+      /* Mostrar inicial mientras carga */
+      avEl.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;'
+        + 'justify-content:center;font-size:20px;font-weight:900;color:#fff;">'
+        + nombreDisplay.charAt(0).toUpperCase() + '</div>';
+
+      /* Cargar foto y datos del domi */
+      cargarDomiCompleto(nombreDisplay, avEl, p);
+    }
+
+    /* Estado texto */
+    var etMap = {
+      'En camino':  'En camino hacia ti 🛵',
+      'Confirmado': 'Pedido confirmado ✅',
+      'Entregado':  'Entregado 🏠',
+      'Pendiente':  'Asignando domiciliario…'
+    };
+    var horaClave = p.horaEnCamino || p.horaEnProceso || '';
+    var domiEstEl = document.getElementById('domiEstadoTxt');
+    if (domiEstEl) {
+      domiEstEl.textContent = (etMap[p.estado] || p.estado)
+        + (horaClave ? '  ·  ' + horaClave : '');
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     CARGAR FOTO + TELÉFONO + GPS DEL DOMI desde hoja Domiciliarios
+  ══════════════════════════════════════════════════════════ */
+  var _domiCargado = {}; // evitar recargas innecesarias
+
+  async function cargarDomiCompleto(nombreDisplay, avEl, p) {
+    if (_domiCargado[nombreDisplay]) return; // ya cargamos este domi
+    _domiCargado[nombreDisplay] = true;
+
+    var primerNombre = nombreDisplay.split(' ')[0].toLowerCase();
+    var tqD = "select * where lower(B) contains '" + primerNombre.replace(/'/g, "\\'") + "' limit 5";
+    var txtD;
+    try {
+      txtD = await fetchSheet('Domiciliarios', tqD);
+    } catch (e) {
+      try { txtD = await fetchSheet('Domiciliarios'); } catch (e2) { return; }
+    }
+
+    var linesD = txtD.trim().split('\n');
+    var nombreLower = nombreDisplay.toLowerCase();
+    var domiRow = null;
+
+    for (var j = 1; j < linesD.length; j++) {
+      var dc = parseCsv(linesD[j]);
+      var dn = (dc[1] || '').trim().toLowerCase();
+      if (dn && (dn === nombreLower || nombreLower.indexOf(dn) !== -1 || dn.indexOf(nombreLower) !== -1)) {
+        domiRow = dc; break;
+      }
+    }
+
+    if (!domiRow) return;
+
+    /* ── Foto ── */
+    var foto = (domiRow[4] || '').trim(); // col E
+    if (foto && avEl && !avEl.querySelector('img')) {
+      var fotoUrl = foto;
+      if (foto.indexOf('drive.google.com') !== -1) {
+        var m = foto.match(/\/d\/([^/?\s]+)/);
+        if (m) fotoUrl = 'https://lh3.googleusercontent.com/d/' + m[1];
+      } else if (!foto.startsWith('http')) {
+        fotoUrl = 'icons/' + foto;
+      }
+      var ini = nombreDisplay.charAt(0).toUpperCase();
+      avEl.innerHTML = '<img src="' + fotoUrl + '" '
+        + 'style="width:100%;height:100%;object-fit:cover;object-position:center 20%" '
+        + 'onerror="this.parentElement.innerHTML=\'<div style=&quot;width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff;&quot;>' + ini + '</div>\'">';
+    }
+
+    /* ── Teléfono: WhatsApp + llamada ── */
+    var dTel = (domiRow[2] || '').trim(); // col C
+    if (dTel) {
+      var waNum   = dTel.replace(/\D/g, '');
+      var waBtn   = document.getElementById('domiWABtn');
+      var callBtn = document.getElementById('domiCallBtn');
+      if (waBtn) {
+        waBtn.href = 'https://wa.me/57' + waNum
+          + '?text=' + encodeURIComponent('Hola, soy tu cliente. Pedido #' + (p ? p.id : ''));
+        waBtn.style.display = 'flex';
+      }
+      if (callBtn) {
+        callBtn.href = 'tel:+57' + waNum;
+        callBtn.style.display = 'flex';
+      }
+
+      /* Chat modal: teléfono del domi */
+      var chatCallBtn = document.getElementById('chatModalCall');
+      if (chatCallBtn) {
+        chatCallBtn.href = 'tel:+57' + waNum;
+        chatCallBtn.style.display = 'flex';
+      }
+    }
+
+    /* ── GPS desde col G (Actividad) ── */
+    var dActividad = (domiRow[6] || '').trim(); // col G
+    if (dActividad && window.mapResult) {
+      var coordMatch = dActividad.match(/(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
+      if (coordMatch) {
+        var dLat = parseFloat(coordMatch[1]);
+        var dLng = parseFloat(coordMatch[2]);
+        if (!isNaN(dLat) && !isNaN(dLng)) {
+          if (window.domiMarkerResult) {
+            window.domiMarkerResult.setLatLng([dLat, dLng]);
+          }
+        }
+      }
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     CONTROL DEL POLLING
+  ══════════════════════════════════════════════════════════ */
+  function iniciar() {
+    if (_corriendo) return; // ya está corriendo
+    _corriendo = true;
+    clearInterval(_timer);
+    ciclo(); // INMEDIATO
+    _timer = setInterval(ciclo, POLL_MS);
+    console.log('[WIL PATCH] Polling iniciado — cada ' + POLL_MS + 'ms');
+  }
+
+  function detener() {
+    _corriendo = false;
+    clearInterval(_timer);
+    _timer = null;
+    _domiCargado = {}; // resetear caché de fotos
+    console.log('[WIL PATCH] Polling detenido');
+  }
+
+  function reiniciar() {
+    _corriendo = false;
+    _domiCargado = {};
+    iniciar();
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     PAGE VISIBILITY API
+     Cuando el usuario vuelve a la pestaña/app → ciclo inmediato
+  ══════════════════════════════════════════════════════════ */
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') {
+      var p = window.state && window.state.pedidoRastreado;
+      if (!p || !p.id) return;
+      /* Si el timer se durmió, reiniciar */
+      if (!_timer || !_corriendo) {
+        reiniciar();
+      } else {
+        /* Aunque siga corriendo, forzar lectura inmediata */
+        ciclo();
+      }
+    }
+  });
+
+  /* ══════════════════════════════════════════════════════════
+     FOCUS del documento (Android WebView llama focus al volver)
+  ══════════════════════════════════════════════════════════ */
+  window.addEventListener('focus', function () {
+    var p = window.state && window.state.pedidoRastreado;
+    if (p && p.id && (!_timer || !_corriendo)) reiniciar();
+    else if (p && p.id) ciclo();
+  });
+
+  /* ══════════════════════════════════════════════════════════
+     SOBREESCRIBIR rtIniciarPolling y rtDetenerPolling globales
+     para que el resto del código use ESTE motor
+  ══════════════════════════════════════════════════════════ */
+  window.rtIniciarPolling = function () {
+    iniciar();
+  };
+
+  window.rtDetenerPolling = function () {
+    detener();
+    /* Detener rastreo nativo Android si aplica */
+    try {
+      if (window.WilNativo && typeof window.WilNativo.detenerRastreo === 'function') {
+        window.WilNativo.detenerRastreo();
+      }
+    } catch (e) {}
+  };
+
+  /* ══════════════════════════════════════════════════════════
+     RESETEAR CACHÉ DE FOTOS al buscar nuevo pedido
+     Enganchamos rastrearPedido original para limpiar al inicio
+  ══════════════════════════════════════════════════════════ */
+  var _origRastrear = window.rastrearPedido;
+  if (typeof _origRastrear === 'function') {
+    window.rastrearPedido = async function () {
+      _domiCargado = {}; // limpiar caché de fotos del pedido anterior
+      detener();         // detener polling anterior
+      return _origRastrear.apply(this, arguments);
+    };
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     PARCHE PARA cargarFotoDomi global
+     Reemplaza la función existente con la versión anti-caché
+  ══════════════════════════════════════════════════════════ */
+  window.cargarFotoDomi = async function (nombreDomi, avEl) {
+    var nombreBuscar = (nombreDomi || '').trim().toLowerCase();
+    var primerNombre = nombreBuscar.split(' ')[0];
+
+    var tqD = "select * where lower(B) contains '" + primerNombre.replace(/'/g, "\\'") + "' limit 5";
+    var txtD;
+    try {
+      txtD = await fetchSheet('Domiciliarios', tqD);
+    } catch (e) {
+      try { txtD = await fetchSheet('Domiciliarios'); } catch (e2) { return; }
+    }
+
+    var linesD = txtD.trim().split('\n');
+    for (var i = 1; i < linesD.length; i++) {
+      var cols = parseCsv(linesD[i]);
+      var nombreSheet = (cols[1] || '').trim().toLowerCase();
+      if (!nombreSheet) continue;
+
+      var match = (
+        nombreSheet === nombreBuscar ||
+        nombreBuscar.indexOf(nombreSheet) !== -1 ||
+        nombreSheet.indexOf(nombreBuscar) !== -1
+      );
+      if (!match) continue;
+
+      var foto = (cols[4] || '').trim(); // col E = FOTO
+      if (!foto) break;
+
+      var fotoUrl = foto;
+      if (foto.indexOf('drive.google.com') !== -1) {
+        var m = foto.match(/\/d\/([^/?\s]+)/);
+        if (m) fotoUrl = 'https://lh3.googleusercontent.com/d/' + m[1];
+      } else if (!foto.startsWith('http')) {
+        fotoUrl = 'icons/' + foto;
+      }
+
+      var ini = nombreDomi.charAt(0).toUpperCase();
+      avEl.innerHTML = '<img src="' + fotoUrl + '" '
+        + 'style="width:100%;height:100%;object-fit:cover;object-position:center 20%" '
+        + 'onerror="this.parentElement.innerHTML=\'<div style=&quot;width:100%;height:100%;'
+        + 'display:flex;align-items:center;justify-content:center;'
+        + 'font-size:20px;font-weight:900;color:#fff;&quot;>' + ini + '</div>\'">';
+      break;
+    }
+  };
+
+  console.log('[WIL PATCH] ✅ Parche cargado — polling anti-caché + foto domi + visibility API');
+
+})(); /* fin IIFE */
 
 </script>
 </body>
