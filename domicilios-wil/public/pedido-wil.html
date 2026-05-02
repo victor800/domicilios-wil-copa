@@ -11,6 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
  <script src="pedido-libre.js"></script>
+ <script src="wil-fix-final.js"></script>
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
@@ -5544,6 +5545,406 @@ function _copiarFallback(txt){
   console.log('[WIL PATCH] ✅ Parche cargado — polling anti-caché + foto domi + visibility API');
 
 })(); /* fin IIFE */
+
+/**
+ * WIL FIX FINAL — reemplaza wil-rastrear-patch.js
+ * Pegar como ÚLTIMO <script> antes de </body>
+ * ─────────────────────────────────────────────
+ * Fix 1: Elimina chip duplicado "● Confirmado" debajo del step
+ * Fix 2: Un único setInterval de 3s que SÍ actualiza en tiempo real
+ */
+(function () {
+  'use strict';
+
+  var SHEET_ID = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+
+  /* ══════════════════════════════════════════════════════
+     1. MATAR TODOS LOS TIMERS ANTERIORES
+     Limpiamos cualquier setInterval activo heredado
+  ══════════════════════════════════════════════════════ */
+  (function matarTimers() {
+    // Limpiar variables globales conocidas
+    if (window._rtPollTimer)    { clearInterval(window._rtPollTimer);    window._rtPollTimer = null; }
+    if (window._domiPollUbicTimer) { clearInterval(window._domiPollUbicTimer); window._domiPollUbicTimer = null; }
+    // Barrido masivo: matar los últimos 500 posibles IDs de setInterval
+    var id = setInterval(function(){}, 99999);
+    for (var k = Math.max(0, id - 600); k <= id; k++) clearInterval(k);
+    clearInterval(id);
+  })();
+
+  /* ══════════════════════════════════════════════════════
+     2. FIX STEPPER — sin chip duplicado
+     Reemplaza rtActualizarStepper para NO añadir el span
+     ".rt-step-lbl-active" que duplica el texto del estado
+  ══════════════════════════════════════════════════════ */
+  window.rtActualizarStepper = function (estado, horas) {
+    horas = horas || {};
+    var STEP_MAP   = { 'Pendiente':0,'Confirmado':1,'En camino':2,'Entregado':3,'Cancelado':0 };
+    var STEP_LABELS= ['Recibido','Confirmado','En camino','Entregado'];
+    var STEP_HORAS = [
+      horas.hora          || '',
+      horas.horaEnProceso || '',
+      horas.horaEnCamino  || '',
+      horas.horaEntrego   || ''
+    ];
+
+    var paso = (STEP_MAP[estado] !== undefined) ? STEP_MAP[estado] : 0;
+    var pcts  = [8, 36, 68, 97];
+
+    var lineEl = document.getElementById('rtStepLine');
+    if (!lineEl) return;
+    lineEl.classList.remove('loading');
+    lineEl.style.transition = 'none';
+    lineEl.style.width = '0%';
+    setTimeout(function () {
+      lineEl.style.transition = 'width 1.4s cubic-bezier(.22,1,.36,1)';
+      lineEl.style.width = pcts[paso] + '%';
+      if (paso < 3) setTimeout(function () { lineEl.classList.add('loading'); }, 1500);
+    }, 80);
+
+    // Limpiar chips de hora previos (sin añadir nuevos chips de estado)
+    document.querySelectorAll('.rt-step-hora-lbl, .rt-step-lbl-active').forEach(function (el) { el.remove(); });
+
+    for (var i = 0; i <= 3; i++) {
+      var dot   = document.getElementById('step' + i);
+      var lbl   = document.getElementById('step' + i + 'lbl');
+      if (!dot || !lbl) continue;
+      var icon  = dot.querySelector('.sym');
+
+      if (i < paso) {
+        // completado
+        dot.style.cssText = 'background:#65d000;border:none;box-shadow:0 2px 8px rgba(101,208,0,.35)';
+        if (icon) { icon.style.color = '#fff'; icon.style.fontVariationSettings = "'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24"; }
+        lbl.style.color = '#65d000'; lbl.style.fontWeight = '800';
+        lbl.textContent = STEP_LABELS[i];
+      } else if (i === paso) {
+        // activo — sin chip extra
+        dot.style.cssText = 'background:#fff;border:2.5px solid #006970;box-shadow:0 0 0 5px rgba(0,105,112,.12)';
+        if (icon) { icon.style.color = '#006970'; icon.style.fontVariationSettings = "'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24"; }
+        lbl.style.color = '#006970'; lbl.style.fontWeight = '900';
+        lbl.textContent = STEP_LABELS[i]; // solo el texto, sin chip duplicado
+      } else {
+        // futuro
+        dot.style.cssText = 'background:#e7e8e9;border:none;box-shadow:none';
+        if (icon) { icon.style.color = '#9aa5ae'; icon.style.fontVariationSettings = "'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24"; }
+        lbl.style.color = '#9aa5ae'; lbl.style.fontWeight = '700';
+        lbl.textContent = STEP_LABELS[i];
+      }
+
+      // Hora debajo del label (solo si existe)
+      if (STEP_HORAS[i]) {
+        var horaEl = document.createElement('span');
+        horaEl.className = 'rt-step-hora-lbl';
+        horaEl.textContent = STEP_HORAS[i];
+        horaEl.style.cssText = 'font-size:8px;text-align:center;display:block;'
+          + 'margin-top:1px;font-weight:700;max-width:64px;overflow:hidden;'
+          + 'text-overflow:ellipsis;white-space:nowrap;'
+          + 'color:' + (i <= paso ? (i < paso ? '#65d000' : '#006970') : '#9aa5ae');
+        lbl.parentNode.appendChild(horaEl);
+      }
+    }
+  };
+
+  /* ══════════════════════════════════════════════════════
+     3. POLLING SIMPLE — UN ÚNICO setInterval
+     Lee solo col E (ESTADO) y cols Q/R/S (horas) de la
+     fila del pedido. Si algo cambió → actualiza la UI.
+  ══════════════════════════════════════════════════════ */
+  var _wil_timer  = null;
+  var _wil_ultimo = '';   // último estado conocido
+  var _wil_fotos  = {};   // caché de fotos ya cargadas
+
+  function csvLine(line) {
+    var r = [], cur = '', q = false;
+    for (var i = 0; i < line.length; i++) {
+      var c = line[i];
+      if (c === '"') { if (q && line[i+1] === '"') { cur += '"'; i++; } else q = !q; }
+      else if (c === ',' && !q) { r.push(cur.trim()); cur = ''; }
+      else cur += c;
+    }
+    r.push(cur.trim());
+    return r;
+  }
+
+  async function leerEstado() {
+    var p = window.state && window.state.pedidoRastreado;
+    if (!p || !p.id) return;
+
+    var id  = p.id;
+    var ts  = Date.now();
+    var rnd = Math.random().toString(36).slice(2);
+
+    /* Query SQL → solo la fila del pedido, sin caché */
+    var tq  = "select * where A='" + id + "' limit 1";
+    var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
+            + '/gviz/tq?tqx=out:csv&sheet=Pedidos'
+            + '&tq=' + encodeURIComponent(tq)
+            + '&_=' + ts + rnd;
+
+    var txt;
+    try {
+      var res = await fetch(url, {
+        cache:   'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store', 'Pragma': 'no-cache' }
+      });
+      txt = await res.text();
+    } catch (e) { return; }
+
+    var lines = txt.trim().split('\n');
+    /* Con query: línea 0 = header, línea 1 = dato.
+       Si Sheets devuelve sólo header (query vacía), fallback a CSV completo */
+    var f0 = null;
+    if (lines.length >= 2 && lines[1].trim()) {
+      var tmp = csvLine(lines[1]);
+      if ((tmp[0] || '').replace(/^#+/, '').trim() === id) f0 = tmp;
+    }
+
+    /* Fallback CSV completo */
+    if (!f0) {
+      var url2 = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
+               + '/gviz/tq?tqx=out:csv&sheet=Pedidos&_=' + ts + rnd;
+      try {
+        var res2 = await fetch(url2, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+        var txt2 = await res2.text();
+        var ls2  = txt2.trim().split('\n');
+        for (var i = 1; i < ls2.length; i++) {
+          var c2 = csvLine(ls2[i]);
+          if ((c2[0] || '').replace(/^#+/, '').trim() === id) { f0 = c2; break; }
+        }
+      } catch (e2) { return; }
+    }
+
+    if (!f0) return;
+
+    var nuevoEstado      = (f0[4]  || '').trim();
+    var nuevoDomi        = (f0[15] || '').trim();
+    var nuevaHoraProceso = (f0[16] || '').trim();
+    var nuevaHoraCamino  = (f0[17] || '').trim();
+    var nuevaHoraEntrega = (f0[18] || '').trim();
+
+    if (!nuevoEstado) return;
+
+    /* Clave compuesta para detectar CUALQUIER cambio */
+    var clave = [nuevoEstado, nuevoDomi, nuevaHoraProceso, nuevaHoraCamino, nuevaHoraEntrega].join('|');
+    if (clave === _wil_ultimo) return; // nada cambió
+    _wil_ultimo = clave;
+
+    /* ── Actualizar state ── */
+    p.estado        = nuevoEstado;
+    p.domiciliario  = nuevoDomi  || p.domiciliario;
+    p.horaEnProceso = nuevaHoraProceso || p.horaEnProceso;
+    p.horaEnCamino  = nuevaHoraCamino  || p.horaEnCamino;
+    p.horaEntrego   = nuevaHoraEntrega || p.horaEntrego;
+
+    /* ── Colores ── */
+    var COLS = {
+      'Pendiente':  '#f59e0b',
+      'Confirmado': '#3b82f6',
+      'En camino':  '#8b5cf6',
+      'Entregado':  '#16a34a',
+      'Cancelado':  '#dc2626'
+    };
+    var col = COLS[nuevoEstado] || '#006970';
+
+    /* Ping dot */
+    var pb = document.getElementById('estadoPingBase');
+    var pp = document.getElementById('estadoPing');
+    if (pb) pb.style.background = col;
+    if (pp) {
+      pp.style.background = col;
+      pp.style.animation  = (nuevoEstado === 'En camino' || nuevoEstado === 'Confirmado')
+        ? 'pingDot 1.5s ease-in-out infinite' : 'none';
+    }
+
+    /* Label estado */
+    var ELABELS = {
+      'Pendiente':  '⏳ Recibido',
+      'Confirmado': '✅ Confirmado',
+      'En camino':  '🛵 En camino',
+      'Entregado':  '🏠 Entregado',
+      'Cancelado':  '❌ Cancelado'
+    };
+    var elLbl = document.getElementById('estadoLabel');
+    if (elLbl) { elLbl.textContent = ELABELS[nuevoEstado] || nuevoEstado; elLbl.style.color = col; }
+
+    /* Stepper */
+    window.rtActualizarStepper(nuevoEstado, {
+      hora:          p.hora,
+      horaEnProceso: p.horaEnProceso,
+      horaEnCamino:  p.horaEnCamino,
+      horaEntrego:   p.horaEntrego
+    });
+
+    /* Toast + vibración */
+    if (typeof window.mostrarToast === 'function') {
+      window.mostrarToast('Estado: ' + nuevoEstado, 'update');
+    }
+    if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
+
+    /* Calificar */
+    var secCal = document.getElementById('seccionCalificar');
+    if (secCal) secCal.style.display = (nuevoEstado === 'Entregado') ? 'block' : 'none';
+
+    /* Actualizar card del domi si cambió */
+    if (nuevoDomi && nuevoDomi.trim()) {
+      actualizarCardDomi(p, nuevoDomi);
+    }
+
+    /* Detener si terminó */
+    if (nuevoEstado === 'Entregado' || nuevoEstado === 'Cancelado') {
+      detenerPoll();
+    }
+  }
+
+  /* ── Actualizar card domi ── */
+  async function actualizarCardDomi(p, nombreDomi) {
+    var nd = (nombreDomi || '').replace(/\s*\([^)]+\)/g, '').trim();
+    if (!nd) return;
+
+    var dc = document.getElementById('domiCard');
+    if (dc) dc.style.display = 'block';
+
+    var dcNom = document.getElementById('domiNombre');
+    if (dcNom) dcNom.textContent = nd;
+
+    /* Foto solo una vez por domi */
+    var avEl = document.getElementById('domiFotoWrap');
+    if (avEl && !avEl.querySelector('img') && !_wil_fotos[nd]) {
+      _wil_fotos[nd] = true;
+      avEl.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;'
+        + 'justify-content:center;font-size:20px;font-weight:900;color:#fff;">'
+        + nd.charAt(0).toUpperCase() + '</div>';
+      cargarFotoDomiSimple(nd, avEl, p);
+    }
+
+    /* Estado texto */
+    var etMap = {
+      'En camino':  'En camino hacia ti 🛵',
+      'Confirmado': 'Pedido confirmado ✅',
+      'Entregado':  'Entregado 🏠',
+      'Pendiente':  'Asignando domiciliario…'
+    };
+    var hc = p.horaEnCamino || p.horaEnProceso || '';
+    var destEl = document.getElementById('domiEstadoTxt');
+    if (destEl) destEl.textContent = (etMap[p.estado] || p.estado) + (hc ? '  ·  ' + hc : '');
+  }
+
+  /* ── Cargar foto desde hoja Domiciliarios ── */
+  async function cargarFotoDomiSimple(nd, avEl, p) {
+    var primerNom = nd.split(' ')[0].toLowerCase().replace(/'/g, "\\'");
+    var tqD = "select * where lower(B) contains '" + primerNom + "' limit 5";
+    var urlD = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
+             + '/gviz/tq?tqx=out:csv&sheet=Domiciliarios'
+             + '&tq=' + encodeURIComponent(tqD)
+             + '&_=' + Date.now() + Math.random();
+    var txt;
+    try {
+      var r = await fetch(urlD, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+      txt = await r.text();
+    } catch (e) { return; }
+
+    var lines = txt.trim().split('\n');
+    var ndl   = nd.toLowerCase();
+    for (var i = 1; i < lines.length; i++) {
+      var c  = csvLine(lines[i]);
+      var dn = (c[1] || '').trim().toLowerCase();
+      if (!dn || !(dn === ndl || ndl.indexOf(dn) !== -1 || dn.indexOf(ndl) !== -1)) continue;
+
+      /* Foto col E */
+      var foto = (c[4] || '').trim();
+      if (foto && !avEl.querySelector('img')) {
+        var furl = foto;
+        if (foto.indexOf('drive.google.com') !== -1) {
+          var m = foto.match(/\/d\/([^/?\s]+)/);
+          if (m) furl = 'https://lh3.googleusercontent.com/d/' + m[1];
+        } else if (!foto.startsWith('http')) {
+          furl = 'icons/' + foto;
+        }
+        var ini = nd.charAt(0).toUpperCase();
+        avEl.innerHTML = '<img src="' + furl + '" '
+          + 'style="width:100%;height:100%;object-fit:cover;object-position:center 20%" '
+          + 'onerror="this.parentElement.innerHTML=\'<div style=&quot;width:100%;height:100%;'
+          + 'display:flex;align-items:center;justify-content:center;font-size:20px;'
+          + 'font-weight:900;color:#fff;&quot;>' + ini + '</div>\'">';
+      }
+
+      /* Tel col C */
+      var tel = (c[2] || '').trim().replace(/\D/g, '');
+      if (tel) {
+        var waBtn   = document.getElementById('domiWABtn');
+        var callBtn = document.getElementById('domiCallBtn');
+        if (waBtn)   { waBtn.href = 'https://wa.me/57' + tel + '?text=' + encodeURIComponent('Hola, soy tu cliente. Pedido #' + (p ? p.id : '')); waBtn.style.display = 'flex'; }
+        if (callBtn) { callBtn.href = 'tel:+57' + tel; callBtn.style.display = 'flex'; }
+      }
+
+      /* GPS col G */
+      var act = (c[6] || '').trim();
+      if (act && window.mapResult && window.domiMarkerResult) {
+        var gm = act.match(/(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
+        if (gm) window.domiMarkerResult.setLatLng([parseFloat(gm[1]), parseFloat(gm[2])]);
+      }
+      break;
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════
+     CONTROL DEL TIMER
+  ══════════════════════════════════════════════════════ */
+  function iniciarPoll() {
+    detenerPoll();
+    _wil_ultimo = ''; // reset para forzar lectura inicial
+    leerEstado();     // INMEDIATO
+    _wil_timer = setInterval(leerEstado, 3000);
+    console.log('[WIL] ✅ Polling iniciado — 3s');
+  }
+
+  function detenerPoll() {
+    clearInterval(_wil_timer);
+    _wil_timer  = null;
+    _wil_ultimo = '';
+    _wil_fotos  = {};
+    try {
+      if (window.WilNativo && window.WilNativo.detenerRastreo)
+        window.WilNativo.detenerRastreo();
+    } catch (e) {}
+  }
+
+  /* ── Exponer globalmente ── */
+  window.rtIniciarPolling = iniciarPoll;
+  window.rtDetenerPolling = detenerPoll;
+
+  /* ── Limpiar caché de fotos al buscar nuevo pedido ── */
+  var _origRastrear = window.rastrearPedido;
+  if (typeof _origRastrear === 'function') {
+    window.rastrearPedido = async function () {
+      _wil_fotos  = {};
+      _wil_ultimo = '';
+      detenerPoll();
+      return _origRastrear.apply(this, arguments);
+    };
+  }
+
+  /* ══════════════════════════════════════════════════════
+     PAGE VISIBILITY + FOCUS
+     Cuando el usuario vuelve → ciclo inmediato
+  ══════════════════════════════════════════════════════ */
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState !== 'visible') return;
+    var p = window.state && window.state.pedidoRastreado;
+    if (!p || !p.id) return;
+    if (!_wil_timer) iniciarPoll();
+    else leerEstado(); // forzar lectura inmediata
+  });
+
+  window.addEventListener('focus', function () {
+    var p = window.state && window.state.pedidoRastreado;
+    if (!p || !p.id) return;
+    if (!_wil_timer) iniciarPoll();
+    else leerEstado();
+  });
+
+  console.log('[WIL] ✅ Fix final cargado — sin chips duplicados + polling 3s limpio');
+})();
 
 </script>
 </body>
