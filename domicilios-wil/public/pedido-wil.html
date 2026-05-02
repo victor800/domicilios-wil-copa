@@ -5946,6 +5946,212 @@ function _copiarFallback(txt){
   console.log('[WIL] ✅ Fix final cargado — sin chips duplicados + polling 3s limpio');
 })();
 
+/* ═══════════════════════════════════════
+   POLLING DEFINITIVO — 2 segundos, limpio
+═══════════════════════════════════════ */
+(function(){
+  var SHEET = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+  var TIMER = null;
+  var ULTIMO = '';
+
+  function csv(line){
+    var r=[],cur='',q=false;
+    for(var i=0;i<line.length;i++){
+      var c=line[i];
+      if(c==='"'){if(q&&line[i+1]==='"'){cur+='"';i++;}else q=!q;}
+      else if(c===','&&!q){r.push(cur.trim());cur='';}
+      else cur+=c;
+    }
+    r.push(cur.trim());return r;
+  }
+
+  async function poll(){
+    var p = window.state && window.state.pedidoRastreado;
+    if(!p || !p.id) return;
+
+    var ts  = Date.now();
+    var rnd = Math.random().toString(36).slice(2);
+    var tq  = "select A,E,P,Q,R,S where A='" + p.id + "' limit 1";
+    var url = 'https://docs.google.com/spreadsheets/d/' + SHEET
+            + '/gviz/tq?tqx=out:csv&sheet=Pedidos'
+            + '&tq=' + encodeURIComponent(tq)
+            + '&_=' + ts + rnd;
+
+    var txt;
+    try {
+      var res = await fetch(url,{cache:'no-store',headers:{'Cache-Control':'no-cache, no-store','Pragma':'no-cache'}});
+      txt = await res.text();
+    } catch(e){ return; }
+
+    var lines = txt.trim().split('\n');
+    var f = null;
+
+    // Con query SQL línea 1 = dato
+    if(lines.length >= 2 && lines[1].trim()){
+      var tmp = csv(lines[1]);
+      // La query devuelve solo las cols seleccionadas: A,E,P,Q,R,S → índices 0,1,2,3,4,5
+      var idSheet = (tmp[0]||'').replace(/^#+/,'').trim();
+      if(idSheet === p.id) f = {
+        estado:       (tmp[1]||'').trim(),
+        domi:         (tmp[2]||'').trim(),
+        horaProceso:  (tmp[3]||'').trim(),
+        horaCamino:   (tmp[4]||'').trim(),
+        horaEntrega:  (tmp[5]||'').trim()
+      };
+    }
+
+    // Fallback: leer CSV completo
+    if(!f){
+      var url2 = 'https://docs.google.com/spreadsheets/d/' + SHEET
+               + '/gviz/tq?tqx=out:csv&sheet=Pedidos&_=' + ts + rnd;
+      try {
+        var res2 = await fetch(url2,{cache:'no-store',headers:{'Cache-Control':'no-cache'}});
+        var txt2 = await res2.text();
+        var ls2  = txt2.trim().split('\n');
+        for(var i=1;i<ls2.length;i++){
+          var c2 = csv(ls2[i]);
+          if((c2[0]||'').replace(/^#+/,'').trim() === p.id){
+            f = {
+              estado:      (c2[4] ||'').trim(),
+              domi:        (c2[15]||'').trim(),
+              horaProceso: (c2[16]||'').trim(),
+              horaCamino:  (c2[17]||'').trim(),
+              horaEntrega: (c2[18]||'').trim()
+            };
+            break;
+          }
+        }
+      } catch(e2){ return; }
+    }
+
+    if(!f || !f.estado) return;
+
+    var clave = f.estado + '|' + f.domi + '|' + f.horaProceso + '|' + f.horaCamino + '|' + f.horaEntrega;
+    if(clave === ULTIMO) return; // nada cambió
+    ULTIMO = clave;
+
+    // Actualizar state
+    p.estado        = f.estado;
+    p.domiciliario  = f.domi        || p.domiciliario;
+    p.horaEnProceso = f.horaProceso || p.horaEnProceso;
+    p.horaEnCamino  = f.horaCamino  || p.horaEnCamino;
+    p.horaEntrego   = f.horaEntrega || p.horaEntrego;
+
+    // Colores
+    var COLS = {'Pendiente':'#f59e0b','Confirmado':'#3b82f6','En camino':'#8b5cf6','Entregado':'#16a34a','Cancelado':'#dc2626'};
+    var col  = COLS[f.estado] || '#006970';
+
+    // Ping dot
+    var pb = document.getElementById('estadoPingBase');
+    var pp = document.getElementById('estadoPing');
+    if(pb) pb.style.background = col;
+    if(pp){
+      pp.style.background = col;
+      pp.style.animation  = (f.estado==='En camino'||f.estado==='Confirmado') ? 'pingDot 1.5s ease-in-out infinite' : 'none';
+    }
+
+    // Label
+    var LABELS = {'Pendiente':'⏳ Recibido','Confirmado':'✅ Confirmado','En camino':'🛵 En camino','Entregado':'🏠 Entregado','Cancelado':'❌ Cancelado'};
+    var elLbl  = document.getElementById('estadoLabel');
+    if(elLbl){ elLbl.textContent = LABELS[f.estado] || f.estado; elLbl.style.color = col; }
+
+    // Stepper
+    var STEP_MAP  = {'Pendiente':0,'Confirmado':1,'En camino':2,'Entregado':3,'Cancelado':0};
+    var STEP_LBLS = ['Recibido','Confirmado','En camino','Entregado'];
+    var paso      = STEP_MAP[f.estado] !== undefined ? STEP_MAP[f.estado] : 0;
+    var pcts      = [8,36,68,97];
+    var lineEl    = document.getElementById('rtStepLine');
+
+    // Limpiar chips anteriores
+    document.querySelectorAll('.rt-step-hora-lbl,.rt-step-lbl-active').forEach(function(e){e.remove();});
+
+    if(lineEl){
+      lineEl.classList.remove('loading');
+      lineEl.style.transition='none';
+      lineEl.style.width='0%';
+      setTimeout(function(){
+        lineEl.style.transition='width 1.2s cubic-bezier(.22,1,.36,1)';
+        lineEl.style.width = pcts[paso]+'%';
+        if(paso<3) setTimeout(function(){lineEl.classList.add('loading');},1300);
+      },60);
+    }
+
+    var HORAS = [p.hora||'', f.horaProceso, f.horaCamino, f.horaEntrega];
+
+    for(var si=0;si<=3;si++){
+      var dot  = document.getElementById('step'+si);
+      var lbl  = document.getElementById('step'+si+'lbl');
+      if(!dot||!lbl) continue;
+      var ico  = dot.querySelector('.sym');
+
+      if(si < paso){
+        dot.style.cssText='background:#65d000;border:none;box-shadow:0 2px 8px rgba(101,208,0,.35)';
+        if(ico){ico.style.color='#fff';ico.style.fontVariationSettings="'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24";}
+        lbl.style.color='#65d000';lbl.style.fontWeight='800';
+      } else if(si===paso){
+        dot.style.cssText='background:#fff;border:2.5px solid #006970;box-shadow:0 0 0 5px rgba(0,105,112,.12)';
+        if(ico){ico.style.color='#006970';ico.style.fontVariationSettings="'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24";}
+        lbl.style.color='#006970';lbl.style.fontWeight='900';
+      } else {
+        dot.style.cssText='background:#e7e8e9;border:none;box-shadow:none';
+        if(ico){ico.style.color='#9aa5ae';ico.style.fontVariationSettings="'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24";}
+        lbl.style.color='#9aa5ae';lbl.style.fontWeight='700';
+      }
+      lbl.textContent = STEP_LBLS[si];
+
+      if(HORAS[si]){
+        var hEl = document.createElement('span');
+        hEl.className='rt-step-hora-lbl';
+        hEl.textContent=HORAS[si];
+        hEl.style.cssText='font-size:8px;text-align:center;display:block;margin-top:1px;font-weight:700;max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:'+(si<=paso?(si<paso?'#65d000':'#006970'):'#9aa5ae');
+        lbl.parentNode.appendChild(hEl);
+      }
+    }
+
+    // Calificar
+    var secCal = document.getElementById('seccionCalificar');
+    if(secCal) secCal.style.display = (f.estado==='Entregado') ? 'block' : 'none';
+
+    // Toast
+    if(typeof mostrarToast==='function') mostrarToast('Estado: '+f.estado,'update');
+    if(navigator.vibrate) navigator.vibrate([80,40,80]);
+
+    // Detener si terminó
+    if(f.estado==='Entregado'||f.estado==='Cancelado') parar();
+  }
+
+  function arrancar(){
+    parar();
+    ULTIMO='';
+    poll();
+    TIMER = setInterval(poll, 2000);
+  }
+
+  function parar(){
+    clearInterval(TIMER);
+    TIMER=null;
+    ULTIMO='';
+  }
+
+  // Sobreescribir globales
+  window.rtIniciarPolling = arrancar;
+  window.rtDetenerPolling = parar;
+
+  // Visibilidad
+  document.addEventListener('visibilitychange',function(){
+    if(document.visibilityState==='visible'){
+      var p=window.state&&window.state.pedidoRastreado;
+      if(p&&p.id){if(!TIMER)arrancar();else poll();}
+    }
+  });
+  window.addEventListener('focus',function(){
+    var p=window.state&&window.state.pedidoRastreado;
+    if(p&&p.id){if(!TIMER)arrancar();else poll();}
+  });
+
+  console.log('[WIL] Polling definitivo 2s activo ✓');
+})();
+
 </script>
 </body>
 </html>
