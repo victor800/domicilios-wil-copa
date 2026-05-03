@@ -2351,7 +2351,7 @@ async function enviarPedido(tipo){
   }
 
   /* ── GAS URL — mismo endpoint que pedido-farmacia ── */
-  var GAS_URL = 'https://script.google.com/macros/library/d/1II0KlakVS10fD1wr-aO_W-d6Hy9zvEH2Km79E4Ei51C07fRaKsHx420n/80';
+  var GAS_URL = 'https://script.google.com/macros/s/AKfycbxYFNbh5pJgPQ4yjooGI0q3TUjrW8iOZeLJU_SZ_mS06Es6LUPYxzYs-C6q91YFnna7Dw/exec';
 
   try{
     /* FIX CRÍTICO: POST directo al GAS con accion en el body,
@@ -2683,7 +2683,7 @@ async function enviarCalificacion(){
 
   var comentario = (document.getElementById('califComentario').value || '').trim();
 
-  var GAS_URL = 'https://script.google.com/macros/s/AKfycbwbypqPgL16lssPdQsktDx9dHs0My_cMaS7YNQrMSkzY8Kw7HPmFgJHZeImkW2EJ48H7A/exec';
+  var GAS_URL = 'https://script.google.com/macros/s/AKfycbxYFNbh5pJgPQ4yjooGI0q3TUjrW8iOZeLJU_SZ_mS06Es6LUPYxzYs-C6q91YFnna7Dw/exec';
   try {
     await fetch(GAS_URL, {
       method:  'POST',
@@ -3793,7 +3793,7 @@ verificarHorarioCliente();
 
 /* ── Crear zona nueva en la hoja Tarifas (no-cors) ── */
 function _crearZonaEnSheets(data) {
-  var GAS_URL = 'https://script.google.com/macros/library/d/1II0KlakVS10fD1wr-aO_W-d6Hy9zvEH2Km79E4Ei51C07fRaKsHx420n/80';
+  var GAS_URL = 'https://script.google.com/macros/s/AKfycbxYFNbh5pJgPQ4yjooGI0q3TUjrW8iOZeLJU_SZ_mS06Es6LUPYxzYs-C6q91YFnna7Dw/exec';
   fetch(GAS_URL, {
     method:  'POST',
     mode:    'no-cors',
@@ -4976,7 +4976,7 @@ async function confirmarPedidoDirecto(){
     '','','','','','','','','','','',''
   ]);
 
- var GAS_URL = 'https://script.google.com/macros/s/AKfycbwbypqPgL16lssPdQsktDx9dHs0My_cMaS7YNQrMSkzY8Kw7HPmFgJHZeImkW2EJ48H7A/exec';
+ var GAS_URL = 'https://script.google.com/macros/s/AKfycbxYFNbh5pJgPQ4yjooGI0q3TUjrW8iOZeLJU_SZ_mS06Es6LUPYxzYs-C6q91YFnna7Dw/exec';
  try {
     await fetch(GAS_URL, {
       method:  'POST',
@@ -6307,7 +6307,7 @@ function _copiarFallback(txt){
       '', '', '', '', '', '', '', '', '', '', ''
     ]);
 
-    var GAS = 'https://script.google.com/macros/s/AKfycbwbypqPgL16lssPdQsktDx9dHs0My_cMaS7YNQrMSkzY8Kw7HPmFgJHZeImkW2EJ48H7A/exec';
+    var GAS = 'https://script.google.com/macros/s/AKfycbxYFNbh5pJgPQ4yjooGI0q3TUjrW8iOZeLJU_SZ_mS06Es6LUPYxzYs-C6q91YFnna7Dw/exec';
     try {
       await fetch(GAS, {
         method: 'POST', mode: 'no-cors',
@@ -6493,7 +6493,384 @@ function _copiarFallback(txt){
 }(window));
 
 
+/* ═══════════════════════════════════════════════════════
+   WIL — FACTURA LIBRE EN RASTREADOR
+   Lee hoja FacturaLibre: col F = URL_FACTURA, col J = NOTA
+   Muestra FAB con badge + popup al rastrear un pedido
+═══════════════════════════════════════════════════════ */
+(function(W) {
+  'use strict';
 
+  var SHEET_ID = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+
+  /* ── CSS ── */
+  var st = document.createElement('style');
+  st.textContent = `
+    #wil-fl-fab {
+      position: fixed;
+      bottom: calc(env(safe-area-inset-bottom,0px) + 80px);
+      left: 16px;
+      z-index: 1800;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+    }
+    #wil-fl-fab-inner {
+      width: 54px; height: 54px; border-radius: 50%;
+      background: linear-gradient(135deg,#005a60,#00a3b4);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 6px 22px rgba(0,105,112,.5);
+      position: relative;
+      transition: transform .15s;
+    }
+    #wil-fl-fab-inner:active { transform: scale(.91); }
+    #wil-fl-badge {
+      position: absolute; top: -3px; right: -3px;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #ef4444; border: 2px solid #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 900; color: #fff;
+      box-shadow: 0 2px 6px rgba(239,68,68,.4);
+      animation: wlFabPop .3s cubic-bezier(.22,1,.36,1);
+    }
+    @keyframes wlFabPop {
+      from { transform: scale(0); opacity: 0; }
+      to   { transform: scale(1); opacity: 1; }
+    }
+    #wil-fl-fab-lbl {
+      font-size: 10px; font-weight: 800; color: #005a60;
+      background: rgba(255,255,255,.95);
+      border-radius: 20px; padding: 2px 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.12);
+      white-space: nowrap;
+    }
+    /* Overlay */
+    #wil-fl-overlay {
+      position: fixed; inset: 0; z-index: 2500;
+      background: rgba(0,0,0,.55); backdrop-filter: blur(5px);
+      display: none; align-items: flex-end; justify-content: center;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    #wil-fl-overlay.open { display: flex; }
+    #wil-fl-popup {
+      width: 100%; max-width: 480px;
+      background: #fff; border-radius: 26px 26px 0 0;
+      max-height: 88dvh; display: flex; flex-direction: column;
+      box-shadow: 0 -8px 40px rgba(0,0,0,.25);
+      animation: wlSlideUp .32s cubic-bezier(.22,1,.36,1);
+      overflow: hidden;
+    }
+    @keyframes wlSlideUp {
+      from { transform: translateY(60px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+    #wil-fl-popup-hdr {
+      background: linear-gradient(135deg,#004851,#006970,#00a3b4);
+      padding: 14px 16px;
+      display: flex; align-items: center; gap: 11px;
+      flex-shrink: 0;
+    }
+    #wil-fl-popup-body {
+      overflow-y: auto; padding: 16px;
+      display: flex; flex-direction: column; gap: 12px;
+      flex: 1;
+    }
+    .wl-fl-nota-bubble {
+      background: #f0f9ff;
+      border: 1.5px solid #bae6fd;
+      border-radius: 16px 16px 16px 4px;
+      padding: 12px 14px;
+      font-size: 13px; line-height: 1.6; color: #0c4a6e;
+      font-weight: 500;
+    }
+    .wl-fl-nota-bubble b {
+      display: block; font-size: 10px; font-weight: 800;
+      text-transform: uppercase; letter-spacing: .05em;
+      color: #0369a1; margin-bottom: 5px;
+    }
+    .wl-fl-img-wrap {
+      border-radius: 14px; overflow: hidden;
+      border: 1.5px solid #e0f2fe;
+      background: #f0f9ff;
+      cursor: zoom-in;
+    }
+    .wl-fl-img-wrap img {
+      width: 100%; display: block;
+      object-fit: contain; max-height: 320px;
+    }
+    .wl-fl-empty {
+      text-align: center; padding: 32px 16px;
+      color: #9aa5ae; font-size: 13px; font-weight: 600;
+    }
+    /* Zoom img overlay */
+    #wil-fl-zoom {
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,.9);
+      display: none; align-items: center; justify-content: center;
+      padding: 16px;
+    }
+    #wil-fl-zoom.open { display: flex; }
+    #wil-fl-zoom img {
+      max-width: 100%; max-height: 90dvh;
+      border-radius: 12px; object-fit: contain;
+    }
+  `;
+  document.head.appendChild(st);
+
+  /* ── HTML ── */
+  document.body.insertAdjacentHTML('beforeend', `
+    <!-- FAB Factura Libre -->
+    <div id="wil-fl-fab" onclick="wlFlAbrirPopup()">
+      <div id="wil-fl-fab-inner">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+          <polyline points="10 9 9 9 8 9"/>
+        </svg>
+        <div id="wil-fl-badge" style="display:none">1</div>
+      </div>
+      <div id="wil-fl-fab-lbl">Factura</div>
+    </div>
+
+    <!-- Popup -->
+    <div id="wil-fl-overlay" onclick="if(event.target===this)wlFlCerrar()">
+      <div id="wil-fl-popup">
+        <div id="wil-fl-popup-hdr">
+          <div style="width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:900;color:#fff;line-height:1.2">Factura del domiciliario</div>
+            <div style="font-size:11px;color:rgba(255,255,255,.75);margin-top:2px" id="wil-fl-popup-sub">Pedido —</div>
+          </div>
+          <button onclick="wlFlCerrar()" style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.18);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div id="wil-fl-popup-body"></div>
+      </div>
+    </div>
+
+    <!-- Zoom imagen -->
+    <div id="wil-fl-zoom" onclick="this.classList.remove('open')">
+      <img id="wil-fl-zoom-img" src="" alt="Factura"/>
+    </div>
+  `);
+
+  /* ── Estado ── */
+  var _flData = null; // { url, nota }
+
+  /* ── CSV parser ── */
+  function _csv(line) {
+    var r = [], cur = '', q = false;
+    for (var i = 0; i < line.length; i++) {
+      var c = line[i];
+      if (c === '"') { if (q && line[i+1] === '"') { cur += '"'; i++; } else q = !q; }
+      else if (c === ',' && !q) { r.push(cur.trim()); cur = ''; }
+      else cur += c;
+    }
+    r.push(cur.trim());
+    return r;
+  }
+
+  /* ── Leer FacturaLibre para el pedido ── */
+  async function leerFacturaLibre(pedidoId) {
+    try {
+      var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
+              + '/gviz/tq?tqx=out:csv&sheet=FacturaLibre&cachebust=' + Date.now();
+      var res  = await fetch(url, { cache: 'no-store' });
+      var text = await res.text();
+      var lines = text.trim().split('\n');
+
+      for (var i = 1; i < lines.length; i++) {
+        var cols = _csv(lines[i]);
+        /* Col A (idx 0) = ID_PEDIDO */
+        var idFila = (cols[0] || '').replace(/^#+/, '').trim();
+        if (idFila !== String(pedidoId).trim()) continue;
+
+        var urlFact = (cols[5]  || '').trim(); /* Col F (idx 5) */
+        var nota    = (cols[9]  || '').trim(); /* Col J (idx 9) */
+
+        if (urlFact || nota) {
+          return { url: urlFact, nota: nota };
+        }
+        return null;
+      }
+    } catch(e) {
+      console.warn('[WIL FacturaLibre]', e.message);
+    }
+    return null;
+  }
+
+  /* ── Mostrar FAB ── */
+  function _mostrarFAB(data) {
+    _flData = data;
+    var fab    = document.getElementById('wil-fl-fab');
+    var badge  = document.getElementById('wil-fl-badge');
+    var count  = (data.url ? 1 : 0) + (data.nota ? 1 : 0);
+
+    fab.style.display = 'flex';
+    badge.textContent  = count;
+    badge.style.display = 'flex';
+    /* Animación suave de entrada */
+    fab.style.opacity   = '0';
+    fab.style.transform = 'translateY(12px)';
+    requestAnimationFrame(function() {
+      fab.style.transition = 'opacity .3s ease, transform .3s ease';
+      fab.style.opacity    = '1';
+      fab.style.transform  = 'translateY(0)';
+    });
+  }
+
+  function _ocultarFAB() {
+    var fab = document.getElementById('wil-fl-fab');
+    if (fab) fab.style.display = 'none';
+    _flData = null;
+  }
+
+  /* ── Abrir popup ── */
+  W.wlFlAbrirPopup = function() {
+    if (!_flData) return;
+    var ov   = document.getElementById('wil-fl-overlay');
+    var body = document.getElementById('wil-fl-popup-body');
+    var sub  = document.getElementById('wil-fl-popup-sub');
+    var p    = W.state && W.state.pedidoRastreado;
+
+    if (sub) sub.textContent = 'Pedido #' + (p ? p.id : '—');
+
+    body.innerHTML = '';
+
+    /* Nota del domiciliario */
+    if (_flData.nota) {
+      body.insertAdjacentHTML('beforeend',
+        '<div class="wl-fl-nota-bubble">'
+        + '<b>💬 Nota del domiciliario</b>'
+        + _escHtml(_flData.nota)
+        + '</div>');
+    }
+
+    /* Foto factura */
+    if (_flData.url) {
+      var src = _flData.url;
+      /* Normalizar URL de Drive si es necesario */
+      if (src.indexOf('drive.google.com') !== -1) {
+        var m = src.match(/\/d\/([^/?&\s]+)/);
+        if (m) src = 'https://lh3.googleusercontent.com/d/' + m[1];
+      }
+      body.insertAdjacentHTML('beforeend',
+        '<div>'
+        + '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#9aa5ae;margin-bottom:7px">🧾 Factura adjunta</div>'
+        + '<div class="wl-fl-img-wrap" onclick="wlFlZoom(\'' + _escAttr(src) + '\')">'
+        + '<img src="' + _escAttr(src) + '" alt="Factura" '
+        + 'onerror="this.parentElement.innerHTML=\'<div style=padding:24px;text-align:center;color:#9aa5ae>⚠️ No se pudo cargar la imagen</div>\'">'
+        + '</div>'
+        + '<p style="font-size:10px;color:#9aa5ae;text-align:center;margin-top:6px;font-weight:600">Toca la imagen para ampliar</p>'
+        + '</div>');
+    }
+
+    if (!_flData.url && !_flData.nota) {
+      body.innerHTML = '<div class="wl-fl-empty">Sin contenido adjunto aún.</div>';
+    }
+
+    /* Quitar badge al abrir */
+    var badge = document.getElementById('wil-fl-badge');
+    if (badge) badge.style.display = 'none';
+
+    ov.classList.add('open');
+  };
+
+  W.wlFlCerrar = function() {
+    document.getElementById('wil-fl-overlay').classList.remove('open');
+  };
+
+  W.wlFlZoom = function(src) {
+    var z = document.getElementById('wil-fl-zoom');
+    var i = document.getElementById('wil-fl-zoom-img');
+    if (!z || !i) return;
+    i.src = src;
+    z.classList.add('open');
+  };
+
+  function _escHtml(t) {
+    return (t || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  }
+  function _escAttr(t) {
+    return (t || '').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  /* ── Hook en rastrearPedido ── */
+  var _origRastrear = W.rastrearPedido;
+  if (typeof _origRastrear === 'function') {
+    W.rastrearPedido = async function() {
+      _ocultarFAB();
+      await _origRastrear.apply(this, arguments);
+      /* Leer FacturaLibre después de rastrear con éxito */
+      var p = W.state && W.state.pedidoRastreado;
+      if (p && p.id) {
+        var data = await leerFacturaLibre(p.id);
+        if (data && (data.url || data.nota)) {
+          _mostrarFAB(data);
+        }
+      }
+    };
+  }
+
+  /* ── Ocultar FAB si se minimiza el resultado ── */
+  var _origMin = W.minimizarResult;
+  if (typeof _origMin === 'function') {
+    W.minimizarResult = function() {
+      _origMin.apply(this, arguments);
+      _ocultarFAB();
+    };
+  }
+
+  /* ── Ocultar FAB al cambiar de pestaña ── */
+  var _origNav = W.navTo;
+  if (typeof _origNav === 'function') {
+    W.navTo = function(tab) {
+      if (tab !== 'rastrear') _ocultarFAB();
+      _origNav.apply(this, arguments);
+    };
+  }
+
+  /* ── Poll: re-verificar si llega factura mientras el cliente espera ── */
+  var _flPollTimer = null;
+  function _iniciarFlPoll(pedidoId) {
+    clearInterval(_flPollTimer);
+    _flPollTimer = setInterval(async function() {
+      if (_flData) { clearInterval(_flPollTimer); return; }
+      var data = await leerFacturaLibre(pedidoId);
+      if (data && (data.url || data.nota)) {
+        _mostrarFAB(data);
+        clearInterval(_flPollTimer);
+        if (typeof mostrarToast === 'function')
+          mostrarToast('📄 El domi adjuntó la factura', 'receipt_long');
+        if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
+      }
+    }, 15000); /* cada 15 s */
+  }
+
+  /* Iniciar poll al rastrear */
+  var _origR2 = W.rastrearPedido;
+  W.rastrearPedido = async function() {
+    clearInterval(_flPollTimer);
+    await _origR2.apply(this, arguments);
+    var p = W.state && W.state.pedidoRastreado;
+    if (p && p.id && !_flData) _iniciarFlPoll(p.id);
+  };
+
+  console.log('[WIL] ✅ FacturaLibre rastreador — FAB + popup + poll 15s');
+
+})(window);
 
 
 </script>

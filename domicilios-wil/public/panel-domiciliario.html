@@ -5858,11 +5858,12 @@ W.wflEnviarFactura = async function () {
 function _wflMostrarResumenExito(totalFact, domiNum, urlFact) {
   var wrap = document.getElementById('wfl-manual-wrap');
   var totW = document.getElementById('wfl-total-wrap');
+  var prev = document.getElementById('wfl-preview-wrap');
   if (wrap) wrap.style.display = 'none';
   if (totW) totW.style.display = 'none';
+  if (prev) prev.style.display = 'none';
 
   var fmtCOP = function(n){ return '$'+Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.'); };
-  var prev = document.getElementById('wfl-preview-wrap');
 
   var existente = document.getElementById('wfl-exito-card');
   if (existente) existente.remove();
@@ -5870,12 +5871,10 @@ function _wflMostrarResumenExito(totalFact, domiNum, urlFact) {
   var card = document.createElement('div');
   card.id = 'wfl-exito-card';
   card.style.cssText = 'background:#f0fdf4;border:1.5px solid #86efac;border-radius:14px;padding:12px 14px;margin-top:10px;animation:cardIn .3s ease both';
-  card.innerHTML =
-    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
-    +'<span style="font-size:22px">✅</span>'
-    +'<div><p style="font-family:Plus Jakarta Sans,sans-serif;font-weight:900;font-size:13px;color:#166534;margin:0"></p>'
-    +'<p style="font-size:10px;color:#6c7a7b;margin:1px 0 0">La factura quedó registrada</p></div></div>'
-    +'<div style="display:flex;gap:6px">'
+
+  /* ── Chips Factura / Domi / Cobrar ── */
+  var chipsHtml =
+    '<div style="display:flex;gap:6px;margin-bottom:8px">'
     +'<div style="flex:1;background:#fff;border-radius:10px;padding:7px 9px;text-align:center;border:1px solid #86efac">'
     +'<p style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase;margin:0">Factura</p>'
     +'<p style="font-family:Plus Jakarta Sans,sans-serif;font-weight:900;font-size:14px;color:#006970;margin:0">'+fmtCOP(totalFact)+'</p></div>'
@@ -5885,11 +5884,55 @@ function _wflMostrarResumenExito(totalFact, domiNum, urlFact) {
     +'<div style="flex:1;background:linear-gradient(135deg,rgba(0,105,112,.08),rgba(0,188,200,.05));border-radius:10px;padding:7px 9px;text-align:center;border:1.5px solid rgba(0,105,112,.2)">'
     +'<p style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase;margin:0">Cobrar</p>'
     +'<p style="font-family:Plus Jakarta Sans,sans-serif;font-weight:900;font-size:14px;color:#006970;margin:0">'+fmtCOP(totalFact+domiNum)+'</p></div>'
-    +'</div>'
-    +(urlFact ? '<p style="font-size:10px;color:#2a9d5c;margin:8px 0 0;display:flex;align-items:center;gap:4px"><span></span></p>' : '');
+    +'</div>';
 
-  var body = document.querySelector('#'+'wil-factura-libre-section .wfl-body');
+  /* ── Botón colapsable Ver factura (solo si hay imagen) ── */
+  var verFacturaHtml = '';
+  if (urlFact) {
+    var uid = 'wfl-img-collapse-' + Date.now();
+    verFacturaHtml =
+      '<button id="'+uid+'-btn" onclick="(function(){'
+      +'var c=document.getElementById(\''+uid+'\');'
+      +'var b=document.getElementById(\''+uid+'-btn\');'
+      +'var ico=document.getElementById(\''+uid+'-ico\');'
+      +'var open=c.style.maxHeight&&c.style.maxHeight!==\'0px\';'
+      +'if(open){c.style.maxHeight=\'0px\';c.style.opacity=\'0\';b.style.borderColor=\'rgba(0,105,112,.2)\';ico.textContent=\'expand_more\';}' 
+      +'else{c.style.maxHeight=\'320px\';c.style.opacity=\'1\';b.style.borderColor=\'#006970\';ico.textContent=\'expand_less\';}'
+      +'})()" '
+      +'style="width:100%;padding:9px 12px;background:transparent;border:1.5px dashed rgba(0,105,112,.25);border-radius:11px;cursor:pointer;'
+      +'font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:11px;color:#006970;'
+      +'display:flex;align-items:center;justify-content:center;gap:6px;transition:border-color .2s;margin-bottom:0">'
+      +'<span class="material-symbols-outlined" style="font-size:15px;font-variation-settings:\'FILL\' 1">receipt_long</span>'
+      +'Ver factura adjunta'
+      +'<span class="material-symbols-outlined" id="'+uid+'-ico" style="font-size:15px;margin-left:auto">expand_more</span>'
+      +'</button>'
+      +'<div id="'+uid+'" style="max-height:0px;opacity:0;overflow:hidden;transition:max-height .38s cubic-bezier(.22,1,.36,1),opacity .28s ease;margin-top:0">'
+      +'<div style="padding-top:8px">'
+      +'<img src="'+urlFact+'" alt="Factura" '
+      +'style="width:100%;border-radius:11px;border:1px solid #e7e8e9;display:block;object-fit:contain;max-height:280px;cursor:zoom-in" '
+      +'onclick="wflAbrirZoom&&wflAbrirZoom()"/>'
+      +'<p style="font-size:10px;color:#2a9d5c;margin:6px 0 0;text-align:center;font-weight:700">📎 Imagen guardada en el registro</p>'
+      +'</div>'
+      +'</div>';
+  }
+
+  card.innerHTML =
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
+    +'<span style="font-size:20px">✅</span>'
+    +'<div><p style="font-family:Plus Jakarta Sans,sans-serif;font-weight:900;font-size:13px;color:#166534;margin:0">¡Factura enviada!</p>'
+    +'<p style="font-size:10px;color:#6c7a7b;margin:1px 0 0">La factura quedó registrada</p></div>'
+    +'</div>'
+    + chipsHtml
+    + verFacturaHtml;
+
+  var body = document.querySelector('#wil-factura-libre-section .wfl-body');
   if (body) body.appendChild(card);
+
+  /* Sincronizar zoom modal con la imagen del collapse */
+  if (urlFact) {
+    var prevImg = document.getElementById('wfl-preview-img');
+    if (prevImg) prevImg.src = urlFact;
+  }
 }
 
   /* ════ HOOK ════ */
