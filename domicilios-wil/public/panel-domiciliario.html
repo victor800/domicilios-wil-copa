@@ -5627,15 +5627,27 @@ console.log('[PARCHE Historial RT v1.0] ✅ Stats en tiempo real con domicilio c
     });
   }
 
-  function _buildHTML(domiNum) {
-    return (
-      '<div class="wfl-header">' +
-        '<div class="wfl-ico"><span class="material-symbols-outlined" style="font-size:20px;color:#fff;font-variation-settings:\'FILL\' 1">receipt_long</span></div>' +
-        '<div>' +
-          '<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:13px;color:#191c1d;margin:0">Factura / Comprobante</p>' +
-          '<p style="font-size:11px;color:#6c7a7b;margin:2px 0 0">Foto de factura, recibo</p>' +
-        '</div>' +
+function _buildHTML(domiNum) {
+  var tid = 'wfl-toggle-' + Date.now();
+  return (
+    '<div class="wfl-header">' +
+      '<div class="wfl-ico"><span class="material-symbols-outlined" style="font-size:20px;color:#fff;font-variation-settings:\'FILL\' 1">receipt_long</span></div>' +
+      '<div style="flex:1;min-width:0">' +
+        '<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:13px;color:#191c1d;margin:0">¿Necesitas cargar factura?</p>' +
+        '<p style="font-size:11px;color:#6c7a7b;margin:2px 0 0">Solo si el comercio emite recibo o comprobante</p>' +
       '</div>' +
+      /* Toggle ON/OFF */
+      '<div id="wfl-toggle-track" onclick="wflToggleFactura()" ' +
+        'style="width:46px;height:26px;border-radius:999px;position:relative;cursor:pointer;' +
+        'background:#bbc9cb;transition:background .25s;flex-shrink:0;">' +
+        '<div id="wfl-toggle-thumb" ' +
+          'style="position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;' +
+          'background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.22);transition:left .25s"></div>' +
+      '</div>' +
+    '</div>' +
+
+    /* Sección colapsable — oculta por defecto */
+    '<div id="wfl-form-wrap" style="max-height:0;overflow:hidden;opacity:0;transition:max-height .38s cubic-bezier(.22,1,.36,1),opacity .28s ease">' +
       '<div class="wfl-body">' +
         '<div id="wfl-btn-wrap">' +
           '<input type="file" id="wfl-file-input" accept="image/*" capture="environment" style="display:none"/>' +
@@ -5692,9 +5704,32 @@ console.log('[PARCHE Historial RT v1.0] ✅ Stats en tiempo real con domicilio c
             'Enviar resumen al cliente' +
           '</button>' +
         '</div>' +
-      '</div>'
-    );
+      '</div>' +
+    '</div>'
+  );
+}
+
+var _wflFacturaActiva = false;
+
+W.wflToggleFactura = function() {
+  _wflFacturaActiva = !_wflFacturaActiva;
+  var track  = document.getElementById('wfl-toggle-track');
+  var thumb  = document.getElementById('wfl-toggle-thumb');
+  var form   = document.getElementById('wfl-form-wrap');
+  if (!track || !thumb || !form) return;
+
+  if (_wflFacturaActiva) {
+    track.style.background = '#2a9d5c';
+    thumb.style.left       = '23px';
+    form.style.maxHeight   = '1200px';
+    form.style.opacity     = '1';
+  } else {
+    track.style.background = '#bbc9cb';
+    thumb.style.left       = '3px';
+    form.style.maxHeight   = '0px';
+    form.style.opacity     = '0';
   }
+};
 
   /* ════ PROCESAR IMAGEN ════ */
   async function _procesarImagen(file) {
