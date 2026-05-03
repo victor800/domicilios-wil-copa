@@ -11,6 +11,8 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="domi-notif.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.2/tesseract.min.js"></script>
+<script src="factura-libre-corregido.js"></script>
 
 
 
@@ -5600,88 +5602,35 @@ console.log('[PARCHE Historial RT v1.0] ✅ Stats en tiempo real con domicilio c
      Devuelve JSON: {"total": 47500, "tipo": "TOTAL A PAGAR"}
   */
   async function extraerTotalIA(b64, mime) {
-    try {
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 300,
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'image', source: { type: 'base64', media_type: mime, data: b64 } },
-              {
-                type: 'text',
-                text:
-                  'Eres un asistente de pagos colombiano. Analiza esta imagen.\n\n' +
-                  'REGLA PRINCIPAL: Encuentra el valor en pesos colombianos más importante de la imagen.\n\n' +
-                  'Prioridad de búsqueda (de mayor a menor):\n' +
-                  '1. Cualquier campo que diga "Total a pagar", "TOTAL A PAGAR"\n' +
-                  '2. "Valor de la transferencia", "Valor transferencia", "Valor transferido"\n' +
-                  '3. "Monto transferido", "Monto"\n' +
-                  '4. "Total", "TOTAL", "Grand total"\n' +
-                  '5. "Valor a cobrar", "Subtotal"\n' +
-                  '6. Si NO hay etiqueta clara: toma el número con $ MÁS GRANDE visible en la imagen\n\n' +
-                  'FORMATO COLOMBIANO: El punto separa miles, la coma separa decimales.\n' +
-                  '$ 50.000 = 50000 pesos\n' +
-                  '$ 1.250.000 = 1250000 pesos\n' +
-                  '$ 50,00 = 50 pesos (centavos, ignorar si hay otro valor mayor)\n\n' +
-                  'IMPORTANTE: Devuelve SIEMPRE el valor como número entero SIN puntos NI comas.\n' +
-                  'Si ves "$ 50.000" devuelve 50000, NO 50.\n\n' +
-                  'Responde ÚNICAMENTE con JSON sin markdown:\n' +
-                  '{"total": 50000, "tipo": "Valor de la transferencia"}\n\n' +
-                  'Si no encuentras absolutamente ningún valor: {"total": 0, "tipo": "no detectado"}'
-              }
-            ]
-          }]
-        })
-      });
-
-      const data = await resp.json();
-      
-      if (!resp.ok) {
-        console.error('Claude API error:', data);
-        return { total: 0, tipo: 'error-api' };
-      }
-
-      const txt = (data.content?.[0]?.text || '').trim().replace(/```json|```/g, '').trim();
-      
-      try {
-        const parsed = JSON.parse(txt);
-        let totalRaw = String(parsed.total || '0');
-        let totalLimpio = parseInt(totalRaw.replace(/\./g, '').replace(/,/g, '')) || 0;
-        
-        // Buscar números mayores en la respuesta si el parseado es muy pequeño
-        const todosNumeros = txt.match(/\d[\d.]*/g) || [];
-        const masGrande = todosNumeros
-          .map(n => parseInt(n.replace(/\./g, '')) || 0)
-          .filter(n => n >= 1000)
-          .sort((a, b) => b - a)[0];
-        
-        if (totalLimpio < 1000 && masGrande && masGrande > totalLimpio) {
-          totalLimpio = masGrande;
-        }
-        
-        return {
-          total: totalLimpio,
-          tipo: parsed.tipo || 'TOTAL'
-        };
-      } catch (parseErr) {
-        // Fallback: buscar número más grande >= 1000
-        const nums = txt.match(/\d[\d.]*/g) || [];
-        const mejor = nums
-          .map(n => parseInt(n.replace(/\./g, '')) || 0)
-          .filter(n => n >= 1000)
-          .sort((a, b) => b - a)[0];
-        return { total: mejor || 0, tipo: 'TOTAL' };
-      }
-    } catch (error) {
-      console.error('[extraerTotalIA] Error:', error);
-      return { total: 0, tipo: 'error-conexion' };
-    }
+  try {
+    // Convertir base64 a blob
+    const byteString = atob(b64);
+    const bytes = new Uint8Array(byteString.length);
+    for (let i = 0; i < byteString.length; i++) bytes[i] = byteString.charCodeAt(i);
+    const blob = new Blob([bytes], { type: mime });
+    const url = URL.createObjectURL(blob);
+    
+    // OCR gratuito
+    console.log('[extraerTotalIA] Iniciando OCR...');
+    const { data: { text } } = await Tesseract.recognize(url, 'spa');
+    URL.revokeObjectURL(url);
+    
+    // Extraer números
+    const numeros = text.match(/\d[\d.]*(?:[.,]\d{2})?/g) || [];
+    const valores = numeros
+      .map(n => parseInt(n.replace(/\./g, '').replace(/,/g, '')) || 0)
+      .filter(n => n >= 1000)
+      .sort((a, b) => b - a);
+    
+    const total = valores[0] || 0;
+    console.log('[extraerTotalIA] Total detectado:', total);
+    
+    return { total: total, tipo: total > 0 ? 'OCR detectado' : 'no detectado' };
+  } catch (error) {
+    console.error('[extraerTotalIA] Error:', error);
+    return { total: 0, tipo: 'error-ocr' };
   }
-
+}
   /* ════ GUARDAR EN GOOGLE SHEET ════
      ✅ FUNCIONA: Envía datos al Google Apps Script via fetch POST
      Columnas: ID_PEDIDO | CLIENTE | FECHA | HORA | URL_FACTURA | TOTAL_EXTRAIDO | NOMBRE_DOMI | ESTADO | NOTA
