@@ -5762,66 +5762,135 @@ console.log('[PARCHE Historial RT v1.0] ✅ Stats en tiempo real con domicilio c
     if (inp) { inp.value = ''; inp.click(); }
   };
 
+  async function guardarEnSheet(p, totalFactura, urlFact, notaCliente) {
+  var domiNum = parseInt(parseCOP(p.domicilio || '0'), 10) || 0;
+  var payload = JSON.stringify({
+    accion:       'factura-libre',
+    pedidoId:     String(p.id || '').trim(),
+    cliente:      p.cliente || '',
+    domi:         domi.nombre || '',
+    fecha:        new Date().toLocaleDateString('es-CO', { timeZone: TZ }),
+    hora:         new Date().toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit', timeZone: TZ }),
+    totalFactura: totalFactura,
+    domicilio:    domiNum,
+    totalCobrar:  totalFactura + domiNum,
+    nota:         notaCliente,
+    imagen:       urlFact && urlFact !== 'sin-imagen' ? urlFact : ''
+  });
+
+  var r = await fetch(GAS_URL, {
+    method:  'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body:    payload,
+    signal:  AbortSignal.timeout(25000)
+  });
+  var json = await r.json().catch(function(){ return { ok: true }; });
+  console.log('[guardarEnSheet]', json);
+  return json;
+}
+
   /* ════ ENVIAR FACTURA AL SHEET ════
      ✅ CORREGIDO: Sin dependencias de Utilities ni Drive API
      Envía: ID, CLIENTE, FECHA, HORA, IMAGEN (base64), TOTAL, DOMI, ESTADO, NOTA
   */
 W.wflEnviarFactura = async function () {
-  const p = W.state?.pedidoActivo;
-  if (!p) { 
-    alert('No hay pedido activo.'); 
-    return; 
-  }
+  var p = W.state && W.state.pedidoActivo;
+  if (!p) { alert('Sin pedido activo'); return; }
 
-  const domiNum = parseInt(_parseCOP(p.domicilio || '0'), 10) || 0;
-  const manInp = document.getElementById('wfl-manual-input');
-  
-  if (!manInp?.value) {
-    alert('Ingresa el valor de la factura');
-    return;
-  }
+  var manInp = document.getElementById('wfl-manual-input');
+  var nota   = (document.getElementById('wfl-nota-cliente') || {}).value || '';
+  var totalV = parseInt(String((manInp || {}).value || '0').replace(/\D/g,''),10) || 0;
 
-  _totalIA = parseInt(String(manInp.value).replace(/\D/g, ''), 10) || 0;
-  const notaCliente = document.getElementById('wfl-nota-cliente')?.value?.trim() || '';
-  const urlFact = (_b64 && _mime) ? `data:${_mime};base64,${_b64}` : 'sin-imagen';
+  if (!totalV) { alert('Ingresa el valor de la factura'); return; }
 
-  const btn = document.getElementById('wfl-enviar-btn') || document.querySelector('.wfl-enviar-btn');
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = 'Guardando...';
-  }
+  /* Deshabilitar botones */
+  document.querySelectorAll('.wfl-enviar-btn').forEach(function(b){
+    b.disabled = true;
+    b.textContent = 'Guardando…';
+  });
+
+  var domiNum = parseInt((_parseCOP(p.domicilio || '0')),10) || 0;
+  var urlFact = (_b64 && _mime) ? 'data:'+_mime+';base64,'+_b64 : '';
+
+  /* Payload — campos directos (no rows[]) */
+  var payload = {
+    accion:       'factura-libre',
+    pedidoId:     String(p.id || '').trim(),
+    cliente:      p.cliente   || '',
+    domi:         (window.domi && window.domi.nombre) || '',
+    fecha:        new Date().toLocaleDateString('es-CO',{timeZone:'America/Bogota'}),
+    hora:         new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',timeZone:'America/Bogota'}),
+    totalFactura: totalV,
+    domicilio:    domiNum,
+    totalCobrar:  totalV + domiNum,
+    nota:         nota.trim(),
+    imagen:       urlFact
+  };
+
+  console.log('[wflEnviar] payload →', JSON.stringify({...payload, imagen: urlFact ? '[base64 ok]' : 'sin-imagen'}));
 
   try {
-    // Guardar en Sheet
-    await guardarEnSheet(p, _totalIA, urlFact, notaCliente);
+    var r = await fetch(GAS_URL, {
+      method:  'POST',
+      headers: {'Content-Type':'text/plain'},
+      body:    JSON.stringify(payload),
+      signal:  AbortSignal.timeout(28000)
+    });
+    var json = await r.json().catch(function(){ return {ok:false,error:'respuesta no JSON'}; });
+    console.log('[wflEnviar] respuesta GAS →', json);
 
-    // Feedback visual
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = '✅ Datos guardados con éxito';
-      btn.style.background = '#16a34a';
-    }
+    if (!json.ok) throw new Error(json.error || 'GAS respondió ok=false');
 
-    console.log('[wflEnviarFactura] OK');
+    /* ─ ÉXITO: colapsar form y mostrar resumen ─ */
+    _wflMostrarResumenExito(totalV, domiNum, urlFact);
 
-  } catch (e) {
-    console.error('[wflEnviarFactura]', e);
-    alert('Error al guardar');
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = 'Reintentar';
-    }
+  } catch(err) {
+    console.error('[wflEnviar] ERROR →', err.message);
+    document.querySelectorAll('.wfl-enviar-btn').forEach(function(b){
+      b.disabled = false;
+      b.textContent = '⚠️ Reintentar';
+    });
+    alert('Error: ' + err.message);
   }
 };
-  W.wflActualizarManual = function(domiNum) {
-  const inp = document.getElementById('wfl-manual-input');
-  if (!inp?.value) {
-    document.getElementById('wfl-val-final-man').textContent = _fmtCOP(domiNum);
-    return;
-  }
-  const val = parseInt(String(inp.value).replace(/\D/g, ''), 10) || 0;
-  document.getElementById('wfl-val-final-man').textContent = _fmtCOP(val + domiNum);
-};
+
+/* ─ Resumen visual post-envío ─ */
+function _wflMostrarResumenExito(totalFact, domiNum, urlFact) {
+  var wrap = document.getElementById('wfl-manual-wrap');
+  var totW = document.getElementById('wfl-total-wrap');
+  if (wrap) wrap.style.display = 'none';
+  if (totW) totW.style.display = 'none';
+
+  var fmtCOP = function(n){ return '$'+Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.'); };
+  var prev = document.getElementById('wfl-preview-wrap');
+
+  var existente = document.getElementById('wfl-exito-card');
+  if (existente) existente.remove();
+
+  var card = document.createElement('div');
+  card.id = 'wfl-exito-card';
+  card.style.cssText = 'background:#f0fdf4;border:1.5px solid #86efac;border-radius:14px;padding:12px 14px;margin-top:10px;animation:cardIn .3s ease both';
+  card.innerHTML =
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+    +'<span style="font-size:22px">✅</span>'
+    +'<div><p style="font-family:Plus Jakarta Sans,sans-serif;font-weight:900;font-size:13px;color:#166534;margin:0">Guardado en la hoja</p>'
+    +'<p style="font-size:10px;color:#6c7a7b;margin:1px 0 0">La factura quedó registrada</p></div></div>'
+    +'<div style="display:flex;gap:6px">'
+    +'<div style="flex:1;background:#fff;border-radius:10px;padding:7px 9px;text-align:center;border:1px solid #86efac">'
+    +'<p style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase;margin:0">Factura</p>'
+    +'<p style="font-family:Plus Jakarta Sans,sans-serif;font-weight:900;font-size:14px;color:#006970;margin:0">'+fmtCOP(totalFact)+'</p></div>'
+    +'<div style="flex:1;background:#fff;border-radius:10px;padding:7px 9px;text-align:center;border:1px solid #86efac">'
+    +'<p style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase;margin:0">🚚 Domi</p>'
+    +'<p style="font-family:Plus Jakarta Sans,sans-serif;font-weight:900;font-size:14px;color:#006970;margin:0">'+(domiNum>0?fmtCOP(domiNum):'$0')+'</p></div>'
+    +'<div style="flex:1;background:linear-gradient(135deg,rgba(0,105,112,.08),rgba(0,188,200,.05));border-radius:10px;padding:7px 9px;text-align:center;border:1.5px solid rgba(0,105,112,.2)">'
+    +'<p style="font-size:9px;font-weight:700;color:#6c7a7b;text-transform:uppercase;margin:0">Cobrar</p>'
+    +'<p style="font-family:Plus Jakarta Sans,sans-serif;font-weight:900;font-size:14px;color:#006970;margin:0">'+fmtCOP(totalFact+domiNum)+'</p></div>'
+    +'</div>'
+    +(urlFact ? '<p style="font-size:10px;color:#2a9d5c;margin:8px 0 0;display:flex;align-items:center;gap:4px"><span>🖼️</span> Foto guardada en Drive</p>' : '');
+
+  var body = document.querySelector('#'+'wil-factura-libre-section .wfl-body');
+  if (body) body.appendChild(card);
+}
 
   /* ════ HOOK ════ */
   const _orig = W.activarPedidoEnRuta;
