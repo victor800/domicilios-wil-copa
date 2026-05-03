@@ -6054,7 +6054,480 @@ function _wflMostrarResumenExito(totalFact, domiNum, urlFact) {
 
 }(window));
 
+/* ═══════════════════════════════════════════════════════════════
+   PARCHE WIL v3.1 — Factura en Historial + Popup WhatsApp
+   ─────────────────────────────────────────────────────────────
+   1. Ver Factura en detalles del historial
+      - Consulta _cacheFacturasHist (ya cargado por fetchHistorialSheet)
+      - Si ID existe en FacturaLibre → botón colapsable + imagen
+      - Si no existe → no muestra nada
+      - Zoom modal completo: pinch, arrastra, botones +/−/reset, doble tap
 
+   2. Popup WhatsApp antes de abrir el chat
+      - Muestra plantilla lista para enviar
+      - Saludo por hora del día (Buenos días/tardes/noches)
+      - Mi nombre (domi.nombre) + # pedido + productos + total
+      - Si hay factura → imagen en el popup (toca para zoom)
+      - Botón "Enviar por WhatsApp" abre wa.me con el texto
+      - Botón "Cancelar" cierra el popup
+═══════════════════════════════════════════════════════════════ */
+
+(function patchWIL_FacturaWA() {
+  'use strict';
+
+  /* ══ 0. ESTILOS ══ */
+  var _st = document.createElement('style');
+  _st.textContent =
+    /* Popup WhatsApp */
+    '#wilWaOverlay{position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.55);'
+    + 'backdrop-filter:blur(5px);display:none;align-items:flex-end;justify-content:center;}'
+    + '#wilWaOverlay.open{display:flex;}'
+    + '#wilWaBox{width:100%;max-width:520px;background:#f8f9fa;border-radius:28px 28px 0 0;'
+    + 'padding:20px 20px calc(24px + env(safe-area-inset-bottom));'
+    + 'box-shadow:0 -8px 48px rgba(0,0,0,.35);'
+    + 'animation:slideUp .35s cubic-bezier(.22,1,.36,1);max-height:88dvh;overflow-y:auto;}'
+    /* Factura colapsable en historial */
+    + '.wil-fact-collapse{max-height:0;overflow:hidden;opacity:0;'
+    + 'transition:max-height .38s cubic-bezier(.22,1,.36,1),opacity .28s ease;}'
+    + '.wil-fact-collapse.open{max-height:420px;opacity:1;}'
+    + '.wil-fact-btn{width:100%;padding:9px 12px;background:rgba(0,105,112,.05);'
+    + "border:1.5px dashed rgba(0,105,112,.3);border-radius:11px;cursor:pointer;"
+    + "font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:11px;"
+    + 'color:#006970;display:flex;align-items:center;justify-content:center;'
+    + 'gap:6px;transition:all .18s;margin-bottom:7px;}'
+    + '.wil-fact-btn:hover{background:rgba(0,105,112,.1);border-color:rgba(0,105,112,.45);}'
+    + '.wil-fact-btn.open{border-style:solid;border-color:rgba(0,105,112,.4);}'
+    + '.wil-fact-img{width:100%;border-radius:11px;border:1px solid #e7e8e9;'
+    + 'display:block;object-fit:contain;max-height:300px;cursor:zoom-in;background:#f8f9fa;}'
+    /* ── ZOOM MODAL ── */
+    + '#_wilZoomModal{position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.95);'
+    + 'display:none;flex-direction:column;align-items:stretch;justify-content:stretch;'
+    + 'touch-action:none;user-select:none;-webkit-user-select:none;}'
+    + '#_wilZoomModal.zopen{display:flex;animation:_wilZFI .2s ease both;}'
+    + '@keyframes _wilZFI{from{opacity:0}to{opacity:1}}'
+    /* barra superior */
+    + '#_wilZoomBar{display:flex;align-items:center;justify-content:space-between;'
+    + 'padding:12px 14px;flex-shrink:0;}'
+    + '#_wilZoomLabel{font-size:12px;font-weight:800;color:rgba(255,255,255,.6);'
+    + "font-family:'Plus Jakarta Sans',sans-serif;letter-spacing:.04em;}"
+    /* área de imagen */
+    + '#_wilZoomArea{flex:1;overflow:hidden;position:relative;display:flex;'
+    + 'align-items:center;justify-content:center;}'
+    + '#_wilZoomImg{max-width:100%;max-height:100%;object-fit:contain;'
+    + 'transform-origin:center center;will-change:transform;'
+    + 'cursor:grab;-webkit-user-drag:none;transition:none;}'
+    + '#_wilZoomImg.grabbing{cursor:grabbing;}'
+    /* barra inferior controles */
+    + '#_wilZoomCtrls{display:flex;align-items:center;justify-content:center;gap:10px;'
+    + 'padding:14px;flex-shrink:0;}'
+    + '.wil-zc{width:48px;height:48px;border-radius:50%;'
+    + 'background:rgba(255,255,255,.13);border:1.5px solid rgba(255,255,255,.22);'
+    + 'color:#fff;font-size:22px;cursor:pointer;display:flex;align-items:center;'
+    + 'justify-content:center;transition:background .15s,transform .1s;-webkit-tap-highlight-color:transparent;}'
+    + '.wil-zc:active{background:rgba(255,255,255,.28);transform:scale(.9);}'
+    + '#_wilZoomPct{font-size:13px;font-weight:800;color:rgba(255,255,255,.75);'
+    + "font-family:'Plus Jakarta Sans',sans-serif;min-width:52px;text-align:center;}"
+    /* hint */
+    + '#_wilZoomHint{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);'
+    + 'background:rgba(0,0,0,.5);backdrop-filter:blur(4px);color:rgba(255,255,255,.65);'
+    + 'border-radius:20px;padding:5px 13px;font-size:11px;font-weight:600;'
+    + 'pointer-events:none;white-space:nowrap;opacity:1;transition:opacity .5s;'
+    + "font-family:'Plus Jakarta Sans',sans-serif;}";
+  document.head.appendChild(_st);
+
+  /* ══ 1. CREAR MODAL WHATSAPP ══ */
+  var _waOv = document.createElement('div');
+  _waOv.id = 'wilWaOverlay';
+  _waOv.innerHTML =
+    '<div id="wilWaBox">'
+    + '<div style="width:40px;height:4px;background:#dde2e4;border-radius:4px;margin:0 auto 16px"></div>'
+    /* Header */
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'
+    +   '<div style="width:42px;height:42px;border-radius:50%;background:#25D366;display:flex;align-items:center;justify-content:center;flex-shrink:0">'
+    +     '<svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.096.537 4.066 1.479 5.779L0 24l6.432-1.687A11.93 11.93 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.006-1.368l-.36-.214-3.716.975.992-3.625-.235-.373A9.818 9.818 0 1112 21.818z"/></svg>'
+    +   '</div>'
+    +   '<div style="flex:1"><p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:900;font-size:15px;color:#191c1d;margin:0">Enviar detalles al cliente</p>'
+    +   '<p style="font-size:11px;color:#6c7a7b;margin:2px 0 0">Revisa el mensaje antes de enviarlo</p></div>'
+    +   '<button onclick="wilCerrarWaPopup()" style="width:34px;height:34px;border-radius:50%;background:#f3f4f5;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;color:#6c7a7b">✕</button>'
+    + '</div>'
+    /* Preview del mensaje */
+    + '<div style="background:#e2f8e5;border-radius:16px;padding:13px 14px;margin-bottom:12px;border:1px solid #b7deba">'
+    +   '<p style="font-size:9px;font-weight:800;text-transform:uppercase;color:#2a9d5c;letter-spacing:.06em;margin:0 0 8px">Vista previa del mensaje</p>'
+    +   '<pre id="wilWaMsgPreview" style="font-family:inherit;font-size:12px;color:#191c1d;white-space:pre-wrap;word-break:break-word;margin:0;line-height:1.55"></pre>'
+    + '</div>'
+    /* Imagen factura (si hay) */
+    + '<div id="wilWaFacturaPreview" style="display:none;margin-bottom:12px">'
+    +   '<p style="font-size:9px;font-weight:800;text-transform:uppercase;color:#2a9d5c;letter-spacing:.06em;margin:0 0 7px">📎 Factura adjunta</p>'
+    +   '<img id="wilWaFacturaImg" src="" alt="Factura" style="width:100%;max-height:200px;object-fit:contain;border-radius:11px;border:1.5px solid #b7deba;display:block;background:#fff;cursor:zoom-in" onclick="wilZoomAbrir(this.src,\'Factura\')"/>'
+    + '</div>'
+    /* Botones */
+    + '<div style="display:flex;gap:8px">'
+    +   '<button onclick="wilCerrarWaPopup()" style="flex:1;padding:12px;background:#f3f4f5;border:1.5px solid #e7e8e9;border-radius:14px;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:12px;color:#6c7a7b;cursor:pointer">Cancelar</button>'
+    +   '<button id="wilWaEnviarBtn" style="flex:3;padding:12px;background:linear-gradient(135deg,#25D366,#128C7E);border:none;border-radius:14px;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:12px;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;box-shadow:0 3px 14px rgba(37,211,102,.3);">'
+    +     '<svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.096.537 4.066 1.479 5.779L0 24l6.432-1.687A11.93 11.93 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.006-1.368l-.36-.214-3.716.975.992-3.625-.235-.373A9.818 9.818 0 1112 21.818z"/></svg>'
+    +     'Enviar por WhatsApp'
+    +   '</button>'
+    + '</div>'
+    + '</div>';
+  _waOv.addEventListener('click', function(e){ if(e.target===_waOv) wilCerrarWaPopup(); });
+  document.body.appendChild(_waOv);
+
+  /* ══ 1b. MOTOR ZOOM MODAL ══ */
+  var _zm = {
+    modal: null, img: null, pctEl: null, hint: null,
+    sc: 1, tx: 0, ty: 0,
+    dragging: false, ox: 0, oy: 0,
+    /* pinch */
+    p0: 0, s0: 1, pc0x: 0, pc0y: 0,
+    /* doble tap */
+    lastTap: 0,
+    MIN: 0.5, MAX: 8
+  };
+
+  function _zmCreate() {
+    if (document.getElementById('_wilZoomModal')) {
+      _zm.modal = document.getElementById('_wilZoomModal');
+      _zm.img   = document.getElementById('_wilZoomImg');
+      _zm.pctEl = document.getElementById('_wilZoomPct');
+      _zm.hint  = document.getElementById('_wilZoomHint');
+      return;
+    }
+    var m = document.createElement('div');
+    m.id = '_wilZoomModal';
+    m.innerHTML =
+      /* barra top */
+      '<div id="_wilZoomBar">'
+      + '<span id="_wilZoomLabel">FACTURA</span>'
+      + '<button class="wil-zc" style="width:38px;height:38px;font-size:18px" onclick="wilZoomCerrar()">✕</button>'
+      + '</div>'
+      /* área imagen */
+      + '<div id="_wilZoomArea"><img id="_wilZoomImg" src="" alt="Factura"/></div>'
+      /* hint */
+      + '<div id="_wilZoomHint">Pellizca · Arrastra · Doble tap para ajustar</div>'
+      /* controles */
+      + '<div id="_wilZoomCtrls">'
+      + '<button class="wil-zc" onclick="wilZoomStep(-0.4)">−</button>'
+      + '<span id="_wilZoomPct">100%</span>'
+      + '<button class="wil-zc" onclick="wilZoomStep(0.4)">+</button>'
+      + '<button class="wil-zc" style="font-size:17px" onclick="wilZoomReset()">⟳</button>'
+      + '</div>';
+    document.body.appendChild(m);
+
+    _zm.modal = m;
+    _zm.img   = document.getElementById('_wilZoomImg');
+    _zm.pctEl = document.getElementById('_wilZoomPct');
+    _zm.hint  = document.getElementById('_wilZoomHint');
+
+    /* ── Mouse drag ── */
+    _zm.img.addEventListener('mousedown', function(e) {
+      if (_zm.sc <= 1) return;
+      _zm.dragging = true; _zm.ox = e.clientX - _zm.tx; _zm.oy = e.clientY - _zm.ty;
+      _zm.img.classList.add('grabbing'); e.preventDefault();
+    });
+    window.addEventListener('mousemove', function(e) {
+      if (!_zm.dragging) return;
+      _zm.tx = e.clientX - _zm.ox; _zm.ty = e.clientY - _zm.oy; _zmApply();
+    });
+    window.addEventListener('mouseup', function() {
+      _zm.dragging = false; _zm.img.classList.remove('grabbing');
+    });
+
+    /* ── Touch (pinch + drag + doble tap) ── */
+    _zm.img.addEventListener('touchstart', function(e) {
+      /* Doble tap → toggle fit/2x */
+      var now = Date.now();
+      if (e.touches.length === 1 && now - _zm.lastTap < 300) {
+        _zm.sc = (_zm.sc > 1.2) ? 1 : 2; _zm.tx = 0; _zm.ty = 0;
+        _zmApply(true); _zm.lastTap = 0; return;
+      }
+      _zm.lastTap = now;
+
+      if (e.touches.length === 1) {
+        _zm.ox = e.touches[0].clientX - _zm.tx;
+        _zm.oy = e.touches[0].clientY - _zm.ty;
+      } else if (e.touches.length === 2) {
+        _zm.p0  = Math.hypot(
+          e.touches[1].clientX - e.touches[0].clientX,
+          e.touches[1].clientY - e.touches[0].clientY
+        );
+        _zm.s0  = _zm.sc;
+        _zm.pc0x = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        _zm.pc0y = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      }
+    }, {passive:true});
+
+    _zm.img.addEventListener('touchmove', function(e) {
+      e.preventDefault();
+      if (e.touches.length === 1 && _zm.sc > 1) {
+        _zm.tx = e.touches[0].clientX - _zm.ox;
+        _zm.ty = e.touches[0].clientY - _zm.oy;
+        _zmApply();
+      } else if (e.touches.length === 2) {
+        var d = Math.hypot(
+          e.touches[1].clientX - e.touches[0].clientX,
+          e.touches[1].clientY - e.touches[0].clientY
+        );
+        _zm.sc = Math.min(_zm.MAX, Math.max(_zm.MIN, _zm.s0 * (d / _zm.p0)));
+        _zmApply();
+      }
+    }, {passive:false});
+
+    _zm.img.addEventListener('touchend', function() {
+      if (_zm.sc < 1) { _zm.sc = 1; _zm.tx = 0; _zm.ty = 0; _zmApply(true); }
+    }, {passive:true});
+
+    /* Clic en fondo (fuera de la imagen) → cerrar */
+    document.getElementById('_wilZoomArea').addEventListener('click', function(e) {
+      if (e.target !== _zm.img) wilZoomCerrar();
+    });
+  }
+
+  function _zmApply(animate) {
+    if (!_zm.img) return;
+    _zm.img.style.transition = animate ? 'transform .25s cubic-bezier(.22,1,.36,1)' : 'none';
+    _zm.img.style.transform  = 'translate('+_zm.tx+'px,'+_zm.ty+'px) scale('+_zm.sc+')';
+    if (_zm.pctEl) _zm.pctEl.textContent = Math.round(_zm.sc * 100) + '%';
+  }
+
+  window.wilZoomAbrir = function(src, label) {
+    _zmCreate();
+    _zm.sc = 1; _zm.tx = 0; _zm.ty = 0;
+    _zm.img.src = src;
+    _zm.img.style.transition = 'none';
+    _zm.img.style.transform  = '';
+    if (_zm.pctEl) _zm.pctEl.textContent = '100%';
+    if (document.getElementById('_wilZoomLabel'))
+      document.getElementById('_wilZoomLabel').textContent = label || 'FACTURA';
+    _zm.modal.classList.add('zopen');
+    document.body.style.overflow = 'hidden';
+    /* Ocultar hint después de 3s */
+    if (_zm.hint) {
+      _zm.hint.style.opacity = '1';
+      clearTimeout(_zm._hintTimer);
+      _zm._hintTimer = setTimeout(function(){ if(_zm.hint) _zm.hint.style.opacity='0'; }, 3000);
+    }
+  };
+
+  window.wilZoomCerrar = function() {
+    if (_zm.modal) _zm.modal.classList.remove('zopen');
+    document.body.style.overflow = '';
+  };
+
+  window.wilZoomStep = function(delta) {
+    _zm.sc = Math.min(_zm.MAX, Math.max(_zm.MIN, _zm.sc + delta));
+    if (_zm.sc === 1) { _zm.tx = 0; _zm.ty = 0; }
+    _zmApply(true);
+  };
+
+  window.wilZoomReset = function() {
+    _zm.sc = 1; _zm.tx = 0; _zm.ty = 0; _zmApply(true);
+  };
+
+  /* ══ 2. HELPERS ══ */
+  function _saludoHora() {
+    var h = new Date().toLocaleTimeString('es-CO',{hour:'numeric',hour12:false,timeZone:'America/Bogota'});
+    var n = parseInt(h,10);
+    if (n >= 5  && n < 12) return 'Buenos días';
+    if (n >= 12 && n < 19) return 'Buenas tardes';
+    return 'Buenas noches';
+  }
+
+  function _fmtCOP(n) {
+    var num = Math.round(n||0);
+    if (!num) return '$0';
+    return '$'+num.toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+  }
+
+  function _parseCOP(v) {
+    var s = String(v||'').replace(/[^0-9.,]/g,'');
+    if (!s) return 0;
+    var p = (s.match(/\./g)||[]).length;
+    if (p>1) return parseFloat(s.replace(/\./g,''));
+    if (p===1){ var pts=s.split('.'); return (pts[1]&&pts[1].length===3)?parseFloat(s.replace('.','')):parseFloat(s); }
+    return parseFloat(s)||0;
+  }
+
+  /* ══ 3. ABRIR POPUP WA ══ */
+  window.wilAbrirWaPopup = function(tel, h) {
+    /* h = objeto historial del pedido */
+    var saludo   = _saludoHora();
+    var domiNom  = (window.domi && window.domi.nombre) ? window.domi.nombre.split(' ')[0] : 'tu domiciliario';
+    var cliente  = h.cliente || 'Cliente';
+    var pedidoId = h.id || '—';
+    var total    = h.total || '—';
+    var facUrl   = (window._cacheFacturasHist && window._cacheFacturasHist[pedidoId]) || '';
+
+    /* Construir línea de productos */
+    var prodLines = '';
+    if (h._prods && h._prods.length) {
+      prodLines = h._prods.map(function(pr){
+        var nom = pr.nom || pr.nombre || '';
+        var qty = pr.qty || 1;
+        var vt  = pr.vtotal || ((pr.vu||0) * qty) || 0;
+        return '  • ' + nom + (qty > 1 ? ' x'+qty : '') + (vt > 0 ? ' — '+_fmtCOP(vt) : '');
+      }).join('\n');
+    }
+
+    /* Plantilla */
+    var msg =
+      saludo + ', ' + cliente + ' 👋\n\n'
+    + 'Soy *' + domiNom + '*, tu domiciliario de *Domicilios WIL* 🛵\n\n'
+    + 'Tu pedido *#' + pedidoId + '* está siendo gestionado por mí.\n\n'
+    + 'Aquí te comparto los detalles:\n\n'
+    + (prodLines ? '📦 *Productos:*\n' + prodLines + '\n\n' : '')
+    + '💰 *Valor total:* ' + total + '\n'
+    + (facUrl ? '\n📎 _(Se adjunta la factura)_' : '')
+    + '\n\n¡Gracias por confiar en *Domicilios WIL*! 🙏';
+
+    /* Mostrar preview */
+    var prev = document.getElementById('wilWaMsgPreview');
+    if (prev) prev.textContent = msg;
+
+    /* Imagen factura */
+    var factDiv = document.getElementById('wilWaFacturaPreview');
+    var factImg = document.getElementById('wilWaFacturaImg');
+    if (factDiv && factImg) {
+      if (facUrl) {
+        factImg.src = facUrl;
+        factDiv.style.display = 'block';
+      } else {
+        factDiv.style.display = 'none';
+      }
+    }
+
+    /* Botón enviar */
+    var envBtn = document.getElementById('wilWaEnviarBtn');
+    if (envBtn) {
+      envBtn.onclick = function() {
+        var telLimpio = (tel||'').replace(/\D/g,'');
+        var waUrl = 'https://wa.me/57' + telLimpio + '?text=' + encodeURIComponent(msg);
+        /* Abrir WhatsApp */
+        window.open(waUrl, '_blank');
+        wilCerrarWaPopup();
+      };
+    }
+
+    /* Abrir overlay */
+    _waOv.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.wilCerrarWaPopup = function() {
+    _waOv.classList.remove('open');
+    document.body.style.overflow = '';
+  };
+
+  /* ══ 4. BLOQUE FACTURA PARA HISTORIAL ══ */
+  /* Devuelve el HTML del bloque factura para insertar en el drawer */
+  window._wilFacturaBlockHist = function(pedidoId) {
+    var facUrl = (window._cacheFacturasHist && window._cacheFacturasHist[pedidoId]) || '';
+    if (!facUrl) return ''; /* Sin factura → nada */
+
+    var uid = 'wf_h_' + String(pedidoId).replace(/\D/g,'') + '_' + Math.random().toString(36).slice(2,6);
+    return (
+      '<div style="margin-bottom:9px">'
+      /* Botón colapsable */
+      + '<button class="wil-fact-btn" id="' + uid + '_btn" onclick="(function(){'
+      + 'var c=document.getElementById(\'' + uid + '_c\');'
+      + 'var b=document.getElementById(\'' + uid + '_btn\');'
+      + 'var ic=document.getElementById(\'' + uid + '_ic\');'
+      + 'var op=c.classList.contains(\'open\');'
+      + 'if(op){c.classList.remove(\'open\');b.classList.remove(\'open\');ic.textContent=\'expand_more\';}' 
+      + 'else{c.classList.add(\'open\');b.classList.add(\'open\');ic.textContent=\'expand_less\';}'
+      + '})()">'
+      + '<span class="material-symbols-outlined" style="font-size:15px;font-variation-settings:\'FILL\' 1">receipt_long</span>'
+      + 'Ver factura adjunta'
+      + '<span class="material-symbols-outlined" id="' + uid + '_ic" style="font-size:14px;margin-left:auto">expand_more</span>'
+      + '</button>'
+      /* Contenido colapsable */
+      + '<div class="wil-fact-collapse" id="' + uid + '_c">'
+      +   '<img src="' + facUrl + '" alt="Factura" class="wil-fact-img" '
+      +     'onclick="wilZoomAbrir(\'' + facUrl.replace(/\\/g,'\\\\').replace(/'/g,"\\'") + '\',\'Factura #' + String(pedidoId).replace(/'/g,'') + '\')" />'
+      + '</div>'
+      + '</div>'
+    );
+  };
+
+  /* ══ 5. PARCHEAR renderHistorial ══
+     Reemplazamos la función para inyectar:
+     a) Bloque factura en el drawer de cada item
+     b) Cambiar el botón WhatsApp por onclick que abre nuestro popup
+  */
+  var _origRenderHist = window.renderHistorial;
+
+  window.renderHistorial = function() {
+    /* Llamar el original */
+    _origRenderHist.apply(this, arguments);
+
+    /* Post-proceso: modificar cada card del historial */
+    _patchHistorialCards();
+  };
+
+  function _patchHistorialCards() {
+    /* Buscar todos los drawers del historial */
+    var drawers = document.querySelectorAll('[id^="hdrw_"]');
+    drawers.forEach(function(drawer) {
+      var hid = drawer.id.replace('hdrw_','');
+
+      /* Obtener el historial item correspondiente */
+      var h = _buscarHistItem(hid);
+      if (!h) return;
+
+      /* ── a. Insertar bloque factura si no está ya ── */
+      if (!drawer.querySelector('.wil-fact-btn')) {
+        var factHtml = window._wilFacturaBlockHist(h.id);
+        if (factHtml) {
+          /* Insertar antes del botón "Llamar" */
+          var llamarLink = drawer.querySelector('a[href^="tel:"]');
+          if (llamarLink && llamarLink.parentNode) {
+            var tmp = document.createElement('div');
+            tmp.innerHTML = factHtml;
+            llamarLink.parentNode.insertBefore(tmp.firstChild, llamarLink);
+          }
+        }
+      }
+
+      /* ── b. Reemplazar onclick del botón WhatsApp ── */
+      var waLink = drawer.querySelector('a[href^="https://wa.me"]');
+      if (waLink && !waLink.dataset.wilPatched) {
+        waLink.dataset.wilPatched = '1';
+        var tel = (h.telefono||'').replace(/\D/g,'');
+        waLink.removeAttribute('href');
+        waLink.removeAttribute('target');
+        waLink.style.cursor = 'pointer';
+        waLink.onclick = function(e) {
+          e.preventDefault();
+          window.wilAbrirWaPopup(tel, h);
+        };
+      }
+    });
+  }
+
+  /* Buscar item en state.historial por hid (puede ser "h123_fecha" o similar) */
+  function _buscarHistItem(hid) {
+    if (!window.state || !window.state.historial) return null;
+    /* hid formato: h{id}_{fechaNums} */
+    var match = hid.match(/^h([a-z0-9]+)_(\d+)$/i);
+    if (!match) return null;
+    var idStr = match[1];
+    return window.state.historial.find(function(h) {
+      var hIdNorm = (h.id||'').replace(/[^a-z0-9]/gi,'');
+      return hIdNorm === idStr || String(h.id) === idStr;
+    }) || null;
+  }
+
+  /* ══ 6. También parchear toggleDetalleHist ══
+     Cada vez que se abre un drawer, aplicar el parche */
+  var _origToggle = window.toggleDetalleHist;
+  window.toggleDetalleHist = function(hid) {
+    _origToggle.apply(this, arguments);
+    /* Después de abrir el drawer, aplicar parche */
+    setTimeout(_patchHistorialCards, 50);
+  };
+
+  console.log('[WIL Parche Factura+WA v3.1] ✅ Zoom modal con pinch, drag, doble tap, botones +/−/reset');
+
+})();
 
 </script>
 </body>
