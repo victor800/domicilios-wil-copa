@@ -5990,6 +5990,372 @@ function _wflMostrarResumenExito(totalFact, domiNum, urlFact) {
 
 }(window));
 
+/* ═══════════════════════════════════════════════════════
+   PARCHE: Factura en historial — ver imagen + WhatsApp
+   ════════════════════════════════════════════════════ */
+(function patchHistorialFactura() {
+
+  var SHEET_ID_FACT = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+  var SHEET_FACT    = 'FacturaLibre';
+  var _cacheFacturas = {}; // { idPedido: { url, totalFactura, totalCobrar } | null }
+  var _cargado = false;
+
+  /* ── 1. Cargar toda la hoja FacturaLibre una sola vez ── */
+  async function cargarFacturas() {
+    if (_cargado) return;
+    _cargado = true;
+    try {
+      var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID_FACT
+              + '/gviz/tq?tqx=out:csv&sheet='
+              + encodeURIComponent(SHEET_FACT)
+              + '&cachebust=' + Date.now();
+      var r = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      var text = await r.text();
+      if (!text || text.length < 10) return;
+
+      /* CSV: col A=ID_PEDIDO, col F=URL_FACTURA (índice 5),
+              col G=TOTAL_FACTURA (índice 6), col I=TOTAL_COBRAR (índice 8) */
+      var filas = text.trim().split('\n').filter(Boolean).slice(1); // saltar cabecera
+      filas.forEach(function(line) {
+        var cols = _splitCSVSimple(line);
+        var idPed = (cols[0] || '').replace(/^"|"$/g, '').trim();
+        var urlF  = (cols[5] || '').replace(/^"|"$/g, '').trim();
+        if (!idPed) return;
+        _cacheFacturas[idPed] = urlF
+          ? {
+              url:         urlF,
+              totalFact:   (cols[6] || '').replace(/^"|"$/g, '').trim(),
+              totalCobrar: (cols[8] || '').replace(/^"|"$/g, '').trim(),
+              nota:        (cols[9] || '').replace(/^"|"$/g, '').trim()
+            }
+          : null;
+      });
+      console.log('[FacturaHist] Cargadas', Object.keys(_cacheFacturas).length, 'facturas');
+    } catch(e) {
+      _cargado = false; // reintentar la próxima vez
+      console.warn('[FacturaHist]', e.message);
+    }
+  }
+
+  function _splitCSVSimple(line) {
+    var cols = [], cur = '', inQ = false;
+    for (var i = 0; i < line.length; i++) {
+      var ch = line[i];
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { cols.push(cur); cur = ''; }
+      else cur += ch;
+    }
+    cols.push(cur);
+    return cols;
+  }
+
+  /* ── 2. Obtener datos de factura de un pedido (del cache) ── */
+  function getFactura(idPedido) {
+    return _cacheFacturas[String(idPedido).trim()] || null;
+  }
+
+  /* ── 3. HTML del bloque de factura para insertar en detalles ── */
+  function buildFacturaHtml(factura, uid) {
+    if (!factura || !factura.url) return '';
+
+    var totalFmt = factura.totalFact
+      ? ('$' + parseInt(factura.totalFact).toLocaleString('es-CO'))
+      : '';
+    var cobrarFmt = factura.totalCobrar
+      ? ('$' + parseInt(factura.totalCobrar).toLocaleString('es-CO'))
+      : '';
+
+    return (
+      '<div style="margin-bottom:9px">'
+        /* Botón toggle */
+        + '<button id="fbtn_' + uid + '" onclick="toggleFacturaHist(\'' + uid + '\')"'
+          + ' style="width:100%;padding:9px 12px;background:rgba(0,105,112,.05);'
+          + 'border:1.5px dashed rgba(0,105,112,.3);border-radius:11px;cursor:pointer;'
+          + 'font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:11px;'
+          + 'color:#006970;display:flex;align-items:center;justify-content:center;gap:6px;'
+          + 'transition:background .18s,border-color .2s;margin-bottom:0">'
+          + '<span class="material-symbols-outlined" style="font-size:15px;font-variation-settings:\'FILL\' 1">receipt_long</span>'
+          + '<span>Ver factura adjunta</span>'
+          + (totalFmt ? '<span style="margin-left:auto;font-size:10px;background:#e8f5e9;color:#2a9d5c;padding:1px 8px;border-radius:20px">' + totalFmt + '</span>' : '')
+          + '<span class="material-symbols-outlined" id="fico_' + uid + '" style="font-size:14px;transition:transform .3s">expand_more</span>'
+        + '</button>'
+        /* Contenido colapsable */
+        + '<div id="fcol_' + uid + '" style="max-height:0;overflow:hidden;opacity:0;transition:max-height .38s cubic-bezier(.22,1,.36,1),opacity .28s ease">'
+          + '<div style="padding-top:8px;display:flex;flex-direction:column;gap:7px">'
+            /* Imagen */
+            + '<div style="position:relative;border-radius:12px;overflow:hidden;border:1px solid rgba(0,105,112,.15);background:#f8f9fa;cursor:zoom-in" onclick="ampliarFacturaHist(\'' + uid + '\')">'
+              + '<img id="fimg_' + uid + '" src="' + escHtml(factura.url) + '" alt="Factura"'
+                + ' style="width:100%;max-height:260px;object-fit:contain;display:block"/>'
+              + '<div style="position:absolute;top:7px;right:7px;width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center">'
+                + '<span class="material-symbols-outlined" style="font-size:16px;color:#fff">zoom_in</span>'
+              + '</div>'
+            + '</div>'
+            /* Chips totales si existen */
+            + (cobrarFmt
+              ? '<div style="display:flex;gap:6px">'
+                + (totalFmt ? '<div style="flex:1;background:#f0fff4;border:1px solid #86efac;border-radius:9px;padding:6px 8px;text-align:center"><p style="font-size:9px;color:#2a9d5c;font-weight:700;text-transform:uppercase;margin:0">Factura</p><p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:13px;font-weight:900;color:#006970;margin:0">' + totalFmt + '</p></div>' : '')
+                + '<div style="flex:1;background:linear-gradient(135deg,rgba(0,105,112,.08),rgba(0,188,200,.05));border:1.5px solid rgba(0,105,112,.2);border-radius:9px;padding:6px 8px;text-align:center"><p style="font-size:9px;color:#006970;font-weight:700;text-transform:uppercase;margin:0">Cobrar</p><p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:13px;font-weight:900;color:#006970;margin:0">' + cobrarFmt + '</p></div>'
+                + '</div>'
+              : '')
+            /* Nota si existe */
+            + (factura.nota
+              ? '<div style="background:#fff8ec;border-left:3px solid #f59e0b;border-radius:0 10px 10px 0;padding:8px 10px"><p style="font-size:11px;color:#92400e;font-weight:700;margin:0">📝 ' + escHtml(factura.nota) + '</p></div>'
+              : '')
+          + '</div>'
+        + '</div>'
+      + '</div>'
+    );
+  }
+
+  /* ── 4. Toggle colapsable ── */
+  window.toggleFacturaHist = function(uid) {
+    var col = document.getElementById('fcol_' + uid);
+    var ico = document.getElementById('fico_' + uid);
+    var btn = document.getElementById('fbtn_' + uid);
+    if (!col) return;
+    var isOpen = col.style.maxHeight && col.style.maxHeight !== '0px';
+    if (isOpen) {
+      col.style.maxHeight = '0px';
+      col.style.opacity   = '0';
+      if (ico) ico.style.transform = '';
+      if (btn) btn.style.borderStyle = 'dashed';
+    } else {
+      col.style.maxHeight = '900px';
+      col.style.opacity   = '1';
+      if (ico) ico.style.transform = 'rotate(180deg)';
+      if (btn) btn.style.borderStyle = 'solid';
+    }
+  };
+
+  /* ── 5. Ampliar imagen en un overlay simple ── */
+  window.ampliarFacturaHist = function(uid) {
+    var img = document.getElementById('fimg_' + uid);
+    if (!img || !img.src) return;
+
+    var ov = document.getElementById('_factOverlay');
+    if (!ov) {
+      ov = document.createElement('div');
+      ov.id = '_factOverlay';
+      ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.93);'
+        + 'display:flex;align-items:center;justify-content:center;padding:16px;'
+        + 'touch-action:none';
+      ov.onclick = function(e) { if (e.target === ov || e.target === ov._closeBtn) ov.remove(); };
+      document.body.appendChild(ov);
+    }
+    ov.innerHTML = '';
+
+    var closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    closeBtn.style.cssText = 'position:absolute;top:16px;right:16px;width:42px;height:42px;'
+      + 'border-radius:50%;background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.3);'
+      + 'color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center';
+    closeBtn.onclick = function() { ov.remove(); };
+    ov._closeBtn = closeBtn;
+    ov.appendChild(closeBtn);
+
+    var zImg = document.createElement('img');
+    zImg.src = img.src;
+    zImg.style.cssText = 'max-width:100%;max-height:90dvh;object-fit:contain;'
+      + 'border-radius:12px;user-select:none;-webkit-user-drag:none';
+
+    /* Pinch-to-zoom */
+    var sc = 1, tx = 0, ty = 0, p0 = 0, s0 = 1, t0x = 0, t0y = 0;
+    function ap() { zImg.style.transform = 'translate('+tx+'px,'+ty+'px) scale('+sc+')'; }
+    zImg.addEventListener('touchstart', function(e) {
+      if (e.touches.length === 1) { t0x = e.touches[0].clientX - tx; t0y = e.touches[0].clientY - ty; }
+      else if (e.touches.length === 2) {
+        p0 = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
+        s0 = sc;
+      }
+    }, {passive: true});
+    zImg.addEventListener('touchmove', function(e) {
+      e.preventDefault();
+      if (e.touches.length === 1) { tx = e.touches[0].clientX - t0x; ty = e.touches[0].clientY - t0y; }
+      else if (e.touches.length === 2) {
+        var d = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
+        sc = Math.min(8, Math.max(0.5, s0 * (d / p0)));
+      }
+      ap();
+    }, {passive: false});
+
+    ov.appendChild(zImg);
+  };
+
+  /* ── 6. WhatsApp con datos del pedido + imagen de factura ── */
+  window.abrirWAConFactura = function(telLimpio, hId) {
+    /* hId = mismo uid usado para el drawer = "h{id}_{fechaNum}" */
+    var factura = window._facturaCache && window._facturaCache[hId];
+    var imgUrl  = factura && factura.url ? factura.url : null;
+
+    /* Buscar datos del item en historial */
+    var h = null;
+    if (window.state && window.state.historial) {
+      /* El hId tiene formato h{idSinPuntuacion}_{fechaSinSlash} — buscamos por id */
+      var idBruto = hId.replace(/^h/, '').replace(/_\d+$/, '');
+      h = state.historial.find(function(x) {
+        return (x.id || '').replace(/[^a-z0-9]/gi, '') === idBruto;
+      });
+    }
+
+    var cliente   = h ? (h.cliente   || '—') : '—';
+    var dir       = h ? (h.direccion || '—').replace(/\s*\[.+?\]/,'').replace(/\s*\(Ref:[^)]+\)/,'').trim() : '—';
+    var total     = h ? (h.total     || '—') : '—';
+    var metodo    = h ? ((h.metodoPago||'').toLowerCase().includes('transfer') ? '🏦 Transferencia' : '💵 Efectivo') : '—';
+    var hora      = h ? (h.hora      || '—') : '—';
+    var idPed     = h ? (h.id        || '')  : '';
+
+    /* Construir mensaje */
+    var msg = '📦 *Resumen de pedido WIL*\n'
+      + (idPed    ? '🔖 Pedido #' + idPed + '\n'      : '')
+      + '👤 Cliente: ' + cliente + '\n'
+      + '📍 Dirección: ' + dir + '\n'
+      + '💰 Total: ' + total + '\n'
+      + '💳 Pago: ' + metodo + '\n'
+      + '⏰ Hora: ' + hora;
+
+    if (factura) {
+      if (factura.totalFact)   msg += '\n🧾 Factura: $' + parseInt(factura.totalFact).toLocaleString('es-CO');
+      if (factura.totalCobrar) msg += '\n✅ Total a cobrar: $' + parseInt(factura.totalCobrar).toLocaleString('es-CO');
+      if (factura.nota)        msg += '\n📝 ' + factura.nota;
+    }
+
+    /* Si hay imagen: abrir WhatsApp con el mensaje; la imagen la comparte el domi manualmente
+       porque WhatsApp Web/App no acepta imágenes via URL en el deep link.
+       PERO si la URL es un dataURL base64, ofrecemos descargarla primero. */
+    if (imgUrl && imgUrl.startsWith('data:')) {
+      /* Descargar imagen y luego abrir WhatsApp */
+      _descargarYCompartir(imgUrl, telLimpio, msg);
+    } else if (imgUrl) {
+      /* URL normal → incluir en mensaje como referencia */
+      msg += '\n🖼️ Factura: ' + imgUrl;
+      window.open('https://wa.me/57' + telLimpio + '?text=' + encodeURIComponent(msg), '_blank');
+    } else {
+      window.open('https://wa.me/57' + telLimpio + '?text=' + encodeURIComponent(msg), '_blank');
+    }
+  };
+
+  /* Descargar imagen como archivo y luego abrir WhatsApp para que el domi la adjunte */
+  function _descargarYCompartir(dataUrl, telLimpio, msg) {
+    try {
+      /* Crear link de descarga */
+      var a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = 'factura-wil.jpg';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function() { a.remove(); }, 500);
+
+      /* Pequeño aviso antes de abrir WhatsApp */
+      setTimeout(function() {
+        var ok = confirm('📎 La factura se descargó en tu dispositivo.\n\nEn WhatsApp podrás adjuntarla manualmente al chat. ¿Continuar?');
+        if (ok) {
+          window.open('https://wa.me/57' + telLimpio + '?text=' + encodeURIComponent(msg), '_blank');
+        }
+      }, 700);
+    } catch(e) {
+      /* Fallback: abrir WhatsApp sin imagen */
+      window.open('https://wa.me/57' + telLimpio + '?text=' + encodeURIComponent(msg), '_blank');
+    }
+  }
+
+  /* ── 7. Cachear facturas accesibles por hid para el botón WA ── */
+  window._facturaCache = {}; // { hid: facturaObj }
+
+  /* ── 8. Parche sobre renderHistorial para inyectar el bloque de factura ── */
+  var _renderHistOrig = window.renderHistorial;
+  window.renderHistorial = async function() {
+    /* Primero cargar facturas si no se han cargado */
+    await cargarFacturas();
+    /* Luego renderizar normalmente */
+    _renderHistOrig();
+    /* Inyectar bloques de factura y actualizar botón WhatsApp en cada item */
+    _inyectarFacturasEnDom();
+  };
+
+  function _inyectarFacturasEnDom() {
+    if (!window.state || !window.state.historial) return;
+
+    var hoyYMD = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
+
+    state.historial.forEach(function(h) {
+      var f = String(h.fecha || '');
+      var p = f.split('/');
+      var fechaNum = (p.length === 3 && p[2].length === 4)
+        ? (p[2] + p[1].padStart(2,'0') + p[0].padStart(2,'0'))
+        : f.replace(/\D/g, '');
+      var hid = 'h' + (h.id || '').replace(/[^a-z0-9]/gi, '') + '_' + fechaNum;
+
+      var factura = getFactura(h.id);
+      /* Guardar en cache global para el botón WA */
+      window._facturaCache[hid] = factura;
+
+      /* Encontrar el drawer de este item */
+      var drawer = document.getElementById('hdrw_' + hid);
+      if (!drawer) return;
+
+      /* ── A. Inyectar bloque factura si existe y no está ya ── */
+      if (factura && factura.url && !document.getElementById('fbtn_' + hid)) {
+        var factHtml = buildFacturaHtml(factura, hid);
+        /* Buscar el bloque de dirección como ancla de inserción */
+        var contentWrap = drawer.querySelector('div[style*="border-top"]') || drawer.firstElementChild;
+        if (contentWrap) {
+          /* Insertar ANTES del bloque de dirección (primer div dentro) */
+          var tempDiv = document.createElement('div');
+          tempDiv.innerHTML = factHtml;
+          var firstChild = contentWrap.firstElementChild;
+          if (firstChild) {
+            contentWrap.insertBefore(tempDiv.firstElementChild, firstChild);
+          } else {
+            contentWrap.appendChild(tempDiv.firstElementChild);
+          }
+        }
+      }
+
+      /* ── B. Actualizar el botón de WhatsApp con la nueva función ── */
+      var telLimpio = (h.telefono || '').replace(/\D/g, '');
+      if (!telLimpio) return;
+
+      /* Buscar el <a> de WhatsApp dentro de la card (fuera del drawer, en el resumen) */
+      var card = drawer.closest('.card-in');
+      if (!card) return;
+      var waLink = card.querySelector('a[href^="https://wa.me/"]');
+      if (!waLink) return;
+
+      /* Reemplazar el link por un botón que llame abrirWAConFactura */
+      var btnWA = document.createElement('button');
+      btnWA.onclick = function(e) {
+        e.preventDefault();
+        window.abrirWAConFactura(telLimpio, hid);
+      };
+      /* Copiar estilos del link original */
+      btnWA.style.cssText = waLink.getAttribute('style') || '';
+      btnWA.style.cssText += ';cursor:pointer;';
+      btnWA.innerHTML = waLink.innerHTML;
+      /* Añadir ícono de factura si tiene */
+      if (factura && factura.url) {
+        var badge = document.createElement('span');
+        badge.style.cssText = 'font-size:10px;font-weight:800;background:#dcfce7;color:#166534;'
+          + 'padding:1px 6px;border-radius:20px;margin-left:4px';
+        badge.textContent = '📎';
+        btnWA.appendChild(badge);
+      }
+      waLink.parentNode.replaceChild(btnWA, waLink);
+    });
+  }
+
+  /* ── 9. Recargar facturas cuando se recarga el historial ── */
+  var _fetchHistOrig = window.fetchHistorialSheet;
+  window.fetchHistorialSheet = async function() {
+    _cargado = false; // forzar recarga de facturas
+    window._facturaCache = {};
+    await _fetchHistOrig();
+  };
+
+  console.log('[PARCHE FacturaHist v1.0] ✅ Factura en historial + WhatsApp con imagen');
+})();
+
 </script>
 </body>
 </html>
