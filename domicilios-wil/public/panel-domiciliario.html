@@ -5601,73 +5601,9 @@ console.log('[PARCHE Historial RT v1.0] ✅ Stats en tiempo real con domicilio c
      Prioridad: TOTAL A PAGAR > VALOR TRANSFERENCIA > TOTAL > GRAND TOTAL
      Devuelve JSON: {"total": 47500, "tipo": "TOTAL A PAGAR"}
   */
-  async function extraerTotalIA(b64, mime) {
-  try {
-    // Convertir base64 a blob
-    const byteString = atob(b64);
-    const bytes = new Uint8Array(byteString.length);
-    for (let i = 0; i < byteString.length; i++) bytes[i] = byteString.charCodeAt(i);
-    const blob = new Blob([bytes], { type: mime });
-    const url = URL.createObjectURL(blob);
-    
-    // OCR gratuito
-    console.log('[extraerTotalIA] Iniciando OCR...');
-    const { data: { text } } = await Tesseract.recognize(url, 'spa');
-    URL.revokeObjectURL(url);
-    
-    // Extraer números
-    const numeros = text.match(/\d[\d.]*(?:[.,]\d{2})?/g) || [];
-    const valores = numeros
-      .map(n => parseInt(n.replace(/\./g, '').replace(/,/g, '')) || 0)
-      .filter(n => n >= 1000)
-      .sort((a, b) => b - a);
-    
-    const total = valores[0] || 0;
-    console.log('[extraerTotalIA] Total detectado:', total);
-    
-    return { total: total, tipo: total > 0 ? 'OCR detectado' : 'no detectado' };
-  } catch (error) {
-    console.error('[extraerTotalIA] Error:', error);
-    return { total: 0, tipo: 'error-ocr' };
-  }
+ async function extraerTotalIA(b64, mime) {
+  return { total: 0, tipo: 'manual' };
 }
-  /* ════ GUARDAR EN GOOGLE SHEET ════
-     ✅ FUNCIONA: Envía datos al Google Apps Script via fetch POST
-     Columnas: ID_PEDIDO | CLIENTE | FECHA | HORA | URL_FACTURA | TOTAL_EXTRAIDO | NOMBRE_DOMI | ESTADO | NOTA
-  */
-  async function guardarEnSheet(pedido, totalExtraido, urlFactura, notaCliente) {
-    let nombreDomi = '';
-    try {
-      const raw = localStorage.getItem('wil_domi') || sessionStorage.getItem('wil_domi') || '{}';
-      nombreDomi = JSON.parse(raw).nombre || '';
-    } catch (_) {}
-    if (!nombreDomi && W.domi) nombreDomi = W.domi.nombre || '';
-
-    try {
-      await fetch(GAS_URL, {
-        method:  'POST',
-        mode:    'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accion: 'factura-libre',
-          rows: [[
-            String(pedido.id    || '').trim(),
-            pedido.cliente       || '',
-            _fecha(),
-            _hora(),
-            urlFactura           || 'sin-imagen',
-            totalExtraido        || 0,
-            nombreDomi,
-            'Enviado',
-            notaCliente          || ''
-          ]]
-        })
-      });
-      console.log('[guardarEnSheet] OK');
-    } catch (err) {
-      console.error('[guardarEnSheet] Error:', err);
-    }
-  }
 
   /* ════ RENDER SECCIÓN ════ */
   function renderSeccion(p) {
@@ -5762,70 +5698,37 @@ console.log('[PARCHE Historial RT v1.0] ✅ Stats en tiempo real con domicilio c
 
   /* ════ PROCESAR IMAGEN ════ */
   async function _procesarImagen(file) {
-    const preview = document.getElementById('wfl-preview-img');
-    const preWrap = document.getElementById('wfl-preview-wrap');
-    const btnWrap = document.getElementById('wfl-btn-wrap');
-    const status  = document.getElementById('wfl-status');
-    const totWrap = document.getElementById('wfl-total-wrap');
-    const manWrap = document.getElementById('wfl-manual-wrap');
+  const preview = document.getElementById('wfl-preview-img');
+  const preWrap = document.getElementById('wfl-preview-wrap');
+  const btnWrap = document.getElementById('wfl-btn-wrap');
+  const status  = document.getElementById('wfl-status');
+  const manWrap = document.getElementById('wfl-manual-wrap');
 
-    _totalIA = 0;
-    _b64 = null;
+  _totalIA = 0;
+  _b64 = null;
+  _mime = file.type || 'image/jpeg';
+  
+  if (preWrap) preWrap.style.display = 'block';
+  if (btnWrap) btnWrap.style.display = 'none';
+  if (manWrap) manWrap.style.display = 'block';
+
+  const reader = new FileReader();
+  reader.onload = function (ev) {
+    const dataUrl = ev.target.result;
+    if (preview) preview.src = dataUrl;
+    _b64  = dataUrl.split(',')[1];
     _mime = file.type || 'image/jpeg';
-    if (totWrap) totWrap.style.display = 'none';
-    if (manWrap) manWrap.style.display = 'none';
-    if (preWrap) preWrap.style.display = 'block';
-    if (btnWrap) btnWrap.style.display = 'none';
 
-    const reader = new FileReader();
-    reader.onload = async function (ev) {
-      const dataUrl = ev.target.result;
-      if (preview) preview.src = dataUrl;
-      _b64  = dataUrl.split(',')[1];
-      _mime = file.type || 'image/jpeg';
+    if (status) status.innerHTML = '✅ Foto guardada';
 
-      if (status) status.innerHTML =
-        '<span style="display:inline-block;width:14px;height:14px;border:2px solid #006970;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite"></span>' +
-        '&nbsp;Analizando imagen…';
-
-      try {
-        const res = await extraerTotalIA(_b64, _mime);
-        _totalIA = res.total;
-        _tipoIA  = res.tipo;
-
-        const p    = W.state?.pedidoActivo;
-        const domi = _parseCOP(p?.domicilio || '0');
-        const fin  = _totalIA + domi;
-
-        if (status) {
-          status.innerHTML = '<span style="font-size:16px">✅</span> ' +
-            (_totalIA > 0
-              ? `<strong>${_tipoIA}</strong>: <strong>${_fmtCOP(_totalIA)}</strong>`
-              : 'No detectado — ingresa manualmente');
-        }
-
-        if (_totalIA > 0) {
-          const tEl = document.getElementById('wfl-tipo-label');
-          if (tEl) tEl.textContent = '🧧 ' + _tipoIA;
-          _mostrarTotales(_totalIA, domi, fin);
-        } else {
-          _mostrarManual(domi);
-        }
-
-        const tabTot = document.getElementById('tabTotal');
-        if (tabTot && fin > 0) tabTot.textContent = _fmtCOP(fin);
-
-      } catch (e) {
-        console.error('[_procesarImagen]', e);
-        if (status) status.innerHTML =
-          '<span style="font-size:16px">⚠️</span> Error — ingresa el total manualmente.';
-        const p2   = W.state?.pedidoActivo;
-        const dom2 = _parseCOP(p2?.domicilio || '0');
-        _mostrarManual(dom2);
-      }
-    };
-    reader.readAsDataURL(file);
-  }
+    const p = W.state?.pedidoActivo;
+    const domi = _parseCOP(p?.domicilio || '0');
+    if (document.getElementById('wfl-val-final-man')) {
+      document.getElementById('wfl-val-final-man').textContent = _fmtCOP(domi);
+    }
+  };
+  reader.readAsDataURL(file);
+}
 
   function _mostrarTotales(prods, domi, final) {
     const wrap = document.getElementById('wfl-total-wrap');
@@ -5863,73 +5766,68 @@ console.log('[PARCHE Historial RT v1.0] ✅ Stats en tiempo real con domicilio c
      ✅ CORREGIDO: Sin dependencias de Utilities ni Drive API
      Envía: ID, CLIENTE, FECHA, HORA, IMAGEN (base64), TOTAL, DOMI, ESTADO, NOTA
   */
-  W.wflEnviarFactura = async function () {
-    const p = W.state?.pedidoActivo;
-    if (!p) { alert('No hay pedido activo.'); return; }
+W.wflEnviarFactura = async function () {
+  const p = W.state?.pedidoActivo;
+  if (!p) { 
+    alert('No hay pedido activo.'); 
+    return; 
+  }
 
-    const idPedido  = String(p.id || '').trim();
-    const domiNum   = parseInt(_parseCOP(p.domicilio || '0'), 10) || 0;
+  const domiNum = parseInt(_parseCOP(p.domicilio || '0'), 10) || 0;
+  const manInp = document.getElementById('wfl-manual-input');
+  
+  if (!manInp?.value) {
+    alert('Ingresa el valor de la factura');
+    return;
+  }
 
-    const manInp = document.getElementById('wfl-manual-input');
-    if (manInp?.value) {
-      _totalIA = parseInt(String(manInp.value).replace(/\D/g, ''), 10) || 0;
-    }
+  _totalIA = parseInt(String(manInp.value).replace(/\D/g, ''), 10) || 0;
 
-    const notaCliente = document.getElementById('wfl-nota-cliente')?.value?.trim() || '';
+  // ✅ Obtener nota opcional
+  const notaCliente = document.getElementById('wfl-nota-cliente')?.value?.trim() || '';
+  const urlFact = (_b64 && _mime) ? `data:${_mime};base64,${_b64}` : 'sin-imagen';
 
-    const urlFact = (_b64 && _mime) ? `data:${_mime};base64,${_b64}` : 'sin-imagen';
+  const btn = document.getElementById('wfl-enviar-btn') || document.querySelector('.wfl-enviar-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = 'Guardando...';
+  }
 
-    const btn = document.getElementById('wfl-enviar-btn') || document.querySelector('.wfl-enviar-btn');
+  try {
+    await guardarEnSheet(p, _totalIA, urlFact, notaCliente);
+
     if (btn) {
-      btn.disabled = true;
-      btn.innerHTML = '<span style="display:inline-block;width:14px;height:14px;border:2px solid #fff;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite"></span>&nbsp;Procesando…';
+      btn.disabled = false;
+      btn.innerHTML = '✅ Datos guardados con éxito';
+      btn.style.background = '#16a34a';
     }
 
-    try {
-      await guardarEnSheet(p, _totalIA || 0, urlFact, notaCliente);
-
-      const totalFin = (_totalIA || 0) + domiNum;
-      const resumen =
-        `🧾 Factura pedido #${idPedido}\n\n` +
-        (_totalIA > 0 ? `📦 ${_tipoIA}: ${_fmtCOP(_totalIA)}\n` : '') +
-        `🚚 Domicilio: ${_fmtCOP(domiNum)}\n` +
-        `━━━━━━━━━━━━━━━━\n` +
-        `💰 TOTAL A COBRAR: ${_fmtCOP(totalFin > 0 ? totalFin : domiNum)}\n`;
-
-      const status = document.getElementById('wfl-status');
-      if (status) {
-        status.innerHTML = '<span style="font-size:16px">✅</span> Guardado en Sheet correctamente.';
-      }
-
-      if (btn) {
-        btn.disabled = false;
-        btn.style.background = 'linear-gradient(135deg,#1a7a3a,#2a9d5c)';
-        btn.innerHTML =
-          '<span class="material-symbols-outlined" style="font-size:15px;font-variation-settings:\'FILL\' 1">check_circle</span>' +
-          '&nbsp;¡Enviado!';
-      }
-
-      console.log('[wflEnviarFactura] ✅ OK', { idPedido, totalIA: _totalIA, tipoIA: _tipoIA, totalFin, notaCliente });
-
-    } catch (e) {
-      console.error('[wflEnviarFactura] ❌ Error:', e);
-      alert('Error: ' + (e?.message || 'No se pudo procesar'));
-      if (btn) {
-        btn.disabled = false;
-        btn.innerHTML = '⚠️ Error — reintentar';
-      }
+    console.log('[wflEnviarFactura] OK', {
+      pedido: p.id,
+      totalFactura: _totalIA,
+      domicilio: domiNum,
+      totalFinal: _totalIA + domiNum,
+      nota: notaCliente
+    });
+  } catch (e) {
+    console.error('[wflEnviarFactura]', e);
+    alert('Error al guardar');
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = 'Reintentar';
     }
-  };
+  }
+};
 
   W.wflActualizarManual = function(domiNum) {
-    const inp = document.getElementById('wfl-manual-input');
-    if (!inp?.value) {
-      document.getElementById('wfl-val-final-man').textContent = _fmtCOP(domiNum);
-      return;
-    }
-    const val = parseInt(String(inp.value).replace(/\D/g, ''), 10) || 0;
-    document.getElementById('wfl-val-final-man').textContent = _fmtCOP(val + domiNum);
-  };
+  const inp = document.getElementById('wfl-manual-input');
+  if (!inp?.value) {
+    document.getElementById('wfl-val-final-man').textContent = _fmtCOP(domiNum);
+    return;
+  }
+  const val = parseInt(String(inp.value).replace(/\D/g, ''), 10) || 0;
+  document.getElementById('wfl-val-final-man').textContent = _fmtCOP(val + domiNum);
+};
 
   /* ════ HOOK ════ */
   const _orig = W.activarPedidoEnRuta;
