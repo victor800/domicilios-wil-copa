@@ -13,6 +13,7 @@
  <script src="pedido-libre.js"></script>
  <script src="wil-fix-final.js"></script>
   <script src="wil-barrio-noencontrado.js"></script>
+     <script src="wil-patch-v2.js"></script>
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
@@ -5376,851 +5377,992 @@ function _copiarFallback(txt){
   
 })();
 
-/**
- * ═══════════════════════════════════════════════════════════
- *  WIL — Barrio No Encontrado v5
- *  ─────────────────────────────────────────────────────────
- *  NOVEDADES v5:
- *   ✅ Geocodificación Nominatim para dirección libre
- *   ✅ Validación de existencia de la dirección
- *   ✅ Muestra km recogida → entrega
- *   ✅ Tarifa base Unidades de Madera: $24.000
- *   ✅ $1.800/km adicional desde Madera
- *   ✅ Municipios lejanos: $50.000 fijo
- *
- *  FLUJO POR CAMPO:
- *
- *  RECOGIDA (comercio no listado):
- *    → Aviso azul neutro: "Comercio no listado"
- *    → Campo libre → geocodifica con Nominatim
- *    → Muestra si la dirección fue encontrada o no
- *    → Sin tarifa extra (la recogida no suma tarifa)
- *
- *  ENTREGA — destino "Para mí":
- *    → Aviso amarillo + botón GPS "Capturar mi ubicación"
- *    → Con GPS capturado: tarifa = max($24.000, km×$1.800)
- *    → Muestra km recogida → entrega
- *
- *  ENTREGA — destino "Envío a otra persona":
- *    → Aviso naranja "Fuera de Copacabana · cargo adicional"
- *    → Geocodifica la dirección escrita con Nominatim
- *    → Municipios fijos $50.000: Estrella, Sabaneta, Girardota, Barbosa…
- *    → Resto: base $24.000 + $1.800/km desde Unidades de Madera
- *    → Muestra km recogida → entrega
- * ═══════════════════════════════════════════════════════════
- */
 (function (W) {
   'use strict';
 
-  /* ── CONSTANTES ─────────────────────────────────────────── */
-  var ANCLA_WIL    = { lat: 6.3491, lng: -75.5062 }; // Sede WIL Copacabana
-  var ANCLA_MADERA = { lat: 6.3208, lng: -75.5563 }; // Unidades de Madera (último barrio)
-  var TARIFA_BASE  = 24000;  // ← Corregido a $24.000
-  var PRECIO_KM    = 1800;   // $/km adicional desde Madera
-  var TARIFA_FIJA  = 50000;  // municipios lejanos
+  /* ══════════════════════════════════════════════════════
+     FIX 1 — RESET BOTONES AL NAVEGAR ATRÁS
+  ══════════════════════════════════════════════════════ */
+  var BTN_MAP = {
+    'btnConfirmarDirecto': '<span class="sym f" style="font-size:17px">check_circle</span>Confirmar pedido',
+    'btnConfirmarLibre':   '<span class="sym f" style="font-size:17px">check_circle</span>Confirmar pedido',
+    'btnConfirmarPaquete': '<span class="sym f" style="font-size:17px">check_circle</span>Confirmar envío'
+  };
 
-  /* Geocode debounce */
-  var _geocodeTimer = { recogida: null, entrega: null };
-  var _geocodeXHR   = { recogida: null, entrega: null };
-
-  /* Coordenadas geocodificadas por campo */
-  var _geocoded = { recogida: null, entrega: null };
-
-  /* Municipios con tarifa fija $50.000 */
-  var MUNICIPIOS_FIJOS = [
-    'estrella','la estrella','sabaneta','girardota','barbosa',
-    'envigado','itagui','itagüi','san javier','caldas','la tablaza',
-    'heliconia','sopetran','sopetrán','san jeronimo','san jerónimo',
-    'santa barbara','santa bárbara','el retiro'
-  ];
-
-  /* ── Estado GPS por campo ───────────────────────────────── */
-  var _gps = { recogida: null, entrega: null };
-
-  /* ── Haversine (km) ─────────────────────────────────────── */
-  function hv(la1, lo1, la2, lo2) {
-    var R  = 6371,
-        dL = (la2 - la1) * Math.PI / 180,
-        dO = (lo2 - lo1) * Math.PI / 180,
-        a  = Math.sin(dL / 2) * Math.sin(dL / 2)
-           + Math.cos(la1 * Math.PI / 180) * Math.cos(la2 * Math.PI / 180)
-           * Math.sin(dO / 2) * Math.sin(dO / 2);
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  }
-
-  /* ── Normalizar texto ───────────────────────────────────── */
-  function _norm(s) {
-    return (s || '').toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
-  }
-
-  /* ── ¿Municipio de tarifa fija? ─────────────────────────── */
-  function _esMunicipioFijo(texto) {
-    var t = _norm(texto || '');
-    return MUNICIPIOS_FIJOS.some(function (m) {
-      return t.indexOf(_norm(m)) !== -1;
+  function resetBtns() {
+    Object.keys(BTN_MAP).forEach(function (id) {
+      var btn = document.getElementById(id);
+      if (btn && btn.disabled) {
+        btn.disabled = false;
+        btn.innerHTML = BTN_MAP[id];
+      }
     });
   }
 
-  /* ── Calcular tarifa desde Unidades de Madera ───────────── */
-  function _calcTarifa(lat, lng, texto) {
-    if (_esMunicipioFijo(texto || '')) {
-      return { tarifa: TARIFA_FIJA, km: 0, fijo: true };
-    }
-    if (lat && lng) {
-      var distMadera = hv(ANCLA_MADERA.lat, ANCLA_MADERA.lng, lat, lng);
-      var distWIL    = hv(ANCLA_WIL.lat,    ANCLA_WIL.lng,    lat, lng);
-      var kmExtra    = Math.max(0, distMadera - 0.5);
-      var tarifa     = Math.max(TARIFA_BASE, Math.round((TARIFA_BASE + kmExtra * PRECIO_KM) / 500) * 500);
-      return { tarifa: tarifa, km: Math.round(distWIL * 10) / 10, fijo: false };
-    }
-    return { tarifa: TARIFA_BASE, km: 0, fijo: false };
-  }
+  var _gb = W.goBack;
+  W.goBack = function () {
+    resetBtns();
+    if (_gb) _gb.apply(this, arguments);
+  };
 
-  /* ── Km recogida → entrega ──────────────────────────────── */
-  function _kmRecogidaEntrega() {
-    var cR = _geocoded.recogida || _gps.recogida;
-    var cE = _geocoded.entrega  || _gps.entrega;
-    if (!cR || !cE) return null;
-    return Math.round(hv(cR.lat, cR.lng, cE.lat, cE.lng) * 10) / 10;
-  }
+  var _sv = W.showView;
+  W.showView = function (id) {
+    if (id !== 'view-confirmado') resetBtns();
+    if (_sv) _sv.apply(this, arguments);
+  };
 
-  /* ── Destino actual ─────────────────────────────────────── */
-  function _destino() {
-    return (W.WIL_LIBRE || {}).destino || null;
-  }
 
-  /* ── Modo del panel: 'recogida' | 'mi' | 'otro' ────────── */
-  function _modo(campo) {
-    if (campo === 'recogida') return 'recogida';
-    return _destino() === 'otro' ? 'otro' : 'mi';
-  }
-
-  /* ════════════════════════════════════════════════════════
-     GEOCODIFICACIÓN NOMINATIM
-  ════════════════════════════════════════════════════════ */
-
-  /**
-   * Geocodifica una dirección libre con Nominatim.
-   * Busca primero en Colombia/Antioquia, luego global.
-   * Llama onResult(lat, lng, displayName) si encuentra,
-   * o onNotFound() si no.
-   */
-  function _geocodificar(campo, texto, onResult, onNotFound, onError) {
-    /* Cancelar timer e XHR previos */
-    if (_geocodeTimer[campo]) clearTimeout(_geocodeTimer[campo]);
-    if (_geocodeXHR[campo])   _geocodeXHR[campo] = null;
-
-    _geocodeTimer[campo] = setTimeout(function () {
-      _mostrarEstadoGeo(campo, 'buscando');
-
-      /* Construir query: si no menciona ciudad, añadir "Antioquia, Colombia" */
-      var q     = texto.trim();
-      var qFull = (_norm(q).indexOf('colombia') < 0 && _norm(q).indexOf('antioquia') < 0)
-                ? q + ', Antioquia, Colombia'
-                : q;
-
-      var url = 'https://nominatim.openstreetmap.org/search'
-              + '?q='          + encodeURIComponent(qFull)
-              + '&format=json&limit=1&addressdetails=1&countrycodes=co'
-              + '&accept-language=es';
-
-      fetch(url, { headers: { 'User-Agent': 'DomiciliosWIL/1.0' } })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          if (data && data.length > 0) {
-            var hit = data[0];
-            var lat = parseFloat(hit.lat);
-            var lng = parseFloat(hit.lon);
-            var dn  = hit.display_name || q;
-            _geocoded[campo] = { lat: lat, lng: lng };
-            onResult(lat, lng, dn);
-          } else {
-            _geocoded[campo] = null;
-            onNotFound();
-          }
-        })
-        .catch(function (err) {
-          _geocoded[campo] = null;
-          if (onError) onError(err);
-        });
-    }, 700); /* debounce 700ms */
-  }
-
-  /* ── Indicadores de estado geocodificación ──────────────── */
-  function _mostrarEstadoGeo(campo, estado, extra) {
-    var pill = document.getElementById('wil-ne-geo-status-' + campo);
-    if (!pill) return;
-
-    var estilos = {
-      buscando: {
-        bg: '#f0f9ff', border: '#7dd3fc', color: '#0369a1',
-        icono: '🔍', texto: 'Buscando dirección…'
-      },
-      encontrado: {
-        bg: '#f0fdf4', border: '#86efac', color: '#15803d',
-        icono: '✅', texto: extra || 'Dirección encontrada'
-      },
-      noEncontrado: {
-        bg: '#fef2f2', border: '#fca5a5', color: '#b91c1c',
-        icono: '❌', texto: 'Dirección no encontrada. Intenta con más detalles.'
-      },
-      error: {
-        bg: '#fff7ed', border: '#fdba74', color: '#c2410c',
-        icono: '⚠️', texto: 'Sin conexión para verificar. Continúa con la dirección escrita.'
-      }
-    };
-
-    var s = estilos[estado] || estilos.error;
-    pill.style.display    = 'flex';
-    pill.style.background = s.bg;
-    pill.style.border     = '1.5px solid ' + s.border;
-    pill.style.color      = s.color;
-    pill.innerHTML =
-      '<span style="font-size:15px;flex-shrink:0">' + s.icono + '</span>'
-      + '<span style="font-size:11.5px;font-weight:600;line-height:1.4">' + s.texto + '</span>';
-  }
-
-  /* ── Pill de km recogida → entrega ─────────────────────── */
-  function _mostrarKmPill(km) {
-    var pill = document.getElementById('wil-ne-km-pill');
-    if (!pill) return;
-    if (km === null) { pill.style.display = 'none'; return; }
-    pill.style.display = 'flex';
-    pill.innerHTML =
-      '<span class="sym f" style="font-size:18px;color:#006970;flex-shrink:0">route</span>'
-      + '<div>'
-      + '<div style="font-size:14px;font-weight:900;color:#006970">' + km + ' km</div>'
-      + '<div style="font-size:10px;color:#5a7a80;font-weight:600">Distancia recogida → entrega</div>'
-      + '</div>';
-  }
-
-  /* ── Actualizar km pill y tarifa cuando cambian coords ─── */
-  function _actualizarKmYTarifa(campo) {
-    if (campo !== 'entrega') return;
-    var cE = _geocoded.entrega || _gps.entrega;
-    if (!cE) return;
-
-    var km = _kmRecogidaEntrega();
-    _mostrarKmPill(km);
-
-    var textDir = (document.getElementById('wil-ne-dir-entrega') || {}).value || '';
-    var info = _calcTarifa(cE.lat, cE.lng, textDir);
-    W.WIL_LIBRE             = W.WIL_LIBRE || {};
-    W.WIL_LIBRE.tarifaDomi  = info.tarifa;
-    W.WIL_LIBRE.esFuera     = true;
-
-    var hidE = document.getElementById('wil-barrio-entrega');
-    if (hidE) { hidE.value = textDir; hidE.dataset.precio = info.tarifa; }
-    _mostrarTarifa(info.tarifa, info.km, info.fijo);
-  }
-
-  /* ════════════════════════════════════════════════════════
-     CREAR / REFRESCAR PANEL
-  ════════════════════════════════════════════════════════ */
-  function crearPanel(campo) {
-    var panelId    = 'wil-ne-panel-' + campo;
-    var modoActual = _modo(campo);
-    var viejo      = document.getElementById(panelId);
-
-    if (viejo) {
-      if (viejo.dataset.modo !== modoActual) { viejo.remove(); }
-      else { return viejo; }
-    }
-
-    var anchor = document.getElementById('wil-sugs-' + campo);
-    if (!anchor) return null;
-
-    var div = document.createElement('div');
-    div.id            = panelId;
-    div.dataset.modo  = modoActual;
-    div.style.cssText = 'display:none;margin-top:10px';
-    div.innerHTML     = _buildHTML(campo, modoActual);
-
-    anchor.parentNode.insertBefore(div, anchor.nextSibling);
-    return div;
-  }
-
-  /* ── Construir HTML del panel ───────────────────────────── */
-  function _buildHTML(campo, modo) {
-    var html = '';
-
-    /* ── Aviso ── */
-    if (modo === 'recogida') {
-      html +=
-        '<div style="display:flex;align-items:flex-start;gap:9px;padding:11px 13px;'
-        + 'background:#eff6ff;border:1.5px solid #93c5fd;border-radius:12px;margin-bottom:10px">'
-        +   '<span style="font-size:19px;flex-shrink:0">🏪</span>'
-        +   '<div>'
-        +     '<div style="font-size:12.5px;font-weight:800;color:#1e40af">Comercio no listado</div>'
-        +     '<div style="font-size:11px;color:#1d4ed8;margin-top:2px;line-height:1.45">'
-        +       'Escribe la dirección completa. Vamos a verificarla en el mapa automáticamente.'
-        +     '</div>'
-        +   '</div>'
-        + '</div>';
-    } else if (modo === 'mi') {
-      html +=
-        '<div style="display:flex;align-items:flex-start;gap:9px;padding:11px 13px;'
-        + 'background:#fffbeb;border:1.5px solid #f59e0b;border-radius:12px;margin-bottom:10px">'
-        +   '<span style="font-size:20px;flex-shrink:0">⚠️</span>'
-        +   '<div>'
-        +     '<div style="font-size:12.5px;font-weight:800;color:#92400e">Barrio no encontrado</div>'
-        +     '<div style="font-size:11px;color:#92400e;margin-top:2px;line-height:1.45">'
-        +       '¿Estás fuera de Copacabana? Captura tu ubicación o escribe la dirección completa.'
-        +     '</div>'
-        +   '</div>'
-        + '</div>'
-        /* Botón GPS */
-        + '<button type="button" id="wil-ne-gpsbtn-' + campo + '" '
-        +   'onclick="wilNE_gps(\'' + campo + '\')" '
-        +   'style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;'
-        +   'padding:12px 14px;border-radius:12px;border:1.5px solid #006970;'
-        +   'background:rgba(0,105,112,.08);color:#006970;font-family:\'Plus Jakarta Sans\',sans-serif;'
-        +   'font-size:13px;font-weight:800;cursor:pointer;margin-bottom:10px;transition:.15s">'
-        +   '<span class="sym f" style="font-size:17px">my_location</span>Capturar mi ubicación actual'
-        + '</button>'
-        /* Campo GPS readonly */
-        + '<div id="wil-ne-gpsfield-' + campo + '" style="display:none;margin-bottom:10px">'
-        +   '<div style="font-size:10.5px;font-weight:700;color:#7a8fa6;margin-bottom:4px;'
-        +        'text-transform:uppercase;letter-spacing:.04em">📡 GPS capturado</div>'
-        +   '<input type="text" id="wil-ne-gpsval-' + campo + '" readonly '
-        +     'style="width:100%;border:1.5px solid #a7f3d0;border-radius:10px;padding:10px 13px;'
-        +            'font-size:12.5px;font-family:\'Plus Jakarta Sans\',sans-serif;color:#166534;'
-        +            'background:#f0fdf4;outline:none;cursor:not-allowed;font-weight:600"/>'
-        + '</div>'
-        /* Pill tarifa GPS */
-        + '<div id="wil-ne-tarifa-pill" style="display:none;margin-bottom:10px">'
-        +   '<div style="display:flex;align-items:center;gap:10px;background:#fff7ed;'
-        +        'border:1.5px solid #fed7aa;border-radius:12px;padding:12px 14px">'
-        +     '<span class="sym f" style="font-size:22px;color:#d97706">delivery_dining</span>'
-        +     '<div>'
-        +       '<div id="wil-ne-tarifa-val" style="font-size:19px;font-weight:900;color:#d97706;line-height:1.1">—</div>'
-        +       '<div id="wil-ne-tarifa-sub" style="font-size:11px;color:#92400e;font-weight:600;margin-top:2px">Tarifa estimada</div>'
-        +     '</div>'
-        +   '</div>'
-        + '</div>'
-        /* Pill km recogida→entrega */
-        + '<div id="wil-ne-km-pill" style="display:none;align-items:center;gap:10px;'
-        +      'background:#f0fdfa;border:1.5px solid #5eead4;border-radius:12px;'
-        +      'padding:10px 14px;margin-bottom:10px">'
-        + '</div>';
-    } else {
-      /* modo === 'otro' */
-      html +=
-        '<div style="display:flex;align-items:flex-start;gap:9px;padding:11px 13px;'
-        + 'background:#fff7ed;border:1.5px solid #f97316;border-radius:12px;margin-bottom:10px">'
-        +   '<span style="font-size:20px;flex-shrink:0">📦</span>'
-        +   '<div>'
-        +     '<div style="font-size:12.5px;font-weight:800;color:#c2410c">Fuera de Copacabana · cargo adicional</div>'
-        +     '<div style="font-size:11px;color:#c2410c;margin-top:2px;line-height:1.45">'
-        +       'Tarifa desde <strong>$24.000</strong> (Unidades de Madera) + $1.800/km.<br>'
-        +       'Municipios lejanos (Estrella, Sabaneta, Girardota, Barbosa, Envigado, Itagüí…): '
-        +       '<strong>$50.000 fijo</strong>. El domi confirma el valor exacto.'
-        +     '</div>'
-        +   '</div>'
-        + '</div>'
-        /* Pill tarifa estimada */
-        + '<div id="wil-ne-tarifa-pill" style="display:none;margin-bottom:10px">'
-        +   '<div style="display:flex;align-items:center;gap:10px;background:#fff7ed;'
-        +        'border:1.5px solid #fed7aa;border-radius:12px;padding:12px 14px">'
-        +     '<span class="sym f" style="font-size:22px;color:#d97706">delivery_dining</span>'
-        +     '<div>'
-        +       '<div id="wil-ne-tarifa-val" style="font-size:19px;font-weight:900;color:#d97706;line-height:1.1">—</div>'
-        +       '<div id="wil-ne-tarifa-sub" style="font-size:11px;color:#92400e;font-weight:600;margin-top:2px">Cargo adicional estimado</div>'
-        +     '</div>'
-        +   '</div>'
-        + '</div>'
-        /* Pill km recogida→entrega */
-        + '<div id="wil-ne-km-pill" style="display:none;align-items:center;gap:10px;'
-        +      'background:#f0fdfa;border:1.5px solid #5eead4;border-radius:12px;'
-        +      'padding:10px 14px;margin-bottom:10px">'
-        + '</div>';
-    }
-
-    /* ── Estado geocodificación (todos los modos) ── */
-    html +=
-      '<div id="wil-ne-geo-status-' + campo + '" '
-      +   'style="display:none;align-items:center;gap:8px;padding:9px 12px;'
-      +          'border-radius:10px;margin-bottom:10px;transition:.2s">'
-      + '</div>';
-
-    /* ── Campo dirección libre (todos los modos) ── */
-    var placeholder = campo === 'recogida'
-      ? 'Ej: Éxito de Bello, Cra 50 #34-12, Bello'
-      : (modo === 'otro'
-          ? 'Ej: Cra 43 #18-20, El Poblado, Medellín'
-          : 'Ej: Calle 50 #45-23, Barrio El Centro');
-
-    var labelTxt = campo === 'recogida'
-      ? '🏪 Dirección del comercio'
-      : '📍 Dirección de entrega';
-
-    var notaTxt = campo === 'recogida'
-      ? 'Nombre del comercio y dirección — lo verificamos en el mapa'
-      : (modo === 'otro'
-          ? 'Indica calle, número, barrio y ciudad del destinatario'
-          : 'Incluye calle, número y barrio');
-
-    html +=
-      '<div style="margin-bottom:10px">'
-      +   '<div style="font-size:10.5px;font-weight:700;color:#7a8fa6;margin-bottom:5px;'
-      +        'text-transform:uppercase;letter-spacing:.04em">' + labelTxt + '</div>'
-      +   '<input type="text" id="wil-ne-dir-' + campo + '" placeholder="' + placeholder + '" '
-      +     'oninput="wilNE_dirInput(\'' + campo + '\',this.value)" '
-      +     'style="width:100%;border:1.5px solid #dce3ea;border-radius:10px;padding:11px 13px;'
-      +            'font-size:14px;font-family:\'Plus Jakarta Sans\',sans-serif;color:var(--on);'
-      +            'background:#fff;outline:none;transition:.15s" '
-      +     'onfocus="this.style.borderColor=\'#006970\';this.style.boxShadow=\'0 0 0 3px rgba(0,105,112,.08)\'" '
-      +     'onblur="this.style.borderColor=\'#dce3ea\';this.style.boxShadow=\'none\'"/>'
-      +   '<div style="font-size:10px;color:#7a8fa6;margin-top:3px;font-weight:500">' + notaTxt + '</div>'
-      + '</div>';
-
-    return html;
-  }
-
-  /* ════════════════════════════════════════════════════════
-     CAPTURAR GPS (solo modo "mi")
-  ════════════════════════════════════════════════════════ */
+  /* ══════════════════════════════════════════════════════
+     FIX 2 — GPS: CAPTURA INTERNA, SIN CAMPO VISIBLE
+  ══════════════════════════════════════════════════════ */
   W.wilNE_gps = function (campo) {
-    var btn = document.getElementById('wil-ne-gpsbtn-' + campo);
-    if (btn) { btn.innerHTML = '<span class="spin dk"></span> Capturando…'; btn.disabled = true; }
+    var btn      = document.getElementById('wil-ne-gpsbtn-' + campo);
+    var statusEl = document.getElementById('wil-ne-geo-status-' + campo);
+
+    if (btn) {
+      btn.innerHTML = '<span class="spin dk"></span>&nbsp;Capturando…';
+      btn.disabled  = true;
+    }
 
     if (!navigator.geolocation) {
-      if (typeof mostrarToast === 'function')
-        mostrarToast('GPS no disponible en este dispositivo', 'location_off');
-      if (btn) {
-        btn.innerHTML = '<span class="sym f" style="font-size:17px">my_location</span> Capturar mi ubicación actual';
-        btn.disabled = false;
-      }
+      if (typeof mostrarToast === 'function') mostrarToast('GPS no disponible', 'location_off');
+      if (btn) { btn.innerHTML = '<span class="sym f" style="font-size:17px">my_location</span>&nbsp;Capturar mi ubicación'; btn.disabled = false; }
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      function (pos) {
-        var lat = pos.coords.latitude, lng = pos.coords.longitude;
-        _gps[campo] = { lat: lat, lng: lng };
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      var lat = pos.coords.latitude,
+          lng = pos.coords.longitude;
 
-        if (btn) {
-          btn.innerHTML = '<span class="sym f" style="font-size:16px;color:#16a34a">check_circle</span> Ubicación capturada ✓';
-          btn.style.borderColor = '#16a34a';
-          btn.style.background  = '#f0fdf4';
-          btn.style.color       = '#16a34a';
-          btn.disabled          = false;
-        }
+      if (btn) {
+        btn.style.borderColor = '#16a34a';
+        btn.style.background  = '#f0fdf4';
+        btn.style.color       = '#16a34a';
+        btn.innerHTML = '<span class="sym f" style="font-size:16px;color:#16a34a">check_circle</span>&nbsp;Ubicación capturada ✓';
+        btn.disabled  = false;
+      }
 
-        /* Reverse geocoding para obtener nombre legible */
-        fetch(
-          'https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng
-          + '&format=json&accept-language=es',
-          { headers: { 'User-Agent': 'DomiciliosWIL/1.0' } }
-        )
-          .then(function (r) { return r.json(); })
-          .then(function (d) {
-            var a   = d.address || {};
-            var dir = [
-              (a.road || a.street || '').trim(),
-              a.house_number ? '#' + a.house_number : '',
-              (a.neighbourhood || a.suburb || a.city_district || '').trim(),
-              (a.city || a.town || a.municipality || '').trim()
-            ].filter(Boolean).join(', ');
-            _geocoded[campo] = { lat: lat, lng: lng };
-            _aplicarGPS(campo, lat, lng, dir || (lat.toFixed(5) + ', ' + lng.toFixed(5)));
-          })
-          .catch(function () {
-            _geocoded[campo] = { lat: lat, lng: lng };
-            _aplicarGPS(campo, lat, lng, lat.toFixed(5) + ', ' + lng.toFixed(5));
-          });
+      var gf = document.getElementById('wil-ne-gpsfield-' + campo);
+      if (gf) gf.style.display = 'none';
 
-        if (typeof mostrarToast === 'function')
-          mostrarToast('📍 Ubicación capturada ✓', 'check_circle');
-      },
-      function () {
-        if (typeof mostrarToast === 'function')
-          mostrarToast('No se pudo capturar el GPS. Escribe la dirección.', 'location_off');
-        if (btn) {
-          btn.innerHTML = '<span class="sym f" style="font-size:17px">my_location</span> Reintentar GPS';
-          btn.disabled  = false;
-        }
-      },
-      { enableHighAccuracy: true, timeout: 15000 }
-    );
+      fetch(
+        'https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng + '&format=json&accept-language=es',
+        { headers: { 'User-Agent': 'DomiciliosWIL/1.0' } }
+      )
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var a   = d.address || {};
+          var dir = [
+            (a.road || a.street || '').trim(),
+            a.house_number ? '#' + a.house_number : '',
+            (a.neighbourhood || a.suburb || a.city_district || '').trim(),
+            (a.city || a.town || a.municipality || '').trim()
+          ].filter(Boolean).join(', ');
+
+          _aplicarGPS(campo, lat, lng, dir);
+
+          if (statusEl) {
+            statusEl.style.cssText = 'display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:10px;background:#f0fdf4;border:1.5px solid #86efac;color:#15803d;margin-bottom:8px';
+            statusEl.innerHTML = '<span style="font-size:16px">📍</span>'
+              + '<span style="font-size:11.5px;font-weight:700">Ubicación capturada: '
+              + _shortDir(dir) + '</span>';
+          }
+        })
+        .catch(function () {
+          var dir = lat.toFixed(5) + ', ' + lng.toFixed(5);
+          _aplicarGPS(campo, lat, lng, dir);
+          if (statusEl) {
+            statusEl.style.cssText = 'display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:10px;background:#f0fdf4;border:1.5px solid #86efac;color:#15803d;margin-bottom:8px';
+            statusEl.innerHTML = '<span style="font-size:16px">📍</span>'
+              + '<span style="font-size:11.5px;font-weight:700">GPS capturado correctamente ✓</span>';
+          }
+        });
+
+      if (typeof mostrarToast === 'function') mostrarToast('📍 Ubicación capturada ✓', 'check_circle');
+
+    }, function () {
+      if (typeof mostrarToast === 'function') mostrarToast('No se pudo capturar GPS. Escribe la dirección.', 'location_off');
+      if (btn) {
+        btn.innerHTML = '<span class="sym f" style="font-size:17px">my_location</span>&nbsp;Reintentar GPS';
+        btn.disabled  = false;
+      }
+    }, { enableHighAccuracy: true, timeout: 15000 });
   };
 
-  /* ── Procesar GPS capturado ─────────────────────────────── */
-  function _aplicarGPS(campo, lat, lng, dir) {
-    var gf = document.getElementById('wil-ne-gpsfield-' + campo);
-    var gv = document.getElementById('wil-ne-gpsval-'   + campo);
-    var dl = document.getElementById('wil-ne-dir-'      + campo);
-    if (gf) gf.style.display = 'block';
-    if (gv) gv.value = dir;
-    if (dl && !dl.value.trim()) dl.value = dir;
-
-    W.state     = W.state     || {};
-    W.WIL_LIBRE = W.WIL_LIBRE || {};
-
-    if (campo === 'entrega') {
-      var info = _calcTarifa(lat, lng, dir);
-      W.state.coords            = { lat: lat, lng: lng };
-      W.state.barrio            = dir;
-      W.WIL_LIBRE.tarifaDomi    = info.tarifa;
-      W.WIL_LIBRE.esFuera       = true;
-      W.WIL_LIBRE.barrioEntrega = dir;
-
-      _mostrarTarifa(info.tarifa, info.km, info.fijo);
-
-      /* Km recogida → entrega */
-      var km = _kmRecogidaEntrega();
-      _mostrarKmPill(km);
-
-      var hidE = document.getElementById('wil-barrio-entrega');
-      if (hidE) { hidE.value = 'GPS:' + dir; hidE.dataset.precio = info.tarifa; }
-
-      _mostrarSecDir(W.WIL_LIBRE.destino);
-    }
+  function _shortDir(dir) {
+    return (dir || '').split(',').slice(0, 2).join(', ');
   }
 
-  /* ── Pill de tarifa ─────────────────────────────────────── */
-  function _mostrarTarifa(tarifa, km, fijo) {
-    var pill = document.getElementById('wil-ne-tarifa-pill');
-    var val  = document.getElementById('wil-ne-tarifa-val');
-    var sub  = document.getElementById('wil-ne-tarifa-sub');
-    if (pill) pill.style.display = 'block';
-    if (val)  val.textContent = '$' + tarifa.toLocaleString('es-CO');
-    if (sub)  sub.textContent = fijo
-      ? 'Municipio lejano · tarifa fija $50.000'
-      : (km ? 'Aprox. ' + km + ' km desde WIL · base $24.000 + $1.800/km' : 'El domi confirma el valor exacto');
+  function _aplicarGPS(campo, lat, lng, dir) {
+    W.WIL_LIBRE = W.WIL_LIBRE || {};
+    W.state     = W.state     || {};
+    if (campo !== 'entrega') return;
+
+    var dest    = W.WIL_LIBRE.destino || 'mi';
+    var dfId    = dest === 'otro' ? 'wil-dir-otro' : 'wil-dir-mi';
+    var df      = document.getElementById(dfId);
+    if (df && !df.value.trim()) df.value = dir;
+
+    W.state.coords            = { lat: lat, lng: lng };
+    W.WIL_LIBRE.barrioEntrega = W.WIL_LIBRE.barrioEntrega || dir;
+    W.WIL_LIBRE.esFuera       = true;
+
+    var tarifa = _calcTarifaKm(lat, lng, dir);
+    W.WIL_LIBRE.tarifaDomi    = tarifa;
+
+    var hidE = document.getElementById('wil-barrio-entrega');
+    if (hidE) { hidE.value = dir; hidE.dataset.precio = tarifa; }
+
+    _showNEPill(tarifa);
 
     var pillMain = document.getElementById('wil-tarifa-calc');
     var valMain  = document.getElementById('wil-tarifa-calc-val');
     if (pillMain && valMain) {
       pillMain.classList.remove('hidden');
-      valMain.textContent = '$' + tarifa.toLocaleString('es-CO') + (fijo ? '' : ' est.');
+      valMain.textContent = '$' + tarifa.toLocaleString('es-CO');
     }
+
+    var sdMi  = document.getElementById('wil-sec-dir-mi');
+    var sdOtro= document.getElementById('wil-sec-dir-otro');
+    if (dest === 'otro' && sdOtro) sdOtro.classList.remove('hidden');
+    else if (sdMi) sdMi.classList.remove('hidden');
   }
 
-  function _mostrarTarifaPendiente() {
+  /* ── Cálculo de tarifa por km desde Unidades de Madera ─────────────
+     Base: 24.000 COP
+     Extra: +1.800/km a partir de 0,5 km
+     Municipios lejanos fijos: 50.000
+     Redondeo a 500 más cercano
+  ─────────────────────────────────────────────────────────────────── */
+  var MUNICIPIOS_FIJOS = ['estrella','la estrella','sabaneta','girardota','barbosa',
+    'envigado','itagui','itagüi','caldas','heliconia','sopetran','sopetrán'];
+
+  function _calcTarifaKm(lat, lng, texto) {
+    var t = (texto || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (MUNICIPIOS_FIJOS.some(function (m) { return t.indexOf(m) !== -1; })) return 50000;
+
+    var MADERA = { lat: 6.3208, lng: -75.5563 }; // Unidades de Madera, Copacabana
+    var R  = 6371;
+    var dL = (lat - MADERA.lat) * Math.PI / 180;
+    var dO = (lng - MADERA.lng) * Math.PI / 180;
+    var a  = Math.sin(dL/2)*Math.sin(dL/2)
+           + Math.cos(MADERA.lat*Math.PI/180)*Math.cos(lat*Math.PI/180)*Math.sin(dO/2)*Math.sin(dO/2);
+    var kmD   = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    var extra = Math.max(0, kmD - 0.5);
+    return Math.max(24000, Math.round((24000 + extra * 1800) / 500) * 500);
+  }
+
+  function _showNEPill(tarifa) {
     var pill = document.getElementById('wil-ne-tarifa-pill');
     var val  = document.getElementById('wil-ne-tarifa-val');
     var sub  = document.getElementById('wil-ne-tarifa-sub');
     if (pill) pill.style.display = 'block';
-    if (val)  val.textContent = 'El domi confirma';
-    if (sub)  sub.textContent = 'Cargo adicional según distancia real';
+    if (val)  val.textContent = '$' + tarifa.toLocaleString('es-CO');
+    if (sub)  sub.textContent = 'Tarifa estimada · el domi confirma';
   }
 
-  /* ── Mostrar sección datos entrega ──────────────────────── */
-  function _mostrarSecDir(dest) {
-    if (dest === 'mi') {
-      var sm = document.getElementById('wil-sec-dir-mi');
-      if (sm) sm.classList.remove('hidden');
-    } else if (dest === 'otro') {
-      var so = document.getElementById('wil-sec-dir-otro');
-      if (so) so.classList.remove('hidden');
-    }
+
+  /* ══════════════════════════════════════════════════════
+     FIX 3 — ENVÍO POR ZONA: FORMULARIO MEJORADO
+     ▸ Tamaños corregidos: máximo 15 kg
+     ▸ Panel naranja "Fuera de cobertura" con geocoding Nominatim
+  ══════════════════════════════════════════════════════ */
+
+  W._pqSz     = null;
+  W._pqTarifa = 0;
+  W._pqData   = {};
+
+  /* ── CSS extra para el panel OOZ ─────────────────────────────────── */
+  (function _injectOOZStyles() {
+    if (document.getElementById('wil-ooz-styles')) return;
+    var s = document.createElement('style');
+    s.id = 'wil-ooz-styles';
+    s.textContent = `
+      .wil-ooz-panel {
+        display: none;
+        margin-top: 10px;
+        border: 2px solid #f97316;
+        border-radius: 14px;
+        background: #fff7ed;
+        padding: 14px;
+        animation: oozIn .22s ease;
+      }
+      @keyframes oozIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+
+      .wil-ooz-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      .wil-ooz-icon {
+        font-size: 22px;
+        flex-shrink: 0;
+      }
+      .wil-ooz-title {
+        font-size: 13px;
+        font-weight: 800;
+        color: #c2410c;
+        line-height: 1.3;
+      }
+      .wil-ooz-sub {
+        font-size: 11px;
+        color: #ea580c;
+        margin-top: 1px;
+        font-weight: 500;
+      }
+
+      .wil-ooz-addr-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .wil-ooz-addr-wrap input[type="text"],
+      .wil-ooz-addr-wrap textarea {
+        border: 1.5px solid #fdba74;
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 13px;
+        background: #fff;
+        width: 100%;
+        box-sizing: border-box;
+        font-family: inherit;
+        outline: none;
+        transition: border-color .18s;
+      }
+      .wil-ooz-addr-wrap input:focus,
+      .wil-ooz-addr-wrap textarea:focus {
+        border-color: #f97316;
+      }
+      .wil-ooz-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        width: 100%;
+        padding: 11px;
+        border-radius: 10px;
+        border: none;
+        background: #f97316;
+        color: #fff;
+        font-size: 13px;
+        font-weight: 800;
+        cursor: pointer;
+        transition: background .18s, transform .1s;
+      }
+      .wil-ooz-btn:hover  { background: #ea580c; }
+      .wil-ooz-btn:active { transform: scale(.98); }
+      .wil-ooz-btn:disabled { opacity: .6; cursor: default; }
+
+      .wil-ooz-result {
+        display: none;
+        align-items: center;
+        gap: 8px;
+        margin-top: 8px;
+        padding: 9px 12px;
+        border-radius: 10px;
+        background: #f0fdf4;
+        border: 1.5px solid #86efac;
+        color: #15803d;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .wil-sug-ooz {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 14px;
+        cursor: pointer;
+        background: #fff7ed;
+        border-top: 1.5px solid #fed7aa;
+        font-size: 12.5px;
+        color: #c2410c;
+        font-weight: 600;
+        border-radius: 0 0 var(--r-lg, 12px) var(--r-lg, 12px);
+        transition: background .15s;
+      }
+      .wil-sug-ooz:hover { background: #ffedd5; }
+    `;
+    document.head.appendChild(s);
+  })();
+
+
+  /* ── Construir formulario ─────────────────────────────────────────── */
+  function _buildPaqForm() {
+    var v = document.getElementById('view-paquete-form');
+    if (!v || v.dataset.pqPatch) return;
+    v.dataset.pqPatch = '1';
+
+    Array.from(v.querySelectorAll('.card')).forEach(function (c) { c.remove(); });
+
+    var actRow = v.querySelector('.act-row');
+
+    var html = `
+<!-- TAMAÑO DEL PAQUETE — máx 15 kg -->
+<div class="card">
+  <div class="card-tit"><span class="sym f">inventory_2</span>Tamaño del paquete <span style="font-size:11px;font-weight:500;color:var(--on3)">(máx. 15 kg)</span></div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
+    <div class="wil-pq-sz" data-sz="pequeno" data-extra="15000" onclick="pqSelTam(this)"
+      style="border:1.5px solid #dce3ea;border-radius:13px;padding:13px 6px;cursor:pointer;text-align:center;background:#f8fafb;transition:.18s">
+      <div style="font-size:30px">📦</div>
+      <div style="font-size:12px;font-weight:800;color:var(--on);margin-top:4px">Pequeño</div>
+      <div style="font-size:10px;color:var(--on3);margin-top:1px">Hasta 5 kg</div>
+      <div style="font-size:14px;font-weight:900;color:var(--p);margin-top:6px">+$15.000</div>
+    </div>
+    <div class="wil-pq-sz" data-sz="mediano" data-extra="20000" onclick="pqSelTam(this)"
+      style="border:1.5px solid #dce3ea;border-radius:13px;padding:13px 6px;cursor:pointer;text-align:center;background:#f8fafb;transition:.18s">
+      <div style="font-size:30px">🧳</div>
+      <div style="font-size:12px;font-weight:800;color:var(--on);margin-top:4px">Mediano</div>
+      <div style="font-size:10px;color:var(--on3);margin-top:1px">5 – 10 kg</div>
+      <div style="font-size:14px;font-weight:900;color:var(--p);margin-top:6px">+$20.000</div>
+    </div>
+    <div class="wil-pq-sz" data-sz="grande" data-extra="30000" onclick="pqSelTam(this)"
+      style="border:1.5px solid #dce3ea;border-radius:13px;padding:13px 6px;cursor:pointer;text-align:center;background:#f8fafb;transition:.18s">
+      <div style="font-size:30px">📫</div>
+      <div style="font-size:12px;font-weight:800;color:var(--on);margin-top:4px">Grande</div>
+      <div style="font-size:10px;color:var(--on3);margin-top:1px">10 – 15 kg</div>
+      <div style="font-size:14px;font-weight:900;color:var(--p);margin-top:6px">+$30.000</div>
+    </div>
+  </div>
+  <div class="field">
+    <label>Descripción del paquete</label>
+    <textarea id="paquete-descripcion" placeholder="Ej: Ropa, documentos, mercancía, regalo…" style="min-height:60px"></textarea>
+  </div>
+</div>
+
+<!-- BARRIOS + TARIFA -->
+<div class="card">
+  <div class="card-tit"><span class="sym f">swap_horiz</span>Origen y destino</div>
+
+  <!-- BARRIO RECOGIDA -->
+  <div class="field">
+    <label>Barrio de recogida</label>
+    <div style="position:relative">
+      <input type="text" id="pq-barrio-rec-txt"
+        placeholder="Escribe el barrio de origen…"
+        autocomplete="off"
+        oninput="pqSearch('rec',this.value)"
+        onblur="setTimeout(function(){pqCloseSugs('rec');},180)"/>
+      <input type="hidden" id="pq-barrio-rec" data-p="0" data-ooz="0"/>
+      <div id="pq-sugs-rec"
+        style="display:none;position:absolute;left:0;right:0;top:100%;z-index:999;background:#fff;border:1.5px solid var(--plb);border-radius:var(--r-lg);box-shadow:var(--sh2);max-height:200px;overflow-y:auto;margin-top:4px"></div>
+    </div>
+    <div class="field-note">Barrio donde está el paquete / remitente</div>
+    <!-- Panel OOZ recogida -->
+    <div class="wil-ooz-panel" id="pq-ooz-rec">
+      <div class="wil-ooz-header">
+        <div class="wil-ooz-icon">🟠</div>
+        <div>
+          <div class="wil-ooz-title">Barrio fuera de la zona de cobertura</div>
+          <div class="wil-ooz-sub">Escribe la dirección completa para calcular la tarifa por km</div>
+        </div>
+      </div>
+      <div class="wil-ooz-addr-wrap">
+        <input type="text" id="pq-ooz-addr-rec"
+          placeholder="Ej: Cra 50 #80-20, Robledo, Medellín"/>
+        <button class="wil-ooz-btn" id="pq-ooz-btn-rec"
+          onclick="pqGeoBarrio('rec')">
+          <span style="font-size:16px">📍</span> Calcular tarifa
+        </button>
+        <div class="wil-ooz-result" id="pq-ooz-result-rec">
+          <span style="font-size:16px">✅</span>
+          <span id="pq-ooz-result-rec-txt"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BARRIO ENTREGA -->
+  <div class="field">
+    <label>Barrio de entrega</label>
+    <div style="position:relative">
+      <input type="text" id="pq-barrio-ent-txt"
+        placeholder="Escribe el barrio de destino…"
+        autocomplete="off"
+        oninput="pqSearch('ent',this.value)"
+        onblur="setTimeout(function(){pqCloseSugs('ent');},180)"/>
+      <input type="hidden" id="pq-barrio-ent" data-p="0" data-ooz="0"/>
+      <div id="pq-sugs-ent"
+        style="display:none;position:absolute;left:0;right:0;top:100%;z-index:999;background:#fff;border:1.5px solid var(--plb);border-radius:var(--r-lg);box-shadow:var(--sh2);max-height:200px;overflow-y:auto;margin-top:4px"></div>
+    </div>
+    <!-- Panel OOZ entrega -->
+    <div class="wil-ooz-panel" id="pq-ooz-ent">
+      <div class="wil-ooz-header">
+        <div class="wil-ooz-icon">🟠</div>
+        <div>
+          <div class="wil-ooz-title">Barrio fuera de la zona de cobertura</div>
+          <div class="wil-ooz-sub">Escribe la dirección completa de entrega para calcular la tarifa por km</div>
+        </div>
+      </div>
+      <div class="wil-ooz-addr-wrap">
+        <input type="text" id="pq-ooz-addr-ent"
+          placeholder="Ej: Calle 10 #43-15, El Poblado, Medellín"/>
+        <button class="wil-ooz-btn" id="pq-ooz-btn-ent"
+          onclick="pqGeoBarrio('ent')">
+          <span style="font-size:16px">📍</span> Calcular tarifa
+        </button>
+        <div class="wil-ooz-result" id="pq-ooz-result-ent">
+          <span style="font-size:16px">✅</span>
+          <span id="pq-ooz-result-ent-txt"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pill tarifa calculada -->
+  <div class="wil-tarifa-pill hidden" id="pq-tarifa-pill">
+    <span class="sym f" style="font-size:22px;color:#15803d">delivery_dining</span>
+    <div>
+      <div style="font-size:20px;font-weight:900;color:#15803d" id="pq-tarifa-val">$0</div>
+      <div style="font-size:11px;color:#166534;font-weight:600" id="pq-tarifa-sub">Tarifa estimada de envío</div>
+    </div>
+  </div>
+</div>
+
+<!-- DIRECCIÓN DE ENTREGA -->
+<div class="card">
+  <div class="card-tit"><span class="sym f">location_on</span>Dirección de entrega</div>
+  <div class="field">
+    <label>Dirección completa *</label>
+    <input type="text" id="paquete-direccion" placeholder="Cra 43 #18-20, Barrio El Poblado, Medellín"/>
+    <div class="field-note">Incluye calle, número, barrio y ciudad</div>
+  </div>
+  <div class="field">
+    <label>Punto de referencia</label>
+    <input type="text" id="paquete-referencia" placeholder="Edificio azul, frente al parque, piso 2…"/>
+  </div>
+</div>
+
+<!-- QUIEN RECIBE -->
+<div class="card">
+  <div class="card-tit"><span class="sym f">person_pin</span>Quien recibe</div>
+  <div class="field"><label>Nombre *</label><input type="text" id="paquete-nombre" placeholder="Nombre completo del destinatario"/></div>
+  <div class="field"><label>Teléfono *</label><input type="tel" id="paquete-telefono" placeholder="310 123 4567"/></div>
+</div>
+
+<!-- QUIEN ENVÍA -->
+<div class="card">
+  <div class="card-tit"><span class="sym f">send</span>Quien envía (tú)</div>
+  <div class="field"><label>Tu nombre *</label><input type="text" id="pq-envia-nom" placeholder="Tu nombre completo"/></div>
+  <div class="field"><label>Tu teléfono *</label><input type="tel" id="pq-envia-tel" placeholder="310 987 6543"/></div>
+</div>
+
+<!-- MÉTODO DE PAGO -->
+<div class="card">
+  <div class="card-tit"><span class="sym f">payments</span>¿Cómo pagas?</div>
+  <div class="pago-grid">
+    <div class="pago-c" id="pago-efectivo-p" onclick="selectPagoPaquete('EFECTIVO')">
+      <div class="pago-ico">💵</div><div class="pago-lbl">Efectivo</div>
+      <div class="pago-sub">El domi cobra al entregar</div>
+    </div>
+    <div class="pago-c" id="pago-transferencia-p" onclick="selectPagoPaquete('TRANSFERENCIA')">
+      <div class="pago-ico">🏦</div><div class="pago-lbl">Transferencia</div>
+      <div class="pago-sub">Pagas al confirmar entrega</div>
+    </div>
+  </div>
+</div>
+`;
+
+    var temp = document.createElement('div');
+    temp.innerHTML = html;
+    while (temp.firstChild) v.insertBefore(temp.firstChild, actRow);
   }
 
-  function _preRellenarDir(dest, dir) {
-    if (dest === 'mi') {
-      var dm = document.getElementById('wil-dir-mi');
-      if (dm && !dm.value.trim()) dm.value = dir;
-    } else if (dest === 'otro') {
-      var doo = document.getElementById('wil-dir-otro');
-      if (doo && !doo.value.trim()) doo.value = dir;
-    }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _buildPaqForm);
+  } else {
+    setTimeout(_buildPaqForm, 0);
   }
 
-  /* ════════════════════════════════════════════════════════
-     INPUT DIRECCIÓN LIBRE — con geocodificación Nominatim
-  ════════════════════════════════════════════════════════ */
-  W.wilNE_dirInput = function (campo, valor) {
-    W.WIL_LIBRE = W.WIL_LIBRE || {};
-    W.state     = W.state     || {};
 
-    var txt = (valor || '').trim();
-
-    /* Ocultar estado previo si el texto es muy corto */
-    if (txt.length < 5) {
-      var statusEl = document.getElementById('wil-ne-geo-status-' + campo);
-      if (statusEl) statusEl.style.display = 'none';
-      _geocoded[campo] = null;
-    }
-
-    if (campo === 'entrega') {
-      W.WIL_LIBRE.barrioEntrega = txt || 'Fuera de cobertura';
-      W.WIL_LIBRE.direccion     = txt;
-      W.state.barrio            = txt;
-
-      if (txt.length >= 5) {
-        /* Mostrar tarifa preliminar por nombre mientras geocodifica */
-        if (_esMunicipioFijo(txt)) {
-          _mostrarTarifa(TARIFA_FIJA, 0, true);
-        } else {
-          _mostrarTarifaPendiente();
-        }
-        _mostrarSecDir(W.WIL_LIBRE.destino);
-        _preRellenarDir(W.WIL_LIBRE.destino, txt);
-
-        /* Geocodificar para obtener coordenadas precisas */
-        _geocodificar(
-          campo,
-          txt,
-          /* onResult */
-          function (lat, lng, displayName) {
-            var info = _calcTarifa(lat, lng, txt);
-            W.WIL_LIBRE.tarifaDomi = info.tarifa;
-            W.WIL_LIBRE.esFuera    = true;
-            W.state.coords         = { lat: lat, lng: lng };
-
-            var hidE = document.getElementById('wil-barrio-entrega');
-            if (hidE) { hidE.value = txt; hidE.dataset.precio = info.tarifa; }
-
-            _mostrarTarifa(info.tarifa, info.km, info.fijo);
-            _mostrarEstadoGeo(campo, 'encontrado',
-              '✅ ' + _resumirDir(displayName));
-
-            /* Km recogida → entrega */
-            var km = _kmRecogidaEntrega();
-            _mostrarKmPill(km);
-          },
-          /* onNotFound */
-          function () {
-            /* Sin coords: tarifa base o fija por nombre */
-            var info = _calcTarifa(null, null, txt);
-            W.WIL_LIBRE.tarifaDomi = info.tarifa;
-            W.WIL_LIBRE.esFuera    = true;
-            var hidE = document.getElementById('wil-barrio-entrega');
-            if (hidE) { hidE.value = txt; hidE.dataset.precio = info.tarifa; }
-            if (_esMunicipioFijo(txt)) {
-              _mostrarTarifa(TARIFA_FIJA, 0, true);
-            } else {
-              _mostrarTarifaPendiente();
-            }
-            _mostrarEstadoGeo(campo, 'noEncontrado');
-            _mostrarKmPill(null);
-          },
-          /* onError */
-          function () {
-            _mostrarEstadoGeo(campo, 'error');
-          }
-        );
-      }
-
-    } else {
-      /* ── RECOGIDA: geocodificar, sin tarifa ── */
-      W.WIL_LIBRE.barrioRecogida = txt || 'Punto de recogida';
-      var hidR = document.getElementById('wil-barrio-recogida');
-      if (hidR && txt.length > 2) {
-        hidR.value = txt;
-        hidR.dataset.precio = '0';
-      }
-
-      if (txt.length >= 5) {
-        _geocodificar(
-          campo,
-          txt,
-          /* onResult */
-          function (lat, lng, displayName) {
-            _geocoded.recogida = { lat: lat, lng: lng };
-            _mostrarEstadoGeo(campo, 'encontrado', '✅ ' + _resumirDir(displayName));
-            /* Actualizar km si ya hay entrega geocodificada */
-            var km = _kmRecogidaEntrega();
-            _mostrarKmPill(km); /* la pill de km está en el panel de entrega */
-          },
-          /* onNotFound */
-          function () {
-            _mostrarEstadoGeo(campo, 'noEncontrado');
-          },
-          /* onError */
-          function () {
-            _mostrarEstadoGeo(campo, 'error');
-          }
-        );
-      }
-    }
+  /* ── Selección de tamaño ─────────────────────────────────────────── */
+  W.pqSelTam = function (el) {
+    document.querySelectorAll('.wil-pq-sz').forEach(function (t) {
+      t.style.borderColor = '#dce3ea';
+      t.style.background  = '#f8fafb';
+    });
+    el.style.borderColor = 'var(--p)';
+    el.style.background  = 'var(--pl)';
+    W._pqSz = { sz: el.dataset.sz, extra: parseInt(el.dataset.extra) };
+    _pqCalc();
   };
 
-  /* ── Resumir display_name de Nominatim (primeras 2 partes) */
-  function _resumirDir(dn) {
-    if (!dn) return '';
-    var partes = dn.split(',').slice(0, 3).map(function (p) { return p.trim(); });
-    return partes.join(', ');
+
+  /* ── Helpers autocompletado ──────────────────────────────────────── */
+  function _pqNorm(s) {
+    return (s || '').toLowerCase().normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9 ]/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+  }
+  function _pqEsc(t) {
+    return (t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function _getB() {
+    return typeof WIL_BARRIOS !== 'undefined' ? WIL_BARRIOS : [];
   }
 
-  /* ════════════════════════════════════════════════════════
-     PARCHES SOBRE FUNCIONES EXISTENTES
-  ════════════════════════════════════════════════════════ */
 
-  /* ── 1. wilBuscarBarrio ─────────────────────────────────── */
-  W.wilBuscarBarrio = (function (_orig) {
-    return function (campo, query) {
-      var txt     = (query || '').trim();
-      var sugEl   = document.getElementById('wil-sugs-' + campo);
-      var hidEl   = document.getElementById('wil-barrio-' + campo);
-      var panelNE = document.getElementById('wil-ne-panel-' + campo);
+  /* ── Búsqueda de barrios con OOZ al final ───────────────────────── */
+  W.pqSearch = function (campo, query) {
+    var txt   = (query || '').trim();
+    var sugEl = document.getElementById('pq-sugs-' + campo);
+    var hidEl = document.getElementById('pq-barrio-' + campo);
+    var oozEl = document.getElementById('pq-ooz-' + campo);
 
-      if (panelNE) panelNE.style.display = 'none';
-      if (hidEl)  { hidEl.value = ''; hidEl.dataset.precio = '0'; }
+    /* Resetear selección previa */
+    if (hidEl) { hidEl.value = ''; hidEl.dataset.p = '0'; hidEl.dataset.ooz = '0'; }
 
-      if (txt.length < 2) {
-        if (sugEl) sugEl.style.display = 'none';
-        return;
-      }
+    /* Si se borra el texto, ocultar panel OOZ también */
+    if (!txt) {
+      if (sugEl) sugEl.style.display = 'none';
+      if (oozEl) oozEl.style.display = 'none';
+      _pqCalc();
+      return;
+    }
 
-      var wn  = (typeof wilNorm === 'function') ? wilNorm
-              : function (s) { return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim(); };
-      var esc = (typeof escHTML === 'function') ? escHTML
-              : function (t) { return (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
-      var barrios = (typeof WIL_BARRIOS !== 'undefined') ? WIL_BARRIOS : [];
+    _pqCalc(); // recalcular con valores limpios
 
-      var q         = wn(txt);
-      var exactas   = barrios.filter(function (b) { return wn(b[0]) === q; });
-      var parciales = barrios.filter(function (b) {
-        var n = wn(b[0]);
-        return n !== q && (n.indexOf(q) !== -1 || q.split(' ').every(function (w) { return n.indexOf(w) !== -1; }));
-      });
-      var res = exactas.concat(parciales).slice(0, 8);
+    if (txt.length < 2) { if (sugEl) sugEl.style.display = 'none'; return; }
 
-      /* ── BARRIO NO ENCONTRADO ── */
-      if (!res.length) {
-        if (sugEl) { sugEl.innerHTML = ''; sugEl.style.display = 'none'; }
-        var panel = crearPanel(campo);
-        if (panel) {
-          panel.style.display = 'block';
-          var dirInput = document.getElementById('wil-ne-dir-' + campo);
-          if (dirInput && !dirInput.value.trim()) {
-            dirInput.value = txt;
-            W.wilNE_dirInput(campo, txt);
-          }
-        }
-        return;
-      }
+    var q  = _pqNorm(txt);
+    var B  = _getB();
+    var ex = B.filter(function (b) { return _pqNorm(b[0]) === q; });
+    var pa = B.filter(function (b) {
+      var n = _pqNorm(b[0]);
+      return n !== q && (n.indexOf(q) !== -1 || q.split(' ').every(function (w) { return n.indexOf(w) !== -1; }));
+    });
+    var res = ex.concat(pa).slice(0, 8);
 
-      /* Hay resultados → ocultar panel NE */
-      if (panelNE) panelNE.style.display = 'none';
+    if (!sugEl) return;
 
-      function resalt(nombre, q) {
-        var idx = wn(nombre).indexOf(q);
-        if (idx < 0) return esc(nombre);
-        return esc(nombre.slice(0, idx))
-             + '<span class="wil-sug-match">' + esc(nombre.slice(idx, idx + q.length)) + '</span>'
-             + esc(nombre.slice(idx + q.length));
-      }
+    function hl(nombre, q) {
+      var idx = _pqNorm(nombre).indexOf(q);
+      if (idx < 0) return _pqEsc(nombre);
+      return _pqEsc(nombre.slice(0, idx))
+        + '<span class="wil-sug-match">' + _pqEsc(nombre.slice(idx, idx + q.length)) + '</span>'
+        + _pqEsc(nombre.slice(idx + q.length));
+    }
 
-      if (sugEl) {
-        sugEl.innerHTML = res.map(function (b) {
-          return '<div class="wil-sug-item" onmousedown="wilSelBarrio(\'' + campo + '\',\''
-               + b[0].replace(/'/g, "\\'") + '\',' + b[1] + ')">'
-               + '<span>' + resalt(b[0], q) + '</span>'
-               + '<span class="wil-sug-precio">$' + b[1].toLocaleString('es-CO') + '</span>'
-               + '</div>';
-        }).join('');
-        sugEl.style.display = 'block';
-      }
-    };
-  }(W.wilBuscarBarrio));
+    /* Resultados normales */
+    var itemsHtml = res.map(function (b) {
+      return '<div class="wil-sug-item" onmousedown="pqSel(\'' + campo + '\',\''
+        + b[0].replace(/'/g, "\\'") + '\',' + b[1] + ')">'
+        + '<span>' + hl(b[0], q) + '</span>'
+        + '<span class="wil-sug-precio">$' + b[1].toLocaleString('es-CO') + '</span>'
+        + '</div>';
+    }).join('');
 
-  /* ── 2. wilSelBarrio — limpiar GPS y geocoded al elegir barrio ── */
-  W.wilSelBarrio = (function (_orig) {
-    return function (campo) {
-      _gps[campo]      = null;
-      _geocoded[campo] = null;
-      var panelNE = document.getElementById('wil-ne-panel-' + campo);
-      if (panelNE) panelNE.style.display = 'none';
-      W.WIL_LIBRE         = W.WIL_LIBRE || {};
-      W.WIL_LIBRE.esFuera = false;
-      if (campo === 'entrega' && W.state) W.state.coords = null;
-      _mostrarKmPill(null);
-      return _orig.apply(this, arguments);
-    };
-  }(W.wilSelBarrio));
+    /* Siempre agregar opción OOZ al final del dropdown */
+    var oozLabel = res.length
+      ? '¿No aparece? Presiona aquí para calcular por distancia'
+      : 'Barrio no encontrado — presiona para calcular tarifa por distancia';
+    var oozHtml = '<div class="wil-sug-ooz" onmousedown="pqSelOOZ(\'' + campo + '\')">'
+      + '<span style="font-size:18px">🟠</span>'
+      + '<span>' + oozLabel + '</span>'
+      + '</div>';
 
-  /* ── 3. wilCerrarSugs — mantener panel NE visible ───────── */
-  W.wilCerrarSugs = function (campo) {
-    var sugEl = document.getElementById('wil-sugs-' + campo);
+    sugEl.innerHTML = itemsHtml + oozHtml;
+    sugEl.style.display = 'block';
+  };
+
+  W.pqSel = function (campo, nombre, precio) {
+    var txtEl = document.getElementById('pq-barrio-' + campo + '-txt');
+    var hidEl = document.getElementById('pq-barrio-' + campo);
+    var sugEl = document.getElementById('pq-sugs-' + campo);
+    var oozEl = document.getElementById('pq-ooz-' + campo);
+    if (txtEl) txtEl.value = nombre;
+    if (hidEl) { hidEl.value = nombre; hidEl.dataset.p = precio; hidEl.dataset.ooz = '0'; }
     if (sugEl) sugEl.style.display = 'none';
+    if (oozEl) oozEl.style.display = 'none'; // ocultar si estaba abierto
+    _pqCalc();
   };
 
-  /* ── 4. wilGoLibre2 — validar antes de avanzar ──────────── */
-  W.wilGoLibre2 = (function (_orig) {
-    return function () {
-      var L = W.WIL_LIBRE || {};
+  W.pqCloseSugs = function (campo) {
+    var el = document.getElementById('pq-sugs-' + campo);
+    if (el) el.style.display = 'none';
+  };
 
-      /* ─ Validar ENTREGA no encontrada ─ */
-      var panelE = document.getElementById('wil-ne-panel-entrega');
-      if (panelE && panelE.style.display !== 'none') {
-        var modo  = panelE.dataset.modo || 'mi';
-        var dlE   = document.getElementById('wil-ne-dir-entrega');
-        var dirOk = dlE && dlE.value.trim().length > 4;
-        var gpsOk = (modo === 'mi') && !!_gps.entrega;
 
-        if (!gpsOk && !dirOk) {
-          if (typeof mostrarToast === 'function')
-            mostrarToast(
-              modo === 'mi'
-                ? 'Captura tu GPS o escribe la dirección de entrega.'
-                : 'Escribe la dirección completa del destinatario.',
-              'location_on'
-            );
-          return;
+  /* ── Activar panel OOZ (seleccionado desde dropdown) ────────────── */
+  W.pqSelOOZ = function (campo) {
+    var oozEl = document.getElementById('pq-ooz-' + campo);
+    var sugEl = document.getElementById('pq-sugs-' + campo);
+    var hidEl = document.getElementById('pq-barrio-' + campo);
+    var txtEl = document.getElementById('pq-barrio-' + campo + '-txt');
+
+    if (sugEl) sugEl.style.display = 'none';
+    if (oozEl) oozEl.style.display = 'block';
+
+    /* Marcar como OOZ pendiente de geocoding */
+    if (hidEl) { hidEl.value = '__OOZ_PENDING__'; hidEl.dataset.p = '0'; hidEl.dataset.ooz = '1'; }
+
+    /* Pre-rellenar dirección con lo que escribió el usuario */
+    var addrEl = document.getElementById('pq-ooz-addr-' + campo);
+    if (addrEl && txtEl && !addrEl.value.trim()) {
+      addrEl.value = txtEl.value.trim();
+    }
+
+    /* Limpiar resultado previo */
+    var resEl = document.getElementById('pq-ooz-result-' + campo);
+    if (resEl) resEl.style.display = 'none';
+
+    _pqCalc();
+  };
+
+
+  /* ── Geocodificar dirección OOZ con Nominatim ────────────────────── */
+  W.pqGeoBarrio = function (campo) {
+    var addrEl = document.getElementById('pq-ooz-addr-' + campo);
+    var addr   = addrEl ? addrEl.value.trim() : '';
+    var btn    = document.getElementById('pq-ooz-btn-' + campo);
+    var resEl  = document.getElementById('pq-ooz-result-' + campo);
+    var resTxt = document.getElementById('pq-ooz-result-' + campo + '-txt');
+    var hidEl  = document.getElementById('pq-barrio-' + campo);
+    var T      = typeof mostrarToast === 'function' ? mostrarToast : function(){};
+
+    if (!addr) {
+      T('Escribe la dirección o barrio para calcular la tarifa.', 'location_on');
+      if (addrEl) addrEl.focus();
+      return;
+    }
+
+    if (btn) {
+      btn.disabled  = true;
+      btn.innerHTML = '<span class="spin" style="width:14px;height:14px;border-width:2px"></span>&nbsp;Calculando…';
+    }
+    if (resEl) resEl.style.display = 'none';
+
+    /* Intentar primero con Medellín; si falla, con Colombia genérico */
+    function _tryGeo(queries, idx) {
+      if (idx >= queries.length) {
+        T('No se pudo ubicar esa dirección. La tarifa la confirmará el domiciliario.', 'location_off');
+        /* Aún así, marcar como OOZ con tarifa 0 para permitir el pedido */
+        if (hidEl) {
+          hidEl.value       = addr;
+          hidEl.dataset.p   = '0';
+          hidEl.dataset.ooz = '1';
         }
+        if (resTxt) resTxt.innerHTML = 'Dirección registrada · el domi confirmará la tarifa';
+        if (resEl)  resEl.style.display = 'flex';
+        if (btn) { btn.disabled = false; btn.innerHTML = '<span style="font-size:16px">🔄</span> Reintentar'; }
+        _pqCalc();
+        return;
+      }
 
-        var dirFinal = (dlE && dlE.value.trim()) || '';
-        if (gpsOk) {
-          if (!dirFinal) {
-            var gv = document.getElementById('wil-ne-gpsval-entrega');
-            dirFinal = gv ? gv.value : (_gps.entrega.lat.toFixed(5) + ', ' + _gps.entrega.lng.toFixed(5));
+      fetch(
+        'https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(queries[idx])
+          + '&format=json&limit=1&accept-language=es'
+          + '&viewbox=-75.62,6.28,-75.50,6.42&bounded=0',
+        { headers: { 'User-Agent': 'DomiciliosWIL/1.0' } }
+      )
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (!data || !data.length) { _tryGeo(queries, idx + 1); return; }
+
+          var lat    = parseFloat(data[0].lat);
+          var lng    = parseFloat(data[0].lon);
+          var tarifa = _calcTarifaKm(lat, lng, addr);
+          var esFijo = MUNICIPIOS_FIJOS.some(function(m){ return addr.toLowerCase().indexOf(m) !== -1; });
+
+          if (hidEl) {
+            hidEl.value       = addr;
+            hidEl.dataset.p   = tarifa;
+            hidEl.dataset.ooz = '1';
+            hidEl.dataset.lat = lat;
+            hidEl.dataset.lng = lng;
           }
-          if (dirFinal.indexOf('[') < 0)
-            dirFinal += ' [' + _gps.entrega.lat.toFixed(5) + ',' + _gps.entrega.lng.toFixed(5) + ']';
-          W.state = W.state || {};
-          W.state.coords = _gps.entrega;
-        } else if (_geocoded.entrega) {
-          /* Adjuntar coords geocodificadas */
-          if (dirFinal.indexOf('[') < 0)
-            dirFinal += ' [' + _geocoded.entrega.lat.toFixed(5) + ',' + _geocoded.entrega.lng.toFixed(5) + ']';
-          W.state = W.state || {};
-          W.state.coords = _geocoded.entrega;
-        }
 
-        L.barrioEntrega = (dlE && dlE.value.trim()) || 'Fuera de cobertura';
-        L.direccion     = dirFinal;
+          /* Calcular km entre rec y ent si ambos tienen coords */
+          var kmNote = '';
+          var otro   = campo === 'rec' ? 'ent' : 'rec';
+          var hOtro  = document.getElementById('pq-barrio-' + otro);
+          if (hOtro && hOtro.dataset.lat && hOtro.dataset.lng) {
+            var km = _distKm(lat, lng,
+              parseFloat(hOtro.dataset.lat), parseFloat(hOtro.dataset.lng));
+            kmNote = ' · ' + km.toFixed(1) + ' km entre puntos';
+          }
 
-        _preRellenarDir(L.destino, L.barrioEntrega);
+          var tarifaStr = '$' + tarifa.toLocaleString('es-CO');
+          var tag = esFijo ? '· Municipio lejano' : kmNote;
+          if (resTxt) resTxt.innerHTML = '<b>' + tarifaStr + '</b>' + (tag ? ' <span style="font-weight:400">' + tag + '</span>' : '');
+          if (resEl)  resEl.style.display = 'flex';
 
-        var hidE = document.getElementById('wil-barrio-entrega');
-        if (hidE) {
-          hidE.value = L.barrioEntrega;
-          hidE.dataset.precio = L.tarifaDomi || TARIFA_BASE;
-        }
+          if (btn) { btn.disabled = false; btn.innerHTML = '<span style="font-size:16px">🔄</span> Recalcular'; }
+
+          T('📍 Tarifa calculada: ' + tarifaStr, 'check_circle');
+          _pqCalc();
+        })
+        .catch(function () { _tryGeo(queries, idx + 1); });
+    }
+
+    _tryGeo([
+      addr + ', Copacabana, Antioquia, Colombia',
+      addr + ', Bello, Antioquia, Colombia',
+      addr + ', Medellín, Antioquia, Colombia',
+      addr + ', Antioquia, Colombia',
+      addr + ', Colombia'
+    ], 0);
+  };
+
+
+  /* ── Distancia entre dos coords (km) ────────────────────────────── */
+  function _distKm(lat1, lng1, lat2, lng2) {
+    var R = 6371, dL = (lat2-lat1)*Math.PI/180, dO = (lng2-lng1)*Math.PI/180;
+    var a = Math.sin(dL/2)*Math.sin(dL/2)
+          + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dO/2)*Math.sin(dO/2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  /* ── Calcular tarifa total del paquete ───────────────────────────── 
+     Regla: mostrar solo el valor más alto entre recogida y entrega + tamaño.
+     Si uno es OOZ sin geocodificar → mostrar lo que hay + nota de confirmación.
+  ─────────────────────────────────────────────────────────────────── */
+  function _pqCalc() {
+    var hR    = document.getElementById('pq-barrio-rec');
+    var hE    = document.getElementById('pq-barrio-ent');
+    var pill  = document.getElementById('pq-tarifa-pill');
+    var valEl = document.getElementById('pq-tarifa-val');
+    var subEl = document.getElementById('pq-tarifa-sub');
+    if (!hR || !hE) return;
+
+    var pR   = parseInt(hR.dataset.p || 0);
+    var pE   = parseInt(hE.dataset.p || 0);
+    var pSz  = W._pqSz ? W._pqSz.extra : 0;
+
+    /* Tiene valor real (no pendiente y no vacío) */
+    var recResuelto = hR.value && hR.value !== '__OOZ_PENDING__';
+    var entResuelto = hE.value && hE.value !== '__OOZ_PENDING__';
+
+    /* Necesitamos al menos un barrio con precio */
+    if (!recResuelto && !entResuelto) { if (pill) pill.classList.add('hidden'); return; }
+    if (pR === 0 && pE === 0)         { if (pill) pill.classList.add('hidden'); return; }
+
+    /* El valor máximo de los dos barrios es la base */
+    var base  = Math.max(pR, pE);
+    var total = base + pSz;
+    W._pqTarifa = total;
+
+    /* Texto subtítulo: $base + $tamaño · km entre puntos */
+    var partes = [];
+    if (pSz) {
+      partes.push('$' + base.toLocaleString('es-CO') + ' + $' + pSz.toLocaleString('es-CO') + ' tamaño');
+    }
+
+    /* km entre puntos si ambos geocodificados */
+    if (hR.dataset.lat && hE.dataset.lat) {
+      var km = _distKm(
+        parseFloat(hR.dataset.lat), parseFloat(hR.dataset.lng),
+        parseFloat(hE.dataset.lat), parseFloat(hE.dataset.lng)
+      );
+      partes.push(km.toFixed(1) + ' km recogida→entrega');
+    }
+
+    /* Si alguno OOZ está pendiente de geocodificar, avisar */
+    var oozPendiente = (hR.dataset.ooz === '1' && pR === 0)
+                    || (hE.dataset.ooz === '1' && pE === 0);
+    if (oozPendiente) partes.push('tarifa ext. por confirmar');
+
+    if (valEl) valEl.textContent = '$' + total.toLocaleString('es-CO');
+    if (subEl) subEl.textContent = partes.length ? partes.join(' · ') : 'Tarifa estimada de envío';
+    if (pill)  pill.classList.remove('hidden');
+  }
+
+
+  /* ── Override generarFacturaPaquete ─────────────────────────────── */
+  W.generarFacturaPaquete = function () {
+    var g = function (id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; };
+
+    var dir   = g('paquete-direccion');
+    var ref   = g('paquete-referencia');
+    var nom   = g('paquete-nombre');
+    var tel   = g('paquete-telefono');
+    var eNom  = g('pq-envia-nom');
+    var eTel  = g('pq-envia-tel');
+    var desc  = g('paquete-descripcion');
+
+    var hR = document.getElementById('pq-barrio-rec');
+    var hE = document.getElementById('pq-barrio-ent');
+
+    /* Resolver barrio: hidden resuelto > addr OOZ > texto del input */
+    function _resolverBarrio(hid, campo) {
+      if (hid && hid.value && hid.value !== '__OOZ_PENDING__') return hid.value;
+      var oozAddr = g('pq-ooz-addr-' + campo);
+      if (oozAddr) return oozAddr;
+      return g('pq-barrio-' + campo + '-txt');
+    }
+
+    var barR = _resolverBarrio(hR, 'rec');
+    var barE = _resolverBarrio(hE, 'ent');
+
+    var T = typeof mostrarToast === 'function' ? mostrarToast : function(){};
+
+    if (!W._pqSz) { T('Selecciona el tamaño del paquete.','inventory_2'); return; }
+    if (!barR)    { T('Escribe el barrio o dirección de recogida.','location_on'); return; }
+    if (!barE)    { T('Escribe el barrio o dirección de entrega.','location_on'); return; }
+    if (!dir||!nom||!tel) { T('Completa dirección, nombre y teléfono del destinatario.','warning'); return; }
+    if (!eNom||!eTel)     { T('Completa tus datos como remitente.','person'); return; }
+    if (!W.state.metodoPagoPaquete) { T('Selecciona método de pago.','payments'); return; }
+
+    /* Si no hay tarifa calculada aún, usar 0 (el domi confirmará) */
+    var tarifa = W._pqTarifa || 0;
+    var tarifaPorConfirmar = tarifa === 0;
+
+    var SZ_NAMES = { pequeno:'Pequeño (hasta 5 kg)', mediano:'Mediano (5-10 kg)', grande:'Grande (10-15 kg)' };
+    var szNom = SZ_NAMES[W._pqSz.sz] || W._pqSz.sz;
+    var oozRec = hR && hR.dataset.ooz === '1';
+    var oozEnt = hE && hE.dataset.ooz === '1';
+
+    W._pqData = { dir, ref, nom, tel, eNom, eTel, barR, barE, desc, szNom,
+                  szExtra: W._pqSz.extra, tarifa: tarifa,
+                  tarifaPorConfirmar: tarifaPorConfirmar,
+                  pago: W.state.metodoPagoPaquete,
+                  oozRec: oozRec, oozEnt: oozEnt };
+
+    W.state.nombre          = nom;
+    W.state.telefono        = tel;
+    W.state.direccion       = dir;
+    W.state.referencia      = ref;
+    W.state.metodoPago      = W.state.metodoPagoPaquete;
+    W.state.precioDomicilio = tarifa;
+    W.state.barrio          = barE;
+    W.state.paqueteZonaNombre = barE;
+
+    var set = function (id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
+    var oozTag = (oozRec || oozEnt) ? ' 📍' : '';
+    set('fp-zona',   'De ' + barR + ' → ' + barE + oozTag);
+    set('fp-desc',   szNom + (desc ? ' · ' + desc : ''));
+    set('fp-dir',    dir);
+    set('fp-ref',    ref || '—');
+    set('fp-nombre', nom + ' · ' + tel);
+    set('fp-tel',    'Envía: ' + eNom + ' · ' + eTel);
+    set('fp-pago',   W.state.metodoPagoPaquete === 'EFECTIVO' ? '💵 Efectivo' : '🏦 Transferencia');
+
+    var fac = document.querySelector('#view-factura-paquete .factura');
+    var old = document.getElementById('fp-tarifa-row');
+    if (old) old.remove();
+    if (fac) {
+      var tr = document.createElement('div');
+      tr.id = 'fp-tarifa-row';
+      tr.className = 'fac-row';
+      var tarifaDisplay = tarifaPorConfirmar
+        ? '<span style="font-size:12px;color:#ea580c;font-weight:700">El domi confirmará la tarifa</span>'
+        : '<span style="font-weight:900;color:var(--p);font-size:15px">$' + tarifa.toLocaleString('es-CO') + '</span>';
+      tr.innerHTML = '<div class="fac-lbl">🛵 Tarifa envío</div><div class="fac-val">' + tarifaDisplay + '</div>';
+      var nota = fac.querySelector('.fac-nota');
+      if (nota) fac.insertBefore(tr, nota);
+      else fac.appendChild(tr);
+    }
+
+    if (typeof showView === 'function') showView('view-factura-paquete');
+  };
+
+
+  /* ── Override enviarPedido para 'paquete' ───────────────────────── */
+  var _origEnv = W.enviarPedido;
+  W.enviarPedido = async function (tipo) {
+    if (tipo !== 'paquete') return _origEnv.apply(this, arguments);
+
+    var d   = W._pqData || {};
+    var btn = document.getElementById('btnConfirmarPaquete');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span>&nbsp;Enviando…'; }
+
+    var now   = new Date();
+    var hora  = now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
+    var fecha = now.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    var id    = String(Math.floor(100 + Math.random() * 900));
+    var dirC  = (d.dir || '') + (d.ref ? ' — Ref: ' + d.ref : '') + (d.barE ? ', ' + d.barE : '');
+    var oozNote = (d.oozRec || d.oozEnt) ? ' [Tarifa por km]' : '';
+
+    var rows = [[
+      id,
+      d.nom,
+      d.tel,
+      d.pago,
+      'Pendiente',
+      '',
+      (d.szNom || 'Paquete') + (d.desc ? ' · ' + d.desc : ''),
+      '',
+      1,
+      '',
+      '',
+      dirC,
+      hora,
+      fecha,
+      'Tarifa: $' + (d.tarifa || 0).toLocaleString('es-CO') + oozNote,
+      '',
+      '', '', '',
+      d.tarifa || 0,
+      'PAQUETERIA',
+      'Envío por zona',
+      ''
+    ]];
+
+    rows.push([
+      '', '', '', '', '', '',
+      'Envía: ' + d.eNom + ' · ' + d.eTel, '', 1, '', '',
+      'Recogida: ' + d.barR,
+      '', '', '', '', '', '', '', '', '', '', ''
+    ]);
+
+    var GAS = 'https://script.google.com/macros/s/AKfycbwbypqPgL16lssPdQsktDx9dHs0My_cMaS7YNQrMSkzY8Kw7HPmFgJHZeImkW2EJ48H7A/exec';
+    try {
+      await fetch(GAS, {
+        method: 'POST', mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accion: 'pedido-farmacia', rows, id,
+          sede: 'wil-paqueteria', comercio: 'Envío por zona',
+          nombre: d.nom, telefono: d.tel,
+          total: d.tarifa || 0, domicilio: d.tarifa || 0,
+          zona: d.barE || 'Copacabana', direccion: dirC,
+          metodoPago: d.pago, coords: null
+        })
+      });
+
+      W.state.idPedido = id;
+      var dispEl = document.getElementById('idPedidoDisplay');
+      if (dispEl) dispEl.textContent = id;
+      var msgEl = document.getElementById('success-msg');
+      if (msgEl) msgEl.textContent = 'Envío #' + id + ' registrado. El domi contactará a ' + d.eNom + ' al ' + d.eTel + '.';
+
+      var cb = document.getElementById('id-badge-copy-btn');
+      if (cb) {
+        var cn = cb.cloneNode(true);
+        cb.parentNode.replaceChild(cn, cb);
+        cn.addEventListener('click', function () {
+          if (navigator.clipboard) navigator.clipboard.writeText(id)
+            .then(function () { mostrarToast('Código ' + id + ' copiado ✓', 'content_copy'); });
+        });
       }
 
-      /* ─ Validar RECOGIDA no encontrada ─ */
-      var panelR = document.getElementById('wil-ne-panel-recogida');
-      if (panelR && panelR.style.display !== 'none') {
-        var dlR    = document.getElementById('wil-ne-dir-recogida');
-        var dirOkR = dlR && dlR.value.trim().length > 2;
-        if (!dirOkR) {
-          if (typeof mostrarToast === 'function')
-            mostrarToast('Escribe el nombre o dirección del comercio.', 'storefront');
-          return;
-        }
-        L.barrioRecogida = dlR.value.trim();
-        /* Adjuntar coords si Nominatim las encontró */
-        if (_geocoded.recogida) {
-          L.barrioRecogida += ' [' + _geocoded.recogida.lat.toFixed(5) + ',' + _geocoded.recogida.lng.toFixed(5) + ']';
-        }
-        var hidR2 = document.getElementById('wil-barrio-recogida');
-        if (hidR2) { hidR2.value = L.barrioRecogida; hidR2.dataset.precio = '0'; }
+      var rb = document.getElementById('id-badge-rastrear-btn');
+      if (rb) {
+        var rn = rb.cloneNode(true);
+        rb.parentNode.replaceChild(rn, rb);
+        rn.addEventListener('click', function () {
+          navTo('rastrear');
+          setTimeout(function () {
+            var inp = document.getElementById('rastrearInput');
+            if (inp) inp.value = id;
+            rtAbrirPopup();
+            setTimeout(rastrearPedido, 300);
+          }, 250);
+        });
       }
 
-      return _orig.apply(this, arguments);
-    };
-  }(W.wilGoLibre2));
+      if (typeof showView === 'function') showView('view-confirmado');
 
-  console.log('[WIL] ✅ Barrio No Encontrado v5 — Nominatim geocoding + km recogida→entrega + tarifa $24.000');
+    } catch (e) {
+      if (btn) { btn.disabled = false; btn.innerHTML = BTN_MAP['btnConfirmarPaquete']; }
+      if (typeof mostrarToast === 'function') mostrarToast('Error: ' + e.message, 'error');
+    }
+  };
 
-}(window));
+  console.log('[WIL] ✅ Parche v4 — OOZ flujo completo · Nominatim fallback · km entre puntos · Sin bloqueos OOZ');
 
+})(window);
 </script>
 
 </body>
