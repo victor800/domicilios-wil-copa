@@ -14,6 +14,7 @@
  <script src="wil-fix-final.js"></script>
   <script src="wil-barrio-noencontrado.js"></script>
      <script src="wil-patch-v2.js"></script>
+     <script src="wil-rastrear-patch.js"></script>
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
@@ -6363,6 +6364,138 @@ function _copiarFallback(txt){
   console.log('[WIL] ✅ Parche v4 — OOZ flujo completo · Nominatim fallback · km entre puntos · Sin bloqueos OOZ');
 
 })(window);
+
+
+/* ═══════════════════════════════════════════════════════
+   WIL PATCH v2 — Rastrear limpieza UI
+   1. Eliminar filas Confirmado / En camino / Entregado
+      del bento (rtItemsGrid) — ya están en el stepper.
+   2. Filtrar ítem "Recogida:…" de productos.
+   3. Mostrar valor domicilio bajo productos.
+═══════════════════════════════════════════════════════ */
+(function (W) {
+  'use strict';
+
+  var OCULTAR = ['Confirmado', 'En camino', 'Entregado'];
+
+  /* ── Elimina filas del bento por texto del label interno ── */
+  function _limpiarBento() {
+    var bento = document.getElementById('rtItemsGrid');
+    if (!bento) return;
+
+    Array.from(bento.children).forEach(function (row) {
+      /* Buscar el div más pequeño (label) dentro de la fila.
+         Estructura: row > div(icon) + div(content) > div(label 9px) + div(valor) */
+      var divs = row.querySelectorAll('div');
+      for (var i = 0; i < divs.length; i++) {
+        /* Solo checkear divs "hoja" (sin hijos div) para evitar
+           match con el texto compuesto de padres */
+        if (divs[i].querySelectorAll('div').length === 0) {
+          var txt = (divs[i].textContent || '').trim();
+          if (OCULTAR.indexOf(txt) !== -1) {
+            row.remove();
+            return; /* siguiente fila */
+          }
+        }
+      }
+    });
+  }
+
+  /* ── Inyecta fila "Valor domicilio" bajo los productos ── */
+  function _inyectarDomi() {
+    if (document.getElementById('rt-domi-val-row')) return;
+    var p = W.state && W.state.pedidoRastreado;
+    if (!p) return;
+
+    var val = parseInt((p.valorDomicilio || '').toString().replace(/[^\d]/g, '')) || 0;
+    if (val <= 0) return;
+
+    var sec = document.getElementById('rtProductosSection');
+    if (!sec) return;
+
+    var div = document.createElement('div');
+    div.id = 'rt-domi-val-row';
+    div.style.cssText = [
+      'display:flex', 'align-items:center', 'justify-content:space-between',
+      'padding:9px 14px', 'margin:4px 0 2px',
+      'border-top:1.5px dashed #e2e9ef',
+      'background:linear-gradient(90deg,rgba(0,105,112,.05),transparent)'
+    ].join(';');
+    div.innerHTML =
+      '<div style="display:flex;align-items:center;gap:7px;font-size:11.5px;'
+      + 'font-weight:700;color:#3d5068">'
+      + '<div style="width:26px;height:26px;border-radius:7px;'
+      + 'background:rgba(0,105,112,.09);display:flex;align-items:center;'
+      + 'justify-content:center;font-size:13px;flex-shrink:0">🛵</div>'
+      + 'Valor domicilio</div>'
+      + '<div style="font-size:15px;font-weight:900;color:#15803d">$'
+      + val.toLocaleString('es-CO') + '</div>';
+
+    sec.appendChild(div);
+  }
+
+  /* ── Filtro de productos: quitar "Recogida:…" y similares ── */
+  var _origRender = W.rtRenderProductos;
+  if (typeof _origRender === 'function') {
+    W.rtRenderProductos = function (productosTxt) {
+      if (productosTxt) {
+        productosTxt = productosTxt
+          .split(/\s*\|\s*/)
+          .filter(function (item) {
+            var t = item.trim().toLowerCase();
+            return t.length > 0
+              && !t.startsWith('recogida:')
+              && !t.startsWith('comercio:')
+              && !t.startsWith('envía:')
+              && !t.startsWith('envia:');
+          })
+          .join(' | ');
+      }
+      _origRender.call(this, productosTxt);
+    };
+  }
+
+  /* ── Punto de entrada: se llama tras cada rastrearPedido ── */
+  function patchUI() {
+    _limpiarBento();
+    _inyectarDomi();
+  }
+
+  /* Hook en rastrearPedido */
+  var _origRastrear = W.rastrearPedido;
+  if (typeof _origRastrear === 'function') {
+    W.rastrearPedido = async function () {
+      /* Limpiar residuos de ejecución anterior */
+      var old = document.getElementById('rt-domi-val-row');
+      if (old) old.remove();
+
+      await _origRastrear.apply(this, arguments);
+      setTimeout(patchUI, 420);
+    };
+  }
+
+  /* También aplicar si el resultado ya está visible */
+  document.addEventListener('DOMContentLoaded', function () {
+    setTimeout(patchUI, 900);
+  });
+
+  /* Re-aplicar cuando el polling actualiza el estado */
+  var _origActualizar = W.rtActualizarStepper;
+  if (typeof _origActualizar === 'function') {
+    W.rtActualizarStepper = function () {
+      _origActualizar.apply(this, arguments);
+      setTimeout(patchUI, 200);
+    };
+  }
+
+  console.log('[WIL] ✅ Rastrear patch v2 cargado');
+
+}(window));
+
+
+
+
+
 </script>
 
 </body>

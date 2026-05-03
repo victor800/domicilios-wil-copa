@@ -5369,6 +5369,639 @@ console.log('[PARCHE Historial RT v1.0] ✅ Stats en tiempo real con domicilio c
 
 
 
+/* ═══════════════════════════════════════════════════════════════
+   WIL — FACTURA PEDIDO LIBRE v2.1
+   ─────────────────────────────────────────────────────────────
+   DATOS REALES capturados del pedido activo (state.pedidoActivo):
+     • ID_PEDIDO    → p.id  (mismo que tabIdPedido en el HTML)
+     • CLIENTE      → p.cliente
+     • FECHA        → _fecha() tiempo real Bogotá
+     • HORA         → _hora()  tiempo real Bogotá
+     • URL_FACTURA  → dataURL base64 de la foto adjunta
+     • TOTAL_EXTRAIDO → detectado por Claude Vision
+     • NOMBRE_DOMI  → domi.nombre (localStorage wil_domi)
+     • ESTADO       → 'Enviado'
+
+   Claude Vision detecta: TOTAL A PAGAR, VALOR TRANSFERENCIA,
+   TOTAL, GRAND TOTAL — devuelve JSON {total, tipo}
+
+   Modal ZOOM con lupa:
+     • Botón zoom_in sobre la preview
+     • Pinch-to-zoom + arrastra en móvil
+     • Botones ＋ / － / ⟳
+     • Toca el fondo o ✕ para cerrar
+
+   GAS recibe case 'factura-libre'
+   NO toca ninguna hoja existente del sheet.
+═══════════════════════════════════════════════════════════════ */
+(function (W) {
+  'use strict';
+
+  var GAS_URL    = 'https://script.google.com/macros/s/AKfycbwbypqPgL16lssPdQsktDx9dHs0My_cMaS7YNQrMSkzY8Kw7HPmFgJHZeImkW2EJ48H7A/exec';
+  var SECTION_ID = 'wil-factura-libre-section';
+  var MODAL_ID   = 'wfl-zoom-modal';
+
+  var _b64     = null;
+  var _mime    = null;
+  var _totalIA = 0;
+  var _tipoIA  = 'TOTAL';
+
+  /* ════ CSS ════ */
+  (function _css() {
+    if (document.getElementById('wfl-css')) return;
+    var s = document.createElement('style');
+    s.id = 'wfl-css';
+    s.textContent = '\n'
+      + '#' + SECTION_ID + '{'
+      + 'margin:0 0 12px;border-radius:18px;overflow:hidden;'
+      + 'border:2px dashed rgba(0,105,112,.3);'
+      + 'background:linear-gradient(135deg,rgba(0,105,112,.04),rgba(0,188,200,.02));'
+      + 'animation:cardIn .3s ease both;}\n'
+      + '.wfl-header{display:flex;align-items:center;gap:10px;padding:12px 14px 10px;}\n'
+      + '.wfl-ico{width:40px;height:40px;border-radius:12px;flex-shrink:0;'
+      + 'background:linear-gradient(135deg,#006970,#00bcc9);'
+      + 'display:flex;align-items:center;justify-content:center;}\n'
+      + '.wfl-body{padding:0 14px 14px;}\n'
+      + '.wfl-upload-btn{width:100%;padding:12px;'
+      + 'background:linear-gradient(135deg,#006970,#00bcc9);'
+      + "color:#fff;border:none;border-radius:13px;font-family:'Plus Jakarta Sans',sans-serif;"
+      + 'font-weight:800;font-size:13px;cursor:pointer;'
+      + 'display:flex;align-items:center;justify-content:center;gap:8px;'
+      + 'box-shadow:0 3px 14px rgba(0,105,112,.28);transition:opacity .15s;}\n'
+      + '.wfl-upload-btn:active{opacity:.85;}\n'
+      + '.wfl-img-wrap{position:relative;margin-bottom:10px;}\n'
+      + '.wfl-preview-img{width:100%;max-height:220px;object-fit:contain;'
+      + 'border-radius:11px;border:1px solid #e7e8e9;display:block;cursor:zoom-in;}\n'
+      + '.wfl-lupa-btn{position:absolute;top:8px;right:8px;width:36px;height:36px;'
+      + 'border-radius:50%;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);'
+      + 'border:1.5px solid rgba(255,255,255,.3);display:flex;align-items:center;'
+      + 'justify-content:center;cursor:pointer;z-index:2;transition:background .15s,transform .15s;}\n'
+      + '.wfl-lupa-btn:active{transform:scale(.88);}\n'
+      + '.wfl-status{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;'
+      + 'color:#006970;margin-bottom:10px;min-height:22px;}\n'
+      + '.wfl-total-box{background:#f0fff4;border:1.5px solid #86efac;border-radius:13px;padding:12px 13px;}\n'
+      + '.wfl-total-row{display:flex;justify-content:space-between;align-items:center;'
+      + 'padding:4px 0;border-bottom:1px solid rgba(42,157,92,.12);}\n'
+      + '.wfl-total-row:last-child{border-bottom:none;}\n'
+      + '.wfl-total-lbl{font-size:11px;color:#6c7a7b;font-weight:600;}\n'
+      + ".wfl-total-val{font-family:'Plus Jakarta Sans',sans-serif;font-weight:900;font-size:14px;color:#006970;}\n"
+      + '.wfl-total-final{display:flex;justify-content:space-between;align-items:center;'
+      + 'background:rgba(0,105,112,.09);border-radius:10px;padding:9px 11px;margin-top:8px;}\n'
+      + ".wfl-total-final-lbl{font-family:'Plus Jakarta Sans',sans-serif;font-weight:900;font-size:13px;color:#005a60;}\n"
+      + ".wfl-total-final-val{font-family:'Plus Jakarta Sans',sans-serif;font-weight:900;font-size:17px;color:#006970;}\n"
+      + '.wfl-enviar-btn{width:100%;margin-top:10px;padding:11px;'
+      + 'background:linear-gradient(135deg,#1a7a3a,#2a9d5c);'
+      + "color:#fff;border:none;border-radius:12px;font-family:'Plus Jakarta Sans',sans-serif;"
+      + 'font-weight:800;font-size:12px;cursor:pointer;'
+      + 'display:flex;align-items:center;justify-content:center;gap:6px;'
+      + 'box-shadow:0 3px 12px rgba(42,157,92,.3);}\n'
+      + '.wfl-manual-input{width:100%;border:1.5px solid rgba(0,105,112,.25);'
+      + "border-radius:11px;padding:11px 13px;font-size:16px;font-family:'Plus Jakarta Sans',sans-serif;"
+      + 'font-weight:800;color:#006970;outline:none;box-sizing:border-box;}\n'
+      + '.wfl-manual-input:focus{border-color:#006970;}\n'
+      /* Modal zoom */
+      + '#' + MODAL_ID + '{position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.93);'
+      + 'display:none;flex-direction:column;align-items:center;justify-content:center;touch-action:none;}\n'
+      + '#' + MODAL_ID + '.wfl-open{display:flex;animation:wflFI .2s ease both;}\n'
+      + '@keyframes wflFI{from{opacity:0}to{opacity:1}}\n'
+      + '.wfl-modal-close{position:absolute;top:16px;right:16px;z-index:10;'
+      + 'width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.15);'
+      + 'border:1.5px solid rgba(255,255,255,.3);color:#fff;font-size:20px;cursor:pointer;'
+      + 'display:flex;align-items:center;justify-content:center;transition:background .15s;}\n'
+      + '.wfl-modal-close:hover{background:rgba(255,255,255,.28);}\n'
+      + '.wfl-zoom-img-wrap{width:100%;height:100%;display:flex;align-items:center;'
+      + 'justify-content:center;overflow:hidden;position:relative;}\n'
+      + '#wfl-zoom-img{max-width:100%;max-height:100%;object-fit:contain;'
+      + 'transform-origin:center center;user-select:none;-webkit-user-drag:none;'
+      + 'cursor:grab;will-change:transform;}\n'
+      + '#wfl-zoom-img.wfl-grabbing{cursor:grabbing;}\n'
+      + '.wfl-zoom-controls{position:absolute;bottom:24px;right:16px;'
+      + 'display:flex;flex-direction:column;gap:8px;z-index:10;}\n'
+      + '.wfl-zc-btn{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.15);'
+      + 'border:1.5px solid rgba(255,255,255,.3);color:#fff;font-size:20px;cursor:pointer;'
+      + 'display:flex;align-items:center;justify-content:center;transition:background .15s;}\n'
+      + '.wfl-zc-btn:hover{background:rgba(255,255,255,.28);}\n'
+      + '.wfl-zoom-hint{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);'
+      + 'background:rgba(0,0,0,.55);backdrop-filter:blur(4px);color:rgba(255,255,255,.7);'
+      + "border-radius:20px;padding:6px 14px;font-size:11px;font-weight:600;pointer-events:none;white-space:nowrap;font-family:'Plus Jakarta Sans',sans-serif;}\n";
+    document.head.appendChild(s);
+  })();
+
+  /* ════ MODAL ZOOM ════ */
+  function _crearModal() {
+    if (document.getElementById(MODAL_ID)) return;
+    var m = document.createElement('div');
+    m.id = MODAL_ID;
+    m.innerHTML =
+      '<button class="wfl-modal-close" id="wfl-mcerrar">&#10005;</button>'
+      + '<div class="wfl-zoom-img-wrap"><img id="wfl-zoom-img" src="" alt="" draggable="false"/></div>'
+      + '<div class="wfl-zoom-controls">'
+      + '<button class="wfl-zc-btn" id="wfl-zmas">&#65291;</button>'
+      + '<button class="wfl-zc-btn" id="wfl-zmen">&#65293;</button>'
+      + '<button class="wfl-zc-btn" id="wfl-zrst" style="font-size:15px">&#8635;</button>'
+      + '</div>'
+      + '<div class="wfl-zoom-hint">Pellizca &middot; Arrastra &middot; &#10005; para cerrar</div>';
+    document.body.appendChild(m);
+
+    var img = document.getElementById('wfl-zoom-img');
+    var sc = 1, tx = 0, ty = 0, drag = false, ox = 0, oy = 0;
+    function _ap() { img.style.transform = 'translate('+tx+'px,'+ty+'px) scale('+sc+')'; }
+
+    m._z = {
+      reset: function() { sc=1; tx=0; ty=0; _ap(); },
+      step:  function(d) { sc=Math.min(8,Math.max(0.4,sc+d)); _ap(); }
+    };
+
+    document.getElementById('wfl-zmas').onclick = function() { m._z.step(0.35); };
+    document.getElementById('wfl-zmen').onclick = function() { m._z.step(-0.35); };
+    document.getElementById('wfl-zrst').onclick = function() { m._z.reset(); };
+    document.getElementById('wfl-mcerrar').onclick = W.wflCerrarZoom;
+    m.addEventListener('click', function(e) { if (e.target === m) W.wflCerrarZoom(); });
+
+    img.addEventListener('mousedown', function(e) { drag=true; ox=e.clientX-tx; oy=e.clientY-ty; img.classList.add('wfl-grabbing'); });
+    window.addEventListener('mousemove', function(e) { if (!drag) return; tx=e.clientX-ox; ty=e.clientY-oy; _ap(); });
+    window.addEventListener('mouseup', function() { drag=false; img.classList.remove('wfl-grabbing'); });
+
+    var t0x=0, t0y=0, p0=0, s0=1;
+    img.addEventListener('touchstart', function(e) {
+      if (e.touches.length===1) { t0x=e.touches[0].clientX-tx; t0y=e.touches[0].clientY-ty; }
+      else if (e.touches.length===2) { p0=Math.hypot(e.touches[1].clientX-e.touches[0].clientX,e.touches[1].clientY-e.touches[0].clientY); s0=sc; }
+    }, {passive:true});
+    img.addEventListener('touchmove', function(e) {
+      e.preventDefault();
+      if (e.touches.length===1) { tx=e.touches[0].clientX-t0x; ty=e.touches[0].clientY-t0y; }
+      else if (e.touches.length===2) { var d=Math.hypot(e.touches[1].clientX-e.touches[0].clientX,e.touches[1].clientY-e.touches[0].clientY); sc=Math.min(8,Math.max(0.4,s0*(d/p0))); }
+      _ap();
+    }, {passive:false});
+  }
+
+  W.wflAbrirZoom = function() {
+    _crearModal();
+    var modal=document.getElementById(MODAL_ID);
+    var zImg=document.getElementById('wfl-zoom-img');
+    var prev=document.getElementById('wfl-preview-img');
+    if (!modal||!zImg||!prev||!prev.src) return;
+    modal._z.reset();
+    zImg.style.transform='';
+    zImg.src=prev.src;
+    modal.classList.add('wfl-open');
+    document.body.style.overflow='hidden';
+  };
+
+  W.wflCerrarZoom = function() {
+    var m=document.getElementById(MODAL_ID);
+    if (m) m.classList.remove('wfl-open');
+    document.body.style.overflow='';
+  };
+
+  /* ════ UTILIDADES ════ */
+  function _fmtCOP(n) {
+    var num=Math.round(n||0);
+    if (!num) return '$0';
+    return '$'+num.toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+  }
+  
+  function _parseCOP(v) {
+    var s=String(v||'').replace(/[^0-9.,]/g,'');
+    if (!s) return 0;
+    var p=(s.match(/\./g)||[]).length;
+    if (p>1) return parseFloat(s.replace(/\./g,''));
+    if (p===1) { var pts=s.split('.'); return (pts[1]&&pts[1].length===3)?parseFloat(s.replace('.','')):parseFloat(s); }
+    return parseFloat(s)||0;
+  }
+  
+  function _hora() {
+    return new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'America/Bogota'});
+  }
+  
+  function _fecha() {
+    return new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric',timeZone:'America/Bogota'});
+  }
+
+  /* ════ DETECTAR PEDIDO LIBRE ════ */
+  function esPedidoLibre(p) {
+    if (!p) return false;
+    var com=(p.comercio||'').toLowerCase();
+    if (com.includes('domi busca')||com==='wil-libre'||com==='domi wil') return true;
+    var tot=(p.total||'').toLowerCase();
+    if (!tot||tot==='—'||tot.includes('confirmar')||tot.includes('libre')) return true;
+    var prods=p._prods||[];
+    if (prods.length>0) {
+      var sp=prods.every(function(pr){return (!pr.vtotal||pr.vtotal===0)&&(!pr.vu||pr.vu===0);});
+      if (sp) return true;
+    }
+    if (_parseCOP(p.total)===0) return true;
+    return false;
+  }
+
+  /* ════ CLAUDE VISION API ════
+     ✅ CORREGIDO: USA SOLO FETCH A ANTHROPIC API
+     Prioridad: TOTAL A PAGAR > VALOR TRANSFERENCIA > TOTAL > GRAND TOTAL
+     Devuelve JSON: {"total": 47500, "tipo": "TOTAL A PAGAR"}
+  */
+  async function extraerTotalIA(b64, mime) {
+    try {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 300,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: mime, data: b64 } },
+              {
+                type: 'text',
+                text:
+                  'Eres un asistente de pagos colombiano. Analiza esta imagen.\n\n' +
+                  'REGLA PRINCIPAL: Encuentra el valor en pesos colombianos más importante de la imagen.\n\n' +
+                  'Prioridad de búsqueda (de mayor a menor):\n' +
+                  '1. Cualquier campo que diga "Total a pagar", "TOTAL A PAGAR"\n' +
+                  '2. "Valor de la transferencia", "Valor transferencia", "Valor transferido"\n' +
+                  '3. "Monto transferido", "Monto"\n' +
+                  '4. "Total", "TOTAL", "Grand total"\n' +
+                  '5. "Valor a cobrar", "Subtotal"\n' +
+                  '6. Si NO hay etiqueta clara: toma el número con $ MÁS GRANDE visible en la imagen\n\n' +
+                  'FORMATO COLOMBIANO: El punto separa miles, la coma separa decimales.\n' +
+                  '$ 50.000 = 50000 pesos\n' +
+                  '$ 1.250.000 = 1250000 pesos\n' +
+                  '$ 50,00 = 50 pesos (centavos, ignorar si hay otro valor mayor)\n\n' +
+                  'IMPORTANTE: Devuelve SIEMPRE el valor como número entero SIN puntos NI comas.\n' +
+                  'Si ves "$ 50.000" devuelve 50000, NO 50.\n\n' +
+                  'Responde ÚNICAMENTE con JSON sin markdown:\n' +
+                  '{"total": 50000, "tipo": "Valor de la transferencia"}\n\n' +
+                  'Si no encuentras absolutamente ningún valor: {"total": 0, "tipo": "no detectado"}'
+              }
+            ]
+          }]
+        })
+      });
+
+      const data = await resp.json();
+      
+      if (!resp.ok) {
+        console.error('Claude API error:', data);
+        return { total: 0, tipo: 'error-api' };
+      }
+
+      const txt = (data.content?.[0]?.text || '').trim().replace(/```json|```/g, '').trim();
+      
+      try {
+        const parsed = JSON.parse(txt);
+        let totalRaw = String(parsed.total || '0');
+        let totalLimpio = parseInt(totalRaw.replace(/\./g, '').replace(/,/g, '')) || 0;
+        
+        // Buscar números mayores en la respuesta si el parseado es muy pequeño
+        const todosNumeros = txt.match(/\d[\d.]*/g) || [];
+        const masGrande = todosNumeros
+          .map(n => parseInt(n.replace(/\./g, '')) || 0)
+          .filter(n => n >= 1000)
+          .sort((a, b) => b - a)[0];
+        
+        if (totalLimpio < 1000 && masGrande && masGrande > totalLimpio) {
+          totalLimpio = masGrande;
+        }
+        
+        return {
+          total: totalLimpio,
+          tipo: parsed.tipo || 'TOTAL'
+        };
+      } catch (parseErr) {
+        // Fallback: buscar número más grande >= 1000
+        const nums = txt.match(/\d[\d.]*/g) || [];
+        const mejor = nums
+          .map(n => parseInt(n.replace(/\./g, '')) || 0)
+          .filter(n => n >= 1000)
+          .sort((a, b) => b - a)[0];
+        return { total: mejor || 0, tipo: 'TOTAL' };
+      }
+    } catch (error) {
+      console.error('[extraerTotalIA] Error:', error);
+      return { total: 0, tipo: 'error-conexion' };
+    }
+  }
+
+  /* ════ GUARDAR EN GOOGLE SHEET ════
+     ✅ FUNCIONA: Envía datos al Google Apps Script via fetch POST
+     Columnas: ID_PEDIDO | CLIENTE | FECHA | HORA | URL_FACTURA | TOTAL_EXTRAIDO | NOMBRE_DOMI | ESTADO | NOTA
+  */
+  async function guardarEnSheet(pedido, totalExtraido, urlFactura, notaCliente) {
+    let nombreDomi = '';
+    try {
+      const raw = localStorage.getItem('wil_domi') || sessionStorage.getItem('wil_domi') || '{}';
+      nombreDomi = JSON.parse(raw).nombre || '';
+    } catch (_) {}
+    if (!nombreDomi && W.domi) nombreDomi = W.domi.nombre || '';
+
+    try {
+      await fetch(GAS_URL, {
+        method:  'POST',
+        mode:    'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accion: 'factura-libre',
+          rows: [[
+            String(pedido.id    || '').trim(),
+            pedido.cliente       || '',
+            _fecha(),
+            _hora(),
+            urlFactura           || 'sin-imagen',
+            totalExtraido        || 0,
+            nombreDomi,
+            'Enviado',
+            notaCliente          || ''
+          ]]
+        })
+      });
+      console.log('[guardarEnSheet] OK');
+    } catch (err) {
+      console.error('[guardarEnSheet] Error:', err);
+    }
+  }
+
+  /* ════ RENDER SECCIÓN ════ */
+  function renderSeccion(p) {
+    const vieja = document.getElementById(SECTION_ID);
+    if (vieja) vieja.remove();
+    if (!esPedidoLibre(p)) return;
+
+    const stepper = document.getElementById('tabStepper');
+    if (!stepper) return;
+    _crearModal();
+
+    const domiNum = _parseCOP(p.domicilio || '0');
+    const sec = document.createElement('div');
+    sec.id    = SECTION_ID;
+    sec.innerHTML = _buildHTML(domiNum);
+    stepper.parentNode.insertBefore(sec, stepper);
+
+    document.getElementById('wfl-file-input').addEventListener('change', function (e) {
+      const file = e.target.files[0];
+      if (file) _procesarImagen(file);
+    });
+  }
+
+  function _buildHTML(domiNum) {
+    return (
+      '<div class="wfl-header">' +
+        '<div class="wfl-ico"><span class="material-symbols-outlined" style="font-size:20px;color:#fff;font-variation-settings:\'FILL\' 1">receipt_long</span></div>' +
+        '<div>' +
+          '<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:13px;color:#191c1d;margin:0">Factura / Comprobante</p>' +
+          '<p style="font-size:11px;color:#6c7a7b;margin:2px 0 0">Foto de factura, recibo</p>' +
+        '</div>' +
+      '</div>' +
+      '<div class="wfl-body">' +
+        '<div id="wfl-btn-wrap">' +
+          '<input type="file" id="wfl-file-input" accept="image/*" capture="environment" style="display:none"/>' +
+          '<button class="wfl-upload-btn" onclick="document.getElementById(\'wfl-file-input\').click()">' +
+            '<span class="material-symbols-outlined" style="font-size:18px;font-variation-settings:\'FILL\' 1">add_a_photo</span>' +
+            'Subir factura / comprobante' +
+          '</button>' +
+        '</div>' +
+        '<div id="wfl-preview-wrap" style="display:none">' +
+          '<div class="wfl-img-wrap">' +
+            '<img id="wfl-preview-img" class="wfl-preview-img" alt="Factura" onclick="wflAbrirZoom()" title="Toca para ampliar"/>' +
+            '<button class="wfl-lupa-btn" onclick="wflAbrirZoom()" title="Ampliar imagen">' +
+              '<span class="material-symbols-outlined" style="font-size:19px;color:#fff">zoom_in</span>' +
+            '</button>' +
+          '</div>' +
+          '<div class="wfl-status" id="wfl-status"></div>' +
+        '</div>' +
+        '<div id="wfl-total-wrap" style="display:none">' +
+          '<div class="wfl-total-box">' +
+            '<div class="wfl-total-row">' +
+              '<span class="wfl-total-lbl" id="wfl-tipo-label">🧧 Total factura</span>' +
+              '<span class="wfl-total-val" id="wfl-val-prods">&mdash;</span>' +
+            '</div>' +
+            '<div class="wfl-total-row">' +
+              '<span class="wfl-total-lbl">🚚 Domicilio</span>' +
+              '<span class="wfl-total-val" id="wfl-val-domi">' + (domiNum > 0 ? _fmtCOP(domiNum) : '$0') + '</span>' +
+            '</div>' +
+            '<div class="wfl-total-final">' +
+              '<span class="wfl-total-final-lbl">TOTAL A COBRAR</span>' +
+              '<span class="wfl-total-final-val" id="wfl-val-final">&mdash;</span>' +
+            '</div>' +
+            '<button class="wfl-enviar-btn" id="wfl-enviar-btn" onclick="wflEnviarFactura()">' +
+              '<span class="material-symbols-outlined" style="font-size:15px;font-variation-settings:\'FILL\' 1">send</span>' +
+              'Enviar resumen al cliente' +
+            '</button>' +
+          '</div>' +
+          '<button onclick="wflRehacerFoto()" style="width:100%;margin-top:7px;padding:8px;background:transparent;border:1.5px dashed rgba(0,105,112,.25);border-radius:11px;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:700;font-size:11px;color:#006970;display:flex;align-items:center;justify-content:center;gap:5px">' +
+            '<span class="material-symbols-outlined" style="font-size:13px">photo_camera</span>Repetir foto' +
+          '</button>' +
+        '</div>' +
+        '<div id="wfl-manual-wrap" style="display:none;margin-top:10px">' +
+          '<p style="font-size:11px;font-weight:800;color:#9eaaac;text-transform:uppercase;letter-spacing:.04em;margin:0 0 7px">Ingresa el total manualmente</p>' +
+          '<input type="number" id="wfl-manual-input" class="wfl-manual-input" placeholder="Ej: 45000" oninput="wflActualizarManual(' + domiNum + ')"/>' +
+          '<div class="wfl-total-final" style="margin-top:8px">' +
+            '<span class="wfl-total-final-lbl">TOTAL A COBRAR</span>' +
+            '<span class="wfl-total-final-val" id="wfl-val-final-man">' + _fmtCOP(domiNum) + '</span>' +
+          '</div>' +
+          '<div style="margin-top:10px">' +
+            '<p style="font-size:11px;font-weight:800;color:#9eaaac;text-transform:uppercase;letter-spacing:.04em;margin:0 0 7px">Nota para el cliente</p>' +
+            '<textarea id="wfl-nota-cliente" class="wfl-manual-input" rows="3" placeholder="Escribe una nota para el cliente..."></textarea>' +
+          '</div>' +
+          '<button class="wfl-enviar-btn" style="margin-top:10px" onclick="wflEnviarFactura()">' +
+            '<span class="material-symbols-outlined" style="font-size:15px;font-variation-settings:\'FILL\' 1">send</span>' +
+            'Enviar resumen al cliente' +
+          '</button>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  /* ════ PROCESAR IMAGEN ════ */
+  async function _procesarImagen(file) {
+    const preview = document.getElementById('wfl-preview-img');
+    const preWrap = document.getElementById('wfl-preview-wrap');
+    const btnWrap = document.getElementById('wfl-btn-wrap');
+    const status  = document.getElementById('wfl-status');
+    const totWrap = document.getElementById('wfl-total-wrap');
+    const manWrap = document.getElementById('wfl-manual-wrap');
+
+    _totalIA = 0;
+    _b64 = null;
+    _mime = file.type || 'image/jpeg';
+    if (totWrap) totWrap.style.display = 'none';
+    if (manWrap) manWrap.style.display = 'none';
+    if (preWrap) preWrap.style.display = 'block';
+    if (btnWrap) btnWrap.style.display = 'none';
+
+    const reader = new FileReader();
+    reader.onload = async function (ev) {
+      const dataUrl = ev.target.result;
+      if (preview) preview.src = dataUrl;
+      _b64  = dataUrl.split(',')[1];
+      _mime = file.type || 'image/jpeg';
+
+      if (status) status.innerHTML =
+        '<span style="display:inline-block;width:14px;height:14px;border:2px solid #006970;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite"></span>' +
+        '&nbsp;Analizando imagen…';
+
+      try {
+        const res = await extraerTotalIA(_b64, _mime);
+        _totalIA = res.total;
+        _tipoIA  = res.tipo;
+
+        const p    = W.state?.pedidoActivo;
+        const domi = _parseCOP(p?.domicilio || '0');
+        const fin  = _totalIA + domi;
+
+        if (status) {
+          status.innerHTML = '<span style="font-size:16px">✅</span> ' +
+            (_totalIA > 0
+              ? `<strong>${_tipoIA}</strong>: <strong>${_fmtCOP(_totalIA)}</strong>`
+              : 'No detectado — ingresa manualmente');
+        }
+
+        if (_totalIA > 0) {
+          const tEl = document.getElementById('wfl-tipo-label');
+          if (tEl) tEl.textContent = '🧧 ' + _tipoIA;
+          _mostrarTotales(_totalIA, domi, fin);
+        } else {
+          _mostrarManual(domi);
+        }
+
+        const tabTot = document.getElementById('tabTotal');
+        if (tabTot && fin > 0) tabTot.textContent = _fmtCOP(fin);
+
+      } catch (e) {
+        console.error('[_procesarImagen]', e);
+        if (status) status.innerHTML =
+          '<span style="font-size:16px">⚠️</span> Error — ingresa el total manualmente.';
+        const p2   = W.state?.pedidoActivo;
+        const dom2 = _parseCOP(p2?.domicilio || '0');
+        _mostrarManual(dom2);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function _mostrarTotales(prods, domi, final) {
+    const wrap = document.getElementById('wfl-total-wrap');
+    const man  = document.getElementById('wfl-manual-wrap');
+    if (wrap) {
+      document.getElementById('wfl-val-prods').textContent = prods > 0 ? _fmtCOP(prods) : 'No detectado';
+      document.getElementById('wfl-val-domi').textContent  = _fmtCOP(domi);
+      document.getElementById('wfl-val-final').textContent = _fmtCOP(final > 0 ? final : domi);
+      wrap.style.display = 'block';
+    }
+    if (man) man.style.display = 'none';
+  }
+
+  function _mostrarManual(domi) {
+    const wrap = document.getElementById('wfl-total-wrap');
+    const man  = document.getElementById('wfl-manual-wrap');
+    if (wrap) wrap.style.display = 'none';
+    if (man)  man.style.display  = 'block';
+    const el = document.getElementById('wfl-val-final-man');
+    if (el) el.textContent = _fmtCOP(domi);
+  }
+
+  /* ════ FUNCIONES GLOBALES ════ */
+  W.wflRehacerFoto = function() {
+    ['wfl-preview-wrap','wfl-total-wrap','wfl-manual-wrap'].forEach(function(id) {
+      var el = document.getElementById(id); if (el) el.style.display = 'none';
+    });
+    var bw = document.getElementById('wfl-btn-wrap'); if (bw) bw.style.display = 'block';
+    _b64 = null; _totalIA = 0;
+    var inp = document.getElementById('wfl-file-input');
+    if (inp) { inp.value = ''; inp.click(); }
+  };
+
+  /* ════ ENVIAR FACTURA AL SHEET ════
+     ✅ CORREGIDO: Sin dependencias de Utilities ni Drive API
+     Envía: ID, CLIENTE, FECHA, HORA, IMAGEN (base64), TOTAL, DOMI, ESTADO, NOTA
+  */
+  W.wflEnviarFactura = async function () {
+    const p = W.state?.pedidoActivo;
+    if (!p) { alert('No hay pedido activo.'); return; }
+
+    const idPedido  = String(p.id || '').trim();
+    const domiNum   = parseInt(_parseCOP(p.domicilio || '0'), 10) || 0;
+
+    const manInp = document.getElementById('wfl-manual-input');
+    if (manInp?.value) {
+      _totalIA = parseInt(String(manInp.value).replace(/\D/g, ''), 10) || 0;
+    }
+
+    const notaCliente = document.getElementById('wfl-nota-cliente')?.value?.trim() || '';
+
+    const urlFact = (_b64 && _mime) ? `data:${_mime};base64,${_b64}` : 'sin-imagen';
+
+    const btn = document.getElementById('wfl-enviar-btn') || document.querySelector('.wfl-enviar-btn');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span style="display:inline-block;width:14px;height:14px;border:2px solid #fff;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite"></span>&nbsp;Procesando…';
+    }
+
+    try {
+      await guardarEnSheet(p, _totalIA || 0, urlFact, notaCliente);
+
+      const totalFin = (_totalIA || 0) + domiNum;
+      const resumen =
+        `🧾 Factura pedido #${idPedido}\n\n` +
+        (_totalIA > 0 ? `📦 ${_tipoIA}: ${_fmtCOP(_totalIA)}\n` : '') +
+        `🚚 Domicilio: ${_fmtCOP(domiNum)}\n` +
+        `━━━━━━━━━━━━━━━━\n` +
+        `💰 TOTAL A COBRAR: ${_fmtCOP(totalFin > 0 ? totalFin : domiNum)}\n`;
+
+      const status = document.getElementById('wfl-status');
+      if (status) {
+        status.innerHTML = '<span style="font-size:16px">✅</span> Guardado en Sheet correctamente.';
+      }
+
+      if (btn) {
+        btn.disabled = false;
+        btn.style.background = 'linear-gradient(135deg,#1a7a3a,#2a9d5c)';
+        btn.innerHTML =
+          '<span class="material-symbols-outlined" style="font-size:15px;font-variation-settings:\'FILL\' 1">check_circle</span>' +
+          '&nbsp;¡Enviado!';
+      }
+
+      console.log('[wflEnviarFactura] ✅ OK', { idPedido, totalIA: _totalIA, tipoIA: _tipoIA, totalFin, notaCliente });
+
+    } catch (e) {
+      console.error('[wflEnviarFactura] ❌ Error:', e);
+      alert('Error: ' + (e?.message || 'No se pudo procesar'));
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '⚠️ Error — reintentar';
+      }
+    }
+  };
+
+  W.wflActualizarManual = function(domiNum) {
+    const inp = document.getElementById('wfl-manual-input');
+    if (!inp?.value) {
+      document.getElementById('wfl-val-final-man').textContent = _fmtCOP(domiNum);
+      return;
+    }
+    const val = parseInt(String(inp.value).replace(/\D/g, ''), 10) || 0;
+    document.getElementById('wfl-val-final-man').textContent = _fmtCOP(val + domiNum);
+  };
+
+  /* ════ HOOK ════ */
+  const _orig = W.activarPedidoEnRuta;
+  if (typeof _orig === 'function') {
+    W.activarPedidoEnRuta = function (p) {
+      _orig.apply(this, arguments);
+      _b64 = null; _mime = null; _totalIA = 0; _tipoIA = 'TOTAL';
+      setTimeout(function () { renderSeccion(p); }, 500);
+    };
+  }
+
+  setTimeout(function () {
+    const p = W.state?.pedidoActivo;
+    if (p && esPedidoLibre(p)) renderSeccion(p);
+  }, 2000);
+
+  setTimeout(_crearModal, 1000);
+  console.log('[WIL Factura Libre v2.2] ✅ Corregido - Solo Claude Vision + Fetch');
+
+}(window));
+
 </script>
 </body>
 </html>
