@@ -2182,7 +2182,10 @@ function closeCatResults(){
   _catResultsAll = [];
 }
 
-
+/* ══ LOAD SHEET — directo desde Google Sheets CSV (igual que Ofertas) ══
+   Encabezados: A:NOMBRE  B:LABORATORIO  C:PRESENTACION  D:PRECIO_VENTA  E:PRECIO_UNIDAD
+═══════════════════════════════════════════════════════════════════════════ */
+function loadSheet(){
   var tab = SHEETS[tienda].tab;
   var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID_OFERTAS +
             '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent(tab) + '&cachebust=' + Date.now();
@@ -3792,8 +3795,7 @@ var _wcMapas = {
     + '@keyframes msgIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}'
     + '@keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}'
     + '@keyframes wcCartSlide{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}'
-   + '#wil-chat-ov{position:relative!important;display:flex!important;align-items:center!important;justify-content:center!important}'
-
+    + '#wil-chat-ov{position:relative!important}'
     + '#wc-fab-carrito{position:absolute;bottom:68px;right:12px;z-index:400;pointer-events:auto}'
     + '#wc-fab-carrito button{background:#003f87;color:#fff;border:none;border-radius:99px;padding:9px 16px 9px 13px;font-size:12.5px;font-weight:800;cursor:pointer;font-family:inherit;box-shadow:0 4px 18px rgba(0,63,135,.5);display:flex;align-items:center;gap:7px;white-space:nowrap;transition:transform .12s,box-shadow .12s}'
     + '#wc-fab-carrito button:hover{box-shadow:0 6px 22px rgba(0,63,135,.6)}'
@@ -3887,7 +3889,7 @@ function abrirWAFarmacia() {
   if (_wcNombre) {
     _wcFase = 'chat';
     setTimeout(function(){
-      wcMsgFarm('😊 ¿En qué te puedo ayudar hoy?');
+      wcMsgFarm('¡Qué gusto verte de nuevo, *' + _wcNombre + '*! 😊 ¿En qué te puedo ayudar hoy?');
     }, 2400);
     setTimeout(function(){
       document.getElementById('wc-wa-footer').style.display = 'block';
@@ -4171,7 +4173,7 @@ function wcBuscarEnSheets(nombreMed, detalle) {
       if (result.src === 'oferta') {
         msg = '🏷️ ¡*' + nombreMed + '* está en oferta! Mira el precio especial que tenemos para ti:';
       } else if (result.src === 'nuevo') {
-        msg = '😊 Tenemos esto disponible para ti, *';
+        msg = '😊 Tenemos esto disponible para ti, *' + _wcNombre + '*:';
       }
       // Stock: sin mensaje previo, directo a cards
       if (msg) {
@@ -4348,11 +4350,9 @@ function wcMostrarOpciones() {
 
 function wcMostrarOpts(ops) {
   var el = document.getElementById('wc-opts');
-  el.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:8px 14px 12px;background:#f0f4f7';
-
-
+  el.style.cssText = 'display:flex;flex-wrap:wrap;gap:7px;padding:8px 14px 12px;background:#f0f4f7';
   el.innerHTML = ops.map(function(o){
-    return '<button onclick="wcSelOpt(\'' + o.replace(/'/g,"\\'") + '\')" style="border:1.5px solid #003f87;background:#fff;color:#003f87;border-radius:99px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:\'Manrope\',sans-serif;width:100%;text-align:center">' + o + '</button>';
+    return '<button onclick="wcSelOpt(\'' + o.replace(/'/g,"\\'") + '\')" style="border:1.5px solid #003f87;background:#fff;color:#003f87;border-radius:99px;padding:7px 15px;font-size:12px;font-weight:700;cursor:pointer;font-family:\'Manrope\',sans-serif;white-space:nowrap">' + o + '</button>';
   }).join('');
 }
 
@@ -4473,9 +4473,9 @@ function wcProcesar(txt) {
         tl.includes('catalogo')||tl.includes('valor')||tl.includes('cuanto')||tl.includes('costo')) {
       _wcIntencion = 'med_nombre';
       var frases = [
-        '¡Con gusto, 💊 ¿Cuál es el medicamento o producto que buscas?',
-        '¡Por supuesto, 😊 ¿Qué producto necesitas?',
-        '¡Claro que sí! ¿Qué medicamento estás buscando, ? 💊'
+        '¡Con gusto, *' + _wcNombre + '*! 💊 ¿Cuál es el medicamento o producto que buscas?',
+        '¡Por supuesto, *' + _wcNombre + '*! 😊 ¿Qué producto necesitas?',
+        '¡Claro que sí! ¿Qué medicamento estás buscando, *' + _wcNombre + '*? 💊'
       ];
       wcMsgFarm(frases[Math.floor(Math.random()*frases.length)]);
       return;
@@ -4533,7 +4533,6 @@ function wcProcesar(txt) {
     setTimeout(wcMostrarOpciones, 1200);
   }
 }
-
 /* ═══════════════════════════════════════════════════════════════════
    WIL — MODO ENVÍO A TERCERO + FUERA DE ZONA
    Archivo: wil-farmacia-envio-tercero.js
