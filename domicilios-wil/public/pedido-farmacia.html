@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script src="wil-farmacia-barrio-checkout.js"></script>
+ <script src="wil-farmacia-envio-tercero.js"></script>
 
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -3880,33 +3881,36 @@ function wcProcesar(txt) {
       ]);
     }, 1100);
   }
-
-
 /* ═══════════════════════════════════════════════════════════════════
-   WIL — BARRIO + TARIFA DOMICILIO  ·  pedido-farmacia.html
-   Archivo: wil-farmacia-barrio-checkout.js
-   Incluir JUSTO ANTES DEL CIERRE </body> en pedido-farmacia.html:
-
-     <script src="wil-farmacia-barrio-checkout.js">
+   WIL — MODO ENVÍO A TERCERO + FUERA DE ZONA  ·  pedido-farmacia.html
+   Archivo: wil-farmacia-envio-tercero.js
+   Cargar DESPUÉS de wil-farmacia-barrio-checkout.js
 
    Qué hace:
-   ① Inyecta un campo "Barrio de entrega" con autocomplete en Step 1
-      del checkout (después de la referencia).
-   ② Al elegir barrio aplica la tarifa de la misma tabla que pedir.html
-      y muestra una pill verde animada con el costo.
-   ③ Actualiza coDomicilio + coZonaNombre y llama coActualizarResumen()
-      para reflejar el domicilio en el total en tiempo real.
-   ④ Valida que el barrio esté seleccionado antes de pasar a Step 2.
-   ⑤ No toca NADA más del código existente.
+   ① Toggle "Para mí / Para otra persona"
+   ② Modo "Para mí"  → barrio propio con autocomplete de tabla
+   ③ Modo "Para otra persona":
+        · Barrio FARMACIA (origen) + barrio DESTINO
+        · Cobra la tarifa más alta de las dos
+        · Datos del destinatario
+   ④ FUERA DE ZONA — si el barrio NO está en la tabla:
+        · Aparece opción "📡 Calcular tarifa — [lo que escribió]"
+        · Geocodifica con Nominatim (OpenStreetMap)
+        · Calcula ruta con OSRM (routing público)
+        · Tarifa = km_recorridos × $1.800 COP  (la tasa NO se muestra)
+        · Muestra: distancia en km + total a cobrar
+   ⑤ No toca wil-farmacia-barrio-checkout.js
 ═══════════════════════════════════════════════════════════════════ */
 (function (W) {
   'use strict';
 
-  /* ─── TABLA DE BARRIOS CON TARIFA ───────────────────────────────
-     Misma lógica que pedir.html. Formato: [NOMBRE, TARIFA_COP]
-  ─────────────────────────────────────────────────────────────── */
-  var WFB_BARRIOS = [
-    /* Zona 1 — $5.000 */
+  /* ─── CONFIG ──────────────────────────────────────────────────── */
+  var REF_LAT  =  6.3494;   /* Copacabana, Antioquia — punto de referencia */
+  var REF_LON  = -75.5025;
+  var KM_RATE  = 1800;      /* COP por km — no se muestra al cliente */
+
+  /* ─── TABLA DE BARRIOS ────────────────────────────────────────── */
+  var BARRIOS = [
     ['ASUNCION',5000],['FÁTIMA',5000],['MIRADOR AZUL',5000],
     ['AZULITA PARTE BAJA',5000],['CRISTO REY ABAJO DE LA PISCINA',5000],
     ['HORIZONTES',5000],['MIRAFLORES',5000],['MISERICORDIA HASTA PRINCESS',5000],
@@ -3916,7 +3920,6 @@ function wcProcesar(txt) {
     ['REMANSO',5000],['YARUMITO PARTE BAJA',5000],
     ['CANOAS HASTA LA TIENDA DEL CUSCO',5000],['PIEDRAS BLANCAS',5000],
     ['PORVENIR',5000],['RECREO',5000],
-    /* Zona 2 — $6.000 */
     ['CALORCOL',6000],['AZULITA PARTE ALTA',6000],['VILLAS DE COPACABANA',6000],
     ['TABLAZO',6000],['CANOAS DESPUÉS DE LA TIENDA DEL CUSCO',6000],
     ['CRISTO REY DE LA PISCINA HACIA ARRIBA',6000],['PEDREGAL PARTE ALTA',6000],
@@ -3926,393 +3929,567 @@ function wcProcesar(txt) {
     ['JARDÍN DE LA MARGARITA',6000],['RESERVAS DE SAN JUAN 1',6000],
     ['POSADA DEL VIENTO',6000],['ROSA DE LOS VIENTOS',6000],
     ['VICENZA',6000],['RESERVAS DE SAN JUAN 2',6000],
-    /* Zona 3 — $7.000 */
     ['BARRIO MARIA',7000],['PORTERIA PARCELACIÓN EL PARAISO',7000],
     ['TORRE DEL BOSQUE',7000],['EDIFICIO POBLADO NORTE',7000],
     ['SAN JUAN CAMPESTRE',7000],
-    /* Zona 4 — $8.000 */
     ['VIA MACHADO',8000],['CANTERAS',8000],['VILLANUEVA PARTE BAJA Y ALTA',8000],
     ['VILLA ROCA',8000],['SAN JUAN',8000],
-    /* Zona especial */
     ['VEGAS PARTE BAJA',10000],['GUASIMALITO',10000],['MACHADO',10000],
     ['GUASIMALITO (PARTE BAJA)',10000],['GUASIMALITO (PARTE ALTA)',13000],
-    /* Zona 5 / Norte */
     ['UNIDADES DE MACHADO',11000],['ARBOLEDA DEL CAMPO',11000],
     ['FONTIDUEÑO',13000],['NAVARRA',14000],['NIQUIA PARTE BAJA',14000],
     ['UNIDADES DE NAVARRA',14000],['PARQUE DE GIRARDOTA',17000],
     ['TOLEDO CAMPESTRE',17000],['PARQUE DE BELLO',18000],
-    ['FABRICATO',19000],['UNIDADES DE MADERA',25000],
+    ['FABRICATO',19000],['UNIDADES DE MADERA',24000],
   ];
 
   /* ─── ESTADO ──────────────────────────────────────────────────── */
-  var _sel = { nombre: '', tarifa: 0 };
+  var ST = {
+    modo: 'yo',
+    origen:  { nombre:'', tarifa:0, fueraZona:false, km:0 },
+    destino: { nombre:'', tarifa:0, fueraZona:false, km:0 },
+    destinatario: { nombre:'', tel:'' },
+  };
 
   /* ─── HELPERS ─────────────────────────────────────────────────── */
-  function _norm(s) {
-    return (s || '').toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+  function norm(s){
+    return (s||'').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
   }
-  function _esc(s) {
-    return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function cop(n){ return '$\u2009'+(n||0).toLocaleString('es-CO')+' COP'; }
+  function tarifaFinal(){ return Math.max(ST.origen.tarifa||0, ST.destino.tarifa||0); }
+  function toast(msg){
+    if (typeof W.mostrarToastFarmacia==='function'){ W.mostrarToastFarmacia(msg); return; }
+    var t=document.createElement('div');
+    t.style.cssText='position:fixed;bottom:calc(env(safe-area-inset-bottom,0px)+84px);left:50%;'+
+      'transform:translateX(-50%);background:#111827;color:#fff;padding:10px 18px;'+
+      'border-radius:12px;font-family:\'Manrope\',sans-serif;font-size:13px;font-weight:700;'+
+      'z-index:9999;box-shadow:0 4px 18px rgba(0,0,0,.28);white-space:nowrap;pointer-events:none';
+    t.textContent=msg; document.body.appendChild(t);
+    setTimeout(function(){ t.remove(); },2600);
   }
-  function _cop(n) {
-    return '$\u2009' + (n || 0).toLocaleString('es-CO') + ' COP';
-  }
-  function _toast(msg) {
-    /* Reutiliza mostrarToastFarmacia si existe, si no crea uno propio */
-    if (typeof W.mostrarToastFarmacia === 'function') {
-      W.mostrarToastFarmacia(msg); return;
-    }
-    var t = document.createElement('div');
-    t.style.cssText =
-      'position:fixed;bottom:calc(env(safe-area-inset-bottom,0px)+84px);left:50%;' +
-      'transform:translateX(-50%);background:#111827;color:#fff;padding:10px 18px;' +
-      'border-radius:12px;font-family:\'Manrope\',sans-serif;font-size:13px;' +
-      'font-weight:700;z-index:9999;box-shadow:0 4px 18px rgba(0,0,0,.28);' +
-      'white-space:nowrap;pointer-events:none';
-    t.textContent = msg;
-    document.body.appendChild(t);
-    setTimeout(function () { t.remove(); }, 2600);
+
+  /* ─── FUERA DE ZONA: Nominatim → OSRM ────────────────────────── */
+  function calcularFueraZona(textoBusqueda, campo){
+    var fzId = campo==='yo'?'wet3-fz-yo': campo==='origen'?'wet3-fz-origen':'wet3-fz-destino';
+    var dropId= campo==='yo'?'wet3-drop-yo': campo==='origen'?'wet3-drop-origen':'wet3-drop-destino';
+
+    var drop=document.getElementById(dropId);
+    if (drop) drop.style.display='none';
+
+    /* Estado: cargando */
+    var el=document.getElementById(fzId);
+    if (!el) return;
+    el.style.display='block';
+    el.innerHTML='<div class="wet3-fz-inner wet3-fz-loading">'+
+      '<div class="wet3-fz-spinner"></div>'+
+      '<div><div class="wet3-fz-titulo">Calculando ruta\u2026</div>'+
+      '<div class="wet3-fz-sub">Buscando "'+esc(textoBusqueda)+'" en el mapa</div></div></div>';
+
+    /* 1. Geocodificar */
+    var q=encodeURIComponent(textoBusqueda+', Antioquia, Colombia');
+    fetch('https://nominatim.openstreetmap.org/search?q='+q+'&format=json&limit=1&countrycodes=co',
+      { headers:{'Accept-Language':'es'} })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if (!data||!data.length){
+        el.innerHTML='<div class="wet3-fz-inner wet3-fz-error">'+
+          '<span style="font-size:22px;flex-shrink:0">❌</span>'+
+          '<div><div class="wet3-fz-titulo">No encontramos ese lugar</div>'+
+          '<div class="wet3-fz-sub">Verifica el nombre e intenta de nuevo</div></div></div>';
+        return;
+      }
+      var lat=parseFloat(data[0].lat);
+      var lon=parseFloat(data[0].lon);
+      var nombreReal=data[0].display_name.split(',')[0];
+
+      /* 2. Ruta con OSRM */
+      return fetch('https://router.project-osrm.org/route/v1/driving/'+
+        REF_LON+','+REF_LAT+';'+lon+','+lat+'?overview=false')
+      .then(function(r2){ return r2.json(); })
+      .then(function(ruta){
+        if (!ruta||ruta.code!=='Ok'||!ruta.routes||!ruta.routes.length){
+          el.innerHTML='<div class="wet3-fz-inner wet3-fz-error">'+
+            '<span style="font-size:22px;flex-shrink:0">🗺️</span>'+
+            '<div><div class="wet3-fz-titulo">No se pudo calcular la ruta</div>'+
+            '<div class="wet3-fz-sub">Intenta con un nombre más específico</div></div></div>';
+          return;
+        }
+        var distKm=Math.ceil(ruta.routes[0].distance/1000);
+        var tarifa=Math.round(distKm*KM_RATE/100)*100;
+
+        /* UI resultado — sólo km y precio, sin mencionar la tasa */
+        el.innerHTML=[
+          '<div class="wet3-fz-inner wet3-fz-ok">',
+          '<div class="wet3-fz-ruta-ico">🗺️</div>',
+          '<div style="flex:1;min-width:0">',
+          '<div class="wet3-fz-titulo">',
+          '<span class="wet3-fz-nombre">'+esc(nombreReal)+'</span>',
+          '<span class="wet3-fz-badge-fz">Fuera de zona</span>',
+          '</div>',
+          '<div class="wet3-fz-km-row">📍 '+distKm+' km de recorrido</div>',
+          '</div>',
+          '<div class="wet3-fz-precio">'+cop(tarifa)+'</div>',
+          '</div>',
+        ].join('');
+
+        /* Guardar en estado */
+        var slot = (campo==='yo'||campo==='origen') ? 'origen' : 'destino';
+        ST[slot]={ nombre:nombreReal, tarifa:tarifa, fueraZona:true, km:distKm };
+
+        /* Actualizar input */
+        var inpId=campo==='yo'?'wet3-inp-yo': campo==='origen'?'wet3-inp-origen':'wet3-inp-destino';
+        var inp=document.getElementById(inpId);
+        if (inp) inp.value=nombreReal;
+
+        /* Actualizar badge/pill según campo */
+        if (campo==='yo'){
+          var pv=document.getElementById('wet3-pill-yo-val');
+          var ps=document.getElementById('wet3-pill-yo-sub');
+          var pill=document.getElementById('wet3-pill-yo');
+          if (pv) pv.textContent=cop(tarifa);
+          if (ps) ps.textContent='Domicilio fuera de zona \u00b7 '+distKm+' km';
+          if (pill) pill.style.display='flex';
+        } else if (campo==='origen'){
+          var bv=document.getElementById('wet3-badge-origen-val');
+          var bd=document.getElementById('wet3-badge-origen');
+          if (bv) bv.textContent=cop(tarifa); if (bd) bd.style.display='flex';
+          actualizarDuel();
+        } else {
+          var bv2=document.getElementById('wet3-badge-destino-val');
+          var bd2=document.getElementById('wet3-badge-destino');
+          if (bv2) bv2.textContent=cop(tarifa); if (bd2) bd2.style.display='flex';
+          actualizarDuel();
+        }
+        syncCheckout();
+        toast('📡 '+nombreReal+' \u00b7 '+distKm+' km \u00b7 '+cop(tarifa));
+      });
+    })
+    .catch(function(){
+      el.innerHTML='<div class="wet3-fz-inner wet3-fz-error">'+
+        '<span style="font-size:22px;flex-shrink:0">📶</span>'+
+        '<div><div class="wet3-fz-titulo">Error de conexión</div>'+
+        '<div class="wet3-fz-sub">Verifica tu internet e intenta de nuevo</div></div></div>';
+    });
   }
 
   /* ─── CSS ─────────────────────────────────────────────────────── */
-  function _css() {
-    if (document.getElementById('wfb-co-css')) return;
-    var s = document.createElement('style');
-    s.id = 'wfb-co-css';
-    s.textContent = [
-      /* Separador */
-      '.wfb-sep{border:none;border-top:1px solid #f3f4f6;margin:16px 0 14px}',
-
-      /* Label igual que el resto del checkout */
-      '.wfb-label{font-size:10px;font-weight:700;color:#9ca3af;',
-      'text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px}',
-
-      /* Input barrio */
-      '#wfb-inp{width:100%;border:1.5px solid #e5e7eb;border-radius:12px;',
-      'padding:12px 14px;font-family:\'Inter\',sans-serif;font-size:14px;',
-      'color:#111827;outline:none;transition:.15s;background:#fafafa;',
-      'box-sizing:border-box}',
-      '#wfb-inp:focus{border-color:#003f87;box-shadow:0 0 0 3px rgba(0,63,135,.08)}',
-      '#wfb-inp::placeholder{color:#9ca3af}',
-
+  function injectCSS(){
+    if (document.getElementById('wet3-css')) return;
+    var s=document.createElement('style'); s.id='wet3-css';
+    s.textContent=[
+      '#wfb-block{display:none!important}',
+      '#wet3-root{margin-top:14px;font-family:\'Manrope\',sans-serif}',
+      '.wet3-sep{border:none;border-top:1px solid #f3f4f6;margin:0 0 14px}',
+      /* Toggle */
+      '.wet3-toggle-wrap{display:flex;background:#f1f5f9;border-radius:14px;padding:4px;gap:4px;margin-bottom:16px;position:relative}',
+      '.wet3-toggle-btn{flex:1;border:none;background:transparent;border-radius:10px;padding:10px 8px;cursor:pointer;font-family:\'Manrope\',sans-serif;font-size:13px;font-weight:700;color:#6b7280;display:flex;align-items:center;justify-content:center;gap:6px;transition:color .2s;position:relative;z-index:1}',
+      '.wet3-toggle-btn.active{color:#003f87}',
+      '.wet3-toggle-slider{position:absolute;top:4px;left:4px;width:calc(50% - 6px);height:calc(100% - 8px);background:#fff;border-radius:10px;box-shadow:0 1px 6px rgba(0,63,135,.13);transition:transform .28s cubic-bezier(.34,1.56,.64,1);pointer-events:none}',
+      '.wet3-toggle-slider.right{transform:translateX(calc(100% + 4px))}',
+      '#wet3-panel-yo{display:block}#wet3-panel-tercero{display:none}',
+      /* Inputs */
+      '.wet3-field-wrap{position:relative;margin-bottom:0}',
+      '.wet3-label{font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px}',
+      '.wet3-inp{width:100%;border:1.5px solid #e5e7eb;border-radius:12px;padding:11px 14px 11px 38px;font-family:\'Manrope\',sans-serif;font-size:13px;font-weight:600;color:#111827;outline:none;background:#fafafa;box-sizing:border-box;transition:.15s}',
+      '.wet3-inp:focus{border-color:#003f87;box-shadow:0 0 0 3px rgba(0,63,135,.08)}',
+      '.wet3-inp::placeholder{color:#c4c9d4;font-weight:500}',
+      '.wet3-inp-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:17px;pointer-events:none}',
       /* Dropdown */
-      '#wfb-drop{display:none;position:absolute;left:0;right:0;top:100%;',
-      'z-index:999;background:#fff;',
-      'border:1.5px solid #c5d8ff;border-radius:14px;',
-      'box-shadow:0 6px 24px rgba(0,63,135,.12);',
-      'max-height:216px;overflow-y:auto;margin-top:4px;',
-      'scrollbar-width:thin;scrollbar-color:#c5d8ff transparent}',
-
-      '.wfb-item{padding:10px 14px;font-size:13px;font-weight:600;color:#111827;',
-      'cursor:pointer;border-bottom:1px solid #f3f4f6;',
-      'display:flex;align-items:center;justify-content:space-between;gap:8px;',
-      'transition:background .12s}',
-      '.wfb-item:last-child{border-bottom:none}',
-      '.wfb-item:hover{background:#e8f0fe}',
-      '.wfb-match{color:#003f87;font-weight:800}',
-      '.wfb-price{font-size:11px;font-weight:700;color:#15803d;',
-      'background:#dcfce7;border:1px solid #86efac;',
-      'border-radius:6px;padding:2px 8px;flex-shrink:0;white-space:nowrap}',
-      '.wfb-empty{padding:12px 14px;font-size:12px;color:#9ca3af;text-align:center}',
-
-      /* Pill tarifa */
-      '#wfb-pill{display:none;align-items:center;gap:10px;',
-      'background:#f0fdf4;border:1.5px solid #86efac;',
-      'border-radius:12px;padding:11px 14px;margin-top:10px;',
-      'animation:wfbPop .22s cubic-bezier(.22,1,.36,1)}',
-      '@keyframes wfbPop{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}',
-      '#wfb-pill-ico{width:36px;height:36px;border-radius:10px;',
-      'background:#dcfce7;display:flex;align-items:center;justify-content:center;',
-      'flex-shrink:0}',
-      '#wfb-pill-ico .sym{font-size:20px;color:#15803d}',
-      '#wfb-pill-val{font-size:18px;font-weight:900;color:#15803d;',
-      'font-family:\'Manrope\',sans-serif;letter-spacing:-.02em;line-height:1}',
-      '#wfb-pill-sub{font-size:10px;color:#166534;font-weight:600;margin-top:2px}',
-
-      /* Nota informativa */
-      '#wfb-nota{background:#fff7ed;border:1px solid rgba(234,88,12,.2);',
-      'border-radius:10px;padding:9px 12px;font-size:11px;color:#9a3412;',
-      'margin-top:8px;line-height:1.55;display:flex;align-items:flex-start;gap:6px}',
+      '.wet3-drop{display:none;position:absolute;left:0;right:0;top:100%;z-index:999;background:#fff;border:1.5px solid #c5d8ff;border-radius:14px;box-shadow:0 6px 24px rgba(0,63,135,.12);max-height:200px;overflow-y:auto;margin-top:4px;scrollbar-width:thin}',
+      '.wet3-item{padding:9px 13px;font-size:12.5px;font-weight:600;color:#111827;cursor:pointer;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;gap:8px;transition:background .1s}',
+      '.wet3-item:last-child{border-bottom:none}',
+      '.wet3-item:hover{background:#e8f0fe}',
+      '.wet3-match{color:#003f87;font-weight:800}',
+      '.wet3-tag{font-size:10.5px;font-weight:700;background:#dcfce7;color:#15803d;border:1px solid #86efac;border-radius:6px;padding:2px 7px;flex-shrink:0;white-space:nowrap}',
+      '.wet3-empty{padding:10px 13px;font-size:12px;color:#9ca3af;text-align:center}',
+      /* Opción fuera de zona en dropdown */
+      '.wet3-item-fz{padding:10px 13px;font-size:12px;font-weight:700;color:#92400e;cursor:pointer;background:#fffbeb;border-top:1.5px dashed #fcd34d;display:flex;align-items:center;gap:8px;transition:background .1s}',
+      '.wet3-item-fz:hover{background:#fef3c7}',
+      '.wet3-fz-chip{font-size:10px;font-weight:700;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:6px;padding:2px 7px;flex-shrink:0;white-space:nowrap;margin-left:auto}',
+      /* Tarjeta fuera de zona */
+      '.wet3-fz-card{border-radius:12px;overflow:hidden;margin-top:8px;animation:wet3pop .24s cubic-bezier(.22,1,.36,1)}',
+      '.wet3-fz-inner{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;border:1.5px solid}',
+      '.wet3-fz-loading{background:#f8fafc;border-color:#e5e7eb}',
+      '.wet3-fz-error{background:#fff1f2;border-color:#fecdd3}',
+      '.wet3-fz-ok{background:#fffbeb;border-color:#fcd34d}',
+      '.wet3-fz-spinner{width:22px;height:22px;border:3px solid #e5e7eb;border-top-color:#003f87;border-radius:50%;animation:wet3spin .7s linear infinite;flex-shrink:0}',
+      '@keyframes wet3spin{to{transform:rotate(360deg)}}',
+      '.wet3-fz-ruta-ico{font-size:22px;flex-shrink:0}',
+      '.wet3-fz-titulo{font-size:12.5px;font-weight:800;color:#111827;display:flex;align-items:center;gap:6px;flex-wrap:wrap}',
+      '.wet3-fz-sub{font-size:11px;color:#6b7280;margin-top:2px;font-weight:500}',
+      '.wet3-fz-nombre{color:#92400e}',
+      '.wet3-fz-badge-fz{font-size:9.5px;font-weight:700;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:5px;padding:1px 6px}',
+      '.wet3-fz-km-row{font-size:11px;font-weight:700;color:#b45309;margin-top:4px}',
+      '.wet3-fz-precio{font-size:15px;font-weight:900;color:#92400e;white-space:nowrap;letter-spacing:-.02em;flex-shrink:0}',
+      /* Pill yo */
+      '#wet3-pill-yo{display:none;align-items:center;gap:10px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:12px;padding:11px 14px;margin-top:10px;animation:wet3pop .22s cubic-bezier(.22,1,.36,1)}',
+      '#wet3-pill-yo-val{font-size:18px;font-weight:900;color:#15803d;letter-spacing:-.02em}',
+      '#wet3-pill-yo-sub{font-size:10px;color:#166534;font-weight:600;margin-top:2px}',
+      /* Ruta card */
+      '.wet3-ruta-card{background:#fff;border:1.5px solid #e5e7eb;border-radius:18px;overflow:hidden;margin-bottom:14px;box-shadow:0 2px 12px rgba(0,0,0,.06)}',
+      '.wet3-ruta-header{background:linear-gradient(135deg,#003f87,#0060cc);padding:12px 16px;display:flex;align-items:center;gap:8px}',
+      '.wet3-ruta-header-txt{font-size:12px;font-weight:700;color:rgba(255,255,255,.9);letter-spacing:.04em;text-transform:uppercase}',
+      '.wet3-ruta-body{padding:14px 16px}',
+      '.wet3-ruta-line{display:flex;flex-direction:column}',
+      '.wet3-pin-row{display:flex;align-items:flex-start;gap:12px}',
+      '.wet3-pin-col{display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:28px}',
+      '.wet3-pin-dot{width:22px;height:22px;border-radius:50%;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:#fff;flex-shrink:0}',
+      '.wet3-pin-dot.origen{background:#003f87;box-shadow:0 0 0 2px #003f87}',
+      '.wet3-pin-dot.destino{background:#15803d;box-shadow:0 0 0 2px #15803d}',
+      '.wet3-pin-line{width:2px;flex:1;min-height:24px;background:repeating-linear-gradient(to bottom,#c5d8ff 0,#c5d8ff 5px,transparent 5px,transparent 10px);margin:3px 0}',
+      '.wet3-field-col{flex:1;padding-bottom:14px}',
+      '.wet3-field-col:last-child{padding-bottom:0}',
+      '.wet3-campo-badge{display:none;align-items:center;gap:6px;margin-top:6px;padding:6px 10px;border-radius:8px;font-size:11px;font-weight:700;animation:wet3pop .2s ease}',
+      '.wet3-campo-badge.origen{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}',
+      '.wet3-campo-badge.destino{background:#f0fdf4;color:#15803d;border:1px solid #86efac}',
+      /* Duel */
+      '#wet3-duel{display:none;margin-top:14px;border-radius:16px;overflow:hidden;border:1.5px solid #e5e7eb;animation:wet3pop .28s cubic-bezier(.22,1,.36,1)}',
+      '.wet3-duel-header{background:#f8fafc;padding:9px 14px;font-size:10px;font-weight:800;color:#6b7280;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:6px}',
+      '.wet3-duel-body{padding:12px 14px}',
+      '.wet3-vs-row{display:grid;grid-template-columns:1fr 28px 1fr;align-items:center;gap:8px;margin-bottom:10px}',
+      '.wet3-vs-card{border-radius:10px;padding:10px;text-align:center;transition:.2s}',
+      '.wet3-vs-card.lado-a{background:#eff6ff;border:1.5px solid #bfdbfe}',
+      '.wet3-vs-card.lado-b{background:#f0fdf4;border:1.5px solid #86efac}',
+      '.wet3-vs-card.fz{background:#fffbeb!important;border-color:#fcd34d!important}',
+      '.wet3-vs-card.winner.lado-a{box-shadow:0 0 0 2.5px #1d4ed8;border-color:#1d4ed8}',
+      '.wet3-vs-card.winner.lado-b{box-shadow:0 0 0 2.5px #15803d;border-color:#15803d}',
+      '.wet3-vs-card.winner.fz{box-shadow:0 0 0 2.5px #d97706!important;border-color:#d97706!important}',
+      '.wet3-vs-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.65;margin-bottom:2px}',
+      '.wet3-vs-precio{font-size:16px;font-weight:900;letter-spacing:-.02em;line-height:1}',
+      '.wet3-vs-barrio{font-size:9px;font-weight:600;margin-top:3px;opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+      '.wet3-vs-km{font-size:9px;font-weight:700;color:#b45309;margin-top:2px;display:none}',
+      '.wet3-vs-sep{font-size:13px;font-weight:900;color:#9ca3af;text-align:center}',
+      '.wet3-winner-badge{background:linear-gradient(135deg,#003f87,#0060cc);color:#fff;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px}',
+      '.wet3-winner-ico{font-size:22px}',
+      '.wet3-winner-lbl{font-size:10px;font-weight:700;opacity:.8;text-transform:uppercase;letter-spacing:.05em}',
+      '.wet3-winner-val{font-size:20px;font-weight:900;letter-spacing:-.03em;line-height:1.1}',
+      '.wet3-winner-hint{font-size:10px;opacity:.75;margin-top:1px}',
+      /* Destinatario */
+      '.wet3-dest-card{background:#fafafa;border:1.5px solid #f0f0f0;border-radius:14px;padding:14px;margin-top:12px}',
+      '.wet3-dest-title{font-size:10px;font-weight:800;color:#9ca3af;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;display:flex;align-items:center;gap:5px}',
+      '.wet3-dest-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}',
+      '.wet3-dest-inp{width:100%;border:1.5px solid #e5e7eb;border-radius:10px;padding:9px 11px;font-family:\'Manrope\',sans-serif;font-size:13px;font-weight:600;color:#111827;background:#fff;outline:none;box-sizing:border-box;transition:.15s}',
+      '.wet3-dest-inp:focus{border-color:#003f87;box-shadow:0 0 0 3px rgba(0,63,135,.08)}',
+      '.wet3-dest-inp::placeholder{color:#c4c9d4;font-weight:500}',
+      '.wet3-nota{background:#fff7ed;border:1px solid rgba(234,88,12,.2);border-radius:10px;padding:9px 12px;font-size:11px;color:#9a3412;margin-top:8px;line-height:1.55;display:flex;align-items:flex-start;gap:6px}',
+      '@keyframes wet3pop{from{opacity:0;transform:scale(.93) translateY(4px)}to{opacity:1;transform:scale(1) translateY(0)}}',
+      '@keyframes wet3slide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}',
+      '#wet3-panel-tercero.visible{animation:wet3slide .22s ease}',
     ].join('');
     document.head.appendChild(s);
   }
 
-  /* ─── HTML que se inyecta al final de co-s1 ──────────────────── */
-  function _buildBlock() {
-    var wrap = document.createElement('div');
-    wrap.id = 'wfb-block';
-    wrap.style.marginTop = '14px';
-    wrap.innerHTML = [
-      '<hr class="wfb-sep"/>',
-      '<label class="wfb-label" for="wfb-inp">Barrio de entrega *</label>',
-      '<div style="position:relative">',
-      '  <input id="wfb-inp" type="text"',
-      '    placeholder="Escribe tu barrio…" autocomplete="off"',
-      '    oninput="WFB_CO.buscar(this.value)"',
-      '    onblur="setTimeout(WFB_CO.cerrar, 180)"/>',
-      '  <div id="wfb-drop"></div>',
-      '</div>',
-      '<div id="wfb-pill">',
-      '  <div id="wfb-pill-ico">',
-      '    <span class="sym symf">delivery_dining</span>',
-      '  </div>',
-      '  <div>',
-      '    <div id="wfb-pill-val"></div>',
-      '    <div id="wfb-pill-sub">Tarifa de domicilio</div>',
-      '  </div>',
-      '</div>',
-      '<div id="wfb-nota" style="display:none">',
-      '  <span class="sym" style="font-size:14px;color:#ea580c;flex-shrink:0;margin-top:1px">info</span>',
-      '  <span>El domi te muestra la factura real antes del cobro. <strong>Tú apruebas.</strong></span>',
-      '</div>',
-    ].join('\n');
-    return wrap;
-  }
-
-  /* ─── INYECTAR BLOQUE en Step 1 ──────────────────────────────── */
-  function _inject() {
-    if (document.getElementById('wfb-block')) return;
-    var s1 = document.getElementById('co-s1');
-    if (!s1) return;
-    s1.appendChild(_buildBlock());
-  }
-
-  /* ─── AUTOCOMPLETE ───────────────────────────────────────────── */
-  function _buscar(q) {
-    var txt   = (q || '').trim();
-    var drop  = document.getElementById('wfb-drop');
-    var pill  = document.getElementById('wfb-pill');
-    var nota  = document.getElementById('wfb-nota');
-
-    /* Resetear selección */
-    _sel.nombre = '';
-    _sel.tarifa = 0;
-    _sincronizarCheckout();
-    if (pill) pill.style.display = 'none';
-    if (nota) nota.style.display = 'none';
-
-    if (!txt || txt.length < 2) { if (drop) drop.style.display = 'none'; return; }
-
-    var nq = _norm(txt);
-    var exactas   = WFB_BARRIOS.filter(function (b) { return _norm(b[0]) === nq; });
-    var parciales = WFB_BARRIOS.filter(function (b) {
-      var n = _norm(b[0]);
-      return n !== nq && (n.indexOf(nq) !== -1 ||
-        nq.split(' ').every(function (w) { return n.indexOf(w) !== -1; }));
-    });
-    var res = exactas.concat(parciales).slice(0, 9);
-
+  /* ─── AUTOCOMPLETE ────────────────────────────────────────────── */
+  function buscar(q, dropId, campo){
+    var txt=(q||'').trim();
+    var drop=document.getElementById(dropId);
     if (!drop) return;
+    if (!txt||txt.length<2){ drop.style.display='none'; return; }
 
-    if (!res.length) {
-      drop.innerHTML = '<div class="wfb-empty">Sin coincidencias para "' + _esc(txt) + '"</div>';
-      drop.style.display = 'block';
-      return;
+    var nq=norm(txt);
+    var exactas  =BARRIOS.filter(function(b){ return norm(b[0])===nq; });
+    var parciales=BARRIOS.filter(function(b){
+      var n=norm(b[0]);
+      return n!==nq&&(n.indexOf(nq)!==-1||nq.split(' ').every(function(w){ return n.indexOf(w)!==-1; }));
+    });
+    var res=exactas.concat(parciales).slice(0,8);
+
+    function hl(nombre){
+      var idx=norm(nombre).indexOf(nq);
+      if (idx<0) return esc(nombre);
+      return esc(nombre.slice(0,idx))+'<span class="wet3-match">'+esc(nombre.slice(idx,idx+nq.length))+'</span>'+esc(nombre.slice(idx+nq.length));
     }
+    var selFn='WET3.'+(campo==='yo'?'selYo':campo==='origen'?'selOrigen':'selDestino');
+    var fzQuoted="'"+txt.replace(/'/g,"\\'")+"','"+campo+"'";
 
-    function hl(nombre) {
-      var idx = _norm(nombre).indexOf(nq);
-      if (idx < 0) return _esc(nombre);
-      return _esc(nombre.slice(0, idx))
-        + '<span class="wfb-match">' + _esc(nombre.slice(idx, idx + nq.length)) + '</span>'
-        + _esc(nombre.slice(idx + nq.length));
-    }
-
-    drop.innerHTML = res.map(function (b) {
-      return '<div class="wfb-item"' +
-        ' onmousedown="WFB_CO.sel(\'' + b[0].replace(/'/g, "\\'") + '\',' + b[1] + ')">' +
-        '<span>' + hl(b[0]) + '</span>' +
-        '<span class="wfb-price">' + _cop(b[1]) + '</span>' +
-        '</div>';
+    var html=res.map(function(b){
+      return '<div class="wet3-item" onmousedown="'+selFn+'(\''+b[0].replace(/'/g,"\\'")+'\','+b[1]+')">'+
+        '<span>'+hl(b[0])+'</span><span class="wet3-tag">'+cop(b[1])+'</span></div>';
     }).join('');
-    drop.style.display = 'block';
+
+    if (!res.length){
+      html='<div class="wet3-empty">Sin coincidencias · ¿Es fuera de cobertura?</div>';
+    }
+
+    /* Siempre: opción fuera de zona al pie */
+    html+='<div class="wet3-item-fz" onmousedown="WET3.calcularFZ('+fzQuoted+')">'+
+      '<span style="font-size:14px;flex-shrink:0">📡</span>'+
+      '<span>Calcular tarifa para <strong>"'+esc(txt)+'"</strong></span>'+
+      '<span class="wet3-fz-chip">Fuera de zona</span></div>';
+
+    drop.innerHTML=html;
+    drop.style.display='block';
   }
 
-  function _sel_barrio(nombre, tarifa) {
-    var inp  = document.getElementById('wfb-inp');
-    var drop = document.getElementById('wfb-drop');
-    var pill = document.getElementById('wfb-pill');
-    var nota = document.getElementById('wfb-nota');
-    var val  = document.getElementById('wfb-pill-val');
-    var sub  = document.getElementById('wfb-pill-sub');
+  function cerrarDrop(id){ var d=document.getElementById(id); if (d) d.style.display='none'; }
 
-    if (inp) inp.value = nombre;
-    if (drop) drop.style.display = 'none';
-
-    _sel.nombre = nombre;
-    _sel.tarifa = tarifa;
-
-    /* Mostrar pill */
-    if (val) val.textContent = _cop(tarifa);
-    if (sub) sub.textContent = 'Domicilio · ' + nombre;
-    if (pill) pill.style.display = 'flex';
-    if (nota) nota.style.display = 'flex';
-
-    /* Sincronizar con el checkout */
-    _sincronizarCheckout();
-    _toast('📍 ' + nombre + ' · ' + _cop(tarifa));
+  /* ─── SELECCIONES DE TABLA ────────────────────────────────────── */
+  function selYo(nombre,tarifa){
+    ST.origen={nombre:nombre,tarifa:tarifa,fueraZona:false,km:0};
+    var inp=document.getElementById('wet3-inp-yo');
+    if (inp) inp.value=nombre;
+    cerrarDrop('wet3-drop-yo');
+    var fz=document.getElementById('wet3-fz-yo'); if (fz) fz.style.display='none';
+    var pv=document.getElementById('wet3-pill-yo-val');
+    var ps=document.getElementById('wet3-pill-yo-sub');
+    var pill=document.getElementById('wet3-pill-yo');
+    if (pv) pv.textContent=cop(tarifa);
+    if (ps) ps.textContent='Domicilio \u00b7 '+nombre;
+    if (pill) pill.style.display='flex';
+    syncCheckout(); toast('📍 '+nombre+' \u00b7 '+cop(tarifa));
+  }
+  function selOrigen(nombre,tarifa){
+    ST.origen={nombre:nombre,tarifa:tarifa,fueraZona:false,km:0};
+    var inp=document.getElementById('wet3-inp-origen'); if (inp) inp.value=nombre;
+    cerrarDrop('wet3-drop-origen');
+    var fz=document.getElementById('wet3-fz-origen'); if (fz) fz.style.display='none';
+    var bv=document.getElementById('wet3-badge-origen-val'); if (bv) bv.textContent=cop(tarifa);
+    var bd=document.getElementById('wet3-badge-origen'); if (bd) bd.style.display='flex';
+    actualizarDuel(); syncCheckout();
+  }
+  function selDestino(nombre,tarifa){
+    ST.destino={nombre:nombre,tarifa:tarifa,fueraZona:false,km:0};
+    var inp=document.getElementById('wet3-inp-destino'); if (inp) inp.value=nombre;
+    cerrarDrop('wet3-drop-destino');
+    var fz=document.getElementById('wet3-fz-destino'); if (fz) fz.style.display='none';
+    var bv=document.getElementById('wet3-badge-destino-val'); if (bv) bv.textContent=cop(tarifa);
+    var bd=document.getElementById('wet3-badge-destino'); if (bd) bd.style.display='flex';
+    actualizarDuel(); syncCheckout();
   }
 
-  function _cerrar() {
-    var d = document.getElementById('wfb-drop');
-    if (d) d.style.display = 'none';
+  /* ─── DUEL ────────────────────────────────────────────────────── */
+  function actualizarDuel(){
+    var duel=document.getElementById('wet3-duel');
+    if (!ST.origen.tarifa&&!ST.destino.tarifa){ if (duel) duel.style.display='none'; return; }
+    if (!duel) return;
+    duel.style.display='block';
+    var ta=ST.origen.tarifa||0, tb=ST.destino.tarifa||0;
+    var g=function(id){ return document.getElementById(id); };
+    var pA=g('wet3-vs-a-precio'),pB=g('wet3-vs-b-precio');
+    var nA=g('wet3-vs-a-barrio'),nB=g('wet3-vs-b-barrio');
+    var kA=g('wet3-vs-a-km'),kB=g('wet3-vs-b-km');
+    var cA=g('wet3-vs-a'),cB=g('wet3-vs-b');
+    var wv=g('wet3-winner-val'),wh=g('wet3-winner-hint');
+    if (pA) pA.textContent=ta?cop(ta):'—';
+    if (pB) pB.textContent=tb?cop(tb):'—';
+    if (nA) nA.textContent=ST.origen.nombre||'Farmacia';
+    if (nB) nB.textContent=ST.destino.nombre||'Destino';
+    if (kA){ kA.textContent=ST.origen.fueraZona?ST.origen.km+' km':''; kA.style.display=ST.origen.fueraZona?'block':'none'; }
+    if (kB){ kB.textContent=ST.destino.fueraZona?ST.destino.km+' km':''; kB.style.display=ST.destino.fueraZona?'block':'none'; }
+    if (cA){ cA.classList.remove('winner'); cA.classList.toggle('fz',ST.origen.fueraZona); }
+    if (cB){ cB.classList.remove('winner'); cB.classList.toggle('fz',ST.destino.fueraZona); }
+    if (ta>=tb&&ta>0&&cA) cA.classList.add('winner');
+    if (tb>ta&&tb>0&&cB) cB.classList.add('winner');
+    if (ta===tb&&ta>0){ if (cA) cA.classList.add('winner'); if (cB) cB.classList.add('winner'); }
+    var fin=tarifaFinal();
+    if (wv) wv.textContent=fin>0?cop(fin):'—';
+    if (wh){
+      if (!ta||!tb)     wh.textContent='Completa ambos campos';
+      else if (ta===tb) wh.textContent='Misma distancia — tarifas iguales';
+      else if (ta>tb)   wh.textContent=(ST.origen.fueraZona?'La farmacia queda más lejos ('+ST.origen.km+' km)':'La farmacia queda más lejos')+' → se cobra esa tarifa';
+      else              wh.textContent=(ST.destino.fueraZona?'El destino queda más lejos ('+ST.destino.km+' km)':'El destino queda más lejos')+' → se cobra esa tarifa';
+    }
   }
 
-  /* ─── SINCRONIZAR con variables del checkout ─────────────────── */
-  function _sincronizarCheckout() {
-    W.coDomicilio   = _sel.tarifa;
-    W.coZonaNombre  = _sel.nombre || (W.CO_DEFAULT_ZONA || 'Copacabana');
-
-    /* Actualizar los elementos del resumen en tiempo real */
-    var zonaEl = document.getElementById('co-zona-lbl');
-    var domiEl = document.getElementById('co-domi-txt');
-    if (zonaEl) zonaEl.textContent = W.coZonaNombre;
-    if (domiEl) domiEl.textContent = _sel.tarifa > 0 ? _cop(_sel.tarifa) : 'Pendiente';
-
-    /* Recalcular el total si la función existe */
-    if (typeof W.coActualizarResumen === 'function') W.coActualizarResumen();
+  /* ─── SYNC ────────────────────────────────────────────────────── */
+  function syncCheckout(){
+    var tarifa=(ST.modo==='yo')?ST.origen.tarifa:tarifaFinal();
+    var zona=(ST.modo==='yo')?ST.origen.nombre:(ST.destino.nombre||ST.origen.nombre||W.CO_DEFAULT_ZONA||'Copacabana');
+    W.coDomicilio=tarifa; W.coZonaNombre=zona||W.CO_DEFAULT_ZONA||'Copacabana';
+    W.coDestinatarioNombre=ST.destinatario.nombre; W.coDestinatarioTel=ST.destinatario.tel;
+    W.coModoEnvio=ST.modo;
+    W.coOrigenFueraZona=ST.origen.fueraZona; W.coOrigenKm=ST.origen.km;
+    W.coDestinoFueraZona=ST.destino.fueraZona; W.coDestinoKm=ST.destino.km;
+    var ze=document.getElementById('co-zona-lbl'); var de=document.getElementById('co-domi-txt');
+    if (ze) ze.textContent=W.coZonaNombre;
+    if (de) de.textContent=tarifa>0?cop(tarifa):'Pendiente';
+    if (typeof W.coActualizarResumen==='function') W.coActualizarResumen();
   }
 
-  /* ─── PATCH coNext — validar barrio antes de pasar a Step 2 ──── */
-  function _patchCoNext() {
-    var _orig = W.coNext;
-    if (typeof _orig !== 'function') return;
+  /* ─── MODO ────────────────────────────────────────────────────── */
+  function setModo(modo){
+    ST.modo=modo;
+    var sl=document.getElementById('wet3-slider');
+    var by=document.getElementById('wet3-btn-yo'), bt=document.getElementById('wet3-btn-tercero');
+    var py=document.getElementById('wet3-panel-yo'), pt=document.getElementById('wet3-panel-tercero');
+    if (modo==='yo'){
+      if (sl) sl.classList.remove('right'); if (by) by.classList.add('active'); if (bt) bt.classList.remove('active');
+      if (py) py.style.display='block'; if (pt){ pt.style.display='none'; pt.classList.remove('visible'); }
+    } else {
+      if (sl) sl.classList.add('right'); if (by) by.classList.remove('active'); if (bt) bt.classList.add('active');
+      if (py) py.style.display='none';
+      if (pt){ pt.style.display='block'; requestAnimationFrame(function(){ pt.classList.add('visible'); }); }
+    }
+    syncCheckout();
+  }
 
-    W.coNext = function () {
-      /* Solo validar cuando estamos en Step 1 */
-      if ((W.coStep || 1) === 1) {
-        if (!_sel.nombre) {
-          _toast('Selecciona tu barrio de entrega 📍');
-          var inp = document.getElementById('wfb-inp');
-          if (inp) {
-            inp.style.borderColor = '#dc2626';
-            inp.focus();
-            /* Scroll suave al campo */
-            var block = document.getElementById('wfb-block');
-            if (block) block.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            /* Restaurar color borde tras 2 s */
-            setTimeout(function () { inp.style.borderColor = '#e5e7eb'; }, 2000);
-          }
-          return; /* Bloquear el avance */
+  /* ─── PATCH coNext ────────────────────────────────────────────── */
+  function patchCoNext(){
+    var _o=W.coNext; if (typeof _o!=='function') return;
+    W.coNext=function(){
+      if ((W.coStep||1)===1){
+        function err(msg,id){ toast(msg); var e=document.getElementById(id);
+          if (e){ e.style.borderColor='#dc2626'; e.focus(); setTimeout(function(){ e.style.borderColor='#e5e7eb'; },2000); } }
+        if (ST.modo==='yo'){ if (!ST.origen.nombre){ err('Selecciona tu barrio de entrega 📍','wet3-inp-yo'); return; } }
+        else {
+          if (!ST.origen.nombre){ err('Selecciona el barrio de la farmacia 🏪','wet3-inp-origen'); return; }
+          if (!ST.destino.nombre){ err('Selecciona el barrio de destino 📍','wet3-inp-destino'); return; }
+          if (!ST.destinatario.nombre.trim()){ err('Escribe el nombre de quien recibe 👤','wet3-dest-nombre'); return; }
         }
       }
-      _orig.apply(this, arguments);
+      _o.apply(this,arguments);
     };
   }
 
-  /* ─── PATCH abrirCheckout — reiniciar barrio al abrir ────────── */
-  function _patchAbrirCheckout() {
-    var _orig = W.abrirCheckout;
-    if (typeof _orig !== 'function') return;
-
-    W.abrirCheckout = function () {
-      /* Resetear estado */
-      _sel.nombre = '';
-      _sel.tarifa = 0;
-      W.coDomicilio  = W.CO_DEFAULT_PRECIO || 8000;
-      W.coZonaNombre = W.CO_DEFAULT_ZONA   || 'Copacabana';
-
-      _orig.apply(this, arguments);
-
-      /* Limpiar campos del barrio */
-      var inp  = document.getElementById('wfb-inp');
-      var pill = document.getElementById('wfb-pill');
-      var nota = document.getElementById('wfb-nota');
-      var drop = document.getElementById('wfb-drop');
-      if (inp)  inp.value = '';
-      if (pill) pill.style.display = 'none';
-      if (nota) nota.style.display = 'none';
-      if (drop) drop.style.display = 'none';
-
-      /* Si el GPS ya capturó un barrio, preseleccionarlo */
-      setTimeout(function () {
-        var barrioGPS = W.coBarrio || '';
-        if (!barrioGPS || _sel.nombre) return;
-
-        /* Buscar coincidencia en la tabla */
-        var nq = _norm(barrioGPS);
-        var match = null;
-        for (var i = 0; i < WFB_BARRIOS.length; i++) {
-          if (_norm(WFB_BARRIOS[i][0]).indexOf(nq) !== -1 ||
-              nq.indexOf(_norm(WFB_BARRIOS[i][0])) !== -1) {
-            match = WFB_BARRIOS[i];
-            break;
-          }
-        }
-        if (match) _sel_barrio(match[0], match[1]);
-      }, 600);
-    };
+  /* ─── BUILD HTML ──────────────────────────────────────────────── */
+  function buildHTML(){
+    var r=document.createElement('div'); r.id='wet3-root';
+    r.innerHTML='<hr class="wet3-sep"/>'+
+    '<div class="wet3-toggle-wrap">'+
+      '<div class="wet3-toggle-slider" id="wet3-slider"></div>'+
+      '<button class="wet3-toggle-btn active" id="wet3-btn-yo" onclick="WET3.modo(\'yo\')">'+
+        '<span class="sym symf" style="font-size:16px">home</span>Para mí</button>'+
+      '<button class="wet3-toggle-btn" id="wet3-btn-tercero" onclick="WET3.modo(\'tercero\')">'+
+        '<span class="sym symf" style="font-size:16px">card_giftcard</span>Para otra persona</button>'+
+    '</div>'+
+    /* PANEL YO */
+    '<div id="wet3-panel-yo">'+
+      '<label class="wet3-label">Barrio de entrega *</label>'+
+      '<div class="wet3-field-wrap">'+
+        '<span class="wet3-inp-icon sym symf" style="color:#003f87">location_on</span>'+
+        '<input id="wet3-inp-yo" class="wet3-inp" type="text" placeholder="Escribe tu barrio\u2026" autocomplete="off"'+
+          ' oninput="WET3.buscarYo(this.value)"'+
+          ' onblur="setTimeout(function(){WET3.cerrar(\'wet3-drop-yo\')},180)"/>'+
+        '<div id="wet3-drop-yo" class="wet3-drop"></div>'+
+      '</div>'+
+      '<div id="wet3-fz-yo" class="wet3-fz-card" style="display:none"></div>'+
+      '<div id="wet3-pill-yo">'+
+        '<div style="width:36px;height:36px;border-radius:10px;background:#dcfce7;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+
+          '<span class="sym symf" style="font-size:20px;color:#15803d">delivery_dining</span></div>'+
+        '<div><div id="wet3-pill-yo-val"></div><div id="wet3-pill-yo-sub"></div></div>'+
+      '</div>'+
+      '<div class="wet3-nota"><span class="sym" style="font-size:14px;color:#ea580c;flex-shrink:0;margin-top:1px">info</span>'+
+        '<span>El domi te muestra la factura real antes del cobro. <strong>T\u00fa apruebas.</strong></span></div>'+
+    '</div>'+
+    /* PANEL TERCERO */
+    '<div id="wet3-panel-tercero" style="display:none">'+
+      '<div class="wet3-ruta-card">'+
+        '<div class="wet3-ruta-header">'+
+          '<span class="sym symf" style="font-size:18px;color:#fff">alt_route</span>'+
+          '<span class="wet3-ruta-header-txt">Ruta del domicilio</span></div>'+
+        '<div class="wet3-ruta-body"><div class="wet3-ruta-line">'+
+          /* Origen */
+          '<div class="wet3-pin-row">'+
+            '<div class="wet3-pin-col"><div class="wet3-pin-dot origen">A</div><div class="wet3-pin-line"></div></div>'+
+            '<div class="wet3-field-col">'+
+              '<label class="wet3-label">Barrio de la farmacia *</label>'+
+              '<div class="wet3-field-wrap">'+
+                '<span class="wet3-inp-icon sym symf" style="color:#003f87">store</span>'+
+                '<input id="wet3-inp-origen" class="wet3-inp" type="text" placeholder="\u00bfDesde d\u00f3nde sale?" autocomplete="off"'+
+                  ' oninput="WET3.buscarOrigen(this.value)"'+
+                  ' onblur="setTimeout(function(){WET3.cerrar(\'wet3-drop-origen\')},180)"/>'+
+                '<div id="wet3-drop-origen" class="wet3-drop"></div>'+
+              '</div>'+
+              '<div id="wet3-fz-origen" class="wet3-fz-card" style="display:none"></div>'+
+              '<div class="wet3-campo-badge origen" id="wet3-badge-origen">'+
+                '<span class="sym symf" style="font-size:13px">local_shipping</span>'+
+                '<span id="wet3-badge-origen-val"></span>'+
+                '<span style="font-weight:500;opacity:.7">tarifa origen</span></div>'+
+            '</div>'+
+          '</div>'+
+          /* Destino */
+          '<div class="wet3-pin-row">'+
+            '<div class="wet3-pin-col"><div class="wet3-pin-dot destino">B</div></div>'+
+            '<div class="wet3-field-col" style="padding-bottom:0">'+
+              '<label class="wet3-label">Barrio de destino *</label>'+
+              '<div class="wet3-field-wrap">'+
+                '<span class="wet3-inp-icon sym symf" style="color:#15803d">pin_drop</span>'+
+                '<input id="wet3-inp-destino" class="wet3-inp" type="text" placeholder="\u00bfD\u00f3nde llega el pedido?" autocomplete="off"'+
+                  ' oninput="WET3.buscarDestino(this.value)"'+
+                  ' onblur="setTimeout(function(){WET3.cerrar(\'wet3-drop-destino\')},180)"/>'+
+                '<div id="wet3-drop-destino" class="wet3-drop"></div>'+
+              '</div>'+
+              '<div id="wet3-fz-destino" class="wet3-fz-card" style="display:none"></div>'+
+              '<div class="wet3-campo-badge destino" id="wet3-badge-destino">'+
+                '<span class="sym symf" style="font-size:13px">flag</span>'+
+                '<span id="wet3-badge-destino-val"></span>'+
+                '<span style="font-weight:500;opacity:.7">tarifa destino</span></div>'+
+            '</div>'+
+          '</div>'+
+        '</div></div>'+
+      '</div>'+
+      /* Duel */
+      '<div id="wet3-duel">'+
+        '<div class="wet3-duel-header"><span class="sym symf" style="font-size:13px;color:#f59e0b">bolt</span>Se cobra la tarifa m\u00e1s alta</div>'+
+        '<div class="wet3-duel-body">'+
+          '<div class="wet3-vs-row">'+
+            '<div class="wet3-vs-card lado-a" id="wet3-vs-a">'+
+              '<div class="wet3-vs-label" style="color:#1d4ed8">Farmacia</div>'+
+              '<div class="wet3-vs-precio" id="wet3-vs-a-precio" style="color:#1d4ed8">\u2014</div>'+
+              '<div class="wet3-vs-barrio" id="wet3-vs-a-barrio" style="color:#1d4ed8"></div>'+
+              '<div class="wet3-vs-km" id="wet3-vs-a-km"></div></div>'+
+            '<div class="wet3-vs-sep">vs</div>'+
+            '<div class="wet3-vs-card lado-b" id="wet3-vs-b">'+
+              '<div class="wet3-vs-label" style="color:#15803d">Destino</div>'+
+              '<div class="wet3-vs-precio" id="wet3-vs-b-precio" style="color:#15803d">\u2014</div>'+
+              '<div class="wet3-vs-barrio" id="wet3-vs-b-barrio" style="color:#15803d"></div>'+
+              '<div class="wet3-vs-km" id="wet3-vs-b-km"></div></div>'+
+          '</div>'+
+          '<div class="wet3-winner-badge">'+
+            '<span class="wet3-winner-ico sym symf">emoji_events</span>'+
+            '<div><div class="wet3-winner-lbl">Valor del domicilio</div>'+
+            '<div class="wet3-winner-val" id="wet3-winner-val">\u2014</div>'+
+            '<div class="wet3-winner-hint" id="wet3-winner-hint">Completa ambos campos</div></div>'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+      /* Destinatario */
+      '<div class="wet3-dest-card">'+
+        '<div class="wet3-dest-title"><span class="sym symf" style="font-size:13px;color:#6b7280">person</span>\u00bfQui\u00e9n recibe el pedido?</div>'+
+        '<div class="wet3-dest-grid">'+
+          '<div><label class="wet3-label">Nombre *</label>'+
+            '<input id="wet3-dest-nombre" class="wet3-dest-inp" type="text" placeholder="Nombre completo" oninput="WET3.dest(\'nombre\',this.value)"/></div>'+
+          '<div><label class="wet3-label">Tel\u00e9fono</label>'+
+            '<input id="wet3-dest-tel" class="wet3-dest-inp" type="tel" placeholder="3XX XXX XXXX" oninput="WET3.dest(\'tel\',this.value)"/></div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="wet3-nota"><span class="sym" style="font-size:14px;color:#ea580c;flex-shrink:0;margin-top:1px">info</span>'+
+        '<span>Se cobra el domicilio m\u00e1s alto para cubrir el recorrido completo. <strong>T\u00fa apruebas antes del cobro.</strong></span></div>'+
+    '</div>';
+    return r;
   }
 
-  /* ─── PATCH coCapturarGPS — autoselect barrio tras GPS ──────── */
-  function _patchGPS() {
-    var _orig = W.coCapturarGPS;
-    if (typeof _orig !== 'function') return;
+  /* ─── INJECT + API + INIT ─────────────────────────────────────── */
+  function inject(){ if (document.getElementById('wet3-root')) return;
+    var s1=document.getElementById('co-s1'); if (!s1) return; s1.appendChild(buildHTML()); }
 
-    W.coCapturarGPS = function () {
-      _orig.apply(this, arguments);
-
-      /* Observar cambio en co-loc-title (indica que el GPS terminó) */
-      var el = document.getElementById('co-loc-title');
-      if (!el) return;
-      var obs = new MutationObserver(function () {
-        var barrioGPS = W.coBarrio || '';
-        if (!barrioGPS || _sel.nombre) return;
-        var nq = _norm(barrioGPS);
-        for (var i = 0; i < WFB_BARRIOS.length; i++) {
-          if (_norm(WFB_BARRIOS[i][0]).indexOf(nq) !== -1 ||
-              nq.indexOf(_norm(WFB_BARRIOS[i][0])) !== -1) {
-            _sel_barrio(WFB_BARRIOS[i][0], WFB_BARRIOS[i][1]);
-            obs.disconnect();
-            return;
-          }
-        }
-      });
-      obs.observe(el, { childList: true, characterData: true, subtree: true });
-    };
-  }
-
-  /* ─── API PÚBLICA ─────────────────────────────────────────────── */
-  W.WFB_CO = {
-    buscar: _buscar,
-    sel:    _sel_barrio,
-    cerrar: _cerrar,
-    estado: function () { return { nombre: _sel.nombre, tarifa: _sel.tarifa }; },
+  W.WET3={
+    modo:setModo,
+    buscarYo:function(v){buscar(v,'wet3-drop-yo','yo');},
+    buscarOrigen:function(v){buscar(v,'wet3-drop-origen','origen');},
+    buscarDestino:function(v){buscar(v,'wet3-drop-destino','destino');},
+    cerrar:cerrarDrop,selYo:selYo,selOrigen:selOrigen,selDestino:selDestino,
+    calcularFZ:calcularFueraZona,
+    dest:function(k,v){ ST.destinatario[k]=v; },
+    estado:function(){ return ST; },
   };
 
-  /* ─── INIT ────────────────────────────────────────────────────── */
-  function _init() {
-    _css();
-    _patchCoNext();
-    _patchAbrirCheckout();
-    _patchGPS();
-
-    /* Inyectar el bloque en Step 1 cuando el DOM esté listo */
-    var s1 = document.getElementById('co-s1');
-    if (s1) {
-      _inject();
-    } else {
-      /* Si co-s1 aún no existe, esperar */
-      var obs = new MutationObserver(function () {
-        if (document.getElementById('co-s1')) { obs.disconnect(); _inject(); }
-      });
-      obs.observe(document.body, { childList: true, subtree: true });
+  function init(){
+    injectCSS(); patchCoNext();
+    var s1=document.getElementById('co-s1');
+    if (s1){ inject(); } else {
+      var obs=new MutationObserver(function(){ if (document.getElementById('co-s1')){ obs.disconnect(); inject(); } });
+      obs.observe(document.body,{childList:true,subtree:true});
     }
-
-    console.log('[WIL] ✅ wil-farmacia-barrio-checkout.js — barrio en checkout activo');
+    console.log('[WIL] ✅ wil-farmacia-envio-tercero.js — fuera de zona OSRM activo');
   }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', _init);
-  } else {
-    setTimeout(_init, 0);
-  }
+  if (document.readyState==='loading'){ document.addEventListener('DOMContentLoaded',init); }
+  else { setTimeout(init,0); }
 
 }(window));
-  
-
 </script>
 
 <!-- ── POPUP CHAT FARMACIA ── -->
