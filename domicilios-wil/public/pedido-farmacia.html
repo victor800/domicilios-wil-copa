@@ -3674,91 +3674,688 @@ function abrirPopupSheet(key){
   }, 400);
 
 })();
-// ── CHAT FARMACIA ──
-var _wcNombre = '', _wcFase = 'nombre', _wcTiendaChat = '';
+// ══════════════════════════════════════════════
+//  CHAT FARMACIA v3  —  con carrito integrado
+// ══════════════════════════════════════════════
 
-function abrirWAFarmacia() {
-  _wcTiendaChat = tienda;
-  var cfg = {
-    expertos: { nombre:'Farma Expertos',    numero:'573163090049' },
-    central:  { nombre:'Droguería Central', numero:'573163090049' }
-  };
-  window._wcCFG = cfg[_wcTiendaChat];
-  document.getElementById('wc-farm-name').textContent = window._wcCFG.nombre;
-  document.getElementById('wil-msgs').innerHTML = '<div style="text-align:center"><span style="background:#dde6ec;color:#6b7280;font-size:9px;font-weight:700;padding:2px 12px;border-radius:20px">Hoy</span></div>';
-  document.getElementById('wc-opts').style.display = 'none';
-  document.getElementById('wc-wa-footer').style.display = 'none';
-  document.getElementById('wil-input').value = '';
-  _wcNombre = localStorage.getItem('wil_nombre_cliente') || '';
-  document.getElementById('wil-chat-ov').style.display = 'flex';
-  document.body.style.overflow = 'hidden';
+var _wcNombre     = '';
+var _wcFase       = 'saludo';
+var _wcTiendaChat = '';
+var _wcIntencion  = '';
+var _wcMedNombre  = '';
 
-  if (_wcNombre) {
-    _wcFase = 'chat';
-    wcMsgFarm(wcSaludo() + ' *' + _wcNombre + '*! 😊 Bienvenido/a a *' + window._wcCFG.nombre + '*. ¿En qué te puedo ayudar hoy?');
-    setTimeout(function(){
-      document.getElementById('wc-wa-footer').style.display = 'block';
-      wcMostrarOpts(['💊 Necesito un medicamento','🛒 Quiero hacer un pedido','💰 Consultar un precio','📦 Ver disponibilidad']);
-    }, 1000);
-  } else {
-    _wcFase = 'nombre';
-    wcMsgFarm(wcSaludo() + '! 👋 Bienvenido/a a *' + window._wcCFG.nombre + '*. Con gusto te ayudo. ¿Con quién tengo el gusto?');
-  }
+/* ── Carrito ── */
+var _wcCarrito = [];   // [{desc, lab, precio, precioUnit, qty}]
 
-  setTimeout(function(){ document.getElementById('wil-input').focus(); }, 400);
+/* ── URLs de ubicación por tienda ── */
+var _wcMapas = {
+  expertos: 'https://maps.app.goo.gl/m6rgrj5v7MigYeaW8',
+  central:  'https://maps.app.goo.gl/CWPcKwYThJBxToQL7'
+};
+
+/* ── Google Sheets via gviz ── */
+var _wcSheetID  = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+var _wcGVizBase = 'https://docs.google.com/spreadsheets/d/' + _wcSheetID + '/gviz/tq?tqx=out:json&sheet=';
+
+function wcSheetName() {
+  return _wcTiendaChat === 'expertos' ? 'STOCK_DROGUERIA_EXPERTOS' : 'STOCK_DROGUERIA_CENTRAL';
 }
+
+/* ── Animación pulso (una sola vez) ── */
+(function () {
+  if (document.getElementById('wc-anim')) return;
+  var s = document.createElement('style');
+  s.id = 'wc-anim';
+  s.textContent =
+    '@keyframes wcPulso{'
+    + '0%{transform:translate(-50%,-50%) scale(1);opacity:.7}'
+    + '70%{transform:translate(-50%,-50%) scale(2.2);opacity:0}'
+    + '100%{transform:translate(-50%,-50%) scale(1);opacity:0}'
+    + '}'
+    + '@keyframes msgIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}'
+    + '@keyframes slideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}';
+  document.head.appendChild(s);
+})();
 
 /* ── Saludo según hora ── */
 function wcSaludo() {
   var h = new Date().getHours();
-  return h >= 5 && h < 12 ? '¡Buenos días'
-       : h >= 12 && h < 18 ? '¡Buenas tardes'
-       : '¡Buenas noches';
+  if (h >= 5  && h < 12) return 'Buenos días';
+  if (h >= 12 && h < 18) return 'Buenas tardes';
+  return 'Buenas noches';
 }
 
-function wilCerrarChat() {
-  document.getElementById('wil-chat-ov').style.display = 'none';
-  document.body.style.overflow = '';
+/* ── Farmacia abierta ── */
+function wcEstaAbierto() {
+  return true;
+  /*
+  var d = new Date(), min = d.getHours() * 60 + d.getMinutes();
+  return min >= 420 && min < 1290;
+  */
 }
 
-function wcMsgFarm(txt) {
-  var el = document.getElementById('wc-typing');
-  el.style.display = 'flex';
-  document.getElementById('wil-msgs').scrollTop = 99999;
-  setTimeout(function(){
-    el.style.display = 'none';
-    var msgs = document.getElementById('wil-msgs');
-    var d = document.createElement('div');
-    d.style.cssText = 'display:flex;align-items:flex-end;gap:6px;animation:msgIn .22s ease';
-    d.innerHTML =
-      '<div style="width:28px;height:28px;border-radius:50%;background:#003f87;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">💊</div>'
-      + '<div style="max-width:75%;padding:9px 13px 7px;border-radius:16px 16px 16px 4px;background:#fff;color:#111827;font-size:13px;font-weight:500;line-height:1.5;box-shadow:0 1px 4px rgba(0,0,0,.07)">'
-      + wcFmt(txt)
-      + '<div style="font-size:9px;color:rgba(0,0,0,.35);margin-top:3px;text-align:right">' + wcHora() + '</div>'
-      + '</div>';
-    msgs.appendChild(d);
-    msgs.scrollTop = msgs.scrollHeight;
-  }, 900 + Math.random() * 300);
+/* ── Valida que sea un nombre real ── */
+function wcEsNombre(txt) {
+  return (txt || '').trim().length >= 2 &&
+    !/^(hola|buenas?|hey|saludos?|buenos|buen[ao]s|hi|hello|ok|si|no|nada|bien|mal|gracias)$/i.test((txt || '').trim());
 }
 
-function wcMsgUser(txt) {
+/* ── Hora formateada ── */
+function wcHora() {
+  return new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+/* ── Formateo markdown básico ── */
+function wcFmt(txt) {
+  return txt
+    .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
+    .replace(/_(.*?)_/g,   '<em style="color:#6b7280;font-style:normal;font-size:11px">$1</em>')
+    .replace(/\n/g, '<br>');
+}
+// ══════════════════════════════════════════════
+//  CHAT FARMACIA v4
+//  - Carrito flotante dentro del chat
+//  - Prioridad: Ofertas → Nuevo_Producto → Stock
+//  - Cards con imagen cuando hay URL
+//  - Pedido se guarda en Sheets (no WhatsApp)
+//  - Captura domicilio y datos antes de enviar
+//  - Sin "hola" redundante — nombre siempre capturado
+// ══════════════════════════════════════════════
+
+var _wcNombre     = '';
+var _wcFase       = 'saludo';
+var _wcTiendaChat = '';
+var _wcIntencion  = '';
+var _wcMedNombre  = '';
+var _wcCarrito    = [];  // [{desc,lab,precio,imagen,qty}]
+
+/* ── Sheets con pedidos (hoja "Pedidos") ── */
+var _wcSheetID      = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+var _wcGVizBase     = 'https://docs.google.com/spreadsheets/d/' + _wcSheetID + '/gviz/tq?tqx=out:json&sheet=';
+var _wcSheetAppURL  = 'https://script.google.com/macros/s/TU_SCRIPT_ID_AQUI/exec'; // ← reemplazar con tu Web App URL
+
+/* ── Hojas de stock ── */
+function wcSheetStock()   { return _wcTiendaChat === 'expertos' ? 'STOCK_DROGUERIA_EXPERTOS' : 'STOCK_DROGUERIA_CENTRAL'; }
+var _wcSheetOfertas       = 'Ofertas';
+var _wcSheetNuevo         = 'Nuevo_Producto';
+
+/* ── URLs mapa ── */
+var _wcMapas = {
+  expertos: 'https://maps.app.goo.gl/m6rgrj5v7MigYeaW8',
+  central:  'https://maps.app.goo.gl/CWPcKwYThJBxToQL7'
+};
+
+/* ── Inyectar estilos una sola vez ── */
+(function () {
+  if (document.getElementById('wc-anim')) return;
+  var s = document.createElement('style');
+  s.id = 'wc-anim';
+  s.textContent =
+    '@keyframes wcPulso{0%{transform:translate(-50%,-50%) scale(1);opacity:.7}70%{transform:translate(-50%,-50%) scale(2.2);opacity:0}100%{transform:translate(-50%,-50%) scale(1);opacity:0}}'
+    + '@keyframes msgIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}'
+    + '@keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}'
+    + '@keyframes wcCartSlide{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}'
+   + '#wil-chat-ov{position:relative!important;display:flex!important;align-items:center!important;justify-content:center!important}'
+
+    + '#wc-fab-carrito{position:absolute;bottom:68px;right:12px;z-index:400;pointer-events:auto}'
+    + '#wc-fab-carrito button{background:#003f87;color:#fff;border:none;border-radius:99px;padding:9px 16px 9px 13px;font-size:12.5px;font-weight:800;cursor:pointer;font-family:inherit;box-shadow:0 4px 18px rgba(0,63,135,.5);display:flex;align-items:center;gap:7px;white-space:nowrap;transition:transform .12s,box-shadow .12s}'
+    + '#wc-fab-carrito button:hover{box-shadow:0 6px 22px rgba(0,63,135,.6)}'
+    + '#wc-fab-carrito button:active{transform:scale(.95)}'
+    + '#wc-fab-badge{background:#ef4444;color:#fff;border-radius:99px;font-size:10px;font-weight:900;padding:1px 7px;min-width:20px;text-align:center;line-height:1.6}'
+    + '#wc-carrito-panel{position:absolute;bottom:116px;right:12px;left:12px;z-index:500;animation:wcCartSlide .2s ease;background:#fff;border-radius:18px;box-shadow:0 12px 40px rgba(0,0,0,.22);overflow:hidden;display:none;flex-direction:column;max-height:72vh;border:1.5px solid rgba(0,63,135,.12)}'
+    + '#wc-carrito-panel.abierto{display:flex}'
+    + '#wc-carrito-panel table{width:100%;border-collapse:collapse}'
+    + '#wc-carrito-panel thead tr{background:#f8fafc}'
+    + '#wc-carrito-panel thead th{padding:7px 8px;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px}'
+    + '#wc-carrito-panel tbody tr{border-bottom:1px solid #f3f4f6}'
+    + '#wc-carrito-panel tbody td{padding:9px 8px;vertical-align:middle}';
+  document.head.appendChild(s);
+})();
+
+/* ── Helpers ── */
+function wcSaludo() {
+  var h = new Date().getHours();
+  if (h >= 5  && h < 12) return 'Buenos días';
+  if (h >= 12 && h < 18) return 'Buenas tardes';
+  return 'Buenas noches';
+}
+function wcEstaAbierto() {
+  return true;
+  /* var d=new Date(),min=d.getHours()*60+d.getMinutes(); return min>=420&&min<1290; */
+}
+function wcEsNombre(txt) {
+  return (txt || '').trim().length >= 2 &&
+    !/^(hola|buenas?|hey|saludos?|buenos|buen[ao]s|hi|hello|ok|si|no|nada|bien|mal|gracias)$/i.test((txt || '').trim());
+}
+function wcHora() {
+  return new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true});
+}
+function wcFmt(txt) {
+  return txt
+    .replace(/\*(.*?)\*/g,'<strong>$1</strong>')
+    .replace(/_(.*?)_/g,'<em style="color:#6b7280;font-style:normal;font-size:11px">$1</em>')
+    .replace(/\n/g,'<br>');
+}
+function norm(s) {
+  return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+}
+
+/* ══════════════════════════════════════════════
+   ABRIR CHAT
+══════════════════════════════════════════════ */
+function abrirWAFarmacia() {
+  _wcTiendaChat = tienda;
+  var cfgs = {
+    expertos: { nombre:'Farma Expertos',    numero:'573163090049' },
+    central:  { nombre:'Droguería Central', numero:'573163090049' }
+  };
+  window._wcCFG = cfgs[_wcTiendaChat];
+
+  _wcCarrito   = [];
+  _wcIntencion = '';
+  _wcMedNombre = '';
+
+  document.getElementById('wc-farm-name').textContent = window._wcCFG.nombre;
+  document.getElementById('wil-msgs').innerHTML =
+    '<div style="text-align:center;margin-bottom:8px"><span style="background:#dde6ec;color:#6b7280;font-size:9px;font-weight:700;padding:2px 12px;border-radius:20px">Hoy</span></div>';
+  document.getElementById('wc-opts').style.display      = 'none';
+  document.getElementById('wc-wa-footer').style.display = 'none';
+  document.getElementById('wil-input').value            = '';
+
+  // FAB carrito
+  wcInyectarFAB();
+  wcActualizarFAB();
+
+  // Carrito panel
+  wcInyectarPanelCarrito();
+
+  // Recuperar nombre
+  var guardado = localStorage.getItem('wil_nombre_cliente') || '';
+  _wcNombre = wcEsNombre(guardado) ? guardado : '';
+  if (!_wcNombre) localStorage.removeItem('wil_nombre_cliente');
+
+  document.getElementById('wil-chat-ov').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+
+  if (!wcEstaAbierto()) {
+    _wcFase = 'cerrado';
+    wcMsgFarm(wcSaludo() + ', gracias por comunicarte con *' + window._wcCFG.nombre + '*.\n\n⏰ Estamos fuera de horario.\n\nAtendemos de *7:00 a.m.* a *9:30 p.m.* todos los días.');
+    return;
+  }
+
+  _wcFase = 'saludo';
+  wcMsgFarm(wcSaludo() + ', bienvenido/a a *' + window._wcCFG.nombre + '*. Aquí tienes nuestra ubicación:');
+  setTimeout(wcMsgMapa, 1100);
+
+  if (_wcNombre) {
+    _wcFase = 'chat';
+    setTimeout(function(){
+      wcMsgFarm('😊 ¿En qué te puedo ayudar hoy?');
+    }, 2400);
+    setTimeout(function(){
+      document.getElementById('wc-wa-footer').style.display = 'block';
+      wcMostrarOpciones();
+    }, 3600);
+  } else {
+    _wcFase = 'nombre';
+    setTimeout(function(){
+      wcMsgFarm('¿Con quién tengo el gusto de hablar hoy? 😊');
+    }, 2400);
+  }
+
+  setTimeout(function(){ document.getElementById('wil-input').focus(); }, 500);
+}
+
+/* ══════════════════════════════════════════════
+   FAB CARRITO FLOTANTE
+══════════════════════════════════════════════ */
+function wcInyectarFAB() {
+  if (document.getElementById('wc-fab-carrito')) return;
+  var overlay = document.getElementById('wil-chat-ov');
+  var fab = document.createElement('div');
+  fab.id = 'wc-fab-carrito';
+  fab.innerHTML = '<button onclick="wcToggleCarrito()">🛒 Carrito <span id="wc-fab-badge">0</span></button>';
+  overlay.appendChild(fab);
+}
+
+function wcActualizarFAB() {
+  var badge = document.getElementById('wc-fab-badge');
+  if (!badge) return;
+  var total = _wcCarrito.reduce(function(s,x){return s+x.qty;},0);
+  badge.textContent = total;
+  badge.style.display = total === 0 ? 'none' : 'inline-block';
+}
+
+function wcToggleCarrito() {
+  var panel = document.getElementById('wc-carrito-panel');
+  if (!panel) return;
+  if (panel.classList.contains('abierto')) {
+    panel.classList.remove('abierto');
+  } else {
+    wcRenderCarritoPanel();
+    panel.classList.add('abierto');
+  }
+}
+
+/* ══════════════════════════════════════════════
+   PANEL CARRITO (flotante dentro del chat overlay)
+══════════════════════════════════════════════ */
+function wcInyectarPanelCarrito() {
+  var viejo = document.getElementById('wc-carrito-panel');
+  if (viejo) viejo.remove();
+  var overlay = document.getElementById('wil-chat-ov');
+  var panel = document.createElement('div');
+  panel.id = 'wc-carrito-panel';
+  overlay.appendChild(panel);
+}
+
+function wcRenderCarritoPanel() {
+  var panel = document.getElementById('wc-carrito-panel');
+  if (!panel) return;
+  var cfg   = window._wcCFG;
+  var total = 0;
+
+  var filas = _wcCarrito.length === 0
+    ? '<tr><td colspan="4" style="text-align:center;padding:22px 12px;color:#9ca3af;font-size:12px;font-style:italic">Tu carrito está vacío</td></tr>'
+    : _wcCarrito.map(function(item, i){
+        var sub = item.precio != null ? item.precio * item.qty : null;
+        if (sub) total += sub;
+        var imgTag = item.imagen
+          ? '<img src="' + item.imagen + '" style="width:36px;height:36px;object-fit:cover;border-radius:8px;margin-right:8px;flex-shrink:0;vertical-align:middle" onerror="this.style.display=\'none\'">'
+          : '';
+        return '<tr>'
+          + '<td style="padding:10px 8px">'
+            + '<div style="display:flex;align-items:center">'
+              + imgTag
+              + '<div>'
+                + '<div style="font-size:11.5px;font-weight:700;color:#111827;line-height:1.3">' + item.desc + '</div>'
+                + '<div style="font-size:10px;color:#9ca3af;margin-top:1px">' + item.lab + '</div>'
+              + '</div>'
+            + '</div>'
+          + '</td>'
+          + '<td style="font-size:11.5px;color:#6b7280;text-align:center;white-space:nowrap">' + (item.precio != null ? '$' + item.precio.toLocaleString('es-CO') : '—') + '</td>'
+          + '<td style="text-align:center">'
+            + '<div style="display:inline-flex;align-items:center;gap:4px;background:#f3f4f6;border-radius:99px;padding:3px 4px">'
+              + '<button onclick="wcQty(' + i + ',-1)" style="width:22px;height:22px;border-radius:50%;border:none;background:#fff;font-size:14px;font-weight:700;cursor:pointer;color:#374151;font-family:inherit;line-height:1;box-shadow:0 1px 3px rgba(0,0,0,.1)">−</button>'
+              + '<span style="font-size:12px;font-weight:800;min-width:18px;text-align:center;color:#111827">' + item.qty + '</span>'
+              + '<button onclick="wcQty(' + i + ',1)" style="width:22px;height:22px;border-radius:50%;border:none;background:#003f87;font-size:14px;font-weight:700;cursor:pointer;color:#fff;font-family:inherit;line-height:1">+</button>'
+            + '</div>'
+          + '</td>'
+          + '<td style="font-size:12px;font-weight:800;color:#003f87;text-align:right;padding-right:10px;white-space:nowrap">' + (sub != null ? '$' + sub.toLocaleString('es-CO') : '—') + '</td>'
+          + '</tr>';
+      }).join('');
+
+  var totalStr = total > 0 ? '$' + total.toLocaleString('es-CO') : '—';
+
+  panel.innerHTML =
+    /* ── Cabecera azul ── */
+    '<div style="background:linear-gradient(135deg,#003f87,#0055b3);padding:12px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">'
+      + '<div style="display:flex;align-items:center;gap:8px">'
+        + '<span style="font-size:16px">🛒</span>'
+        + '<div>'
+          + '<div style="color:#fff;font-size:13px;font-weight:800;line-height:1.2">' + cfg.nombre + '</div>'
+          + '<div style="color:rgba(255,255,255,.65);font-size:10.5px">'
+            + _wcCarrito.reduce(function(s,x){return s+x.qty;},0) + ' producto(s)'
+          + '</div>'
+        + '</div>'
+      + '</div>'
+      + '<button onclick="wcToggleCarrito()" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:28px;height:28px;border-radius:50%;font-size:14px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center">✕</button>'
+    + '</div>'
+    /* ── Tabla ── */
+    + '<div style="overflow-y:auto;flex:1;overscroll-behavior:contain">'
+      + '<table><thead><tr>'
+        + '<th style="text-align:left;padding-left:8px">Producto</th>'
+        + '<th>Precio</th>'
+        + '<th>Cant.</th>'
+        + '<th style="text-align:right;padding-right:10px">Total</th>'
+      + '</tr></thead><tbody>' + filas + '</tbody></table>'
+    + '</div>'
+    /* ── Pie ── */
+    + '<div style="padding:12px 14px;border-top:1.5px solid #f0f0f0;flex-shrink:0;background:#fafafa">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px">'
+        + '<span style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.6px">Total</span>'
+        + '<span style="font-size:17px;font-weight:900;color:#003f87">' + totalStr + '</span>'
+      + '</div>'
+      + (_wcCarrito.length > 0
+        ? '<button onclick="wcIniciarCheckout()" style="width:100%;background:#003f87;color:#fff;border:none;border-radius:12px;padding:11px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;margin-bottom:8px;box-shadow:0 3px 10px rgba(0,63,135,.3)">✅ Confirmar pedido</button>'
+          + '<div style="display:flex;gap:7px">'
+            + '<button onclick="wcToggleCarrito();wcSelOpt(\'💊 Buscar medicamento / producto\')" style="flex:1;background:#fff;color:#003f87;border:1.5px solid #003f87;border-radius:10px;padding:9px 6px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit">+ Agregar</button>'
+            + '<button onclick="wcVaciarCarrito()" style="flex:1;background:#fff;color:#ef4444;border:1.5px solid #fca5a5;border-radius:10px;padding:9px 6px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit">🗑 Vaciar</button>'
+          + '</div>'
+        : '<button onclick="wcToggleCarrito();wcSelOpt(\'💊 Buscar medicamento / producto\')" style="width:100%;background:#003f87;color:#fff;border:none;border-radius:12px;padding:11px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">💊 Buscar productos</button>'
+      )
+    + '</div>';
+}
+
+function wcQty(idx, delta) {
+  if (!_wcCarrito[idx]) return;
+  _wcCarrito[idx].qty += delta;
+  if (_wcCarrito[idx].qty <= 0) _wcCarrito.splice(idx, 1);
+  wcActualizarFAB();
+  wcRenderCarritoPanel();
+}
+
+function wcVaciarCarrito() {
+  _wcCarrito = [];
+  wcActualizarFAB();
+  wcRenderCarritoPanel();
+  var panel = document.getElementById('wc-carrito-panel');
+  if (panel) panel.classList.remove('abierto');
+  wcMsgFarm('Carrito vaciado 🗑 ¿En qué más te ayudo, *' + _wcNombre + '*?');
+  setTimeout(wcMostrarOpciones, 1200);
+}
+
+/* ══════════════════════════════════════════════
+   CHECKOUT — captura dirección y datos → guarda en Sheets
+══════════════════════════════════════════════ */
+function wcIniciarCheckout() {
+  var panel = document.getElementById('wc-carrito-panel');
+  if (panel) panel.classList.remove('abierto');
+  _wcIntencion = 'checkout_direccion';
+  wcMsgFarm('¡Perfecto, *' + _wcNombre + '*! 📦 Para completar tu pedido necesito algunos datos.\n\n¿Cuál es tu *dirección de entrega*? _(barrio, calle, número)_');
+}
+
+/* ── Datos del pedido en construcción ── */
+var _wcPedidoDatos = {};
+
+function wcGuardarPedidoSheets() {
+  var cfg    = window._wcCFG;
+  var fecha  = new Date().toLocaleString('es-CO');
+  var items  = _wcCarrito.map(function(x){
+    return x.qty + 'x ' + x.desc + ' (' + x.lab + ')' + (x.precio ? ' $' + (x.precio*x.qty).toLocaleString('es-CO') : '');
+  }).join(' | ');
+  var total  = _wcCarrito.reduce(function(s,x){ return s + (x.precio ? x.precio*x.qty : 0); }, 0);
+
+  var payload = {
+    fecha:     fecha,
+    tienda:    cfg.nombre,
+    cliente:   _wcNombre,
+    telefono:  _wcPedidoDatos.tel   || '',
+    direccion: _wcPedidoDatos.dir   || '',
+    productos: items,
+    total:     total > 0 ? '$' + total.toLocaleString('es-CO') : 'Por confirmar',
+    domicilio: _wcPedidoDatos.domi  || '',
+    notas:     _wcPedidoDatos.notas || ''
+  };
+
+  /* Google Apps Script Web App — recibe POST y escribe en Sheets */
+  fetch(_wcSheetAppURL, {
+    method:  'POST',
+    mode:    'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(payload)
+  }).catch(function(e){ console.warn('[WC pedido]', e); });
+
+  wcMsgFarm(
+    '¡Pedido registrado con éxito, *' + _wcNombre + '*! 🎉\n\n'
+    + '📦 *Resumen:*\n' + _wcCarrito.map(function(x,i){
+        return (i+1) + '. ' + x.desc + ' x' + x.qty
+          + (x.precio ? ' — $' + (x.precio*x.qty).toLocaleString('es-CO') : '');
+      }).join('\n')
+    + (total > 0 ? '\n\n*Total: $' + total.toLocaleString('es-CO') + '*' : '')
+    + '\n\n🛵 *Entrega en:* ' + _wcPedidoDatos.dir
+    + '\n📞 *Teléfono:* ' + _wcPedidoDatos.tel
+    + '\n\nEn breve un asesor confirmará tu pedido. ¡Gracias! 😊'
+  );
+
+  _wcCarrito      = [];
+  _wcPedidoDatos  = {};
+  _wcIntencion    = '';
+  wcActualizarFAB();
+  setTimeout(wcMostrarOpciones, 3000);
+}
+
+/* ══════════════════════════════════════════════
+   BÚSQUEDA PRIORIZADA: Ofertas → Nuevo_Producto → Stock
+══════════════════════════════════════════════ */
+function wcBuscarEnSheets(nombreMed, detalle) {
+  wcMsgFarm('Buscando *' + nombreMed + '* en nuestro catálogo... 🔍');
+
+  var busq    = norm(nombreMed);
+  var detNorm = detalle ? norm(detalle) : '';
+
+  function filtrar(rows, colDesc, colLab, colPrecio, colImagen) {
+    return rows.filter(function(row){
+      if (!row.c || !row.c[colDesc] || row.c[colDesc].v == null) return false;
+      var desc = norm(row.c[colDesc].v);
+      var lab  = norm(row.c[colLab] ? row.c[colLab].v : '');
+      if (!desc.includes(busq)) return false;
+      if (detNorm) return desc.includes(detNorm) || lab.includes(detNorm);
+      return true;
+    }).map(function(row){
+      return {
+        desc:    row.c[colDesc]   ? row.c[colDesc].v   : '—',
+        lab:     row.c[colLab]    ? row.c[colLab].v    : '—',
+        precio:  row.c[colPrecio] ? Number(row.c[colPrecio].v) : null,
+        imagen:  (colImagen != null && row.c[colImagen] && row.c[colImagen].v) ? row.c[colImagen].v : null
+      };
+    });
+  }
+
+  function fetchSheet(sheet) {
+    return fetch(_wcGVizBase + encodeURIComponent(sheet))
+      .then(function(r){ return r.text(); })
+      .then(function(raw){
+        var json = raw.replace(/^[^{]*/,'').replace(/\);\s*$/,'');
+        return JSON.parse(json).table.rows;
+      });
+  }
+
+  // 1. Ofertas: A=Producto B=Laboratorio C=Precio D,E,F,G... H=Imagen (col índice: A=0,B=1,C=2,H=7)
+  // 2. Nuevo_Producto: B=Nombre C=Lab D=Precio E=Descripcion I=Imagen (índices B=1,C=2,D=3,I=8)
+  // 3. Stock: A=Descripción B=Lab D=Precio (sin imagen)
+
+  fetchSheet(_wcSheetOfertas)
+    .then(function(rows){
+      var res = filtrar(rows, 0, 1, 2, 7);  // A,B,C,H
+      if (res.length > 0) return { src:'oferta', items: res };
+
+      return fetchSheet(_wcSheetNuevo).then(function(rows2){
+        var res2 = filtrar(rows2, 1, 2, 3, 8);  // B,C,D,I
+        if (res2.length > 0) return { src:'nuevo', items: res2 };
+
+        return fetchSheet(wcSheetStock()).then(function(rows3){
+          var res3 = filtrar(rows3, 0, 1, 3, null);  // A,B,D,sin imagen
+          return { src:'stock', items: res3 };
+        });
+      });
+    })
+    .then(function(result){
+      var items = result.items;
+      if (!items || items.length === 0) {
+        wcMsgFarm('😕 No encontré *' + nombreMed + '* en el catálogo de *' + window._wcCFG.nombre + '*.\n\n¿Quieres buscar con otro nombre?');
+        setTimeout(function(){
+          wcMostrarOpts(['🔍 Buscar otro producto','💬 Hablar con asesor','🔙 Volver al menú']);
+        }, 800);
+        return;
+      }
+
+      var msg = '';
+      if (result.src === 'oferta') {
+        msg = '🏷️ ¡*' + nombreMed + '* está en oferta! Mira el precio especial que tenemos para ti:';
+      } else if (result.src === 'nuevo') {
+        msg = '😊 Tenemos esto disponible para ti, *';
+      }
+      // Stock: sin mensaje previo, directo a cards
+      if (msg) {
+        wcMsgFarm(msg);
+        setTimeout(function(){ wcMostrarProductos(items.slice(0,8), Math.max(0, items.length-8)); }, 900);
+      } else {
+        wcMostrarProductos(items.slice(0,8), Math.max(0, items.length-8));
+      }
+    })
+    .catch(function(err){
+      console.error('[WC Sheets]', err);
+      wcMsgFarm('⚠️ Tuve un problema consultando el catálogo. ¿Te conecto con un asesor?');
+      setTimeout(function(){
+        wcMostrarOpts(['💬 Hablar con asesor','🔙 Volver al menú']);
+      }, 800);
+    });
+}
+
+/* ══════════════════════════════════════════════
+   TARJETAS DE PRODUCTO con imagen y botón agregar
+══════════════════════════════════════════════ */
+function wcMostrarProductos(productos, extras) {
   var msgs = document.getElementById('wil-msgs');
-  var d = document.createElement('div');
-  d.style.cssText = 'display:flex;flex-direction:row-reverse;align-items:flex-end;gap:6px;animation:msgIn .22s ease';
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;align-items:flex-start;gap:6px;animation:msgIn .22s ease;margin-bottom:6px';
+  wrap.id = 'wc-last-productos';
+  wrap.setAttribute('data-productos', JSON.stringify(productos));
+
+  var cards = productos.map(function(item, i){
+    var precioStr = item.precio != null ? '$' + item.precio.toLocaleString('es-CO') : 'Precio a confirmar';
+    var imgHTML   = item.imagen
+      ? '<div style="width:100%;height:90px;overflow:hidden;border-radius:10px 10px 0 0;background:#f3f4f6">'
+          + '<img src="' + item.imagen + '" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.style.display=\'none\'">'
+        + '</div>'
+      : '';
+    return '<div style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.09);animation:slideUp .22s ease ' + (i*0.07) + 's both;min-width:160px;max-width:200px;flex-shrink:0">'
+        + imgHTML
+        + '<div style="padding:10px">'
+          + '<div style="font-size:12px;font-weight:800;color:#111827;line-height:1.3;margin-bottom:2px">' + item.desc + '</div>'
+          + '<div style="font-size:10.5px;color:#6b7280;margin-bottom:8px">🏭 ' + item.lab + '</div>'
+          + '<div style="display:flex;align-items:center;justify-content:space-between;gap:4px">'
+            + '<span style="font-size:13px;font-weight:900;color:#003f87">' + precioStr + '</span>'
+            + '<button onclick="wcAgregar(' + i + ')" style="background:#003f87;color:#fff;border:none;border-radius:99px;padding:5px 11px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0" id="wc-btn-agregar-' + i + '">+ Agregar</button>'
+          + '</div>'
+        + '</div>'
+      + '</div>';
+  }).join('');
+
+  var extrasHTML = extras > 0
+    ? '<div style="font-size:11px;color:#9ca3af;text-align:center;padding:6px 0;font-style:italic">...y ' + extras + ' resultado(s) más. Afina la búsqueda.</div>'
+    : '';
+
+  wrap.innerHTML =
+    '<div style="width:28px;height:28px;border-radius:50%;background:#003f87;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;margin-top:4px">💊</div>'
+    + '<div style="max-width:calc(100% - 40px);overflow-x:auto">'
+      + '<div style="display:flex;gap:10px;padding-bottom:6px">' + cards + '</div>'
+      + extrasHTML
+    + '</div>';
+
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  setTimeout(function(){
+    wcMostrarOpts(['🔍 Buscar otro producto','🔙 Volver al menú']);
+  }, 400);
+}
+
+/* ══════════════════════════════════════════════
+   AGREGAR AL CARRITO
+══════════════════════════════════════════════ */
+function wcAgregar(idx) {
+  var wrap  = document.getElementById('wc-last-productos');
+  if (!wrap) return;
+  var lista = JSON.parse(wrap.getAttribute('data-productos') || '[]');
+  var item  = lista[idx];
+  if (!item) return;
+
+  var existe = _wcCarrito.find(function(x){ return x.desc === item.desc && x.lab === item.lab; });
+  if (existe) {
+    existe.qty++;
+  } else {
+    _wcCarrito.push({ desc:item.desc, lab:item.lab, precio:item.precio, imagen:item.imagen||null, qty:1 });
+  }
+
+  wcActualizarFAB();
+
+  var btn = document.getElementById('wc-btn-agregar-' + idx);
+  if (btn) {
+    btn.textContent  = '✓ Listo';
+    btn.style.background = '#059669';
+    setTimeout(function(){ btn.textContent = '+ Agregar'; btn.style.background = '#003f87'; }, 1400);
+  }
+
+  var total = _wcCarrito.reduce(function(s,x){return s+x.qty;},0);
+  wcMsgFarm('¡Listo! 🛒 *' + item.desc + '* agregado.\n\nTienes *' + total + ' producto(s)* en tu carrito.');
+}
+
+/* ══════════════════════════════════════════════
+   MAPA
+══════════════════════════════════════════════ */
+function wcMsgMapa() {
+  var cfg  = window._wcCFG;
+  var url  = _wcMapas[_wcTiendaChat] || '#';
+  var queries = { expertos:'Farma Expertos Medellín Antioquia', central:'Droguería Central Medellín Antioquia' };
+  var src  = 'https://maps.google.com/maps?q=' + encodeURIComponent(queries[_wcTiendaChat] || cfg.nombre) + '&z=17&output=embed';
+  var msgs = document.getElementById('wil-msgs');
+  var d    = document.createElement('div');
+  d.style.cssText = 'display:flex;align-items:flex-end;gap:6px;animation:msgIn .22s ease;margin-bottom:6px';
   d.innerHTML =
-    '<div style="max-width:75%;padding:9px 13px 7px;border-radius:16px 16px 4px 16px;background:#003f87;color:#fff;font-size:13px;font-weight:500;line-height:1.5">'
-    + wcFmt(txt)
-    + '<div style="font-size:9px;color:rgba(255,255,255,.6);margin-top:3px;text-align:right">' + wcHora() + ' ✓✓</div>'
+    '<div style="width:28px;height:28px;border-radius:50%;background:#003f87;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">💊</div>'
+    + '<div style="max-width:82%;border-radius:16px 16px 16px 4px;background:#fff;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.09)">'
+      + '<div style="position:relative;width:100%;height:190px;overflow:hidden">'
+        + '<iframe src="' + src + '" width="100%" height="100%" style="border:0;display:block;pointer-events:none" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>'
+        + '<a href="' + url + '" target="_blank" rel="noopener" style="position:absolute;inset:0;z-index:2" title="Abrir en Google Maps"></a>'
+        + '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-70%);z-index:3;pointer-events:none;display:flex;flex-direction:column;align-items:center">'
+          + '<div style="position:relative;width:46px;height:46px">'
+            + '<div style="position:absolute;top:50%;left:50%;width:46px;height:46px;border-radius:50%;background:rgba(0,63,135,.2);animation:wcPulso 1.8s ease-out infinite"></div>'
+            + '<div style="position:absolute;top:50%;left:50%;width:46px;height:46px;border-radius:50%;background:rgba(0,63,135,.13);animation:wcPulso 1.8s ease-out infinite .65s"></div>'
+            + '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:36px;height:36px;border-radius:50%;background:#003f87;display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 3px 12px rgba(0,63,135,.55)">💊</div>'
+          + '</div>'
+          + '<div style="width:0;height:0;margin-top:-3px;border-left:7px solid transparent;border-right:7px solid transparent;border-top:11px solid #003f87;filter:drop-shadow(0 2px 3px rgba(0,63,135,.35))"></div>'
+        + '</div>'
+      + '</div>'
+      + '<div style="padding:10px 13px 12px">'
+        + '<div style="font-size:12.5px;font-weight:800;color:#111827;margin-bottom:2px">' + cfg.nombre + '</div>'
+        + '<div style="font-size:11px;color:#6b7280;margin-bottom:9px">📍 Medellín, Antioquia &nbsp;·&nbsp; <span style="color:#003f87">Toca para abrir</span></div>'
+        + '<a href="' + url + '" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:6px;background:#003f87;color:#fff;font-size:12px;font-weight:700;padding:9px 14px;border-radius:9px;text-decoration:none">🗺️ Ver en Google Maps</a>'
+      + '</div>'
     + '</div>';
   msgs.appendChild(d);
   msgs.scrollTop = msgs.scrollHeight;
 }
 
+/* ══════════════════════════════════════════════
+   UI — burbujas, opciones, cierre
+══════════════════════════════════════════════ */
+function wcMsgFarm(txt) {
+  var el    = document.getElementById('wc-typing');
+  el.style.display = 'flex';
+  document.getElementById('wil-msgs').scrollTop = 99999;
+  var delay = Math.min(400 + txt.length * 14, 1800);
+  setTimeout(function(){
+    el.style.display = 'none';
+    var msgs = document.getElementById('wil-msgs');
+    var d    = document.createElement('div');
+    d.style.cssText = 'display:flex;align-items:flex-end;gap:6px;animation:msgIn .22s ease;margin-bottom:6px';
+    d.innerHTML =
+      '<div style="width:28px;height:28px;border-radius:50%;background:#003f87;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">💊</div>'
+      + '<div style="max-width:78%;padding:9px 13px 7px;border-radius:16px 16px 16px 4px;background:#fff;color:#111827;font-size:13px;font-weight:500;line-height:1.55;box-shadow:0 1px 4px rgba(0,0,0,.07)">'
+      + wcFmt(txt)
+      + '<div style="font-size:9px;color:rgba(0,0,0,.35);margin-top:4px;text-align:right">' + wcHora() + '</div>'
+      + '</div>';
+    msgs.appendChild(d);
+    msgs.scrollTop = msgs.scrollHeight;
+  }, delay);
+}
+
+function wcMsgUser(txt) {
+  var msgs = document.getElementById('wil-msgs');
+  var d    = document.createElement('div');
+  d.style.cssText = 'display:flex;flex-direction:row-reverse;align-items:flex-end;gap:6px;animation:msgIn .22s ease;margin-bottom:6px';
+  d.innerHTML =
+    '<div style="max-width:78%;padding:9px 13px 7px;border-radius:16px 16px 4px 16px;background:#003f87;color:#fff;font-size:13px;font-weight:500;line-height:1.55">'
+    + wcFmt(txt)
+    + '<div style="font-size:9px;color:rgba(255,255,255,.6);margin-top:4px;text-align:right">' + wcHora() + ' ✓✓</div>'
+    + '</div>';
+  msgs.appendChild(d);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function wcMostrarOpciones() {
+  wcMostrarOpts(['💊 Buscar medicamento / producto','🕐 Horarios de atención','📍 Nuestra ubicación','💬 Hablar con asesor']);
+}
+
 function wcMostrarOpts(ops) {
   var el = document.getElementById('wc-opts');
-  el.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;padding:6px 14px 10px;background:#f0f4f7';
+  el.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:8px 14px 12px;background:#f0f4f7';
+
+
   el.innerHTML = ops.map(function(o){
-    return '<button onclick="wcSelOpt(\'' + o + '\')" style="border:1.5px solid #003f87;background:#fff;color:#003f87;border-radius:99px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:\'Manrope\',sans-serif;white-space:nowrap">' + o + '</button>';
+    return '<button onclick="wcSelOpt(\'' + o.replace(/'/g,"\\'") + '\')" style="border:1.5px solid #003f87;background:#fff;color:#003f87;border-radius:99px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:\'Manrope\',sans-serif;width:100%;text-align:center">' + o + '</button>';
   }).join('');
 }
 
@@ -3772,115 +4369,174 @@ function wcEnviar() {
   var inp = document.getElementById('wil-input');
   var txt = (inp.value || '').trim();
   if (!txt) return;
-  inp.value = ''; inp.style.height = 'auto';
+  inp.value = '';
+  if (inp.style) inp.style.height = 'auto';
   wcMsgUser(txt);
   wcProcesar(txt);
 }
 
-/* ══════════════════════════════════════════════════════════
-   LÓGICA DE CONVERSACIÓN
-   → Aquí va la IA. Cada bloque tiene su marca.
-   → Sustituye wcMsgFarm(respuesta) por la llamada a la API.
-══════════════════════════════════════════════════════════ */
-var _wcNombre = '';
-var _wcFase = 'nombre';
-var _wcTiendaChat = '';
-var _wcIntencion = '';
-var _wcProductoBuscado = '';
+function wilCerrarChat() {
+  document.getElementById('wil-chat-ov').style.display = 'none';
+  document.body.style.overflow = '';
+}
 
+/* ══════════════════════════════════════════════
+   PROCESADOR PRINCIPAL
+══════════════════════════════════════════════ */
 function wcProcesar(txt) {
   var cfg = window._wcCFG;
-  var tl = txt.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  var tl  = txt.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 
-  if (_wcFase === 'nombre') {
-    _wcNombre = txt.replace(/^(soy|me llamo|mi nombre es)\s*/i,'').trim();
-    _wcNombre = _wcNombre.charAt(0).toUpperCase() + _wcNombre.slice(1);
-    localStorage.setItem('wil_nombre_cliente', _wcNombre);
-    _wcFase = 'chat';
+  /* ── CERRADO ── */
+  if (_wcFase === 'cerrado') return;
 
-    wcMsgFarm('¡Mucho gusto, *' + _wcNombre + '*! 😊 ¿En qué te puedo ayudar hoy?');
-    setTimeout(function () {
-      document.getElementById('wc-wa-footer').style.display = 'block';
-      wcMostrarOpts([
-        '💊 Necesito un medicamento',
-        '🛒 Quiero hacer un pedido',
-        '💰 Consultar un precio',
-        '📦 Ver disponibilidad'
-      ]);
-    }, 900);
+  /* ── SALUDO ──
+     El bot ya lanzó el setTimeout con "¿Con quién tengo el gusto?".
+     Solo capturamos si el usuario introduce su nombre antes. */
+  if (_wcFase === 'saludo') {
+    var m = txt.match(/(?:soy|me llamo|mi nombre es)\s+([A-Za-zÁÉÍÓÚáéíóúÑñ]+(?:\s+[A-Za-zÁÉÍÓÚáéíóúÑñ]+)?)/i);
+    if (m) { _wcFase = 'nombre'; wcProcesar(m[1].trim()); }
     return;
   }
 
+  /* ── NOMBRE ── */
+  if (_wcFase === 'nombre') {
+    if (/^(hola|buenas?|hey|saludos?|buenos|buenos dias|buenas tardes|buenas noches|hi|hello)$/i.test(txt.trim())) {
+      wcMsgFarm('¿Con quién tengo el gusto de hablar hoy? 😊');
+      return;
+    }
+    var raw = txt.replace(/^(soy|me llamo|mi nombre es)\s*/i,'').trim();
+    raw = raw.split(/\s+/).slice(0,2).join(' ');
+    raw = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+    if (!wcEsNombre(raw)) {
+      wcMsgFarm('Disculpa, ¿me puedes decir tu nombre para atenderte mejor? 😊');
+      return;
+    }
+    _wcNombre = raw;
+    localStorage.setItem('wil_nombre_cliente', _wcNombre);
+    _wcFase = 'chat';
+    wcMsgFarm('¡Mucho gusto, *' + _wcNombre + '*! 😊 ¿En qué te puedo ayudar hoy?');
+    setTimeout(function(){
+      document.getElementById('wc-wa-footer').style.display = 'block';
+      wcMostrarOpciones();
+    }, 1600);
+    return;
+  }
+
+  /* ── CHAT ── */
   if (_wcFase === 'chat') {
     document.getElementById('wc-opts').style.display = 'none';
 
-    if (_wcIntencion === 'disponibilidad') {
-      _wcProductoBuscado = txt.trim();
-      wcMsgFarm('Sí, claro *' + _wcNombre + '* 📦 Busco *' + _wcProductoBuscado + '* en el stock de *' + cfg.nombre + '*...');
-      consultarStock(_wcProductoBuscado);
+    /* ─ Flujo checkout: dirección ─ */
+    if (_wcIntencion === 'checkout_direccion') {
+      _wcPedidoDatos.dir = txt.trim();
+      _wcIntencion = 'checkout_tel';
+      wcMsgFarm('¿Y tu *número de teléfono* de contacto? 📞');
+      return;
+    }
+
+    /* ─ Flujo checkout: teléfono ─ */
+    if (_wcIntencion === 'checkout_tel') {
+      _wcPedidoDatos.tel = txt.trim();
+      _wcIntencion = 'checkout_domi';
+      wcMsgFarm('¿El domicilio es con *costo de envío* o tienes alguna indicación especial para el repartidor?\n\n_(Escribe "ninguna" si no aplica)_');
+      return;
+    }
+
+    /* ─ Flujo checkout: datos domicilio / notas ─ */
+    if (_wcIntencion === 'checkout_domi') {
+      _wcPedidoDatos.domi = /ninguna?|no|sin/i.test(tl) ? '' : txt.trim();
       _wcIntencion = '';
+      wcGuardarPedidoSheets();
       return;
     }
 
-    if (tl.includes('medicamento') || tl.includes('medicina')) {
-      _wcIntencion = 'medicamento';
-      wcMsgFarm('Sí, claro *' + _wcNombre + '* 😊 Dime el nombre del medicamento que necesitas.');
+    /* ─ Flujo med: nombre ─ */
+    if (_wcIntencion === 'med_nombre') {
+      _wcMedNombre = txt.trim();
+      _wcIntencion = 'med_detalle';
+      wcMsgFarm('¿Lo buscas de algún laboratorio o presentación específica? 💊\n\n_(Escribe "cualquiera" si no importa)_');
       return;
     }
 
-    if (tl.includes('pedido') || tl.includes('compra') || tl.includes('pedir')) {
-      _wcIntencion = 'pedido';
-      wcMsgFarm('Sí, claro *' + _wcNombre + '* 🛒 Dime qué productos necesitas y te ayudo a armar tu pedido.');
+    /* ─ Flujo med: detalle ─ */
+    if (_wcIntencion === 'med_detalle') {
+      _wcIntencion = '';
+      var det = /cualquiera|no importa|da igual|sin|ninguno|^no$/i.test(tl) ? null : txt.trim();
+      wcBuscarEnSheets(_wcMedNombre, det);
       return;
     }
 
-    if (tl.includes('precio') || tl.includes('valor') || tl.includes('costo') || tl.includes('cuanto')) {
-      _wcIntencion = 'precio';
-      wcMsgFarm('Sí, claro *' + _wcNombre + '* 💰 Dime el nombre del producto y te doy el precio.');
+    /* ─ Detectar intención ─ */
+
+    if (tl.includes('medicamento')||tl.includes('medicina')||tl.includes('pastilla')||
+        tl.includes('jarabe')||tl.includes('crema')||tl.includes('ampolla')||
+        tl.includes('buscar')||tl.includes('disponib')||tl.includes('hay ')||
+        tl.includes('tienen')||tl.includes('stock')||tl.includes('precio')||
+        tl.includes('catalogo')||tl.includes('valor')||tl.includes('cuanto')||tl.includes('costo')) {
+      _wcIntencion = 'med_nombre';
+      var frases = [
+        '¡Con gusto, 💊 ¿Cuál es el medicamento o producto que buscas?',
+        '¡Por supuesto, 😊 ¿Qué producto necesitas?',
+        '¡Claro que sí! ¿Qué medicamento estás buscando, ? 💊'
+      ];
+      wcMsgFarm(frases[Math.floor(Math.random()*frases.length)]);
       return;
     }
 
-    if (tl.includes('disponib') || tl.includes('stock') || tl.includes('hay') || tl.includes('tienen')) {
-      _wcIntencion = 'disponibilidad';
-      wcMsgFarm('Sí, claro *' + _wcNombre + '* 📦 Dime qué producto buscas y reviso disponibilidad en el stock.');
+    if (tl.includes('pedido')||tl.includes('pedir')||(tl.includes('compra')&&!tl.includes('buscar'))) {
+      if (_wcCarrito.length > 0) {
+        wcIniciarCheckout();
+      } else {
+        wcMsgFarm('Tu carrito está vacío, *' + _wcNombre + '*. Busca primero el producto que necesitas 😊');
+        setTimeout(function(){ wcMostrarOpts(['💊 Buscar medicamento','🔙 Volver al menú']); }, 800);
+      }
       return;
     }
 
-    if (tl.includes('horario') || tl.includes('hora') || tl.includes('abierto') || tl.includes('abren')) {
-      wcMsgFarm('Sí, claro *' + _wcNombre + '* 🕐 Nuestro horario es de *7am a 9pm* todos los días.');
+    if (tl.includes('horario')||tl.includes('hora')||tl.includes('abierto')||tl.includes('abren')||tl.includes('cierran')||tl.includes('atencion')) {
+      wcMsgFarm('Nuestro horario de atención, *' + _wcNombre + '* 🕐:\n\n*Lunes a domingo*\n🌅 *7:00 a.m.* a 🌙 *9:30 p.m.*\n\n¡Estamos para servirte! 😊');
+      setTimeout(wcMostrarOpciones, 1800);
       return;
     }
 
-    if (tl.includes('domicilio') || tl.includes('envio') || tl.includes('entrega') || tl.includes('llevar')) {
-      wcMsgFarm('Sí, claro *' + _wcNombre + '* 🛵 Sí contamos con domicilio. Puedes hacer tu pedido y te lo enviamos.');
+    if (tl.includes('domicilio')||tl.includes('envio')||tl.includes('envío')||tl.includes('entrega')||tl.includes('llevar')) {
+      wcMsgFarm('Sí, *' + _wcNombre + '* 🛵 contamos con servicio de domicilio.\n\nAgrega productos al carrito y al confirmar el pedido capturamos tu dirección y datos de entrega.');
+      setTimeout(function(){ wcMostrarOpts(['💊 Buscar medicamento','🔙 Volver al menú']); }, 1600);
       return;
     }
 
-    if (tl.includes('gracias') || tl.includes('listo') || tl.includes('ok') || tl.includes('perfecto')) {
-      wcMsgFarm('Con gusto, *' + _wcNombre + '* 😊 ¿Deseas consultar algo más?');
-      setTimeout(function () {
-        wcMostrarOpts([
-          '💊 Necesito un medicamento',
-          '🛒 Quiero hacer un pedido',
-          '💰 Consultar un precio',
-          '📦 Ver disponibilidad'
-        ]);
-      }, 900);
+    if (tl.includes('ubicacion')||tl.includes('donde')||tl.includes('direccion')||tl.includes('mapa')) {
+      wcMsgFarm('Con gusto, *' + _wcNombre + '* 📍 Aquí tienes nuestra ubicación:');
+      setTimeout(wcMsgMapa, 1200);
+      setTimeout(wcMostrarOpciones, 2500);
       return;
     }
 
+    if (tl.includes('gracias')||tl.includes('listo')||tl.includes('hasta luego')||tl.includes('chao')||tl.includes('adios')) {
+      wcMsgFarm('¡Con mucho gusto, *' + _wcNombre + '*! 😊\n\nFue un placer atenderte en *' + cfg.nombre + '*.\n\n¡' + wcSaludo() + ' y hasta pronto! 🌟');
+      return;
     }
 
-    wcMsgFarm('Sí, claro *' + _wcNombre + '* 😊 Puedo ayudarte con medicamentos, precios, disponibilidad y pedidos. ¿Qué necesitas?');
-    setTimeout(function () {
-      wcMostrarOpts([
-        '💊 Necesito un medicamento',
-        '🛒 Quiero hacer un pedido',
-        '💰 Consultar un precio',
-        '📦 Ver disponibilidad'
-      ]);
-    }, 1100);
+    if (tl.includes('menu')||tl.includes('menú')||tl.includes('volver')||tl.includes('opciones')||tl.includes('inicio')) {
+      wcMsgFarm('¡Claro, *' + _wcNombre + '*! ¿En qué más te puedo ayudar? 😊');
+      setTimeout(wcMostrarOpciones, 1200);
+      return;
+    }
+
+    if (tl.includes('asesor')||tl.includes('hablar con')) {
+      var tel  = cfg.numero;
+      var wmsg = encodeURIComponent('Soy *' + _wcNombre + '*, me comuniqué desde el chat de *' + cfg.nombre + '* y necesito ayuda.');
+      window.open('https://wa.me/' + tel + '?text=' + wmsg, '_blank');
+      wcMsgFarm('Conectándote con un asesor de *' + cfg.nombre + '* por WhatsApp 📲. ¡Que tengas un excelente día, *' + _wcNombre + '*! 😊');
+      return;
+    }
+
+    wcMsgFarm('Entendido, *' + _wcNombre + '* 😊 ¿En qué te puedo ayudar?');
+    setTimeout(wcMostrarOpciones, 1200);
   }
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    WIL — MODO ENVÍO A TERCERO + FUERA DE ZONA
    Archivo: wil-farmacia-envio-tercero.js
@@ -4528,10 +5184,7 @@ function wcProcesar(txt) {
       </button>
     </div>
     <div id="wc-wa-footer" style="padding:12px 16px;background:#fff;border-top:1px solid #f0f3f6;flex-shrink:0;display:none">
-      <button onclick="wcAbrirWAReal()" style="width:100%;background:#25D366;color:#fff;border:none;border-radius:14px;padding:13px;font-family:'Manrope',sans-serif;font-size:13px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 14px rgba(37,211,102,.35)">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
-        Continuar en WhatsApp real
-      </button>
+      
     </div>
   </div>
 </div>
