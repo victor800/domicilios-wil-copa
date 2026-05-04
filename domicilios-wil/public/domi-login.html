@@ -197,17 +197,17 @@ body{min-height:max(820px,100dvh)}
 
 
 <script>
-var API_BASE = 'https://script.google.com/macros/s/AKfycbyNLLKk8S6bG-MgRLWx2zUVp4lXjaMl7txlUAAGLxAa-ZmoBrWN5mWWnnDNw-ZIs78NHA/exec';  // ← ¡PON TU URL AQUÍ!
+var API_BASE = 'https://script.google.com/macros/s/AKfycbyNLLKk8S6bG-MgRLWx2zUVp4lXjaMl7txlUAAGLxAa-ZmoBrWN5mWWnnDNw-ZIs78NHA/exec';
 
 function togglePass() {
   var inp = document.getElementById('inputClave');
   var ico = document.getElementById('eyeIcon');
-  if (inp.type === 'password') { 
-    inp.type = 'text'; 
-    ico.textContent = 'visibility_off'; 
-  } else { 
-    inp.type = 'password'; 
-    ico.textContent = 'visibility'; 
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    ico.textContent = 'visibility_off';
+  } else {
+    inp.type = 'password';
+    ico.textContent = 'visibility';
   }
 }
 
@@ -255,12 +255,13 @@ async function doLogin() {
   setBtnLoading(true);
 
   try {
-var url = API_BASE + '?accion=domi-login&id=' + encodeURIComponent(id) + '&clave=' + encodeURIComponent(clave);
-console.log('URL completa:', url);
-var res = await fetch(url);
-var text = await res.text();
-console.log('Respuesta raw:', text);
-var data = JSON.parse(text);
+    var url = API_BASE + '?accion=domi-login&id=' + encodeURIComponent(id) + '&clave=' + encodeURIComponent(clave);
+    console.log('URL completa:', url);
+    var res = await fetch(url);
+    var text = await res.text();
+    console.log('Respuesta raw:', text);
+    var data = JSON.parse(text);
+
     if (!data.ok) {
       mostrarError(data.error || 'ID o clave incorrectos');
       setBtnLoading(false);
@@ -269,17 +270,24 @@ var data = JSON.parse(text);
       return;
     }
 
- 
-    sessionStorage.setItem('wil_domi', JSON.stringify({
-      id: data.domi.id,
-      nombre: data.domi.nombre,
-      tel: data.domi.tel,
-      foto: data.domi.foto,
-      activo: data.domi.activo,
+    // ── FIX: limpiar sesión anterior ANTES de guardar la nueva ──
+    localStorage.removeItem('wil_domi');
+    sessionStorage.removeItem('wil_domi');
+
+    var _sesionDomi = JSON.stringify({
+      id:        data.domi.id,
+      nombre:    data.domi.nombre,
+      tel:       data.domi.tel,
+      foto:      data.domi.foto,
+      activo:    data.domi.activo,
       actividad: data.domi.actividad,
-      rol: 'domiciliario',
-      loginAt: new Date().toISOString()
-    }));
+      rol:       'domiciliario',
+      loginAt:   new Date().toISOString()
+    });
+
+    // Guardar en ambos para que el panel siempre encuentre al usuario correcto
+    localStorage.setItem('wil_domi', _sesionDomi);
+    sessionStorage.setItem('wil_domi', _sesionDomi);
 
     // Éxito visual
     var content = document.getElementById('btnContent');
@@ -297,14 +305,16 @@ var data = JSON.parse(text);
   }
 }
 
-// Auto-redirigir si ya logueado
+// Auto-redirigir si ya hay sesión activa válida
 document.addEventListener('DOMContentLoaded', function() {
-  var session = sessionStorage.getItem('wil_domi');
+  // ── FIX: leer de ambos storages ──
+  var session = localStorage.getItem('wil_domi') || sessionStorage.getItem('wil_domi');
   if (session) {
     try {
       JSON.parse(session);
       window.location.href = 'panel-domiciliario.html';
     } catch(e) {
+      localStorage.removeItem('wil_domi');
       sessionStorage.removeItem('wil_domi');
     }
   }
