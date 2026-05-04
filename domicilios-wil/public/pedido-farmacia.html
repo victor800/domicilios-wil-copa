@@ -3674,23 +3674,20 @@ function abrirPopupSheet(key){
   }, 400);
 
 })();
+
+
+
 // ══════════════════════════════════════════════
 //  CHAT FARMACIA v3  —  con carrito integrado
 // ══════════════════════════════════════════════
 
-var _wcNombre     = '';
-var _wcFase       = 'saludo';
-var _wcTiendaChat = '';
-var _wcIntencion  = '';
-var _wcMedNombre  = '';
 
-/* ── Carrito ── */
-var _wcCarrito = [];   // [{desc, lab, precio, precioUnit, qty}]
 
-/* ── URLs de ubicación por tienda ── */
+
+/* ── URLs mapa por tienda ── */
 var _wcMapas = {
-  expertos: 'https://maps.app.goo.gl/m6rgrj5v7MigYeaW8',
-  central:  'https://maps.app.goo.gl/CWPcKwYThJBxToQL7'
+  expertos: 'https://maps.app.goo.gl/oXy2JpWRxrGYFdYo8',
+  central:  'https://maps.app.goo.gl/ah8PjvaAbgmQSLpeA'
 };
 
 /* ── Google Sheets via gviz ── */
@@ -3753,90 +3750,186 @@ function wcFmt(txt) {
     .replace(/\n/g, '<br>');
 }
 // ══════════════════════════════════════════════
-//  CHAT FARMACIA v4
-//  - Carrito flotante dentro del chat
-//  - Prioridad: Ofertas → Nuevo_Producto → Stock
-//  - Cards con imagen cuando hay URL
-//  - Pedido se guarda en Sheets (no WhatsApp)
-//  - Captura domicilio y datos antes de enviar
-//  - Sin "hola" redundante — nombre siempre capturado
+//  CHAT FARMACIA v5  —  COMPLETO
+//  Variables declaradas UNA sola vez
+//  Carrito circular flotante esquina inf-derecha
+//  Saludos random al abrir chat
+//  Chat centrado, botones 2 columnas cuadrados
+//  Lupa en imágenes → modal ampliado
+//  Ofertas: columnas B(1) C(2) D(3) E(4) imagen H(7)
+//  Badge "🏷️ OFERTA" en tarjetas provenientes de Ofertas
 // ══════════════════════════════════════════════
 
-var _wcNombre     = '';
-var _wcFase       = 'saludo';
-var _wcTiendaChat = '';
-var _wcIntencion  = '';
-var _wcMedNombre  = '';
-var _wcCarrito    = [];  // [{desc,lab,precio,imagen,qty}]
+// ══════════════════════════════════════════════
+//  CHAT FARMACIA v5  —  CORREGIDO
+//  Fix 1: Carrito dentro del chat (wil-chat-sheet)
+//  Fix 2: Imágenes completas (altura correcta)
+//  Fix 3: Botones opciones 2 columnas
+// ══════════════════════════════════════════════
 
-/* ── Sheets con pedidos (hoja "Pedidos") ── */
-var _wcSheetID      = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
-var _wcGVizBase     = 'https://docs.google.com/spreadsheets/d/' + _wcSheetID + '/gviz/tq?tqx=out:json&sheet=';
-var _wcSheetAppURL  = 'https://script.google.com/macros/s/TU_SCRIPT_ID_AQUI/exec'; // ← reemplazar con tu Web App URL
+/* ── Estado global ── */
+var _wcNombre      = '';
+var _wcFase        = 'saludo';
+var _wcTiendaChat  = '';
+var _wcIntencion   = '';
+var _wcMedNombre   = '';
+var _wcCarrito     = [];
+var _wcPedidoDatos = {};
 
-/* ── Hojas de stock ── */
-function wcSheetStock()   { return _wcTiendaChat === 'expertos' ? 'STOCK_DROGUERIA_EXPERTOS' : 'STOCK_DROGUERIA_CENTRAL'; }
-var _wcSheetOfertas       = 'Ofertas';
-var _wcSheetNuevo         = 'Nuevo_Producto';
+/* ── Config Sheets ── */
+var _wcSheetID     = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+var _wcGVizBase    = 'https://docs.google.com/spreadsheets/d/' + _wcSheetID + '/gviz/tq?tqx=out:json&sheet=';
+var _wcSheetAppURL = 'https://script.google.com/macros/s/TU_SCRIPT_ID_AQUI/exec';
+var _wcSheetOfertas = 'Ofertas';
+var _wcSheetNuevo   = 'Nuevo_Producto';
 
-/* ── URLs mapa ── */
 var _wcMapas = {
-  expertos: 'https://maps.app.goo.gl/m6rgrj5v7MigYeaW8',
-  central:  'https://maps.app.goo.gl/CWPcKwYThJBxToQL7'
+  expertos: 'https://maps.app.goo.gl/oXy2JpWRxrGYFdYo8',
+  central:  'https://maps.app.goo.gl/ah8PjvaAbgmQSLpeA'
 };
 
-/* ── Inyectar estilos una sola vez ── */
+/* ══════════════════════════════════════════════
+   ESTILOS — inyectados UNA sola vez
+══════════════════════════════════════════════ */
 (function () {
   if (document.getElementById('wc-anim')) return;
   var s = document.createElement('style');
-  s.id = 'wc-anim';
-  s.textContent =
-    '@keyframes wcPulso{0%{transform:translate(-50%,-50%) scale(1);opacity:.7}70%{transform:translate(-50%,-50%) scale(2.2);opacity:0}100%{transform:translate(-50%,-50%) scale(1);opacity:0}}'
-    + '@keyframes msgIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}'
-    + '@keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}'
-    + '@keyframes wcCartSlide{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}'
-    + '#wil-chat-ov{position:relative!important}'
-    + '#wc-fab-carrito{position:absolute;bottom:68px;right:12px;z-index:400;pointer-events:auto}'
-    + '#wc-fab-carrito button{background:#003f87;color:#fff;border:none;border-radius:99px;padding:9px 16px 9px 13px;font-size:12.5px;font-weight:800;cursor:pointer;font-family:inherit;box-shadow:0 4px 18px rgba(0,63,135,.5);display:flex;align-items:center;gap:7px;white-space:nowrap;transition:transform .12s,box-shadow .12s}'
-    + '#wc-fab-carrito button:hover{box-shadow:0 6px 22px rgba(0,63,135,.6)}'
-    + '#wc-fab-carrito button:active{transform:scale(.95)}'
-    + '#wc-fab-badge{background:#ef4444;color:#fff;border-radius:99px;font-size:10px;font-weight:900;padding:1px 7px;min-width:20px;text-align:center;line-height:1.6}'
-    + '#wc-carrito-panel{position:absolute;bottom:116px;right:12px;left:12px;z-index:500;animation:wcCartSlide .2s ease;background:#fff;border-radius:18px;box-shadow:0 12px 40px rgba(0,0,0,.22);overflow:hidden;display:none;flex-direction:column;max-height:72vh;border:1.5px solid rgba(0,63,135,.12)}'
-    + '#wc-carrito-panel.abierto{display:flex}'
-    + '#wc-carrito-panel table{width:100%;border-collapse:collapse}'
-    + '#wc-carrito-panel thead tr{background:#f8fafc}'
-    + '#wc-carrito-panel thead th{padding:7px 8px;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px}'
-    + '#wc-carrito-panel tbody tr{border-bottom:1px solid #f3f4f6}'
-    + '#wc-carrito-panel tbody td{padding:9px 8px;vertical-align:middle}';
+  s.id  = 'wc-anim';
+  s.textContent = [
+    '@keyframes wcPulso{0%{transform:translate(-50%,-50%) scale(1);opacity:.7}70%{transform:translate(-50%,-50%) scale(2.2);opacity:0}100%{transform:translate(-50%,-50%) scale(1);opacity:0}}',
+    '@keyframes msgIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}',
+    '@keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}',
+    '@keyframes wcCartSlide{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}',
+    '@keyframes wcModalIn{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:none}}',
+    '@keyframes wcBadgePop{0%{transform:scale(0)}60%{transform:scale(1.25)}100%{transform:scale(1)}}',
+    '@keyframes wcOfertaPulse{0%,100%{opacity:1}50%{opacity:.72}}',
+    '@keyframes td{0%,80%,100%{transform:scale(0.6);opacity:.4}40%{transform:scale(1);opacity:1}}',
+
+    /* ── FAB carrito: DENTRO del sheet, esquina inf-derecha ── */
+    /* FIX 1: position:absolute relativo a wil-chat-sheet */
+    '#wc-fab-carrito{position:fixed!important;bottom:90px!important;right:18px!important;z-index:99990!important;}',
+'#wc-fab-carrito button{width:56px;height:56px;border-radius:50%;background:#003f87;color:#fff;border:none;font-size:24px;cursor:pointer;box-shadow:0 4px 20px rgba(0,63,135,.6);display:flex;align-items:center;justify-content:center;position:relative;transition:transform .13s,box-shadow .13s;}',
+'#wc-fab-carrito button:hover{transform:scale(1.1);box-shadow:0 7px 28px rgba(0,63,135,.72);}',
+'#wc-fab-carrito button:active{transform:scale(.92);}',
+'#wc-fab-badge{position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;border-radius:50%;font-size:10px;font-weight:900;width:21px;height:21px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;line-height:1;animation:wcBadgePop .25s ease;}',
+
+    /* ── Panel carrito: DENTRO del sheet ── */
+    /* FIX 1: contenido dentro del chat, arriba del input */
+    '#wc-carrito-panel{position:fixed!important;bottom:160px!important;right:12px!important;left:12px!important;z-index:99980!important;background:#fff!important;border-radius:18px!important;box-shadow:0 12px 40px rgba(0,0,0,.28)!important;overflow:hidden!important;display:none!important;flex-direction:column!important;max-height:60vh!important;border:1.5px solid rgba(0,63,135,.15)!important;}',
+'#wc-carrito-panel.abierto{display:flex!important;animation:wcCartSlide .2s ease!important;}',
+    '#wc-carrito-panel.abierto{display:flex;animation:wcCartSlide .2s ease;}',
+    '#wc-carrito-panel table{width:100%;border-collapse:collapse;}',
+    '#wc-carrito-panel thead tr{background:#f8fafc;}',
+    '#wc-carrito-panel thead th{padding:7px 8px;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;}',
+    '#wc-carrito-panel tbody tr{border-bottom:1px solid #f3f4f6;}',
+    '#wc-carrito-panel tbody td{padding:9px 8px;vertical-align:middle;}',
+
+    /* ── FIX 3: Botones opciones 2 columnas ── */
+   '#wc-opts{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;padding:12px 14px 14px!important;background:#eef2f7!important;border-top:1.5px solid #dde4ed!important;}',
+'#wc-opts button{border:none!important;background:#003f87!important;color:#fff!important;border-radius:14px!important;padding:13px 10px!important;font-size:12.5px!important;font-weight:700!important;cursor:pointer!important;font-family:inherit!important;white-space:normal!important;text-align:center!important;line-height:1.35!important;min-height:58px!important;transition:background .15s,transform .1s,box-shadow .15s!important;display:flex!important;align-items:center!important;justify-content:center!important;width:100%!important;box-shadow:0 3px 10px rgba(0,63,135,.28)!important;letter-spacing:.1px!important;}',
+'#wc-opts button:hover{background:#0050ad!important;transform:scale(1.03)!important;box-shadow:0 5px 16px rgba(0,63,135,.38)!important;}',
+'#wc-opts button:active{transform:scale(.95)!important;box-shadow:0 1px 4px rgba(0,63,135,.2)!important;}',
+
+    /* ── FIX 2: Badge OFERTA (typo corregido) ── */
+    '.wc-badge-oferta{position:absolute;top:8px;right:8px;z-index:10;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;font-size:9.5px;font-weight:900;padding:3px 9px;border-radius:99px;letter-spacing:.4px;text-transform:uppercase;box-shadow:0 2px 8px rgba(239,68,68,.45);animation:wcOfertaPulse 2s ease-in-out infinite;display:flex;align-items:center;gap:3px;}',
+
+    /* ── Modal imagen ── */
+    '#wc-img-modal{position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;}',
+    '#wc-img-modal.open{display:flex;animation:wcModalIn .22s ease;}',
+    '#wc-img-modal img{max-width:90vw;max-height:80vh;border-radius:18px;box-shadow:0 16px 60px rgba(0,0,0,.55);object-fit:contain;}',
+    '#wc-img-modal-close{position:absolute;top:18px;right:18px;background:#fff;border:none;width:38px;height:38px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.3);font-weight:700;}',
+
+    /* ── Botón lupa sobre imagen ── */
+    '.wc-lupa-btn{position:absolute;bottom:8px;right:8px;width:32px;height:32px;border-radius:50%;background:rgba(0,63,135,.88);border:none;color:#fff;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.3);transition:transform .12s,background .12s;z-index:5;}',
+    '.wc-lupa-btn:hover{transform:scale(1.12);background:#003f87;}'
+  ].join('');
   document.head.appendChild(s);
 })();
 
-/* ── Helpers ── */
+/* ══════════════════════════════════════════════
+   HELPERS
+══════════════════════════════════════════════ */
 function wcSaludo() {
   var h = new Date().getHours();
   if (h >= 5  && h < 12) return 'Buenos días';
   if (h >= 12 && h < 18) return 'Buenas tardes';
   return 'Buenas noches';
 }
-function wcEstaAbierto() {
-  return true;
-  /* var d=new Date(),min=d.getHours()*60+d.getMinutes(); return min>=420&&min<1290; */
+
+var _wcSaludosRandom = [
+  function (s) { return wcSaludo() + ', bienvenido/a a *' + s + '* 🌟 Aquí tienes nuestra ubicación:'; },
+  function (s) { return '¡Hola! Qué bueno tenerte en *' + s + '* 😊 Te comparto dónde estamos:'; },
+  function (s) { return wcSaludo() + ' ¿Cómo estás? Bienvenido/a a *' + s + '* 💊 Mira nuestra ubicación:'; },
+  function (s) { return '¡Bienvenido/a a *' + s + '*! 🏥 Me alegra que estés aquí. Te comparto dónde encontrarnos:'; },
+  function (s) { return wcSaludo() + ' 😊 Es un gusto atenderte en *' + s + '*. Aquí nuestra ubicación:'; }
+];
+
+var _wcRegresoRandom = [
+  function (n) { return '¡Qué gusto verte de nuevo, *' + n + '*! 😊 ¿En qué te puedo ayudar hoy?'; },
+  function (n) { return '¡Bienvenido de vuelta, *' + n + '*! 🌟 ¿Qué necesitas hoy?'; },
+  function (n) { return '¡Hola de nuevo, *' + n + '*! 💊 ¿En qué te puedo servir?'; },
+  function (n) { return wcSaludo() + ', *' + n + '*! Me alegra verte otra vez 😊 ¿Cómo te puedo ayudar?'; }
+];
+
+function wcPickRandom(arr, arg) {
+  return arr[Math.floor(Math.random() * arr.length)](arg);
 }
+
+function wcEstaAbierto() { return true; }
+
 function wcEsNombre(txt) {
   return (txt || '').trim().length >= 2 &&
     !/^(hola|buenas?|hey|saludos?|buenos|buen[ao]s|hi|hello|ok|si|no|nada|bien|mal|gracias)$/i.test((txt || '').trim());
 }
+
 function wcHora() {
-  return new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true});
+  return new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
+
 function wcFmt(txt) {
-  return txt
-    .replace(/\*(.*?)\*/g,'<strong>$1</strong>')
-    .replace(/_(.*?)_/g,'<em style="color:#6b7280;font-style:normal;font-size:11px">$1</em>')
-    .replace(/\n/g,'<br>');
+  return (txt || '')
+    .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
+    .replace(/_(.*?)_/g,   '<em style="color:#6b7280;font-style:normal;font-size:11px">$1</em>')
+    .replace(/\n/g, '<br>');
 }
+
 function norm(s) {
-  return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+}
+
+function wcSheetStock() {
+  return _wcTiendaChat === 'expertos' ? 'STOCK_DROGUERIA_EXPERTOS' : 'STOCK_DROGUERIA_CENTRAL';
+}
+
+/* ── Helper: obtener el contenedor del chat ── */
+/* FIX 1: siempre usar wil-chat-sheet */
+function wcGetSheet() {
+  return document.getElementById('wil-chat-sheet');
+}
+
+/* ══════════════════════════════════════════════
+   MODAL IMAGEN
+══════════════════════════════════════════════ */
+function wcInyectarModal() {
+  if (document.getElementById('wc-img-modal')) return;
+  var m = document.createElement('div');
+  m.id  = 'wc-img-modal';
+  m.innerHTML =
+    '<button id="wc-img-modal-close" onclick="wcCerrarModal()">✕</button>'
+    + '<img id="wc-img-modal-img" src="" alt="Producto">';
+  m.addEventListener('click', function (e) { if (e.target === m) wcCerrarModal(); });
+  document.body.appendChild(m);
+}
+
+function wcAbrirModal(src) {
+  wcInyectarModal();
+  document.getElementById('wc-img-modal-img').src = src;
+  document.getElementById('wc-img-modal').classList.add('open');
+}
+
+function wcCerrarModal() {
+  var m = document.getElementById('wc-img-modal');
+  if (m) m.classList.remove('open');
 }
 
 /* ══════════════════════════════════════════════
@@ -3845,107 +3938,122 @@ function norm(s) {
 function abrirWAFarmacia() {
   _wcTiendaChat = tienda;
   var cfgs = {
-    expertos: { nombre:'Farma Expertos',    numero:'573163090049' },
-    central:  { nombre:'Droguería Central', numero:'573163090049' }
+    expertos: { nombre: 'Farma Expertos',    numero: '573163090049' },
+    central:  { nombre: 'Droguería Central', numero: '573163090049' }
   };
   window._wcCFG = cfgs[_wcTiendaChat];
 
-  _wcCarrito   = [];
-  _wcIntencion = '';
-  _wcMedNombre = '';
+  _wcCarrito     = [];
+  _wcIntencion   = '';
+  _wcMedNombre   = '';
+  _wcPedidoDatos = {};
 
-  document.getElementById('wc-farm-name').textContent = window._wcCFG.nombre;
-  document.getElementById('wil-msgs').innerHTML =
-    '<div style="text-align:center;margin-bottom:8px"><span style="background:#dde6ec;color:#6b7280;font-size:9px;font-weight:700;padding:2px 12px;border-radius:20px">Hoy</span></div>';
+  /* FIX 1: asegurar que wil-chat-sheet tenga position:relative para que
+     el FAB y el panel carrito se posicionen dentro */
+  var sheet = wcGetSheet();
+  if (sheet) sheet.style.position = 'relative';
+
+  document.getElementById('wc-farm-name').textContent   = window._wcCFG.nombre;
+  document.getElementById('wil-msgs').innerHTML         =
+    '<div style="text-align:center;margin-bottom:8px">'
+    + '<span style="background:#dde6ec;color:#6b7280;font-size:9px;font-weight:700;padding:2px 12px;border-radius:20px">Hoy</span>'
+    + '</div>';
   document.getElementById('wc-opts').style.display      = 'none';
   document.getElementById('wc-wa-footer').style.display = 'none';
   document.getElementById('wil-input').value            = '';
 
-  // FAB carrito
   wcInyectarFAB();
   wcActualizarFAB();
-
-  // Carrito panel
   wcInyectarPanelCarrito();
+  wcInyectarModal();
 
-  // Recuperar nombre
-  var guardado = localStorage.getItem('wil_nombre_cliente') || '';
-  _wcNombre = wcEsNombre(guardado) ? guardado : '';
-  if (!_wcNombre) localStorage.removeItem('wil_nombre_cliente');
+  localStorage.removeItem('wil_nombre_cliente');
 
   document.getElementById('wil-chat-ov').style.display = 'flex';
   document.body.style.overflow = 'hidden';
 
   if (!wcEstaAbierto()) {
     _wcFase = 'cerrado';
-    wcMsgFarm(wcSaludo() + ', gracias por comunicarte con *' + window._wcCFG.nombre + '*.\n\n⏰ Estamos fuera de horario.\n\nAtendemos de *7:00 a.m.* a *9:30 p.m.* todos los días.');
+    wcMsgFarm(wcSaludo() + ', gracias por comunicarte con *' + window._wcCFG.nombre + '*.\n\n'
+      + '⏰ Estamos fuera de horario.\n\nAtendemos de *7:00 a.m.* a *9:30 p.m.* todos los días.');
     return;
   }
 
   _wcFase = 'saludo';
-  wcMsgFarm(wcSaludo() + ', bienvenido/a a *' + window._wcCFG.nombre + '*. Aquí tienes nuestra ubicación:');
+  wcMsgFarm(wcPickRandom(_wcSaludosRandom, window._wcCFG.nombre));
   setTimeout(wcMsgMapa, 1100);
 
   if (_wcNombre) {
     _wcFase = 'chat';
-    setTimeout(function(){
-      wcMsgFarm('¡Qué gusto verte de nuevo, *' + _wcNombre + '*! 😊 ¿En qué te puedo ayudar hoy?');
-    }, 2400);
-    setTimeout(function(){
+    setTimeout(function () { wcMsgFarm(wcPickRandom(_wcRegresoRandom, _wcNombre)); }, 2400);
+    setTimeout(function () {
       document.getElementById('wc-wa-footer').style.display = 'block';
       wcMostrarOpciones();
     }, 3600);
   } else {
     _wcFase = 'nombre';
-    setTimeout(function(){
-      wcMsgFarm('¿Con quién tengo el gusto de hablar hoy? 😊');
-    }, 2400);
+    setTimeout(function () { wcMsgFarm('¿Con quién tengo el gusto de hablar hoy? 😊'); }, 2400);
   }
 
-  setTimeout(function(){ document.getElementById('wil-input').focus(); }, 500);
+  setTimeout(function () { document.getElementById('wil-input').focus(); }, 500);
 }
 
 /* ══════════════════════════════════════════════
-   FAB CARRITO FLOTANTE
+   FAB CARRITO
+   FIX 1: se inyecta en wil-chat-sheet (no wil-chat-box)
 ══════════════════════════════════════════════ */
 function wcInyectarFAB() {
   if (document.getElementById('wc-fab-carrito')) return;
-  var overlay = document.getElementById('wil-chat-ov');
   var fab = document.createElement('div');
   fab.id = 'wc-fab-carrito';
-  fab.innerHTML = '<button onclick="wcToggleCarrito()">🛒 Carrito <span id="wc-fab-badge">0</span></button>';
-  overlay.appendChild(fab);
+  fab.setAttribute('style', 'position:fixed;bottom:88px;right:18px;z-index:999999;');
+  fab.innerHTML =
+    '<button onclick="wcToggleCarrito()" title="Ver carrito" '
+    + 'style="width:56px;height:56px;border-radius:50%;background:#003f87;color:#fff;border:none;font-size:24px;cursor:pointer;'
+    + 'box-shadow:0 4px 20px rgba(0,63,135,.65);display:flex;align-items:center;justify-content:center;position:relative;">'
+    + '🛒'
+    + '<span id="wc-fab-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#ef4444;'
+    + 'color:#fff;border-radius:50%;font-size:10px;font-weight:900;width:21px;height:21px;'
+    + 'align-items:center;justify-content:center;border:2px solid #fff;line-height:1;">0</span>'
+    + '</button>';
+  document.body.appendChild(fab); // <- body, no el sheet
 }
 
 function wcActualizarFAB() {
   var badge = document.getElementById('wc-fab-badge');
   if (!badge) return;
-  var total = _wcCarrito.reduce(function(s,x){return s+x.qty;},0);
-  badge.textContent = total;
-  badge.style.display = total === 0 ? 'none' : 'inline-block';
+  var total = _wcCarrito.reduce(function (s, x) { return s + x.qty; }, 0);
+  badge.textContent   = total;
+  badge.style.display = total === 0 ? 'none' : 'flex';
 }
 
 function wcToggleCarrito() {
   var panel = document.getElementById('wc-carrito-panel');
   if (!panel) return;
-  if (panel.classList.contains('abierto')) {
-    panel.classList.remove('abierto');
+  if (panel.style.display === 'flex') {
+    panel.style.display = 'none';
   } else {
     wcRenderCarritoPanel();
-    panel.classList.add('abierto');
+    panel.style.display = 'flex';
+    panel.style.flexDirection = 'column';
   }
 }
 
 /* ══════════════════════════════════════════════
-   PANEL CARRITO (flotante dentro del chat overlay)
+   PANEL CARRITO
+   FIX 1: se inyecta en wil-chat-sheet
 ══════════════════════════════════════════════ */
 function wcInyectarPanelCarrito() {
   var viejo = document.getElementById('wc-carrito-panel');
   if (viejo) viejo.remove();
-  var overlay = document.getElementById('wil-chat-ov');
   var panel = document.createElement('div');
   panel.id = 'wc-carrito-panel';
-  overlay.appendChild(panel);
+  panel.setAttribute('style',
+    'position:fixed;bottom:158px;right:12px;left:12px;z-index:999990;'
+    + 'background:#fff;border-radius:18px;box-shadow:0 12px 40px rgba(0,0,0,.28);'
+    + 'overflow:hidden;display:none;flex-direction:column;max-height:60vh;'
+    + 'border:1.5px solid rgba(0,63,135,.15);');
+  document.body.appendChild(panel); // <- body, no el sheet
 }
 
 function wcRenderCarritoPanel() {
@@ -3956,23 +4064,38 @@ function wcRenderCarritoPanel() {
 
   var filas = _wcCarrito.length === 0
     ? '<tr><td colspan="4" style="text-align:center;padding:22px 12px;color:#9ca3af;font-size:12px;font-style:italic">Tu carrito está vacío</td></tr>'
-    : _wcCarrito.map(function(item, i){
+    : _wcCarrito.map(function (item, i) {
         var sub = item.precio != null ? item.precio * item.qty : null;
         if (sub) total += sub;
+
+        /* FIX 2: imagen en carrito más grande y visible */
         var imgTag = item.imagen
-          ? '<img src="' + item.imagen + '" style="width:36px;height:36px;object-fit:cover;border-radius:8px;margin-right:8px;flex-shrink:0;vertical-align:middle" onerror="this.style.display=\'none\'">'
+          ? '<img src="' + item.imagen + '" '
+              + 'style="width:48px;height:48px;object-fit:cover;border-radius:10px;margin-right:9px;flex-shrink:0;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.12)" '
+              + 'onclick="wcAbrirModal(\'' + item.imagen.replace(/\\/g,'\\\\').replace(/'/g,"\\'") + '\')" '
+              + 'title="Ver imagen grande" '
+              + 'onerror="this.style.display=\'none\'">'
           : '';
+
+        var ofertaTag = item.esOferta
+          ? '<span style="color:#ef4444;font-size:9px;font-weight:900;margin-right:3px">🏷️</span>'
+          : '';
+
         return '<tr>'
           + '<td style="padding:10px 8px">'
             + '<div style="display:flex;align-items:center">'
               + imgTag
               + '<div>'
-                + '<div style="font-size:11.5px;font-weight:700;color:#111827;line-height:1.3">' + item.desc + '</div>'
+                + '<div style="font-size:11.5px;font-weight:700;color:#111827;line-height:1.3">'
+                  + ofertaTag + item.desc
+                + '</div>'
                 + '<div style="font-size:10px;color:#9ca3af;margin-top:1px">' + item.lab + '</div>'
               + '</div>'
             + '</div>'
           + '</td>'
-          + '<td style="font-size:11.5px;color:#6b7280;text-align:center;white-space:nowrap">' + (item.precio != null ? '$' + item.precio.toLocaleString('es-CO') : '—') + '</td>'
+          + '<td style="font-size:11.5px;color:#6b7280;text-align:center;white-space:nowrap">'
+            + (item.precio != null ? '$' + item.precio.toLocaleString('es-CO') : '—')
+          + '</td>'
           + '<td style="text-align:center">'
             + '<div style="display:inline-flex;align-items:center;gap:4px;background:#f3f4f6;border-radius:99px;padding:3px 4px">'
               + '<button onclick="wcQty(' + i + ',-1)" style="width:22px;height:22px;border-radius:50%;border:none;background:#fff;font-size:14px;font-weight:700;cursor:pointer;color:#374151;font-family:inherit;line-height:1;box-shadow:0 1px 3px rgba(0,0,0,.1)">−</button>'
@@ -3980,36 +4103,34 @@ function wcRenderCarritoPanel() {
               + '<button onclick="wcQty(' + i + ',1)" style="width:22px;height:22px;border-radius:50%;border:none;background:#003f87;font-size:14px;font-weight:700;cursor:pointer;color:#fff;font-family:inherit;line-height:1">+</button>'
             + '</div>'
           + '</td>'
-          + '<td style="font-size:12px;font-weight:800;color:#003f87;text-align:right;padding-right:10px;white-space:nowrap">' + (sub != null ? '$' + sub.toLocaleString('es-CO') : '—') + '</td>'
+          + '<td style="font-size:12px;font-weight:800;color:#003f87;text-align:right;padding-right:10px;white-space:nowrap">'
+            + (sub != null ? '$' + sub.toLocaleString('es-CO') : '—')
+          + '</td>'
           + '</tr>';
       }).join('');
 
   var totalStr = total > 0 ? '$' + total.toLocaleString('es-CO') : '—';
 
   panel.innerHTML =
-    /* ── Cabecera azul ── */
     '<div style="background:linear-gradient(135deg,#003f87,#0055b3);padding:12px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">'
       + '<div style="display:flex;align-items:center;gap:8px">'
         + '<span style="font-size:16px">🛒</span>'
         + '<div>'
           + '<div style="color:#fff;font-size:13px;font-weight:800;line-height:1.2">' + cfg.nombre + '</div>'
           + '<div style="color:rgba(255,255,255,.65);font-size:10.5px">'
-            + _wcCarrito.reduce(function(s,x){return s+x.qty;},0) + ' producto(s)'
+            + _wcCarrito.reduce(function (s, x) { return s + x.qty; }, 0) + ' producto(s)'
           + '</div>'
         + '</div>'
       + '</div>'
-      + '<button onclick="wcToggleCarrito()" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:28px;height:28px;border-radius:50%;font-size:14px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center">✕</button>'
+      + '<button onclick="wcToggleCarrito()" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:28px;height:28px;border-radius:50%;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>'
     + '</div>'
-    /* ── Tabla ── */
     + '<div style="overflow-y:auto;flex:1;overscroll-behavior:contain">'
       + '<table><thead><tr>'
         + '<th style="text-align:left;padding-left:8px">Producto</th>'
-        + '<th>Precio</th>'
-        + '<th>Cant.</th>'
+        + '<th>Precio</th><th>Cant.</th>'
         + '<th style="text-align:right;padding-right:10px">Total</th>'
       + '</tr></thead><tbody>' + filas + '</tbody></table>'
     + '</div>'
-    /* ── Pie ── */
     + '<div style="padding:12px 14px;border-top:1.5px solid #f0f0f0;flex-shrink:0;background:#fafafa">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px">'
         + '<span style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.6px">Total</span>'
@@ -4045,30 +4166,27 @@ function wcVaciarCarrito() {
 }
 
 /* ══════════════════════════════════════════════
-   CHECKOUT — captura dirección y datos → guarda en Sheets
+   CHECKOUT
 ══════════════════════════════════════════════ */
 function wcIniciarCheckout() {
   var panel = document.getElementById('wc-carrito-panel');
   if (panel) panel.classList.remove('abierto');
   _wcIntencion = 'checkout_direccion';
-  wcMsgFarm('¡Perfecto, *' + _wcNombre + '*! 📦 Para completar tu pedido necesito algunos datos.\n\n¿Cuál es tu *dirección de entrega*? _(barrio, calle, número)_');
+  wcMsgFarm('¡Perfecto, *' + _wcNombre + '*! 📦 Para completar tu pedido necesito algunos datos.\n\n'
+    + '¿Cuál es tu *dirección de entrega*? _(barrio, calle, número)_');
 }
 
-/* ── Datos del pedido en construcción ── */
-var _wcPedidoDatos = {};
-
 function wcGuardarPedidoSheets() {
-  var cfg    = window._wcCFG;
-  var fecha  = new Date().toLocaleString('es-CO');
-  var items  = _wcCarrito.map(function(x){
-    return x.qty + 'x ' + x.desc + ' (' + x.lab + ')' + (x.precio ? ' $' + (x.precio*x.qty).toLocaleString('es-CO') : '');
+  var cfg   = window._wcCFG;
+  var fecha = new Date().toLocaleString('es-CO');
+  var items = _wcCarrito.map(function (x) {
+    return x.qty + 'x ' + x.desc + ' (' + x.lab + ')'
+      + (x.precio ? ' $' + (x.precio * x.qty).toLocaleString('es-CO') : '');
   }).join(' | ');
-  var total  = _wcCarrito.reduce(function(s,x){ return s + (x.precio ? x.precio*x.qty : 0); }, 0);
+  var total = _wcCarrito.reduce(function (s, x) { return s + (x.precio ? x.precio * x.qty : 0); }, 0);
 
   var payload = {
-    fecha:     fecha,
-    tienda:    cfg.nombre,
-    cliente:   _wcNombre,
+    fecha: fecha, tienda: cfg.nombre, cliente: _wcNombre,
     telefono:  _wcPedidoDatos.tel   || '',
     direccion: _wcPedidoDatos.dir   || '',
     productos: items,
@@ -4077,19 +4195,18 @@ function wcGuardarPedidoSheets() {
     notas:     _wcPedidoDatos.notas || ''
   };
 
-  /* Google Apps Script Web App — recibe POST y escribe en Sheets */
   fetch(_wcSheetAppURL, {
-    method:  'POST',
-    mode:    'no-cors',
+    method: 'POST', mode: 'no-cors',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify(payload)
-  }).catch(function(e){ console.warn('[WC pedido]', e); });
+    body: JSON.stringify(payload)
+  }).catch(function (e) { console.warn('[WC pedido]', e); });
 
   wcMsgFarm(
     '¡Pedido registrado con éxito, *' + _wcNombre + '*! 🎉\n\n'
-    + '📦 *Resumen:*\n' + _wcCarrito.map(function(x,i){
-        return (i+1) + '. ' + x.desc + ' x' + x.qty
-          + (x.precio ? ' — $' + (x.precio*x.qty).toLocaleString('es-CO') : '');
+    + '📦 *Resumen:*\n'
+    + _wcCarrito.map(function (x, i) {
+        return (i + 1) + '. ' + x.desc + ' x' + x.qty
+          + (x.precio ? ' — $' + (x.precio * x.qty).toLocaleString('es-CO') : '');
       }).join('\n')
     + (total > 0 ? '\n\n*Total: $' + total.toLocaleString('es-CO') + '*' : '')
     + '\n\n🛵 *Entrega en:* ' + _wcPedidoDatos.dir
@@ -4097,133 +4214,146 @@ function wcGuardarPedidoSheets() {
     + '\n\nEn breve un asesor confirmará tu pedido. ¡Gracias! 😊'
   );
 
-  _wcCarrito      = [];
-  _wcPedidoDatos  = {};
-  _wcIntencion    = '';
+  _wcCarrito = []; _wcPedidoDatos = {}; _wcIntencion = '';
   wcActualizarFAB();
   setTimeout(wcMostrarOpciones, 3000);
 }
 
 /* ══════════════════════════════════════════════
-   BÚSQUEDA PRIORIZADA: Ofertas → Nuevo_Producto → Stock
+   BÚSQUEDA EN SHEETS
 ══════════════════════════════════════════════ */
 function wcBuscarEnSheets(nombreMed, detalle) {
   wcMsgFarm('Buscando *' + nombreMed + '* en nuestro catálogo... 🔍');
-
   var busq    = norm(nombreMed);
   var detNorm = detalle ? norm(detalle) : '';
 
-  function filtrar(rows, colDesc, colLab, colPrecio, colImagen) {
-    return rows.filter(function(row){
-      if (!row.c || !row.c[colDesc] || row.c[colDesc].v == null) return false;
-      var desc = norm(row.c[colDesc].v);
-      var lab  = norm(row.c[colLab] ? row.c[colLab].v : '');
-      if (!desc.includes(busq)) return false;
-      if (detNorm) return desc.includes(detNorm) || lab.includes(detNorm);
+  function filtrar(rows, colDesc, colLab, colPrecio, colImagen, colExtra, esOferta) {
+    return rows.filter(function (row) {
+      if (!row.c) return false;
+      var cD = row.c[colDesc];
+      if (!cD || cD.v == null) return false;
+      var desc  = norm(cD.v);
+      var lab   = norm(row.c[colLab]   && row.c[colLab].v   ? row.c[colLab].v   : '');
+      var extra = norm(colExtra != null && row.c[colExtra]   && row.c[colExtra].v ? row.c[colExtra].v : '');
+      if (!desc.includes(busq) && !lab.includes(busq) && !extra.includes(busq)) return false;
+      if (detNorm) return desc.includes(detNorm) || lab.includes(detNorm) || extra.includes(detNorm);
       return true;
-    }).map(function(row){
+    }).map(function (row) {
       return {
-        desc:    row.c[colDesc]   ? row.c[colDesc].v   : '—',
-        lab:     row.c[colLab]    ? row.c[colLab].v    : '—',
-        precio:  row.c[colPrecio] ? Number(row.c[colPrecio].v) : null,
-        imagen:  (colImagen != null && row.c[colImagen] && row.c[colImagen].v) ? row.c[colImagen].v : null
+        desc:      row.c[colDesc]   && row.c[colDesc].v   != null ? String(row.c[colDesc].v)   : '—',
+        lab:       row.c[colLab]    && row.c[colLab].v    != null ? String(row.c[colLab].v)    : '—',
+        precio:    row.c[colPrecio] && row.c[colPrecio].v != null ? Number(row.c[colPrecio].v) : null,
+        imagen:    colImagen != null && row.c[colImagen]  && row.c[colImagen].v  ? String(row.c[colImagen].v)  : null,
+        descExtra: colExtra  != null && row.c[colExtra]   && row.c[colExtra].v   ? String(row.c[colExtra].v)   : null,
+        esOferta:  !!esOferta
       };
     });
   }
 
   function fetchSheet(sheet) {
     return fetch(_wcGVizBase + encodeURIComponent(sheet))
-      .then(function(r){ return r.text(); })
-      .then(function(raw){
-        var json = raw.replace(/^[^{]*/,'').replace(/\);\s*$/,'');
+      .then(function (r) { return r.text(); })
+      .then(function (raw) {
+        var json = raw.replace(/^[^{]*/, '').replace(/\);\s*$/, '');
         return JSON.parse(json).table.rows;
       });
   }
 
-  // 1. Ofertas: A=Producto B=Laboratorio C=Precio D,E,F,G... H=Imagen (col índice: A=0,B=1,C=2,H=7)
-  // 2. Nuevo_Producto: B=Nombre C=Lab D=Precio E=Descripcion I=Imagen (índices B=1,C=2,D=3,I=8)
-  // 3. Stock: A=Descripción B=Lab D=Precio (sin imagen)
-
   fetchSheet(_wcSheetOfertas)
-    .then(function(rows){
-      var res = filtrar(rows, 0, 1, 2, 7);  // A,B,C,H
-      if (res.length > 0) return { src:'oferta', items: res };
-
-      return fetchSheet(_wcSheetNuevo).then(function(rows2){
-        var res2 = filtrar(rows2, 1, 2, 3, 8);  // B,C,D,I
-        if (res2.length > 0) return { src:'nuevo', items: res2 };
-
-        return fetchSheet(wcSheetStock()).then(function(rows3){
-          var res3 = filtrar(rows3, 0, 1, 3, null);  // A,B,D,sin imagen
-          return { src:'stock', items: res3 };
+    .then(function (rowsO) {
+      var resO = filtrar(rowsO, 1, 2, 3, 7, 4, true);
+      if (resO.length > 0) return { src: 'oferta', items: resO };
+      return fetchSheet(_wcSheetNuevo).then(function (rowsN) {
+        var resN = filtrar(rowsN, 1, 2, 3, 8, null, false);
+        if (resN.length > 0) return { src: 'nuevo', items: resN };
+        return fetchSheet(wcSheetStock()).then(function (rowsS) {
+          return { src: 'stock', items: filtrar(rowsS, 0, 1, 3, null, null, false) };
         });
       });
     })
-    .then(function(result){
+    .then(function (result) {
       var items = result.items;
       if (!items || items.length === 0) {
         wcMsgFarm('😕 No encontré *' + nombreMed + '* en el catálogo de *' + window._wcCFG.nombre + '*.\n\n¿Quieres buscar con otro nombre?');
-        setTimeout(function(){
-          wcMostrarOpts(['🔍 Buscar otro producto','💬 Hablar con asesor','🔙 Volver al menú']);
+        setTimeout(function () {
+          wcMostrarOpts(['🔍 Buscar otro producto', '💬 Hablar con asesor', '🔙 Volver al menú']);
         }, 800);
         return;
       }
-
-      var msg = '';
-      if (result.src === 'oferta') {
-        msg = '🏷️ ¡*' + nombreMed + '* está en oferta! Mira el precio especial que tenemos para ti:';
-      } else if (result.src === 'nuevo') {
-        msg = '😊 Tenemos esto disponible para ti, *' + _wcNombre + '*:';
-      }
-      // Stock: sin mensaje previo, directo a cards
-      if (msg) {
-        wcMsgFarm(msg);
-        setTimeout(function(){ wcMostrarProductos(items.slice(0,8), Math.max(0, items.length-8)); }, 900);
+      if (result.src === 'nuevo') {
+        wcMsgFarm('😊 Tenemos esto disponible para ti, *' + _wcNombre + '*:');
+        setTimeout(function () {
+          wcMostrarProductos(items.slice(0, 8), Math.max(0, items.length - 8), result.src);
+        }, 900);
       } else {
-        wcMostrarProductos(items.slice(0,8), Math.max(0, items.length-8));
+        wcMostrarProductos(items.slice(0, 8), Math.max(0, items.length - 8), result.src);
       }
     })
-    .catch(function(err){
+    .catch(function (err) {
       console.error('[WC Sheets]', err);
       wcMsgFarm('⚠️ Tuve un problema consultando el catálogo. ¿Te conecto con un asesor?');
-      setTimeout(function(){
-        wcMostrarOpts(['💬 Hablar con asesor','🔙 Volver al menú']);
-      }, 800);
+      setTimeout(function () { wcMostrarOpts(['💬 Hablar con asesor', '🔙 Volver al menú']); }, 800);
     });
 }
 
 /* ══════════════════════════════════════════════
-   TARJETAS DE PRODUCTO con imagen y botón agregar
+   TARJETAS DE PRODUCTO
+   FIX 2: imagen completa, altura 150px
 ══════════════════════════════════════════════ */
-function wcMostrarProductos(productos, extras) {
+function wcMostrarProductos(productos, extras, src) {
   var msgs = document.getElementById('wil-msgs');
   var wrap = document.createElement('div');
   wrap.style.cssText = 'display:flex;align-items:flex-start;gap:6px;animation:msgIn .22s ease;margin-bottom:6px';
   wrap.id = 'wc-last-productos';
   wrap.setAttribute('data-productos', JSON.stringify(productos));
 
-  var cards = productos.map(function(item, i){
-    var precioStr = item.precio != null ? '$' + item.precio.toLocaleString('es-CO') : 'Precio a confirmar';
-    var imgHTML   = item.imagen
-      ? '<div style="width:100%;height:90px;overflow:hidden;border-radius:10px 10px 0 0;background:#f3f4f6">'
-          + '<img src="' + item.imagen + '" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.style.display=\'none\'">'
-        + '</div>'
+  var cards = productos.map(function (item, i) {
+    var precioStr   = item.precio != null ? '$' + item.precio.toLocaleString('es-CO') : 'Precio a confirmar';
+    var precioColor = item.esOferta ? '#ef4444' : '#003f87';
+
+    /* FIX 2: height:150px para ver la imagen completa sin recortar */
+    var imgBlock = '';
+if (item.imagen) {
+  var safe = item.imagen.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  imgBlock =
+    '<div style="position:relative;width:100%;height:150px;overflow:hidden;border-radius:10px 10px 0 0;background:#f3f4f6">'
+      + (item.esOferta ? '<div class="wc-badge-oferta">🏷️ OFERTA</div>' : '')
+      + '<img src="' + item.imagen + '" '
+        + 'style="width:100%;height:100%;object-fit:cover;display:block;position:relative;z-index:1" '
+        + 'onerror="this.parentElement.style.display=\'none\'">'
+      + '<button class="wc-lupa-btn" onclick="wcAbrirModal(\'' + safe + '\')" title="Ver imagen grande" style="position:absolute;bottom:8px;right:8px;z-index:10;width:32px;height:32px;border-radius:50%;background:rgba(0,63,135,.88);border:none;color:#fff;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;">🔍</button>'
+    + '</div>';
+
+    } else if (item.esOferta) {
+      imgBlock =
+        '<div style="width:100%;background:linear-gradient(90deg,#fef2f2,#fee2e2);padding:7px 10px;border-radius:10px 10px 0 0">'
+          + '<div class="wc-badge-oferta" style="position:static;animation:none;display:inline-flex">🏷️ OFERTA</div>'
+        + '</div>';
+    }
+
+    var extraHTML = (item.descExtra && item.esOferta)
+      ? '<div style="font-size:10px;color:#6b7280;margin-bottom:5px;line-height:1.3;font-style:italic">' + item.descExtra + '</div>'
       : '';
-    return '<div style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.09);animation:slideUp .22s ease ' + (i*0.07) + 's both;min-width:160px;max-width:200px;flex-shrink:0">'
-        + imgHTML
+
+    return '<div style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.10);animation:slideUp .22s ease ' + (i * 0.07) + 's both;min-width:165px;max-width:205px;flex-shrink:0">'
+        + imgBlock
         + '<div style="padding:10px">'
           + '<div style="font-size:12px;font-weight:800;color:#111827;line-height:1.3;margin-bottom:2px">' + item.desc + '</div>'
-          + '<div style="font-size:10.5px;color:#6b7280;margin-bottom:8px">🏭 ' + item.lab + '</div>'
+          + '<div style="font-size:10.5px;color:#6b7280;margin-bottom:5px">🏭 ' + item.lab + '</div>'
+          + extraHTML
           + '<div style="display:flex;align-items:center;justify-content:space-between;gap:4px">'
-            + '<span style="font-size:13px;font-weight:900;color:#003f87">' + precioStr + '</span>'
-            + '<button onclick="wcAgregar(' + i + ')" style="background:#003f87;color:#fff;border:none;border-radius:99px;padding:5px 11px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0" id="wc-btn-agregar-' + i + '">+ Agregar</button>'
+            + '<span style="font-size:13px;font-weight:900;color:' + precioColor + '">' + precioStr + '</span>'
+            + '<button onclick="wcAgregar(' + i + ')" id="wc-btn-agregar-' + i + '" '
+              + 'style="background:#003f87;color:#fff;border:none;border-radius:99px;padding:5px 11px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0">'
+              + '+ Agregar'
+            + '</button>'
           + '</div>'
         + '</div>'
       + '</div>';
   }).join('');
 
   var extrasHTML = extras > 0
-    ? '<div style="font-size:11px;color:#9ca3af;text-align:center;padding:6px 0;font-style:italic">...y ' + extras + ' resultado(s) más. Afina la búsqueda.</div>'
+    ? '<div style="font-size:11px;color:#9ca3af;text-align:center;padding:6px 0;font-style:italic">…y ' + extras + ' resultado(s) más. Afina la búsqueda.</div>'
     : '';
 
   wrap.innerHTML =
@@ -4236,9 +4366,7 @@ function wcMostrarProductos(productos, extras) {
   msgs.appendChild(wrap);
   msgs.scrollTop = msgs.scrollHeight;
 
-  setTimeout(function(){
-    wcMostrarOpts(['🔍 Buscar otro producto','🔙 Volver al menú']);
-  }, 400);
+  setTimeout(function () { wcMostrarOpts(['🔍 Buscar otro producto', '🔙 Volver al menú']); }, 400);
 }
 
 /* ══════════════════════════════════════════════
@@ -4251,23 +4379,25 @@ function wcAgregar(idx) {
   var item  = lista[idx];
   if (!item) return;
 
-  var existe = _wcCarrito.find(function(x){ return x.desc === item.desc && x.lab === item.lab; });
+  var existe = _wcCarrito.find(function (x) { return x.desc === item.desc && x.lab === item.lab; });
   if (existe) {
     existe.qty++;
   } else {
-    _wcCarrito.push({ desc:item.desc, lab:item.lab, precio:item.precio, imagen:item.imagen||null, qty:1 });
+    _wcCarrito.push({
+      desc: item.desc, lab: item.lab, precio: item.precio,
+      imagen: item.imagen || null, esOferta: item.esOferta || false, qty: 1
+    });
   }
 
   wcActualizarFAB();
 
   var btn = document.getElementById('wc-btn-agregar-' + idx);
   if (btn) {
-    btn.textContent  = '✓ Listo';
-    btn.style.background = '#059669';
-    setTimeout(function(){ btn.textContent = '+ Agregar'; btn.style.background = '#003f87'; }, 1400);
+    btn.textContent = '✓ Listo'; btn.style.background = '#059669';
+    setTimeout(function () { btn.textContent = '+ Agregar'; btn.style.background = '#003f87'; }, 1400);
   }
 
-  var total = _wcCarrito.reduce(function(s,x){return s+x.qty;},0);
+  var total = _wcCarrito.reduce(function (s, x) { return s + x.qty; }, 0);
   wcMsgFarm('¡Listo! 🛒 *' + item.desc + '* agregado.\n\nTienes *' + total + ' producto(s)* en tu carrito.');
 }
 
@@ -4275,19 +4405,19 @@ function wcAgregar(idx) {
    MAPA
 ══════════════════════════════════════════════ */
 function wcMsgMapa() {
-  var cfg  = window._wcCFG;
-  var url  = _wcMapas[_wcTiendaChat] || '#';
-  var queries = { expertos:'Farma Expertos Medellín Antioquia', central:'Droguería Central Medellín Antioquia' };
-  var src  = 'https://maps.google.com/maps?q=' + encodeURIComponent(queries[_wcTiendaChat] || cfg.nombre) + '&z=17&output=embed';
+  var cfg     = window._wcCFG;
+  var url     = _wcMapas[_wcTiendaChat] || '#';
+  var queries = { expertos: 'Farma Expertos Copacabana Antioquia', central: 'Droguería Central Copacabana Antioquia' };
+  var src = 'https://maps.google.com/maps?q=' + encodeURIComponent(queries[_wcTiendaChat] || cfg.nombre) + '&z=17&output=embed';
   var msgs = document.getElementById('wil-msgs');
-  var d    = document.createElement('div');
+  var d = document.createElement('div');
   d.style.cssText = 'display:flex;align-items:flex-end;gap:6px;animation:msgIn .22s ease;margin-bottom:6px';
   d.innerHTML =
     '<div style="width:28px;height:28px;border-radius:50%;background:#003f87;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">💊</div>'
     + '<div style="max-width:82%;border-radius:16px 16px 16px 4px;background:#fff;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.09)">'
       + '<div style="position:relative;width:100%;height:190px;overflow:hidden">'
         + '<iframe src="' + src + '" width="100%" height="100%" style="border:0;display:block;pointer-events:none" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>'
-        + '<a href="' + url + '" target="_blank" rel="noopener" style="position:absolute;inset:0;z-index:2" title="Abrir en Google Maps"></a>'
+        + '<a href="' + url + '" target="_blank" rel="noopener" style="position:absolute;inset:0;z-index:2"></a>'
         + '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-70%);z-index:3;pointer-events:none;display:flex;flex-direction:column;align-items:center">'
           + '<div style="position:relative;width:46px;height:46px">'
             + '<div style="position:absolute;top:50%;left:50%;width:46px;height:46px;border-radius:50%;background:rgba(0,63,135,.2);animation:wcPulso 1.8s ease-out infinite"></div>'
@@ -4299,7 +4429,7 @@ function wcMsgMapa() {
       + '</div>'
       + '<div style="padding:10px 13px 12px">'
         + '<div style="font-size:12.5px;font-weight:800;color:#111827;margin-bottom:2px">' + cfg.nombre + '</div>'
-        + '<div style="font-size:11px;color:#6b7280;margin-bottom:9px">📍 Medellín, Antioquia &nbsp;·&nbsp; <span style="color:#003f87">Toca para abrir</span></div>'
+        + '<div style="font-size:11px;color:#6b7280;margin-bottom:9px">📍 Copacabana, Antioquia · <span style="color:#003f87">Toca para abrir</span></div>'
         + '<a href="' + url + '" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:6px;background:#003f87;color:#fff;font-size:12px;font-weight:700;padding:9px 14px;border-radius:9px;text-decoration:none">🗺️ Ver en Google Maps</a>'
       + '</div>'
     + '</div>';
@@ -4311,20 +4441,21 @@ function wcMsgMapa() {
    UI — burbujas, opciones, cierre
 ══════════════════════════════════════════════ */
 function wcMsgFarm(txt) {
-  var el    = document.getElementById('wc-typing');
-  el.style.display = 'flex';
-  document.getElementById('wil-msgs').scrollTop = 99999;
-  var delay = Math.min(400 + txt.length * 14, 1800);
-  setTimeout(function(){
-    el.style.display = 'none';
+  var el = document.getElementById('wc-typing');
+  if (el) el.style.display = 'flex';
+  var msgsEl = document.getElementById('wil-msgs');
+  if (msgsEl) msgsEl.scrollTop = 99999;
+  var delay = Math.min(400 + (txt || '').length * 14, 1800);
+  setTimeout(function () {
+    if (el) el.style.display = 'none';
     var msgs = document.getElementById('wil-msgs');
-    var d    = document.createElement('div');
+    var d = document.createElement('div');
     d.style.cssText = 'display:flex;align-items:flex-end;gap:6px;animation:msgIn .22s ease;margin-bottom:6px';
     d.innerHTML =
       '<div style="width:28px;height:28px;border-radius:50%;background:#003f87;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">💊</div>'
       + '<div style="max-width:78%;padding:9px 13px 7px;border-radius:16px 16px 16px 4px;background:#fff;color:#111827;font-size:13px;font-weight:500;line-height:1.55;box-shadow:0 1px 4px rgba(0,0,0,.07)">'
-      + wcFmt(txt)
-      + '<div style="font-size:9px;color:rgba(0,0,0,.35);margin-top:4px;text-align:right">' + wcHora() + '</div>'
+        + wcFmt(txt)
+        + '<div style="font-size:9px;color:rgba(0,0,0,.35);margin-top:4px;text-align:right">' + wcHora() + '</div>'
       + '</div>';
     msgs.appendChild(d);
     msgs.scrollTop = msgs.scrollHeight;
@@ -4333,7 +4464,7 @@ function wcMsgFarm(txt) {
 
 function wcMsgUser(txt) {
   var msgs = document.getElementById('wil-msgs');
-  var d    = document.createElement('div');
+  var d = document.createElement('div');
   d.style.cssText = 'display:flex;flex-direction:row-reverse;align-items:flex-end;gap:6px;animation:msgIn .22s ease;margin-bottom:6px';
   d.innerHTML =
     '<div style="max-width:78%;padding:9px 13px 7px;border-radius:16px 16px 4px 16px;background:#003f87;color:#fff;font-size:13px;font-weight:500;line-height:1.55">'
@@ -4345,19 +4476,28 @@ function wcMsgUser(txt) {
 }
 
 function wcMostrarOpciones() {
-  wcMostrarOpts(['💊 Buscar medicamento / producto','🕐 Horarios de atención','📍 Nuestra ubicación','💬 Hablar con asesor']);
+  wcMostrarOpts([
+    '💊 Buscar medicamento / producto',
+    '🕐 Horarios de atención',
+    '📍 Nuestra ubicación',
+    '💬 Realizar compra'
+  ]);
 }
 
+/* FIX 3: wcMostrarOpts — fuerza display grid y limpia inline style */
 function wcMostrarOpts(ops) {
   var el = document.getElementById('wc-opts');
-  el.style.cssText = 'display:flex;flex-wrap:wrap;gap:7px;padding:8px 14px 12px;background:#f0f4f7';
-  el.innerHTML = ops.map(function(o){
-    return '<button onclick="wcSelOpt(\'' + o.replace(/'/g,"\\'") + '\')" style="border:1.5px solid #003f87;background:#fff;color:#003f87;border-radius:99px;padding:7px 15px;font-size:12px;font-weight:700;cursor:pointer;font-family:\'Manrope\',sans-serif;white-space:nowrap">' + o + '</button>';
+  if (!el) return;
+  var btnStyle = 'border:none;background:#003f87;color:#fff;border-radius:14px;padding:13px 10px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:normal;text-align:center;line-height:1.35;min-height:58px;width:100%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,63,135,.3);letter-spacing:.1px;';
+  el.innerHTML = ops.map(function (o) {
+    return '<button onclick="wcSelOpt(\'' + o.replace(/'/g, "\\'") + '\')" style="' + btnStyle + '">' + o + '</button>';
   }).join('');
+  el.setAttribute('style', 'display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 14px 14px;background:#eef2f7;border-top:1.5px solid #dde4ed;');
 }
 
 function wcSelOpt(txt) {
-  document.getElementById('wc-opts').style.display = 'none';
+  var el = document.getElementById('wc-opts');
+  if (el) el.style.display = 'none';
   wcMsgUser(txt);
   wcProcesar(txt);
 }
@@ -4372,9 +4512,17 @@ function wcEnviar() {
   wcProcesar(txt);
 }
 
+function wcAutoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 80) + 'px';
+}
+
 function wilCerrarChat() {
   document.getElementById('wil-chat-ov').style.display = 'none';
   document.body.style.overflow = '';
+  /* Cerrar panel carrito al cerrar el chat */
+  var panel = document.getElementById('wc-carrito-panel');
+  if (panel) panel.classList.remove('abierto');
 }
 
 /* ══════════════════════════════════════════════
@@ -4382,157 +4530,110 @@ function wilCerrarChat() {
 ══════════════════════════════════════════════ */
 function wcProcesar(txt) {
   var cfg = window._wcCFG;
-  var tl  = txt.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  var tl  = (txt || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-  /* ── CERRADO ── */
   if (_wcFase === 'cerrado') return;
 
-  /* ── SALUDO ──
-     El bot ya lanzó el setTimeout con "¿Con quién tengo el gusto?".
-     Solo capturamos si el usuario introduce su nombre antes. */
   if (_wcFase === 'saludo') {
     var m = txt.match(/(?:soy|me llamo|mi nombre es)\s+([A-Za-zÁÉÍÓÚáéíóúÑñ]+(?:\s+[A-Za-zÁÉÍÓÚáéíóúÑñ]+)?)/i);
     if (m) { _wcFase = 'nombre'; wcProcesar(m[1].trim()); }
     return;
   }
 
-  /* ── NOMBRE ── */
   if (_wcFase === 'nombre') {
-    if (/^(hola|buenas?|hey|saludos?|buenos|buenos dias|buenas tardes|buenas noches|hi|hello)$/i.test(txt.trim())) {
-      wcMsgFarm('¿Con quién tengo el gusto de hablar hoy? 😊');
-      return;
+    if (/^(hola|buenas?|hey|saludos?|buenos dias?|buenas tardes|buenas noches|hi|hello)$/i.test(txt.trim())) {
+      wcMsgFarm('¿Con quién tengo el gusto de hablar hoy? 😊'); return;
     }
-    var raw = txt.replace(/^(soy|me llamo|mi nombre es)\s*/i,'').trim();
-    raw = raw.split(/\s+/).slice(0,2).join(' ');
+    var raw = txt.replace(/^(soy|me llamo|mi nombre es)\s*/i, '').trim();
+    raw = raw.split(/\s+/).slice(0, 2).join(' ');
     raw = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
-    if (!wcEsNombre(raw)) {
-      wcMsgFarm('Disculpa, ¿me puedes decir tu nombre para atenderte mejor? 😊');
-      return;
-    }
+    if (!wcEsNombre(raw)) { wcMsgFarm('Disculpa, ¿me puedes decir tu nombre para atenderte mejor? 😊'); return; }
     _wcNombre = raw;
     localStorage.setItem('wil_nombre_cliente', _wcNombre);
     _wcFase = 'chat';
     wcMsgFarm('¡Mucho gusto, *' + _wcNombre + '*! 😊 ¿En qué te puedo ayudar hoy?');
-    setTimeout(function(){
+    setTimeout(function () {
       document.getElementById('wc-wa-footer').style.display = 'block';
       wcMostrarOpciones();
     }, 1600);
     return;
   }
 
-  /* ── CHAT ── */
   if (_wcFase === 'chat') {
-    document.getElementById('wc-opts').style.display = 'none';
+    var optsEl = document.getElementById('wc-opts');
+    if (optsEl) optsEl.style.display = 'none';
 
-    /* ─ Flujo checkout: dirección ─ */
     if (_wcIntencion === 'checkout_direccion') {
-      _wcPedidoDatos.dir = txt.trim();
-      _wcIntencion = 'checkout_tel';
-      wcMsgFarm('¿Y tu *número de teléfono* de contacto? 📞');
-      return;
+      _wcPedidoDatos.dir = txt.trim(); _wcIntencion = 'checkout_tel';
+      wcMsgFarm('¿Y tu *número de teléfono* de contacto? 📞'); return;
     }
-
-    /* ─ Flujo checkout: teléfono ─ */
     if (_wcIntencion === 'checkout_tel') {
-      _wcPedidoDatos.tel = txt.trim();
-      _wcIntencion = 'checkout_domi';
-      wcMsgFarm('¿El domicilio es con *costo de envío* o tienes alguna indicación especial para el repartidor?\n\n_(Escribe "ninguna" si no aplica)_');
-      return;
+      _wcPedidoDatos.tel = txt.trim(); _wcIntencion = 'checkout_domi';
+      wcMsgFarm('¿El domicilio tiene alguna indicación especial?\n\n_(Escribe "ninguna" si no aplica)_'); return;
     }
-
-    /* ─ Flujo checkout: datos domicilio / notas ─ */
     if (_wcIntencion === 'checkout_domi') {
       _wcPedidoDatos.domi = /ninguna?|no|sin/i.test(tl) ? '' : txt.trim();
-      _wcIntencion = '';
-      wcGuardarPedidoSheets();
-      return;
+      _wcIntencion = ''; wcGuardarPedidoSheets(); return;
     }
-
-    /* ─ Flujo med: nombre ─ */
     if (_wcIntencion === 'med_nombre') {
-      _wcMedNombre = txt.trim();
-      _wcIntencion = 'med_detalle';
-      wcMsgFarm('¿Lo buscas de algún laboratorio o presentación específica? 💊\n\n_(Escribe "cualquiera" si no importa)_');
-      return;
+      _wcMedNombre = txt.trim(); _wcIntencion = 'med_detalle';
+      wcMsgFarm('¿Lo buscas de algún laboratorio o presentación específica? 💊\n\n_(Escribe "cualquiera" si no importa)_'); return;
     }
-
-    /* ─ Flujo med: detalle ─ */
     if (_wcIntencion === 'med_detalle') {
       _wcIntencion = '';
       var det = /cualquiera|no importa|da igual|sin|ninguno|^no$/i.test(tl) ? null : txt.trim();
-      wcBuscarEnSheets(_wcMedNombre, det);
-      return;
+      wcBuscarEnSheets(_wcMedNombre, det); return;
     }
 
-    /* ─ Detectar intención ─ */
-
-    if (tl.includes('medicamento')||tl.includes('medicina')||tl.includes('pastilla')||
-        tl.includes('jarabe')||tl.includes('crema')||tl.includes('ampolla')||
-        tl.includes('buscar')||tl.includes('disponib')||tl.includes('hay ')||
-        tl.includes('tienen')||tl.includes('stock')||tl.includes('precio')||
-        tl.includes('catalogo')||tl.includes('valor')||tl.includes('cuanto')||tl.includes('costo')) {
+    if (/medicamento|medicina|pastilla|jarabe|crema|ampolla|buscar|disponib|hay |tienen|stock|precio|catalogo|valor|cuanto|costo|producto/.test(tl)) {
       _wcIntencion = 'med_nombre';
       var frases = [
         '¡Con gusto, *' + _wcNombre + '*! 💊 ¿Cuál es el medicamento o producto que buscas?',
         '¡Por supuesto, *' + _wcNombre + '*! 😊 ¿Qué producto necesitas?',
         '¡Claro que sí! ¿Qué medicamento estás buscando, *' + _wcNombre + '*? 💊'
       ];
-      wcMsgFarm(frases[Math.floor(Math.random()*frases.length)]);
-      return;
+      wcMsgFarm(frases[Math.floor(Math.random() * frases.length)]); return;
     }
-
-    if (tl.includes('pedido')||tl.includes('pedir')||(tl.includes('compra')&&!tl.includes('buscar'))) {
-      if (_wcCarrito.length > 0) {
-        wcIniciarCheckout();
-      } else {
-        wcMsgFarm('Tu carrito está vacío, *' + _wcNombre + '*. Busca primero el producto que necesitas 😊');
-        setTimeout(function(){ wcMostrarOpts(['💊 Buscar medicamento','🔙 Volver al menú']); }, 800);
+    if (/pedido|pedir/.test(tl) || (tl.includes('compra') && !tl.includes('buscar'))) {
+      if (_wcCarrito.length > 0) { wcIniciarCheckout(); }
+      else {
+        wcMsgFarm('Tu carrito está vacío, *' + _wcNombre + '*. Busca primero el producto 😊');
+        setTimeout(function () { wcMostrarOpts(['💊 Buscar medicamento', '🔙 Volver al menú']); }, 800);
       }
       return;
     }
-
-    if (tl.includes('horario')||tl.includes('hora')||tl.includes('abierto')||tl.includes('abren')||tl.includes('cierran')||tl.includes('atencion')) {
+    if (/horario|hora|abierto|abren|cierran|atencion/.test(tl)) {
       wcMsgFarm('Nuestro horario de atención, *' + _wcNombre + '* 🕐:\n\n*Lunes a domingo*\n🌅 *7:00 a.m.* a 🌙 *9:30 p.m.*\n\n¡Estamos para servirte! 😊');
-      setTimeout(wcMostrarOpciones, 1800);
-      return;
+      setTimeout(wcMostrarOpciones, 1800); return;
     }
-
-    if (tl.includes('domicilio')||tl.includes('envio')||tl.includes('envío')||tl.includes('entrega')||tl.includes('llevar')) {
-      wcMsgFarm('Sí, *' + _wcNombre + '* 🛵 contamos con servicio de domicilio.\n\nAgrega productos al carrito y al confirmar el pedido capturamos tu dirección y datos de entrega.');
-      setTimeout(function(){ wcMostrarOpts(['💊 Buscar medicamento','🔙 Volver al menú']); }, 1600);
-      return;
+    if (/domicilio|envio|envío|entrega|llevar/.test(tl)) {
+      wcMsgFarm('Sí, *' + _wcNombre + '* 🛵 contamos con servicio de domicilio.\n\nAgrega productos al carrito y al confirmar capturamos tu dirección.');
+      setTimeout(function () { wcMostrarOpts(['💊 Buscar medicamento', '🔙 Volver al menú']); }, 1600); return;
     }
-
-    if (tl.includes('ubicacion')||tl.includes('donde')||tl.includes('direccion')||tl.includes('mapa')) {
+    if (/ubicacion|donde|direccion|mapa/.test(tl)) {
       wcMsgFarm('Con gusto, *' + _wcNombre + '* 📍 Aquí tienes nuestra ubicación:');
-      setTimeout(wcMsgMapa, 1200);
-      setTimeout(wcMostrarOpciones, 2500);
-      return;
+      setTimeout(wcMsgMapa, 1200); setTimeout(wcMostrarOpciones, 2500); return;
     }
-
-    if (tl.includes('gracias')||tl.includes('listo')||tl.includes('hasta luego')||tl.includes('chao')||tl.includes('adios')) {
-      wcMsgFarm('¡Con mucho gusto, *' + _wcNombre + '*! 😊\n\nFue un placer atenderte en *' + cfg.nombre + '*.\n\n¡' + wcSaludo() + ' y hasta pronto! 🌟');
-      return;
+    if (/gracias|listo|hasta luego|chao|adios/.test(tl)) {
+      wcMsgFarm('¡Con mucho gusto, *' + _wcNombre + '*! 😊\n\nFue un placer atenderte en *' + cfg.nombre + '*.\n\n¡' + wcSaludo() + ' y hasta pronto! 🌟'); return;
     }
-
-    if (tl.includes('menu')||tl.includes('menú')||tl.includes('volver')||tl.includes('opciones')||tl.includes('inicio')) {
+    if (/menu|menú|volver|opciones|inicio/.test(tl)) {
       wcMsgFarm('¡Claro, *' + _wcNombre + '*! ¿En qué más te puedo ayudar? 😊');
-      setTimeout(wcMostrarOpciones, 1200);
-      return;
+      setTimeout(wcMostrarOpciones, 1200); return;
     }
-
-    if (tl.includes('asesor')||tl.includes('hablar con')) {
-      var tel  = cfg.numero;
+    if (/asesor|hablar con/.test(tl)) {
       var wmsg = encodeURIComponent('Soy *' + _wcNombre + '*, me comuniqué desde el chat de *' + cfg.nombre + '* y necesito ayuda.');
-      window.open('https://wa.me/' + tel + '?text=' + wmsg, '_blank');
-      wcMsgFarm('Conectándote con un asesor de *' + cfg.nombre + '* por WhatsApp 📲. ¡Que tengas un excelente día, *' + _wcNombre + '*! 😊');
-      return;
+      window.open('https://wa.me/' + cfg.numero + '?text=' + wmsg, '_blank');
+      wcMsgFarm('Conectándote con un asesor por WhatsApp 📲. ¡Que tengas un excelente día, *' + _wcNombre + '*! 😊'); return;
     }
 
     wcMsgFarm('Entendido, *' + _wcNombre + '* 😊 ¿En qué te puedo ayudar?');
     setTimeout(wcMostrarOpciones, 1200);
   }
 }
+
+
+
 /* ═══════════════════════════════════════════════════════════════════
    WIL — MODO ENVÍO A TERCERO + FUERA DE ZONA
    Archivo: wil-farmacia-envio-tercero.js
