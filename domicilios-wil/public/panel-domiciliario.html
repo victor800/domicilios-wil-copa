@@ -5646,18 +5646,8 @@ console.log('[PARCHE Historial RT v1.0] ✅ Stats en tiempo real con domicilio c
 
   /* ════ DETECTAR PEDIDO LIBRE ════ */
   function esPedidoLibre(p) {
-    if (!p) return false;
-    var com=(p.comercio||'').toLowerCase();
-    if (com.includes('domi busca')||com==='wil-libre'||com==='domi wil') return true;
-    var tot=(p.total||'').toLowerCase();
-    if (!tot||tot==='—'||tot.includes('confirmar')||tot.includes('libre')) return true;
-    var prods=p._prods||[];
-    if (prods.length>0) {
-      var sp=prods.every(function(pr){return (!pr.vtotal||pr.vtotal===0)&&(!pr.vu||pr.vu===0);});
-      if (sp) return true;
-    }
-    if (_parseCOP(p.total)===0) return true;
-    return false;
+   
+    return true;
   }
 
   /* ════ CLAUDE VISION API ════
@@ -5685,10 +5675,13 @@ console.log('[PARCHE Historial RT v1.0] ✅ Stats en tiempo real con domicilio c
     sec.innerHTML = _buildHTML(domiNum);
     stepper.parentNode.insertBefore(sec, stepper);
 
-    document.getElementById('wfl-file-input').addEventListener('change', function (e) {
-      const file = e.target.files[0];
-      if (file) _procesarImagen(file);
-    });
+    var inp = document.getElementById('wfl-file-input');
+if (inp) {
+  inp.onchange = function(e) {
+    var file = e.target.files[0];
+    if (file) _procesarImagen(file);
+  };
+}
   }
 
 function _buildHTML(domiNum) {
@@ -6527,6 +6520,55 @@ function _wflMostrarResumenExito(totalFact, domiNum, urlFact) {
 
   console.log('[WIL Parche Factura+WA v3.1] ✅ Zoom modal con pinch, drag, doble tap, botones +/−/reset');
 
+})();
+
+// ═══ PARCHE MÓVIL: Factura siempre visible ═══
+(function parcheMobilFactura() {
+
+  function _intentarRenderFactura() {
+    var p = window.state && window.state.pedidoActivo;
+    if (!p) return false;
+    var sec = document.getElementById('wil-factura-libre-section');
+    if (sec) return true; // ya existe
+    var stepper = document.getElementById('tabStepper');
+    if (!stepper) return false;
+    // Llamar directamente a renderSeccion si existe
+    if (typeof renderSeccion === 'function') {
+      renderSeccion(p);
+      return true;
+    }
+    return false;
+  }
+
+  // Intentar en el momento de switchTab a 'ruta'
+  var _origSwitch = window.switchTab;
+  window.switchTab = function(tab) {
+    _origSwitch.apply(this, arguments);
+    if (tab === 'ruta') {
+      setTimeout(function() {
+        _intentarRenderFactura();
+      }, 300);
+      setTimeout(function() {
+        _intentarRenderFactura();
+      }, 900);
+    }
+  };
+
+  // Intentar cuando se activa el pedido (triple fallback)
+  var _origActivar = window.activarPedidoEnRuta;
+  window.activarPedidoEnRuta = function(p) {
+    if (typeof _origActivar === 'function') _origActivar.apply(this, arguments);
+    [400, 900, 1600, 2500].forEach(function(ms) {
+      setTimeout(function() { _intentarRenderFactura(); }, ms);
+    });
+  };
+
+  // Si ya hay pedido activo al cargar (restaurado de storage)
+  [1500, 3000].forEach(function(ms) {
+    setTimeout(function() { _intentarRenderFactura(); }, ms);
+  });
+
+  console.log('[WIL Parche Móvil Factura] ✅ Activo');
 })();
 
 </script>
