@@ -1716,13 +1716,13 @@ renderOfertasCarrusel = function(ofertas) {
         'scroll-snap-align:start;">' +
 
         /* ── Imagen ── */
-        '<div style="width:100%;height:180px;background:#fff;' +
+        '<div style="width:100%;height:180px;background:#ffffff;display:flex;' +
   'display:flex;align-items:center;justify-content:center;' +
   'overflow:hidden;position:relative;flex-shrink:0;border-bottom:1px solid #f3f4f6;">' +
 
           (hasImg
             ? '<img src="' + escFarmacia(o.img) + '" alt="' + escFarmacia(o.nombre) + '"' +
-              ' style="width:100%;height:180px;object-fit:contain;padding:8px;"' +
+              ' style="width:100%;height:180px;object-fit:contain;padding:0px;"' +
 
               ' onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'">' +
               '<span class="sym" style="font-size:44px;color:' + c1 + ';display:none">medication</span>'
@@ -5458,185 +5458,166 @@ window.renderResults = function(items, q) {
     items.length + ' resultado' + (items.length !== 1 ? 's' : '') + ' para "' + q + '"';
 
   var grid = document.getElementById('res-grid');
-  grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%';
+  grid.style.cssText = 'display:flex;flex-direction:column;gap:10px;width:100%';
   grid.innerHTML = '';
 
-  var GRADS = [
-    ['#003f87','#1a56db'],['#064e3b','#059669'],['#4c1d95','#7c3aed'],
-    ['#7c1d00','#dc2626'],['#1a3a3a','#0d9488'],['#1e1b4b','#4338ca'],
-    ['#86198f','#c026d3'],['#b45309','#d97706'],['#0e7490','#0891b2'],
-    ['#15803d','#16a34a'],['#dc2626','#ef4444'],['#7c3aed','#8b5cf6']
-  ];
-  var ICONS = [
-    'medication','pill','vaccines','healing','health_and_safety','ecg',
-    'monitor_heart','water_drop','science','face_6','child_care','wb_sunny',
-    'spa','thermostat','emergency','biotech','favorite','local_pharmacy'
-  ];
+  // ── FEATURED: primer resultado ocupa ancho completo ──
+  var featured = items[0];
+  var resto    = items.slice(1);
 
-  items.forEach(function(it, i) {
-    cache[it.key] = it;
-    var inCart   = !!cart[it.key];
-    var agotado  = it.stock !== undefined ? it.stock <= 0 : false;
-    var precio   = it.precio > 0 ? it.precio : (it.pUnit > 0 ? it.pUnit : 0);
-    var gc       = GRADS[i % GRADS.length];
-    var c1orig   = gc[0];
-    var c1       = agotado ? '#9ca3af' : c1orig;
-    var icon     = ICONS[i % ICONS.length];
-    var uid      = 'rs_' + i;
+  if (featured) {
+    cache[featured.key] = featured;
+    var precio     = featured.precio > 0 ? featured.precio : (featured.pUnit > 0 ? featured.pUnit : 0);
+    var agotado    = featured.stock !== undefined ? featured.stock <= 0 : false;
+    var hasImg     = !!(featured.imagen && featured.imagen.startsWith('http'));
+    var precioUnd  = parsearPrecioUnidad(featured);
+    var labelCaja  = parsearCantidadCaja(featured) ? 'Caja ×' + parsearCantidadCaja(featured) : 'Caja';
+    var keyUnd     = featured.key + '__unidad';
+    var descUnd    = featured.desc + ' (unidad)';
+    cache[keyUnd]  = Object.assign({}, featured, { key: keyUnd, precio: precioUnd, pUnit: precioUnd });
 
-    var img = (it.imagen || '').replace(/\r|\n|\t/g, '').trim();
-    var hasImg = img.length > 8 && img.startsWith('http');
+    var seed = featured.key.split('').reduce(function(a,c){return a+c.charCodeAt(0);},0);
+    var c1   = _PROD_GRADS[seed % _PROD_GRADS.length][0];
+    var icon = _PROD_ICONS[seed % _PROD_ICONS.length];
 
-    /* ── Detectar precio unitario ── */
-    var precioUnidad = parsearPrecioUnidad(it);
-    var cantCaja     = parsearCantidadCaja(it);
-
-    var card = document.createElement('article');
-    card.style.cssText =
-      'background:#fff;border-radius:16px;border:1.5px solid #e5e7eb;' +
-      'box-shadow:0 2px 10px rgba(0,0,0,.06);display:flex;flex-direction:column;' +
-      'overflow:hidden;animation:fadeUp .25s ease both;animation-delay:' +
-      Math.min(i * 20, 240) + 'ms;' + (agotado ? 'opacity:.82' : '');
-
-    /* ── Zona imagen ── */
-    var zonaImg =
-      '<div style="height:130px;background:#fff;display:flex;align-items:center;' +
-        'justify-content:center;flex-shrink:0;position:relative;overflow:hidden;' +
-        'border-bottom:1px solid #f3f4f6;">' +
-
-        (hasImg
-          ? '<img src="' + escFarmacia(img) + '"' +
-            ' style="width:100%;height:130px;object-fit:contain;object-position:center;' +
-            'padding:6px;' + (agotado ? 'filter:grayscale(.55);opacity:.65;' : '') + '"' +
-            ' onerror="this.style.display=\'none\';' +
-            'var f=document.getElementById(\'' + uid + '\');if(f)f.style.display=\'flex\'">'
-          : '') +
-
-        '<span id="' + uid + '" class="sym symf"' +
-          ' style="font-size:50px;color:' + c1orig + ';opacity:' + (agotado ? .35 : 1) + ';' +
-          'display:' + (hasImg ? 'none' : 'flex') + ';' +
-          'align-items:center;justify-content:center;width:100%;height:130px;">' +
-          icon + '</span>' +
-
-        (agotado
-          ? '<div style="position:absolute;inset:0;background:rgba(220,38,38,.10);z-index:3;pointer-events:none;"></div>' +
-            '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);' +
-            'background:rgba(220,38,38,.90);color:#fff;font-family:\'Manrope\',sans-serif;' +
-            'font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.14em;' +
-            'padding:4px 13px;border-radius:99px;z-index:4;white-space:nowrap;' +
-            'box-shadow:0 2px 8px rgba(220,38,38,.4);">AGOTADO</div>'
-          : '') +
-
-        '<div style="position:absolute;top:7px;right:8px;background:' + (agotado ? '#9ca3af' : c1orig) + ';color:#fff;' +
-          'font-size:7.5px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;' +
-          'padding:2px 7px;border-radius:99px;max-width:88px;overflow:hidden;' +
-          'text-overflow:ellipsis;white-space:nowrap;z-index:5;">' +
-          escFarmacia(it.lab || 'Genérico') +
-        '</div>' +
-
-        '<button onclick="abrirPopupSheet(\'' + esc(it.key) + '\')"' +
-          ' style="position:absolute;bottom:6px;right:8px;width:24px;height:24px;' +
-          'border-radius:50%;border:none;cursor:pointer;background:' + (agotado ? '#9ca3af' : c1orig) + ';' +
-          'display:flex;align-items:center;justify-content:center;' +
-          'box-shadow:0 2px 6px rgba(0,0,0,.22);z-index:5;">' +
-          '<span class="sym" style="font-size:13px;color:#fff">zoom_in</span>' +
-        '</button>' +
-      '</div>';
-
-    /* ── Cuerpo ── */
-    var cuerpoBase =
-      '<div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;' +
-        'padding:2px 7px;border-radius:99px;width:fit-content;max-width:100%;overflow:hidden;' +
-        'text-overflow:ellipsis;white-space:nowrap;background:' + (agotado ? '#f3f4f6' : c1orig + '18') + ';color:' + (agotado ? '#9ca3af' : c1orig) + '">' +
-        hl(it.lab || 'Genérico', q) +
-      '</div>' +
-      '<div style="font-size:11.5px;font-weight:700;color:' + (agotado ? '#9ca3af' : '#111827') + ';line-height:1.3;' +
-        'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;' +
-        'overflow:hidden;min-height:2.2em">' +
-        hl(it.desc, q) +
-      '</div>' +
-      (it.unidad
-        ? '<span style="font-size:8px;font-weight:600;color:#9ca3af;background:#f3f4f6;' +
-          'border-radius:5px;padding:1px 5px;display:inline-block;width:fit-content">' +
-          it.unidad + '</span>'
-        : '');
-
-    /* ── Botones de agregar — distingue CAJA vs INDIVIDUAL ── */
-    var botonesAgregar = '';
-
-    if (agotado) {
-      botonesAgregar =
-        '<div style="font-size:8.5px;font-weight:800;color:#dc2626;background:#fee2e2;' +
-        'padding:4px 10px;border-radius:8px;border:1px solid #fca5a5;align-self:flex-end;' +
-        'display:flex;align-items:center;gap:3px;">' +
-        '<span class="sym symf" style="font-size:11px">remove_shopping_cart</span>Sin stock</div>';
-
-    } else if (precioUnidad && precioUnidad !== precio && precio > precioUnidad) {
-      /* Tiene precio por unidad Y precio de caja — mostrar 2 botones */
-      var labelCaja   = cantCaja ? 'Caja x' + cantCaja : 'Caja';
-      var keyUnidad   = it.key + '__unidad';
-      var descUnidad  = it.desc + ' (individual)';
-      var descCaja    = it.desc + (cantCaja ? ' (caja x' + cantCaja + ')' : ' (caja)');
-
-      /* Guardar la variante individual en cache */
-      cache[keyUnidad] = Object.assign({}, it, {
-        key: keyUnidad,
-        desc: descUnidad,
-        precio: precioUnidad,
-        pUnit: precioUnidad
-      });
-
-     botonesAgregar =
-  '<div style="display:flex;flex-direction:column;gap:4px;margin-top:auto;padding-top:5px">' +
-
-    // CAJA
-    '<div style="display:flex;align-items:center;gap:6px">' +
-      '<div style="flex:1;background:#eef3ff;border-radius:9px;padding:5px 8px">' +
-        '<div style="font-size:8px;font-weight:700;color:#5272a8">'+labelCaja+'</div>' +
-        '<div style="font-size:13px;font-weight:900;color:#003f87">'+fp(precio)+'</div>' +
-      '</div>' +
-      '<button onclick="addToCart(\''+esc(it.key)+'\',this)"'+
-        ' style="background:#003f87;color:#fff;border:none;border-radius:9px;padding:7px 10px;font-size:11px;font-weight:800;cursor:pointer;flex-shrink:0">+ Caja</button>' +
-    '</div>' +
-
-    // UNIDAD
-    '<div style="display:flex;align-items:center;gap:6px">' +
-      '<div style="flex:1;background:#f3f4f6;border-radius:9px;padding:5px 8px">' +
-        '<div style="font-size:8px;font-weight:700;color:#9ca3af">Unidad</div>' +
-        '<div style="font-size:13px;font-weight:900;color:#374151">'+fp(precioUnidad)+'</div>' +
-      '</div>' +
-      '<button onclick="sadd(\''+esc(keyUnidad)+'\',\''+esc(descUnidad)+'\',\''+esc(it.lab||'')+'\','+precioUnidad+',this)"'+
-        ' style="background:#374151;color:#fff;border:none;border-radius:9px;padding:7px 10px;font-size:11px;font-weight:800;cursor:pointer;flex-shrink:0">+ Und.</button>' +
-    '</div>' +
-
-  '</div>';
-
-    } else {
-      /* Un solo precio — botón normal */
-      botonesAgregar =
-        '<div style="display:flex;align-items:flex-end;justify-content:space-between;' +
-          'margin-top:auto;padding-top:4px">' +
-          '<div style="font-size:15px;font-weight:900;color:' + (agotado ? '#9ca3af' : c1orig) + ';letter-spacing:-.02em">' +
-            (precio > 0 ? fp(precio) : 'Consultar') +
+    // Botones de precio
+    var precioBtns = '';
+    if (precioUnd && precioUnd !== precio && precio > precioUnd) {
+      precioBtns =
+        '<div style="display:flex;gap:8px;margin-top:10px">' +
+          '<div style="display:flex;align-items:center;gap:6px;flex:1">' +
+            '<div style="flex:1;background:#eef3ff;border-radius:10px;padding:7px 10px">' +
+              '<div style="font-size:8px;font-weight:700;color:#5272a8">'+labelCaja+'</div>' +
+              '<div style="font-size:15px;font-weight:900;color:#003f87">'+fp(precio)+'</div>' +
+            '</div>' +
+            '<button onclick="addToCart(\''+esc(featured.key)+'\',this)" style="background:#003f87;color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:800;cursor:pointer;flex-shrink:0">+ Caja</button>' +
           '</div>' +
-          '<button data-key="' + esc(it.key) + '" onclick="addToCart(\'' + esc(it.key) + '\',this)"' +
-            ' style="background:' + (inCart ? '#15803d' : c1orig) + ';width:30px;height:30px;' +
-            'border-radius:9px;border:none;cursor:pointer;display:flex;align-items:center;' +
-            'justify-content:center;color:#fff;flex-shrink:0;box-shadow:0 3px 8px ' + c1orig + '44;transition:.12s">' +
-            '<span class="sym symf" style="font-size:16px">' + (inCart ? 'check' : 'add') + '</span>' +
-          '</button>' +
+          '<div style="display:flex;align-items:center;gap:6px;flex:1">' +
+            '<div style="flex:1;background:#f3f4f6;border-radius:10px;padding:7px 10px">' +
+              '<div style="font-size:8px;font-weight:700;color:#9ca3af">Unidad</div>' +
+              '<div style="font-size:15px;font-weight:900;color:#374151">'+fp(precioUnd)+'</div>' +
+            '</div>' +
+            '<button onclick="sadd(\''+esc(keyUnd)+'\',\''+esc(descUnd)+'\',\''+esc(featured.lab||'')+'\','+precioUnd+',this)" style="background:#374151;color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:800;cursor:pointer;flex-shrink:0">+ Und.</button>' +
+          '</div>' +
+        '</div>';
+    } else {
+      precioBtns =
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px">' +
+          '<div style="font-size:22px;font-weight:900;color:'+(agotado?'#9ca3af':c1)+'">'+(precio>0?fp(precio):'Consultar')+'</div>' +
+          (agotado
+            ? '<div style="font-size:10px;font-weight:800;color:#dc2626;background:#fee2e2;padding:6px 12px;border-radius:9px">Sin stock</div>'
+            : '<button onclick="addToCart(\''+esc(featured.key)+'\',this)" style="background:'+c1+';color:#fff;border:none;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px '+c1+'44">+ Agregar</button>'
+          ) +
         '</div>';
     }
 
-    card.innerHTML =
-      zonaImg +
-      '<div style="padding:8px 10px 10px;display:flex;flex-direction:column;gap:4px;flex:1">' +
-        cuerpoBase +
-        botonesAgregar +
-      '</div>';
+    var featCard = document.createElement('div');
+    featCard.style.cssText = 'background:#fff;border-radius:18px;border:2px solid '+c1+'33;box-shadow:0 4px 20px rgba(0,0,0,.1);overflow:hidden;animation:fadeUp .25s ease both; ;min-height:320px';
+    featCard.innerHTML =
+  // Imagen arriba — altura generosa
+  '<div style="width:100%;height:180px;background:#f8f9fa;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;border-bottom:1px solid #f0f0f0">' +
+    (hasImg
+      ? '<img src="'+escFarmacia(featured.imagen)+'" style="width:100%;height:180px;object-fit:contain;padding:10px">'
+      : '<span class="sym symf" style="font-size:70px;color:'+c1+';opacity:.15">'+icon+'</span>'
+    ) +
+    '<button onclick="abrirPopupSheet(\''+esc(featured.key)+'\')" style="position:absolute;bottom:8px;right:10px;width:28px;height:28px;border-radius:50%;border:none;cursor:pointer;background:'+c1+';display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.2)">' +
+      '<span class="sym" style="font-size:14px;color:#fff">zoom_in</span>' +
+    '</button>' +
+  '</div>' +
 
-    grid.appendChild(card);
-  });
+  // Info y botones abajo
+  '<div style="padding:12px 14px 14px">' +
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:7px;flex-wrap:wrap">' +
+
+      '<span style="font-size:8px;font-weight:800;color:'+c1+';background:'+c1+'18;padding:2px 8px;border-radius:99px;text-transform:uppercase">'+hl(featured.lab||'Genérico',q)+'</span>' +
+      '<span style="font-size:8px;font-weight:800;color:#15803d;background:#dcfce7;padding:2px 8px;border-radius:99px">✓ Mejor coincidencia</span>' +
+    '</div>' +
+        '<div style="font-size:15px;font-weight:800;color:#111827;line-height:1.3;margin-bottom:4px">'+hl(featured.desc,q)+'</div>' +
+    (featured.unidad ? '<div style="font-size:10px;color:#9ca3af;background:#f3f4f6;border-radius:6px;padding:2px 7px;width:fit-content">'+featured.unidad+'</div>' : '') +
+    // 3. Botones con margin-top:auto para empujar al fondo
+    '<div style="margin-top:auto;padding-top:12px">' + precioBtns + '</div>' +
+  '</div>';
+
+    grid.appendChild(featCard);
+  }
+
+  // ── RESTO en grid 2 columnas ──
+  if (resto.length > 0) {
+    var subGrid = document.createElement('div');
+    subGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start';
+
+    resto.forEach(function(it, i) {
+      cache[it.key] = it;
+      var agotado  = it.stock !== undefined ? it.stock <= 0 : false;
+      var precio   = it.precio > 0 ? it.precio : (it.pUnit > 0 ? it.pUnit : 0);
+      var seed2    = it.key.split('').reduce(function(a,c){return a+c.charCodeAt(0);},0);
+      var c1r      = agotado ? '#9ca3af' : _PROD_GRADS[seed2 % _PROD_GRADS.length][0];
+      var iconr    = _PROD_ICONS[seed2 % _PROD_ICONS.length];
+      var hasImgR  = !!(it.imagen && it.imagen.startsWith('http'));
+      var uid      = 'rs_sub_'+i;
+      var inCart   = !!cart[it.key];
+
+      var precioUndR = parsearPrecioUnidad(it);
+      var labelCajaR = parsearCantidadCaja(it) ? 'Caja ×'+parsearCantidadCaja(it) : 'Caja';
+      var keyUndR    = it.key+'__unidad';
+      var descUndR   = it.desc+' (unidad)';
+      cache[keyUndR] = Object.assign({}, it, { key:keyUndR, precio:precioUndR, pUnit:precioUndR });
+
+      var btnsR = '';
+      if (precioUndR && precioUndR !== precio && precio > precioUndR) {
+        btnsR =
+          '<div style="display:flex;flex-direction:column;gap:3px;margin-top:auto;padding-top:4px">' +
+            '<div style="display:flex;align-items:center;gap:4px">' +
+              '<div style="flex:1;background:#eef3ff;border-radius:8px;padding:4px 7px">' +
+                '<div style="font-size:7px;font-weight:700;color:#5272a8">'+labelCajaR+'</div>' +
+                '<div style="font-size:12px;font-weight:900;color:#003f87">'+fp(precio)+'</div>' +
+              '</div>' +
+              '<button onclick="addToCart(\''+esc(it.key)+'\',this)" style="background:#003f87;color:#fff;border:none;border-radius:8px;padding:5px 8px;font-size:10px;font-weight:800;cursor:pointer;flex-shrink:0">+ Caja</button>' +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:4px">' +
+              '<div style="flex:1;background:#f3f4f6;border-radius:8px;padding:4px 7px">' +
+                '<div style="font-size:7px;font-weight:700;color:#9ca3af">Unidad</div>' +
+                '<div style="font-size:12px;font-weight:900;color:#374151">'+fp(precioUndR)+'</div>' +
+              '</div>' +
+              '<button onclick="sadd(\''+esc(keyUndR)+'\',\''+esc(descUndR)+'\',\''+esc(it.lab||'')+'\','+precioUndR+',this)" style="background:#374151;color:#fff;border:none;border-radius:8px;padding:5px 8px;font-size:10px;font-weight:800;cursor:pointer;flex-shrink:0">+ Und.</button>' +
+            '</div>' +
+          '</div>';
+      } else {
+        btnsR =
+          '<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:auto;padding-top:4px">' +
+            '<div style="font-size:14px;font-weight:900;color:'+(agotado?'#9ca3af':c1r)+'">'+( precio>0?fp(precio):'Consultar')+'</div>' +
+            (agotado
+              ? '<div style="font-size:8px;font-weight:800;color:#dc2626;background:#fee2e2;padding:4px 8px;border-radius:8px">Sin stock</div>'
+              : '<button onclick="addToCart(\''+esc(it.key)+'\',this)" style="background:'+c1r+';width:28px;height:28px;border-radius:8px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 3px 8px '+c1r+'44">' +
+                '<span class="sym symf" style="font-size:15px">add</span></button>'
+            ) +
+          '</div>';
+      }
+
+      var card = document.createElement('article');
+      card.style.cssText = 'background:#fff;border-radius:16px;border:1.5px solid #e5e7eb;box-shadow:0 2px 10px rgba(0,0,0,.06);display:flex;flex-direction:column;overflow:hidden;animation:fadeUp .25s ease both;animation-delay:'+Math.min(i*20,240)+'ms'+(agotado?';opacity:.82':'');
+      card.innerHTML =
+        '<div style="height:110px;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;overflow:hidden;border-bottom:1px solid #f3f4f6">' +
+          (hasImgR ? '<img src="'+escFarmacia(it.imagen)+'" style="width:100%;height:110px;object-fit:contain;padding:6px" onerror="this.style.display=\'none\';document.getElementById(\''+uid+'\').style.display=\'flex\'">' : '') +
+          '<span id="'+uid+'" class="sym symf" style="font-size:42px;color:'+c1r+';opacity:'+(hasImgR?.15:1)+';display:'+(hasImgR?'none':'flex')+';align-items:center;justify-content:center;width:100%;height:110px">'+iconr+'</span>' +
+          (agotado ? '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(220,38,38,.9);color:#fff;font-size:8px;font-weight:900;text-transform:uppercase;padding:3px 10px;border-radius:99px;z-index:4;white-space:nowrap">AGOTADO</div>' : '') +
+          '<div style="position:absolute;top:6px;right:7px;background:'+c1r+';color:#fff;font-size:7px;font-weight:900;text-transform:uppercase;padding:2px 6px;border-radius:99px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escFarmacia(it.lab||'Genérico')+'</div>' +
+          '<button onclick="abrirPopupSheet(\''+esc(it.key)+'\')" style="position:absolute;bottom:5px;right:7px;width:22px;height:22px;border-radius:50%;border:none;cursor:pointer;background:'+c1r+';display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.2)">' +
+            '<span class="sym" style="font-size:12px;color:#fff">zoom_in</span>' +
+          '</button>' +
+        '</div>' +
+        '<div style="padding:8px 9px 10px;display:flex;flex-direction:column;gap:3px;flex:1">' +
+          '<div style="font-size:7.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:2px 6px;border-radius:99px;width:fit-content;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:'+c1r+'18;color:'+c1r+'">'+hl(it.lab||'Genérico',q)+'</div>' +
+          '<div style="font-size:11px;font-weight:700;color:'+(agotado?'#9ca3af':'#111827')+';line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.2em">'+hl(it.desc,q)+'</div>' +
+          (it.unidad ? '<span style="font-size:8px;color:#9ca3af;background:#f3f4f6;border-radius:5px;padding:1px 5px;width:fit-content">'+it.unidad+'</span>' : '') +
+          btnsR +
+        '</div>';
+
+      subGrid.appendChild(card);
+    });
+
+    grid.appendChild(subGrid);
+  }
 };
 
 console.log('[WIL] ✅ wil-fix-dedup-unitprice.js cargado — dedup + precio unitario activos');
