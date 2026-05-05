@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script src="wil-farmacia-barrio-checkout.js"></script>
  <script src="wil-farmacia-envio-tercero.js"></script>
+ <script src="wil-fix-dedup-unitprice.js"></script>
 
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -5273,6 +5274,368 @@ document.addEventListener('click', function (e) {
   }
 
 }(window));
+
+
+/* ═══════════════════════════════════════════════════════════════
+   WIL FARMACIA — FIX URGENTE v1
+   1. Deduplicación real en búsqueda (prioridad a fotos)
+   2. Precio unitario inteligente (detecta "$X c/u" en descripción)
+   3. _rebuildSearchIndex dedup por nombre normalizado
+   Incluir DESPUÉS del script principal, o reemplazar las funciones indicadas.
+═══════════════════════════════════════════════════════════════ */
+
+/* ─── 1. DETECTAR PRECIO UNITARIO EN DESCRIPCIÓN ─────────────
+   Detecta patrones como:
+     "$4.000 c/u"  "c/u: $4.000"  "$4.000 cada una"
+     "$4.000 individual"  "4000 x unidad"
+   Devuelve el precio numérico o null si no lo encuentra.
+──────────────────────────────────────────────────────────────── */
+function parsearPrecioUnidad(it) {
+  var texto = ((it.unidad || '') + ' ' + (it.desc || '')).toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  var patrones = [
+    /\$\s*([\d.,]+)\s*c\/u/,
+    /c\/u\s*[:\-]?\s*\$\s*([\d.,]+)/,
+    /\$\s*([\d.,]+)\s*(?:cada\s+una?|cada\s+uno|individual|por\s+unidad|x\s*unidad)/,
+    /(?:cada\s+una?|individual|x\s*unidad)\s*[:\-]?\s*\$\s*([\d.,]+)/,
+  ];
+
+  for (var i = 0; i < patrones.length; i++) {
+    var m = texto.match(patrones[i]);
+    if (m) {
+      var str = m[1].replace(/\./g, '').replace(',', '.');
+      var n = parseFloat(str);
+      if (!isNaN(n) && n > 0 && n < 10000000) return Math.round(n);
+    }
+  }
+  return null;
+}
+
+/* ─── 2. HELPER — detectar si es precio de caja ──────────────
+   Detecta "caja x30", "x30 unidades", "x 10 tab", etc. en desc
+──────────────────────────────────────────────────────────────── */
+function parsearCantidadCaja(it) {
+  var texto = ((it.unidad || '') + ' ' + (it.desc || '')).toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  var m = texto.match(/x\s*(\d+)\s*(?:unidades?|tabs?|capsulas?|comprimidos?|ampolletas?|sobres?)?/);
+  if (m) return parseInt(m[1], 10);
+  return null;
+}
+
+/* ─── 3. DEDUPLICACIÓN — reemplaza la función doSearch ──────── */
+window.doSearch = function(q) {
+  if (!q) { setSt('empty'); return; }
+  setSt('loading');
+  setTimeout(function() {
+    if (!allData.length) {
+      document.getElementById('nores-txt').textContent = 'Cargando inventario, intenta en segundos.';
+      setSt('nores'); return;
+    }
+
+    var pool = (_searchAllData && _searchAllData.length) ? _searchAllData : allData;
+
+    /* Score */
+    var sc = [];
+    pool.forEach(function(it) {
+      var s = Math.max(scr2(it.desc, q), scr2(it.lab, q) * 0.7);
+      if (s >= 8) sc.push({ it: it, s: s });
+    });
+
+    /* Ordenar: score DESC, con stock antes que agotados, con foto antes */
+    sc.sort(function(a, b) {
+      if (b.s !== a.s) return b.s - a.s;
+      var as = (a.it.stock !== undefined ? a.it.stock : 3) > 0 ? 1 : 0;
+      var bs = (b.it.stock !== undefined ? b.it.stock : 3) > 0 ? 1 : 0;
+      if (bs !== as) return bs - as;
+      var af = a.it.imagen && a.it.imagen.startsWith('http') ? 1 : 0;
+      var bf = b.it.imagen && b.it.imagen.startsWith('http') ? 1 : 0;
+      return bf - af;
+    });
+
+    /* ── DEDUP por nombre normalizado ──
+       Conserva el de mayor score; si empatan, prefiere el que tiene foto. */
+    var seenNombre = {};
+    var deduped = [];
+
+    sc.forEach(function(x) {
+      var clave = nrm(x.it.desc);
+      if (seenNombre[clave] !== undefined) {
+        var prevIdx = seenNombre[clave];
+        var prev    = deduped[prevIdx];
+        var tieneImg   = x.it.imagen && x.it.imagen.startsWith('http');
+        var prevTieneImg = prev.it.imagen && prev.it.imagen.startsWith('http');
+        /* Reemplazar solo si el nuevo tiene foto y el anterior no */
+        if (tieneImg && !prevTieneImg) {
+          /* Conservar el precio/stock más completo */
+          var merged = Object.assign({}, x.it);
+          if (!merged.precio || merged.precio === 0) merged.precio = prev.it.precio;
+          if (!merged.pUnit  || merged.pUnit  === 0) merged.pUnit  = prev.it.pUnit;
+          if (merged.stock === undefined) merged.stock = prev.it.stock;
+          deduped[prevIdx] = { it: merged, s: Math.max(x.s, prev.s) };
+        }
+        return;
+      }
+      seenNombre[clave] = deduped.length;
+      deduped.push(x);
+    });
+
+    if (!deduped.length) {
+      document.getElementById('nores-txt').textContent =
+        'No encontramos "' + q + '". Intenta con otro nombre.';
+      setSt('nores'); return;
+    }
+
+    renderResults(deduped.slice(0, 60).map(function(x) { return x.it; }), q);
+  }, 55);
+};
+
+/* ─── 4. DEDUP EN EL ÍNDICE — reemplaza _rebuildSearchIndex ── */
+window._rebuildSearchIndex = function() {
+  var seenKey    = {};
+  var seenNombre = {};
+
+  /* Guardar extras antes de limpiar */
+  var extras = (_searchAllData || []).filter(function(it) {
+    return it.key && (it.key.startsWith('np_raw_') || it.key.startsWith('oferta_'));
+  });
+
+  _searchAllData = [];
+
+  function push(it) {
+    if (!it.desc) return;
+
+    var clave = nrm(it.desc);
+
+    /* Dedup por key exacta */
+    if (seenKey[it.key]) return;
+
+    /* Dedup por nombre normalizado: si ya existe, conservar el de mejor imagen */
+    if (seenNombre[clave] !== undefined) {
+      var prevIdx   = seenNombre[clave];
+      var prev      = _searchAllData[prevIdx];
+      var tieneImg  = it.imagen && it.imagen.startsWith('http');
+      var prevImg   = prev.imagen && prev.imagen.startsWith('http');
+      if (tieneImg && !prevImg) {
+        var merged = Object.assign({}, it);
+        if (!merged.precio || merged.precio === 0) merged.precio = prev.precio;
+        if (!merged.pUnit  || merged.pUnit  === 0) merged.pUnit  = prev.pUnit;
+        if (merged.stock === undefined) merged.stock = prev.stock;
+        _searchAllData[prevIdx] = merged;
+        seenKey[it.key] = true;
+      }
+      return;
+    }
+
+    seenKey[it.key]      = true;
+    seenNombre[clave]    = _searchAllData.length;
+    cache[it.key]        = it;
+    _searchAllData.push(it);
+  }
+
+  allData.forEach(push);
+  extras.forEach(push);
+};
+
+/* ─── 5. RENDER CON PRECIO UNITARIO — reemplaza renderResults ─ */
+window.renderResults = function(items, q) {
+  setSt('results');
+  document.getElementById('res-count').textContent =
+    items.length + ' resultado' + (items.length !== 1 ? 's' : '') + ' para "' + q + '"';
+
+  var grid = document.getElementById('res-grid');
+  grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%';
+  grid.innerHTML = '';
+
+  var GRADS = [
+    ['#003f87','#1a56db'],['#064e3b','#059669'],['#4c1d95','#7c3aed'],
+    ['#7c1d00','#dc2626'],['#1a3a3a','#0d9488'],['#1e1b4b','#4338ca'],
+    ['#86198f','#c026d3'],['#b45309','#d97706'],['#0e7490','#0891b2'],
+    ['#15803d','#16a34a'],['#dc2626','#ef4444'],['#7c3aed','#8b5cf6']
+  ];
+  var ICONS = [
+    'medication','pill','vaccines','healing','health_and_safety','ecg',
+    'monitor_heart','water_drop','science','face_6','child_care','wb_sunny',
+    'spa','thermostat','emergency','biotech','favorite','local_pharmacy'
+  ];
+
+  items.forEach(function(it, i) {
+    cache[it.key] = it;
+    var inCart   = !!cart[it.key];
+    var agotado  = it.stock !== undefined ? it.stock <= 0 : false;
+    var precio   = it.precio > 0 ? it.precio : (it.pUnit > 0 ? it.pUnit : 0);
+    var gc       = GRADS[i % GRADS.length];
+    var c1orig   = gc[0];
+    var c1       = agotado ? '#9ca3af' : c1orig;
+    var icon     = ICONS[i % ICONS.length];
+    var uid      = 'rs_' + i;
+
+    var img = (it.imagen || '').replace(/\r|\n|\t/g, '').trim();
+    var hasImg = img.length > 8 && img.startsWith('http');
+
+    /* ── Detectar precio unitario ── */
+    var precioUnidad = parsearPrecioUnidad(it);
+    var cantCaja     = parsearCantidadCaja(it);
+
+    var card = document.createElement('article');
+    card.style.cssText =
+      'background:#fff;border-radius:16px;border:1.5px solid #e5e7eb;' +
+      'box-shadow:0 2px 10px rgba(0,0,0,.06);display:flex;flex-direction:column;' +
+      'overflow:hidden;animation:fadeUp .25s ease both;animation-delay:' +
+      Math.min(i * 20, 240) + 'ms;' + (agotado ? 'opacity:.82' : '');
+
+    /* ── Zona imagen ── */
+    var zonaImg =
+      '<div style="height:130px;background:#fff;display:flex;align-items:center;' +
+        'justify-content:center;flex-shrink:0;position:relative;overflow:hidden;' +
+        'border-bottom:1px solid #f3f4f6;">' +
+
+        (hasImg
+          ? '<img src="' + escFarmacia(img) + '"' +
+            ' style="width:100%;height:130px;object-fit:contain;object-position:center;' +
+            'padding:6px;' + (agotado ? 'filter:grayscale(.55);opacity:.65;' : '') + '"' +
+            ' onerror="this.style.display=\'none\';' +
+            'var f=document.getElementById(\'' + uid + '\');if(f)f.style.display=\'flex\'">'
+          : '') +
+
+        '<span id="' + uid + '" class="sym symf"' +
+          ' style="font-size:50px;color:' + c1orig + ';opacity:' + (agotado ? .35 : 1) + ';' +
+          'display:' + (hasImg ? 'none' : 'flex') + ';' +
+          'align-items:center;justify-content:center;width:100%;height:130px;">' +
+          icon + '</span>' +
+
+        (agotado
+          ? '<div style="position:absolute;inset:0;background:rgba(220,38,38,.10);z-index:3;pointer-events:none;"></div>' +
+            '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);' +
+            'background:rgba(220,38,38,.90);color:#fff;font-family:\'Manrope\',sans-serif;' +
+            'font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.14em;' +
+            'padding:4px 13px;border-radius:99px;z-index:4;white-space:nowrap;' +
+            'box-shadow:0 2px 8px rgba(220,38,38,.4);">AGOTADO</div>'
+          : '') +
+
+        '<div style="position:absolute;top:7px;right:8px;background:' + (agotado ? '#9ca3af' : c1orig) + ';color:#fff;' +
+          'font-size:7.5px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;' +
+          'padding:2px 7px;border-radius:99px;max-width:88px;overflow:hidden;' +
+          'text-overflow:ellipsis;white-space:nowrap;z-index:5;">' +
+          escFarmacia(it.lab || 'Genérico') +
+        '</div>' +
+
+        '<button onclick="abrirPopupSheet(\'' + esc(it.key) + '\')"' +
+          ' style="position:absolute;bottom:6px;right:8px;width:24px;height:24px;' +
+          'border-radius:50%;border:none;cursor:pointer;background:' + (agotado ? '#9ca3af' : c1orig) + ';' +
+          'display:flex;align-items:center;justify-content:center;' +
+          'box-shadow:0 2px 6px rgba(0,0,0,.22);z-index:5;">' +
+          '<span class="sym" style="font-size:13px;color:#fff">zoom_in</span>' +
+        '</button>' +
+      '</div>';
+
+    /* ── Cuerpo ── */
+    var cuerpoBase =
+      '<div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;' +
+        'padding:2px 7px;border-radius:99px;width:fit-content;max-width:100%;overflow:hidden;' +
+        'text-overflow:ellipsis;white-space:nowrap;background:' + (agotado ? '#f3f4f6' : c1orig + '18') + ';color:' + (agotado ? '#9ca3af' : c1orig) + '">' +
+        hl(it.lab || 'Genérico', q) +
+      '</div>' +
+      '<div style="font-size:11.5px;font-weight:700;color:' + (agotado ? '#9ca3af' : '#111827') + ';line-height:1.3;' +
+        'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;' +
+        'overflow:hidden;min-height:2.2em">' +
+        hl(it.desc, q) +
+      '</div>' +
+      (it.unidad
+        ? '<span style="font-size:8px;font-weight:600;color:#9ca3af;background:#f3f4f6;' +
+          'border-radius:5px;padding:1px 5px;display:inline-block;width:fit-content">' +
+          it.unidad + '</span>'
+        : '');
+
+    /* ── Botones de agregar — distingue CAJA vs INDIVIDUAL ── */
+    var botonesAgregar = '';
+
+    if (agotado) {
+      botonesAgregar =
+        '<div style="font-size:8.5px;font-weight:800;color:#dc2626;background:#fee2e2;' +
+        'padding:4px 10px;border-radius:8px;border:1px solid #fca5a5;align-self:flex-end;' +
+        'display:flex;align-items:center;gap:3px;">' +
+        '<span class="sym symf" style="font-size:11px">remove_shopping_cart</span>Sin stock</div>';
+
+    } else if (precioUnidad && precioUnidad !== precio && precio > precioUnidad) {
+      /* Tiene precio por unidad Y precio de caja — mostrar 2 botones */
+      var labelCaja   = cantCaja ? 'Caja x' + cantCaja : 'Caja';
+      var keyUnidad   = it.key + '__unidad';
+      var descUnidad  = it.desc + ' (individual)';
+      var descCaja    = it.desc + (cantCaja ? ' (caja x' + cantCaja + ')' : ' (caja)');
+
+      /* Guardar la variante individual en cache */
+      cache[keyUnidad] = Object.assign({}, it, {
+        key: keyUnidad,
+        desc: descUnidad,
+        precio: precioUnidad,
+        pUnit: precioUnidad
+      });
+
+      botonesAgregar =
+        '<div style="display:flex;gap:5px;margin-top:auto;padding-top:5px;flex-wrap:wrap">' +
+
+          /* Precio caja */
+          '<div style="display:flex;flex-direction:column;align-items:flex-start;gap:1px;flex:1;min-width:60px">' +
+            '<span style="font-size:8px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em">' + labelCaja + '</span>' +
+            '<div style="display:flex;align-items:center;gap:4px">' +
+              '<span style="font-size:13px;font-weight:900;color:' + c1orig + ';letter-spacing:-.02em">' + fp(precio) + '</span>' +
+              '<button data-key="' + esc(it.key) + '" onclick="addToCart(\'' + esc(it.key) + '\',this)"' +
+                ' style="background:' + (inCart ? '#15803d' : c1orig) + ';width:26px;height:26px;' +
+                'border-radius:8px;border:none;cursor:pointer;display:flex;align-items:center;' +
+                'justify-content:center;color:#fff;flex-shrink:0;box-shadow:0 2px 6px ' + c1orig + '44;transition:.12s">' +
+                '<span class="sym symf" style="font-size:14px">' + (inCart ? 'check' : 'add') + '</span>' +
+              '</button>' +
+            '</div>' +
+          '</div>' +
+
+          '<div style="width:1px;background:#e5e7eb;align-self:stretch"></div>' +
+
+          /* Precio unidad */
+          '<div style="display:flex;flex-direction:column;align-items:flex-start;gap:1px;flex:1;min-width:60px">' +
+            '<span style="font-size:8px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em">Unidad</span>' +
+            '<div style="display:flex;align-items:center;gap:4px">' +
+              '<span style="font-size:13px;font-weight:900;color:' + c1orig + ';letter-spacing:-.02em">' + fp(precioUnidad) + '</span>' +
+              '<button data-key="' + esc(keyUnidad) + '" onclick="sadd(\'' + esc(keyUnidad) + '\',\'' + esc(descUnidad) + '\',\'' + esc(it.lab || '') + '\',' + precioUnidad + ',this)"' +
+                ' style="background:' + c1orig + ';width:26px;height:26px;' +
+                'border-radius:8px;border:none;cursor:pointer;display:flex;align-items:center;' +
+                'justify-content:center;color:#fff;flex-shrink:0;box-shadow:0 2px 6px ' + c1orig + '44;transition:.12s">' +
+                '<span class="sym symf" style="font-size:14px">add</span>' +
+              '</button>' +
+            '</div>' +
+          '</div>' +
+
+        '</div>';
+
+    } else {
+      /* Un solo precio — botón normal */
+      botonesAgregar =
+        '<div style="display:flex;align-items:flex-end;justify-content:space-between;' +
+          'margin-top:auto;padding-top:4px">' +
+          '<div style="font-size:15px;font-weight:900;color:' + (agotado ? '#9ca3af' : c1orig) + ';letter-spacing:-.02em">' +
+            (precio > 0 ? fp(precio) : 'Consultar') +
+          '</div>' +
+          '<button data-key="' + esc(it.key) + '" onclick="addToCart(\'' + esc(it.key) + '\',this)"' +
+            ' style="background:' + (inCart ? '#15803d' : c1orig) + ';width:30px;height:30px;' +
+            'border-radius:9px;border:none;cursor:pointer;display:flex;align-items:center;' +
+            'justify-content:center;color:#fff;flex-shrink:0;box-shadow:0 3px 8px ' + c1orig + '44;transition:.12s">' +
+            '<span class="sym symf" style="font-size:16px">' + (inCart ? 'check' : 'add') + '</span>' +
+          '</button>' +
+        '</div>';
+    }
+
+    card.innerHTML =
+      zonaImg +
+      '<div style="padding:8px 10px 10px;display:flex;flex-direction:column;gap:4px;flex:1">' +
+        cuerpoBase +
+        botonesAgregar +
+      '</div>';
+
+    grid.appendChild(card);
+  });
+};
+
+console.log('[WIL] ✅ wil-fix-dedup-unitprice.js cargado — dedup + precio unitario activos');
 
 
 </script>
