@@ -4593,11 +4593,14 @@ function wilGoLibre2(){
 
   const fmtPeso = v => '$' + (v||0).toLocaleString('es-CO');
 
-  let html = '';
-  html += `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f5f7">
-             <span style="color:var(--on3)">🗺️ Recogida</span>
-             <span style="font-weight:700">${escHTML(L.barrioRecogida||'—')}</span>
-           </div>`;
+ var recogidaTxt = L.barrioRecogida || '—';
+if(L.comercio && L.comercioNombre) recogidaTxt += ' · ' + L.comercioNombre;
+else if(L.comercioNombre)           recogidaTxt += ' · ' + L.comercioNombre;
+
+html += `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f5f7">
+           <span style="color:var(--on3)">🗺️ Recogida</span>
+           <span style="font-weight:700;text-align:right;max-width:65%">${escHTML(recogidaTxt)}</span>
+         </div>`;
   html += `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f5f7">
              <span style="color:var(--on3)">📍 Entrega</span>
              <span style="font-weight:700">${escHTML(L.barrioEntrega||'—')}</span>
@@ -4966,17 +4969,20 @@ async function confirmarPedidoDirecto(){
       rows.push([
         '','','','','','',
         p.nombre,'',p.qty||1,'','',
-        '','','','','','','','','','','',''
+        '','','','','','','','','','','','',
       ]);
     }
   });
 
-  rows.push([
-    '','','','','','',
-    'Recogida: '+L.barrioRecogida+' → Entrega: '+L.barrioEntrega,
-    '','1','','',
-    '','','','','','','','','','','',''
-  ]);
+  var recogidaSheet = L.barrioRecogida || '';
+if(L.comercioNombre) recogidaSheet += ' · ' + L.comercioNombre;
+
+rows.push([
+  '','','','','','',
+  'Recogida: '+recogidaSheet+' → Entrega: '+L.barrioEntrega,
+  '','1','','',
+  '','','','','','','','','','','',''
+]);
 
  var GAS_URL = 'https://script.google.com/macros/s/AKfycbxYFNbh5pJgPQ4yjooGI0q3TUjrW8iOZeLJU_SZ_mS06Es6LUPYxzYs-C6q91YFnna7Dw/exec';
  try {
@@ -5706,27 +5712,25 @@ function _copiarFallback(txt){
 <div class="card">
   <div class="card-tit"><span class="sym f">inventory_2</span>Tamaño del paquete <span style="font-size:11px;font-weight:500;color:var(--on3)">(máx. 15 kg)</span></div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
-    <div class="wil-pq-sz" data-sz="pequeno" data-extra="15000" onclick="pqSelTam(this)"
-      style="border:1.5px solid #dce3ea;border-radius:13px;padding:13px 6px;cursor:pointer;text-align:center;background:#f8fafb;transition:.18s">
-      <div style="font-size:30px">📦</div>
-      <div style="font-size:12px;font-weight:800;color:var(--on);margin-top:4px">Pequeño</div>
-      <div style="font-size:10px;color:var(--on3);margin-top:1px">Hasta 5 kg</div>
-      <div style="font-size:14px;font-weight:900;color:var(--p);margin-top:6px">+$15.000</div>
-    </div>
-    <div class="wil-pq-sz" data-sz="mediano" data-extra="20000" onclick="pqSelTam(this)"
-      style="border:1.5px solid #dce3ea;border-radius:13px;padding:13px 6px;cursor:pointer;text-align:center;background:#f8fafb;transition:.18s">
-      <div style="font-size:30px">🧳</div>
-      <div style="font-size:12px;font-weight:800;color:var(--on);margin-top:4px">Mediano</div>
-      <div style="font-size:10px;color:var(--on3);margin-top:1px">5 – 10 kg</div>
-      <div style="font-size:14px;font-weight:900;color:var(--p);margin-top:6px">+$20.000</div>
-    </div>
-    <div class="wil-pq-sz" data-sz="grande" data-extra="30000" onclick="pqSelTam(this)"
-      style="border:1.5px solid #dce3ea;border-radius:13px;padding:13px 6px;cursor:pointer;text-align:center;background:#f8fafb;transition:.18s">
-      <div style="font-size:30px">📫</div>
-      <div style="font-size:12px;font-weight:800;color:var(--on);margin-top:4px">Grande</div>
-      <div style="font-size:10px;color:var(--on3);margin-top:1px">10 – 15 kg</div>
-      <div style="font-size:14px;font-weight:900;color:var(--p);margin-top:6px">+$30.000</div>
-    </div>
+    
+<div class="wil-pq-sz" data-sz="pequeno" data-extra="0" onclick="pqSelTam(this)"
+  style="border:1.5px solid #dce3ea;border-radius:13px;padding:13px 6px;cursor:pointer;text-align:center;background:#f8fafb;transition:.18s">
+  <div style="font-size:30px">📦</div>
+  <div style="font-size:12px;font-weight:800;color:var(--on);margin-top:4px">Pequeño</div>
+  <div style="font-size:10px;color:var(--on3);margin-top:1px">Hasta 5 kg</div>
+</div>
+<div class="wil-pq-sz" data-sz="mediano" data-extra="0" onclick="pqSelTam(this)"
+  style="border:1.5px solid #dce3ea;border-radius:13px;padding:13px 6px;cursor:pointer;text-align:center;background:#f8fafb;transition:.18s">
+  <div style="font-size:30px">🧳</div>
+  <div style="font-size:12px;font-weight:800;color:var(--on);margin-top:4px">Mediano</div>
+  <div style="font-size:10px;color:var(--on3);margin-top:1px">5 – 10 kg</div>
+</div>
+<div class="wil-pq-sz" data-sz="grande" data-extra="0" onclick="pqSelTam(this)"
+  style="border:1.5px solid #dce3ea;border-radius:13px;padding:13px 6px;cursor:pointer;text-align:center;background:#f8fafb;transition:.18s">
+  <div style="font-size:30px">📫</div>
+  <div style="font-size:12px;font-weight:800;color:var(--on);margin-top:4px">Grande</div>
+  <div style="font-size:10px;color:var(--on3);margin-top:1px">10 – 15 kg</div>
+</div>
   </div>
   <div class="field">
     <label>Descripción del paquete</label>
@@ -6144,14 +6148,11 @@ function _copiarFallback(txt){
 
     /* El valor máximo de los dos barrios es la base */
     var base  = Math.max(pR, pE);
-    var total = base + pSz;
+    var total = base;
+
     W._pqTarifa = total;
 
-    /* Texto subtítulo: $base + $tamaño · km entre puntos */
-    var partes = [];
-    if (pSz) {
-      partes.push('$' + base.toLocaleString('es-CO') + ' + $' + pSz.toLocaleString('es-CO') + ' tamaño');
-    }
+    
 
     /* km entre puntos si ambos geocodificados */
     if (hR.dataset.lat && hE.dataset.lat) {
