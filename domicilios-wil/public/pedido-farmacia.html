@@ -212,6 +212,22 @@ mark{background:#dbeafe;color:#1e40af;border-radius:3px;padding:0 2px}
 .skel{background:linear-gradient(90deg,#f0f0f0 25%,#e0e8ff 50%,#f0f0f0 75%);background-size:200% 100%;animation:skelShimmer 1.2s infinite}
 @keyframes skelShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
+/* ── FIX: ocultar textos fantasma de paneles ocultos ── */
+#wc-carrito-panel { display: none !important; }
+#wc-carrito-panel.abierto { display: flex !important; }
+
+#v-cats { display: none; }
+#v-cats[style*="block"] { display: block !important; }
+
+#cats-res-count:empty { display: none; }
+
+/* Asegurar que el panel del carrito no rompa el flujo */
+#wc-carrito-panel {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 999990 !important;
+}
+
 </style>
 </head>
 <body>
@@ -3827,6 +3843,8 @@ var _wcMapas = {
     '#wc-carrito-panel tbody tr{border-bottom:1px solid #f3f4f6;}',
     '#wc-carrito-panel tbody td{padding:9px 8px;vertical-align:middle;}',
 
+    
+
     /* ── FIX 3: Botones opciones 2 columnas ── */
    '#wc-opts{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;padding:12px 14px 14px!important;background:#eef2f7!important;border-top:1.5px solid #dde4ed!important;}',
 '#wc-opts button{border:none!important;background:#003f87!important;color:#fff!important;border-radius:14px!important;padding:13px 10px!important;font-size:12.5px!important;font-weight:700!important;cursor:pointer!important;font-family:inherit!important;white-space:normal!important;text-align:center!important;line-height:1.35!important;min-height:58px!important;transition:background .15s,transform .1s,box-shadow .15s!important;display:flex!important;align-items:center!important;justify-content:center!important;width:100%!important;box-shadow:0 3px 10px rgba(0,63,135,.28)!important;letter-spacing:.1px!important;}',
@@ -4036,15 +4054,16 @@ function wcToggleCarrito() {
   var abierto = panel.style.display === 'flex';
   if (abierto) {
     panel.style.display = 'none';
+    panel.style.visibility = 'hidden';   // ← AGREGAR
     document.body.style.overflow = '';
   } else {
     wcRenderCarritoPanel();
     panel.style.display = 'flex';
+    panel.style.visibility = 'visible';  // ← AGREGAR
     panel.style.flexDirection = 'column';
-    document.body.style.overflow = 'hidden'; // bloquea scroll del fondo
+    document.body.style.overflow = 'hidden';
   }
 }
-
 /* ══════════════════════════════════════════════
    PANEL CARRITO
    FIX 1: se inyecta en wil-chat-sheet
@@ -4056,14 +4075,9 @@ function wcInyectarPanelCarrito() {
   panel.id = 'wc-carrito-panel';
   // Ocupa toda la pantalla en móvil, panel lateral en desktop
   panel.setAttribute('style',
-    'position:fixed;'
-    + 'inset:0;'                          // cubre toda la pantalla
-    + 'z-index:999990;'
-    + 'background:#fff;'
-    + 'display:none;'
-    + 'flex-direction:column;'
-    + 'overflow:hidden;'
-  );
+  'position:fixed;inset:0;z-index:999990;background:#fff;' +
+  'display:none;visibility:hidden;flex-direction:column;overflow:hidden;'
+);
   document.body.appendChild(panel);
 }
 
@@ -5575,37 +5589,35 @@ window.renderResults = function(items, q) {
       botonesAgregar =
         '<div style="display:flex;gap:5px;margin-top:auto;padding-top:5px;flex-wrap:wrap">' +
 
-          /* Precio caja */
-          '<div style="display:flex;flex-direction:column;align-items:flex-start;gap:1px;flex:1;min-width:60px">' +
-            '<span style="font-size:8px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em">' + labelCaja + '</span>' +
-            '<div style="display:flex;align-items:center;gap:4px">' +
-              '<span style="font-size:13px;font-weight:900;color:' + c1orig + ';letter-spacing:-.02em">' + fp(precio) + '</span>' +
-              '<button data-key="' + esc(it.key) + '" onclick="addToCart(\'' + esc(it.key) + '\',this)"' +
-                ' style="background:' + (inCart ? '#15803d' : c1orig) + ';width:26px;height:26px;' +
-                'border-radius:8px;border:none;cursor:pointer;display:flex;align-items:center;' +
-                'justify-content:center;color:#fff;flex-shrink:0;box-shadow:0 2px 6px ' + c1orig + '44;transition:.12s">' +
-                '<span class="sym symf" style="font-size:14px">' + (inCart ? 'check' : 'add') + '</span>' +
-              '</button>' +
-            '</div>' +
-          '</div>' +
+      
+  '<div style="display:flex;flex-direction:column;gap:4px;margin-top:6px;">' +
 
-          '<div style="width:1px;background:#e5e7eb;align-self:stretch"></div>' +
+  // Fila CAJA — fondo azul suave
+  '<div style="background:#eef3ff;border-radius:10px;padding:7px 8px;' +
+    'display:flex;align-items:center;justify-content:space-between;">' +
+    '<div>' +
+      '<div style="font-size:8px;font-weight:700;color:#5272a8;text-transform:uppercase;">'+labelCaja+'</div>' +
+      '<div style="font-size:14px;font-weight:800;color:#003f87">'+fp(precio)+'</div>' +
+    '</div>' +
+    '<button onclick="addToCart(\''+esc(it.key)+'\',this)" ' +
+      'style="background:#003f87;border:none;color:#fff;border-radius:8px;' +
+      'padding:6px 10px;font-size:10px;font-weight:700;cursor:pointer;">+ Caja</button>' +
+  '</div>' +
 
-          /* Precio unidad */
-          '<div style="display:flex;flex-direction:column;align-items:flex-start;gap:1px;flex:1;min-width:60px">' +
-            '<span style="font-size:8px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em">Unidad</span>' +
-            '<div style="display:flex;align-items:center;gap:4px">' +
-              '<span style="font-size:13px;font-weight:900;color:' + c1orig + ';letter-spacing:-.02em">' + fp(precioUnidad) + '</span>' +
-              '<button data-key="' + esc(keyUnidad) + '" onclick="sadd(\'' + esc(keyUnidad) + '\',\'' + esc(descUnidad) + '\',\'' + esc(it.lab || '') + '\',' + precioUnidad + ',this)"' +
-                ' style="background:' + c1orig + ';width:26px;height:26px;' +
-                'border-radius:8px;border:none;cursor:pointer;display:flex;align-items:center;' +
-                'justify-content:center;color:#fff;flex-shrink:0;box-shadow:0 2px 6px ' + c1orig + '44;transition:.12s">' +
-                '<span class="sym symf" style="font-size:14px">add</span>' +
-              '</button>' +
-            '</div>' +
-          '</div>' +
+  // Fila UNIDAD — fondo neutro
+  '<div style="background:#f8f9fa;border-radius:10px;padding:7px 8px;' +
+    'border:0.5px solid #e5e7eb;' +
+    'display:flex;align-items:center;justify-content:space-between;">' +
+    '<div>' +
+      '<div style="font-size:8px;font-weight:700;color:#9ca3af;text-transform:uppercase;">Unidad</div>' +
+      '<div style="font-size:14px;font-weight:800;color:#374151">'+fp(precioUnidad)+'</div>' +
+    '</div>' +
+    '<button onclick="sadd(\''+esc(keyUnidad)+'\',\''+esc(descUnidad)+'\',\''+esc(it.lab||'')+'\','+precioUnidad+',this)" ' +
+      'style="background:#fff;border:1px solid #003f87;color:#003f87;' +
+      'border-radius:8px;padding:6px 10px;font-size:10px;font-weight:700;cursor:pointer;">+ Und.</button>' +
+  '</div>' +
 
-        '</div>';
+'</div>';
 
     } else {
       /* Un solo precio — botón normal */
