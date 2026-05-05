@@ -2606,6 +2606,8 @@ function renderPedidos(){
       var names = prods.slice(0,2).map(function(pr){ return pr.nombre; });
       prodResumen = names.join(', ') + (prods.length > 2 ? ' +' + (prods.length-2) + ' más' : '');
     }
+    // Comercio / lugar de recogida
+var comercio = (p.comercio || '').trim();
 
     // Badge asignado
     var asignadoBadge = p.asignadoAMi
@@ -2872,9 +2874,10 @@ console.log('=== FIN DEBUG ===');
   document.getElementById('tabPago').textContent=(p.metodoPago||'').includes('TRANSFER')?'🏦 Transferencia':'💵 Efectivo';
 
   /* Origen */
-  var esFarm=p.tipo==='farmacia';
-  var alianza=esFarm?((p.productos||'').toLowerCase().includes('expertos')?'Farma Expertos':'Droguería Central'):'WIL General';
-  document.getElementById('tabOrigen').textContent=alianza;
+  /* Origen — leer directamente del campo comercio (columna V del sheet) */
+var comercioRaw = (p.comercio || '').trim();
+var alianza = comercioRaw || 'WIL Domicilios';
+document.getElementById('tabOrigen').textContent = alianza;
 
   /* Destino — limpiar dirección */
   var dirRaw=p.direccion||'';

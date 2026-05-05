@@ -3749,6 +3749,8 @@ function wcFmt(txt) {
     .replace(/_(.*?)_/g,   '<em style="color:#6b7280;font-style:normal;font-size:11px">$1</em>')
     .replace(/\n/g, '<br>');
 }
+
+
 // ══════════════════════════════════════════════
 //  CHAT FARMACIA v5  —  COMPLETO
 //  Variables declaradas UNA sola vez
@@ -4030,12 +4032,15 @@ function wcActualizarFAB() {
 function wcToggleCarrito() {
   var panel = document.getElementById('wc-carrito-panel');
   if (!panel) return;
-  if (panel.style.display === 'flex') {
+  var abierto = panel.style.display === 'flex';
+  if (abierto) {
     panel.style.display = 'none';
+    document.body.style.overflow = '';
   } else {
     wcRenderCarritoPanel();
     panel.style.display = 'flex';
     panel.style.flexDirection = 'column';
+    document.body.style.overflow = 'hidden'; // bloquea scroll del fondo
   }
 }
 
@@ -4048,12 +4053,17 @@ function wcInyectarPanelCarrito() {
   if (viejo) viejo.remove();
   var panel = document.createElement('div');
   panel.id = 'wc-carrito-panel';
+  // Ocupa toda la pantalla en móvil, panel lateral en desktop
   panel.setAttribute('style',
-    'position:fixed;bottom:158px;right:12px;left:12px;z-index:999990;'
-    + 'background:#fff;border-radius:18px;box-shadow:0 12px 40px rgba(0,0,0,.28);'
-    + 'overflow:hidden;display:none;flex-direction:column;max-height:60vh;'
-    + 'border:1.5px solid rgba(0,63,135,.15);');
-  document.body.appendChild(panel); // <- body, no el sheet
+    'position:fixed;'
+    + 'inset:0;'                          // cubre toda la pantalla
+    + 'z-index:999990;'
+    + 'background:#fff;'
+    + 'display:none;'
+    + 'flex-direction:column;'
+    + 'overflow:hidden;'
+  );
+  document.body.appendChild(panel);
 }
 
 function wcRenderCarritoPanel() {
@@ -4112,18 +4122,23 @@ function wcRenderCarritoPanel() {
   var totalStr = total > 0 ? '$' + total.toLocaleString('es-CO') : '—';
 
   panel.innerHTML =
-    '<div style="background:linear-gradient(135deg,#003f87,#0055b3);padding:12px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">'
-      + '<div style="display:flex;align-items:center;gap:8px">'
-        + '<span style="font-size:16px">🛒</span>'
-        + '<div>'
-          + '<div style="color:#fff;font-size:13px;font-weight:800;line-height:1.2">' + cfg.nombre + '</div>'
-          + '<div style="color:rgba(255,255,255,.65);font-size:10.5px">'
-            + _wcCarrito.reduce(function (s, x) { return s + x.qty; }, 0) + ' producto(s)'
-          + '</div>'
+  '<div style="background:#003f87;padding:14px 16px;display:flex;align-items:center;'
+    + 'justify-content:space-between;flex-shrink:0;safe-area-inset-top:env(safe-area-inset-top)">'
+    + '<div style="display:flex;align-items:center;gap:10px">'
+      + '<span style="font-size:20px">🛒</span>'
+      + '<div>'
+        + '<div style="color:#fff;font-size:15px;font-weight:800">' + cfg.nombre + '</div>'
+        + '<div style="color:rgba(255,255,255,.7);font-size:11px">'
+          + _wcCarrito.reduce(function(s,x){return s+x.qty},0) + ' producto(s)'
         + '</div>'
       + '</div>'
-      + '<button onclick="wcToggleCarrito()" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:28px;height:28px;border-radius:50%;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>'
     + '</div>'
+    // Botón cerrar grande y visible
+    + '<button onclick="wcToggleCarrito()" '
+      + 'style="background:rgba(255,255,255,.2);border:none;color:#fff;'
+      + 'width:38px;height:38px;border-radius:50%;font-size:20px;cursor:pointer;'
+      + 'display:flex;align-items:center;justify-content:center;font-weight:700">✕</button>'
+  + '</div>'
     + '<div style="overflow-y:auto;flex:1;overscroll-behavior:contain">'
       + '<table><thead><tr>'
         + '<th style="text-align:left;padding-left:8px">Producto</th>'
@@ -4312,24 +4327,28 @@ function wcMostrarProductos(productos, extras, src) {
     var precioColor = item.esOferta ? '#ef4444' : '#003f87';
 
     /* FIX 2: height:150px para ver la imagen completa sin recortar */
-    var imgBlock = '';
+  
+
+var imgBlock = '';
 if (item.imagen) {
-  var safe = item.imagen.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
   imgBlock =
     '<div style="position:relative;width:100%;height:150px;overflow:hidden;border-radius:10px 10px 0 0;background:#f3f4f6">'
       + (item.esOferta ? '<div class="wc-badge-oferta">🏷️ OFERTA</div>' : '')
       + '<img src="' + item.imagen + '" '
-        + 'style="width:100%;height:100%;object-fit:cover;display:block;position:relative;z-index:1" '
+        + 'style="width:100%;height:100%;object-fit:cover;display:block" '
         + 'onerror="this.parentElement.style.display=\'none\'">'
-      + '<button class="wc-lupa-btn" onclick="wcAbrirModal(\'' + safe + '\')" title="Ver imagen grande" style="position:absolute;bottom:8px;right:8px;z-index:10;width:32px;height:32px;border-radius:50%;background:rgba(0,63,135,.88);border:none;color:#fff;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;">🔍</button>'
+      + '<button class="wc-lupa-btn wc-open-modal" data-src="' + item.imagen + '" '
+        + 'title="Ver imagen grande" '
+        + 'style="position:absolute;bottom:8px;right:8px;z-index:10;width:32px;height:32px;'
+        + 'border-radius:50%;background:rgba(0,63,135,.88);border:none;color:#fff;'
+        + 'font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;">🔍</button>'
     + '</div>';
-
-    } else if (item.esOferta) {
-      imgBlock =
-        '<div style="width:100%;background:linear-gradient(90deg,#fef2f2,#fee2e2);padding:7px 10px;border-radius:10px 10px 0 0">'
-          + '<div class="wc-badge-oferta" style="position:static;animation:none;display:inline-flex">🏷️ OFERTA</div>'
-        + '</div>';
-    }
+} else if (item.esOferta) {
+  imgBlock =
+    '<div style="width:100%;background:linear-gradient(90deg,#fef2f2,#fee2e2);padding:7px 10px;border-radius:10px 10px 0 0">'
+      + '<div class="wc-badge-oferta" style="position:static;animation:none;display:inline-flex">🏷️ OFERTA</div>'
+    + '</div>';
+}
 
     var extraHTML = (item.descExtra && item.esOferta)
       ? '<div style="font-size:10px;color:#6b7280;margin-bottom:5px;line-height:1.3;font-style:italic">' + item.descExtra + '</div>'
@@ -4630,6 +4649,15 @@ function wcProcesar(txt) {
     wcMsgFarm('Entendido, *' + _wcNombre + '* 😊 ¿En qué te puedo ayudar?');
     setTimeout(wcMostrarOpciones, 1200);
   }
+
+  // ── Delegación de eventos para lupa (evita problemas de escape en onclick inline) ──
+document.addEventListener('click', function (e) {
+  var btn = e.target.closest('.wc-open-modal');
+  if (btn) {
+    var src = btn.getAttribute('data-src');
+    if (src) wcAbrirModal(src);
+  }
+});
 }
 
 
