@@ -5458,7 +5458,8 @@ window.renderResults = function(items, q) {
     items.length + ' resultado' + (items.length !== 1 ? 's' : '') + ' para "' + q + '"';
 
   var grid = document.getElementById('res-grid');
-  grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%';
+ grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;align-items:start';
+
   grid.innerHTML = '';
 
   var GRADS = [
@@ -5586,38 +5587,30 @@ window.renderResults = function(items, q) {
         pUnit: precioUnidad
       });
 
-      botonesAgregar =
-        '<div style="display:flex;gap:5px;margin-top:auto;padding-top:5px;flex-wrap:wrap">' +
+     botonesAgregar =
+  '<div style="display:flex;flex-direction:column;gap:4px;margin-top:auto;padding-top:5px">' +
 
-      
-  '<div style="display:flex;flex-direction:column;gap:4px;margin-top:6px;">' +
-
-  // Fila CAJA — fondo azul suave
-  '<div style="background:#eef3ff;border-radius:10px;padding:7px 8px;' +
-    'display:flex;align-items:center;justify-content:space-between;">' +
-    '<div>' +
-      '<div style="font-size:8px;font-weight:700;color:#5272a8;text-transform:uppercase;">'+labelCaja+'</div>' +
-      '<div style="font-size:14px;font-weight:800;color:#003f87">'+fp(precio)+'</div>' +
+    // CAJA
+    '<div style="display:flex;align-items:center;gap:6px">' +
+      '<div style="flex:1;background:#eef3ff;border-radius:9px;padding:5px 8px">' +
+        '<div style="font-size:8px;font-weight:700;color:#5272a8">'+labelCaja+'</div>' +
+        '<div style="font-size:13px;font-weight:900;color:#003f87">'+fp(precio)+' COP</div>' +
+      '</div>' +
+      '<button onclick="addToCart(\''+esc(it.key)+'\',this)"'+
+        ' style="background:#003f87;color:#fff;border:none;border-radius:9px;padding:7px 10px;font-size:11px;font-weight:800;cursor:pointer;flex-shrink:0">+ Caja</button>' +
     '</div>' +
-    '<button onclick="addToCart(\''+esc(it.key)+'\',this)" ' +
-      'style="background:#003f87;border:none;color:#fff;border-radius:8px;' +
-      'padding:6px 10px;font-size:10px;font-weight:700;cursor:pointer;">+ Caja</button>' +
-  '</div>' +
 
-  // Fila UNIDAD — fondo neutro
-  '<div style="background:#f8f9fa;border-radius:10px;padding:7px 8px;' +
-    'border:0.5px solid #e5e7eb;' +
-    'display:flex;align-items:center;justify-content:space-between;">' +
-    '<div>' +
-      '<div style="font-size:8px;font-weight:700;color:#9ca3af;text-transform:uppercase;">Unidad</div>' +
-      '<div style="font-size:14px;font-weight:800;color:#374151">'+fp(precioUnidad)+'</div>' +
+    // UNIDAD
+    '<div style="display:flex;align-items:center;gap:6px">' +
+      '<div style="flex:1;background:#f3f4f6;border-radius:9px;padding:5px 8px">' +
+        '<div style="font-size:8px;font-weight:700;color:#9ca3af">Unidad</div>' +
+        '<div style="font-size:13px;font-weight:900;color:#374151">'+fp(precioUnidad)+' COP</div>' +
+      '</div>' +
+      '<button onclick="sadd(\''+esc(keyUnidad)+'\',\''+esc(descUnidad)+'\',\''+esc(it.lab||'')+'\','+precioUnidad+',this)"'+
+        ' style="background:#374151;color:#fff;border:none;border-radius:9px;padding:7px 10px;font-size:11px;font-weight:800;cursor:pointer;flex-shrink:0">+ Und.</button>' +
     '</div>' +
-    '<button onclick="sadd(\''+esc(keyUnidad)+'\',\''+esc(descUnidad)+'\',\''+esc(it.lab||'')+'\','+precioUnidad+',this)" ' +
-      'style="background:#fff;border:1px solid #003f87;color:#003f87;' +
-      'border-radius:8px;padding:6px 10px;font-size:10px;font-weight:700;cursor:pointer;">+ Und.</button>' +
-  '</div>' +
 
-'</div>';
+  '</div>';
 
     } else {
       /* Un solo precio — botón normal */
