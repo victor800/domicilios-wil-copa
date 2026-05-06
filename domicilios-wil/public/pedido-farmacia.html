@@ -5307,154 +5307,65 @@ document.addEventListener('click', function (e) {
 }(window));
 
 
+/* ═══════════════════════════════════════════════════════════════
+   WIL — FIX BÚSQUEDA v5
+   ─────────────────────────────────────────────────────────────
+   REGLAS:
+   1. Dedup SOLO por key exacta (el sheet ya deduplicó al cargar)
+      → Todos los panitos, shampoos, cepillos de distintas marcas
+        y presentaciones aparecen como cards separadas.
+   2. Umbral de score 22 (antes 8) → no aparecen productos
+      sin relación con lo buscado.
+   3. Fotos primero en resultados y secciones.
+   4. Sobrescribe cualquier patch anterior.
+═══════════════════════════════════════════════════════════════ */
 
+/* ── Helpers ── */
+function _tieneImagen(it) {
+  var img = ((it && it.imagen) || '').trim();
+  return img.length > 4 && (img.startsWith('https://') || img.startsWith('http://'));
+}
 
-/* ─── 1. DETECTAR PRECIO UNITARIO EN DESCRIPCIÓN ─────────────
-   Detecta patrones como:
-     "$4.000 c/u"  "c/u: $4.000"  "$4.000 cada una"
-     "$4.000 individual"  "4000 x unidad"
-   Devuelve el precio numérico o null si no lo encuentra.
-──────────────────────────────────────────────────────────────── */
 function parsearPrecioUnidad(it) {
   var texto = ((it.unidad || '') + ' ' + (it.desc || '')).toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
   var patrones = [
     /\$\s*([\d.,]+)\s*c\/u/,
     /c\/u\s*[:\-]?\s*\$\s*([\d.,]+)/,
-    /\$\s*([\d.,]+)\s*(?:cada\s+una?|cada\s+uno|individual|por\s+unidad|x\s*unidad)/,
-    /(?:cada\s+una?|individual|x\s*unidad)\s*[:\-]?\s*\$\s*([\d.,]+)/,
+    /\$\s*([\d.,]+)\s*(?:cada\s+una?|individual|por\s+unidad|x\s*unidad)/,
   ];
-
   for (var i = 0; i < patrones.length; i++) {
     var m = texto.match(patrones[i]);
     if (m) {
-      var str = m[1].replace(/\./g, '').replace(',', '.');
-      var n = parseFloat(str);
+      var n = parseFloat(m[1].replace(/\./g, '').replace(',', '.'));
       if (!isNaN(n) && n > 0 && n < 10000000) return Math.round(n);
     }
   }
   return null;
 }
 
-/* ─── 2. HELPER — detectar si es precio de caja ──────────────
-   Detecta "caja x30", "x30 unidades", "x 10 tab", etc. en desc
-──────────────────────────────────────────────────────────────── */
 function parsearCantidadCaja(it) {
   var texto = ((it.unidad || '') + ' ' + (it.desc || '')).toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  var m = texto.match(/x\s*(\d+)\s*(?:unidades?|tabs?|capsulas?|comprimidos?|ampolletas?|sobres?)?/);
-  if (m) return parseInt(m[1], 10);
-  return null;
+  var m = texto.match(/x\s*(\d+)\s*(?:unidades?|tabs?|capsulas?|comprimidos?|sobres?)?/);
+  return m ? parseInt(m[1], 10) : null;
 }
 
-/* ─── 3. DEDUPLICACIÓN — reemplaza la función doSearch ──────── */
-window.doSearch = function(q) {
-  if (!q) { setSt('empty'); return; }
-  setSt('loading');
-  setTimeout(function() {
-    if (!allData.length) {
-      document.getElementById('nores-txt').textContent = 'Cargando inventario, intenta en segundos.';
-      setSt('nores'); return;
-    }
-
-    var pool = (_searchAllData && _searchAllData.length) ? _searchAllData : allData;
-
-    /* Score */
-    var sc = [];
-    pool.forEach(function(it) {
-      var s = Math.max(scr2(it.desc, q), scr2(it.lab, q) * 0.7);
-      if (s >= 8) sc.push({ it: it, s: s });
-    });
-
-    /* Ordenar: score DESC, con stock antes que agotados, con foto antes */
-    sc.sort(function(a, b) {
-      if (b.s !== a.s) return b.s - a.s;
-      var as = (a.it.stock !== undefined ? a.it.stock : 3) > 0 ? 1 : 0;
-      var bs = (b.it.stock !== undefined ? b.it.stock : 3) > 0 ? 1 : 0;
-      if (bs !== as) return bs - as;
-      var af = a.it.imagen && a.it.imagen.startsWith('http') ? 1 : 0;
-      var bf = b.it.imagen && b.it.imagen.startsWith('http') ? 1 : 0;
-      return bf - af;
-    });
-
-    /* ── DEDUP por nombre normalizado ──
-       Conserva el de mayor score; si empatan, prefiere el que tiene foto. */
-    var seenNombre = {};
-    var deduped = [];
-
-    sc.forEach(function(x) {
-      var clave = nrm(x.it.desc);
-      if (seenNombre[clave] !== undefined) {
-        var prevIdx = seenNombre[clave];
-        var prev    = deduped[prevIdx];
-        var tieneImg   = x.it.imagen && x.it.imagen.startsWith('http');
-        var prevTieneImg = prev.it.imagen && prev.it.imagen.startsWith('http');
-        /* Reemplazar solo si el nuevo tiene foto y el anterior no */
-        if (tieneImg && !prevTieneImg) {
-          /* Conservar el precio/stock más completo */
-          var merged = Object.assign({}, x.it);
-          if (!merged.precio || merged.precio === 0) merged.precio = prev.it.precio;
-          if (!merged.pUnit  || merged.pUnit  === 0) merged.pUnit  = prev.it.pUnit;
-          if (merged.stock === undefined) merged.stock = prev.it.stock;
-          deduped[prevIdx] = { it: merged, s: Math.max(x.s, prev.s) };
-        }
-        return;
-      }
-      seenNombre[clave] = deduped.length;
-      deduped.push(x);
-    });
-
-    if (!deduped.length) {
-      document.getElementById('nores-txt').textContent =
-        'No encontramos "' + q + '". Intenta con otro nombre.';
-      setSt('nores'); return;
-    }
-
-    renderResults(deduped.slice(0, 60).map(function(x) { return x.it; }), q);
-  }, 55);
-};
-
-/* ─── 4. DEDUP EN EL ÍNDICE — reemplaza _rebuildSearchIndex ── */
-window._rebuildSearchIndex = function() {
-  var seenKey    = {};
-  var seenNombre = {};
-
-  /* Guardar extras antes de limpiar */
-  var extras = (_searchAllData || []).filter(function(it) {
+/* ═══════════════════════════════════════════════════════════════
+   1. _rebuildSearchIndex — dedup solo por key exacta
+═══════════════════════════════════════════════════════════════ */
+window._rebuildSearchIndex = function () {
+  var seenKey = {};
+  var extras = (_searchAllData || []).filter(function (it) {
     return it.key && (it.key.startsWith('np_raw_') || it.key.startsWith('oferta_'));
   });
-
   _searchAllData = [];
 
   function push(it) {
-    if (!it.desc) return;
-
-    var clave = nrm(it.desc);
-
-    /* Dedup por key exacta */
+    if (!it || !it.desc || !it.key) return;
     if (seenKey[it.key]) return;
-
-    /* Dedup por nombre normalizado: si ya existe, conservar el de mejor imagen */
-    if (seenNombre[clave] !== undefined) {
-      var prevIdx   = seenNombre[clave];
-      var prev      = _searchAllData[prevIdx];
-      var tieneImg  = it.imagen && it.imagen.startsWith('http');
-      var prevImg   = prev.imagen && prev.imagen.startsWith('http');
-      if (tieneImg && !prevImg) {
-        var merged = Object.assign({}, it);
-        if (!merged.precio || merged.precio === 0) merged.precio = prev.precio;
-        if (!merged.pUnit  || merged.pUnit  === 0) merged.pUnit  = prev.pUnit;
-        if (merged.stock === undefined) merged.stock = prev.stock;
-        _searchAllData[prevIdx] = merged;
-        seenKey[it.key] = true;
-      }
-      return;
-    }
-
-    seenKey[it.key]      = true;
-    seenNombre[clave]    = _searchAllData.length;
-    cache[it.key]        = it;
+    seenKey[it.key] = true;
+    cache[it.key] = it;
     _searchAllData.push(it);
   }
 
@@ -5462,8 +5373,96 @@ window._rebuildSearchIndex = function() {
   extras.forEach(push);
 };
 
-/* ─── 5. RENDER CON PRECIO UNITARIO — reemplaza renderResults ─ */
-window.renderResults = function(items, q) {
+/* ═══════════════════════════════════════════════════════════════
+   2. doSearch — dedup solo por key, umbral 22, fotos primero
+═══════════════════════════════════════════════════════════════ */
+window.doSearch = function (q) {
+  if (!q) { setSt('empty'); return; }
+  setSt('loading');
+
+  setTimeout(function () {
+    if (!allData.length) {
+      document.getElementById('nores-txt').textContent =
+        'Cargando inventario, intenta en segundos.';
+      setSt('nores'); return;
+    }
+
+    var pool = (_searchAllData && _searchAllData.length) ? _searchAllData : allData;
+
+    var seenKey = {};
+    var scored  = [];
+
+    pool.forEach(function (it) {
+      if (!it || !it.key) return;
+      if (seenKey[it.key]) return;
+      seenKey[it.key] = true;
+
+      var s = Math.max(scr2(it.desc, q), scr2(it.lab, q) * 0.7);
+      if (s >= 22) scored.push({ it: it, s: s });
+    });
+
+    scored.sort(function (a, b) {
+      if (b.s !== a.s) return b.s - a.s;
+      var as = (a.it.stock !== undefined ? a.it.stock : 3) > 0 ? 1 : 0;
+      var bs = (b.it.stock !== undefined ? b.it.stock : 3) > 0 ? 1 : 0;
+      if (bs !== as) return bs - as;
+      return (_tieneImagen(b.it) ? 1 : 0) - (_tieneImagen(a.it) ? 1 : 0);
+    });
+
+    if (!scored.length) {
+      document.getElementById('nores-txt').textContent =
+        'No encontramos "' + q + '". Intenta con otro nombre.';
+      setSt('nores'); return;
+    }
+
+    renderResults(scored.slice(0, 60).map(function (x) { return x.it; }), q);
+  }, 55);
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   3. _renderProdEnScroll — fotos primero, dedup solo por key
+═══════════════════════════════════════════════════════════════ */
+(function () {
+  function patch() {
+    if (!window._renderProdEnScroll || window._renderProdEnScroll._v5) return;
+    var _orig = window._renderProdEnScroll;
+
+    window._renderProdEnScroll = function (scrollId, productos, colorOffset) {
+      if (!productos || !productos.length) return;
+
+      var seenKey = {};
+      var unicos  = [];
+      productos.forEach(function (p) {
+        var k = p.key || (p.nombre + '|||' + p.id);
+        if (!k || seenKey[k]) return;
+        seenKey[k] = true;
+        unicos.push(p);
+      });
+
+      var conFoto = unicos.filter(_tieneImagen);
+      var sinFoto = unicos.filter(function (p) { return !_tieneImagen(p); });
+
+      return _orig.call(this, scrollId, conFoto.concat(sinFoto), colorOffset);
+    };
+
+    window._renderProdEnScroll._v5 = true;
+    console.log('[WIL v5] _renderProdEnScroll OK');
+  }
+
+  patch();
+  if (!window._renderProdEnScroll || !window._renderProdEnScroll._v5) {
+    var t = setInterval(function () {
+      patch();
+      if (window._renderProdEnScroll && window._renderProdEnScroll._v5) clearInterval(t);
+    }, 150);
+    setTimeout(function () { clearInterval(t); }, 12000);
+  }
+})();
+
+/* ═══════════════════════════════════════════════════════════════
+   4. renderResults — featured + grid 2 col + precio unitario
+═══════════════════════════════════════════════════════════════ */
+window.renderResults = function (items, q) {
   setSt('results');
   document.getElementById('res-count').textContent =
     items.length + ' resultado' + (items.length !== 1 ? 's' : '') + ' para "' + q + '"';
@@ -5472,168 +5471,140 @@ window.renderResults = function(items, q) {
   grid.style.cssText = 'display:flex;flex-direction:column;gap:10px;width:100%';
   grid.innerHTML = '';
 
-  // ── FEATURED: primer resultado ocupa ancho completo ──
   var featured = items[0];
   var resto    = items.slice(1);
 
   if (featured) {
     cache[featured.key] = featured;
-    var precio     = featured.precio > 0 ? featured.precio : (featured.pUnit > 0 ? featured.pUnit : 0);
-    var agotado    = featured.stock !== undefined ? featured.stock <= 0 : false;
-    var hasImg     = !!(featured.imagen && featured.imagen.startsWith('http'));
-    var precioUnd  = parsearPrecioUnidad(featured);
-    var labelCaja  = parsearCantidadCaja(featured) ? 'Caja ×' + parsearCantidadCaja(featured) : 'Caja';
-    var keyUnd     = featured.key + '__unidad';
-    var descUnd    = featured.desc + ' (unidad)';
-    cache[keyUnd]  = Object.assign({}, featured, { key: keyUnd, precio: precioUnd, pUnit: precioUnd });
+    var precio    = featured.precio > 0 ? featured.precio : (featured.pUnit > 0 ? featured.pUnit : 0);
+    var agotado   = featured.stock !== undefined ? featured.stock <= 0 : false;
+    var hasImg    = _tieneImagen(featured);
+    var precioUnd = parsearPrecioUnidad(featured);
+    var cantCaja  = parsearCantidadCaja(featured);
+    var labelCaja = cantCaja ? 'Caja x' + cantCaja : 'Caja';
+    var keyUnd    = featured.key + '__und';
+    cache[keyUnd] = Object.assign({}, featured, { key: keyUnd, precio: precioUnd, pUnit: precioUnd });
 
-    var seed = featured.key.split('').reduce(function(a,c){return a+c.charCodeAt(0);},0);
+    var seed = featured.key.split('').reduce(function (a, c) { return a + c.charCodeAt(0); }, 0);
     var c1   = _PROD_GRADS[seed % _PROD_GRADS.length][0];
     var icon = _PROD_ICONS[seed % _PROD_ICONS.length];
 
-    // Botones de precio
     var precioBtns = '';
     if (precioUnd && precioUnd !== precio && precio > precioUnd) {
       precioBtns =
-        '<div style="display:flex;gap:8px;margin-top:10px">' +
-          '<div style="display:flex;align-items:center;gap:6px;flex:1">' +
-            '<div style="flex:1;background:#eef3ff;border-radius:10px;padding:7px 10px">' +
-              '<div style="font-size:8px;font-weight:700;color:#5272a8">'+labelCaja+'</div>' +
-              '<div style="font-size:15px;font-weight:900;color:#003f87">'+fp(precio)+'</div>' +
-            '</div>' +
-            '<button onclick="addToCart(\''+esc(featured.key)+'\',this)" style="background:#003f87;color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:800;cursor:pointer;flex-shrink:0">+ Caja</button>' +
-          '</div>' +
-          '<div style="display:flex;align-items:center;gap:6px;flex:1">' +
-            '<div style="flex:1;background:#f3f4f6;border-radius:10px;padding:7px 10px">' +
-              '<div style="font-size:8px;font-weight:700;color:#9ca3af">Unidad</div>' +
-              '<div style="font-size:15px;font-weight:900;color:#374151">'+fp(precioUnd)+'</div>' +
-            '</div>' +
-            '<button onclick="sadd(\''+esc(keyUnd)+'\',\''+esc(descUnd)+'\',\''+esc(featured.lab||'')+'\','+precioUnd+',this)" style="background:#374151;color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:800;cursor:pointer;flex-shrink:0">+ Und.</button>' +
-          '</div>' +
-        '</div>';
+        '<div style="display:flex;gap:8px;margin-top:10px">'
+          + '<div style="display:flex;align-items:center;gap:6px;flex:1">'
+            + '<div style="flex:1;background:#eef3ff;border-radius:10px;padding:7px 10px">'
+              + '<div style="font-size:8px;font-weight:700;color:#5272a8">' + labelCaja + '</div>'
+              + '<div style="font-size:15px;font-weight:900;color:#003f87">' + fp(precio) + '</div>'
+            + '</div>'
+            + '<button onclick="addToCart(\'' + esc(featured.key) + '\',this)" style="background:#003f87;color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:800;cursor:pointer;flex-shrink:0">+ Caja</button>'
+          + '</div>'
+          + '<div style="display:flex;align-items:center;gap:6px;flex:1">'
+            + '<div style="flex:1;background:#f3f4f6;border-radius:10px;padding:7px 10px">'
+              + '<div style="font-size:8px;font-weight:700;color:#9ca3af">Unidad</div>'
+              + '<div style="font-size:15px;font-weight:900;color:#374151">' + fp(precioUnd) + '</div>'
+            + '</div>'
+            + '<button onclick="sadd(\'' + esc(keyUnd) + '\',\'' + esc(featured.desc + ' (und)') + '\',\'' + esc(featured.lab || '') + '\',' + precioUnd + ',this)" style="background:#374151;color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:800;cursor:pointer;flex-shrink:0">+ Und.</button>'
+          + '</div>'
+        + '</div>';
     } else {
       precioBtns =
-        '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px">' +
-          '<div style="font-size:22px;font-weight:900;color:'+(agotado?'#9ca3af':c1)+'">'+(precio>0?fp(precio):'Consultar')+'</div>' +
-          (agotado
-            ? '<div style="font-size:10px;font-weight:800;color:#dc2626;background:#fee2e2;padding:6px 12px;border-radius:9px">Sin stock</div>'
-            : '<button onclick="addToCart(\''+esc(featured.key)+'\',this)" style="background:'+c1+';color:#fff;border:none;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px '+c1+'44">+ Agregar</button>'
-          ) +
-        '</div>';
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px">'
+          + '<div style="font-size:22px;font-weight:900;color:' + (agotado ? '#9ca3af' : c1) + '">' + (precio > 0 ? fp(precio) : 'Consultar') + '</div>'
+          + (agotado
+              ? '<div style="font-size:10px;font-weight:800;color:#dc2626;background:#fee2e2;padding:6px 12px;border-radius:9px">Sin stock</div>'
+              : '<button onclick="addToCart(\'' + esc(featured.key) + '\',this)" style="background:' + c1 + ';color:#fff;border:none;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:800;cursor:pointer">+ Agregar</button>'
+            )
+        + '</div>';
     }
 
-    var featCard = document.createElement('div');
-    featCard.style.cssText = 'background:#fff;border-radius:18px;border:2px solid '+c1+'33;box-shadow:0 4px 20px rgba(0,0,0,.1);overflow:hidden;animation:fadeUp .25s ease both; ;min-height:320px';
-    featCard.innerHTML =
-  // Imagen arriba — altura generosa
-  '<div style="width:100%;height:180px;background:#f8f9fa;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;border-bottom:1px solid #f0f0f0">' +
-    (hasImg
-      ? '<img src="'+escFarmacia(featured.imagen)+'" style="width:100%;height:180px;object-fit:contain;padding:10px">'
-      : '<span class="sym symf" style="font-size:70px;color:'+c1+';opacity:.15">'+icon+'</span>'
-    ) +
-    '<button onclick="abrirPopupSheet(\''+esc(featured.key)+'\')" style="position:absolute;bottom:8px;right:10px;width:28px;height:28px;border-radius:50%;border:none;cursor:pointer;background:'+c1+';display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.2)">' +
-      '<span class="sym" style="font-size:14px;color:#fff">zoom_in</span>' +
-    '</button>' +
-  '</div>' +
-
-  // Info y botones abajo
-  '<div style="padding:12px 14px 14px">' +
-        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:7px;flex-wrap:wrap">' +
-
-      '<span style="font-size:8px;font-weight:800;color:'+c1+';background:'+c1+'18;padding:2px 8px;border-radius:99px;text-transform:uppercase">'+hl(featured.lab||'Genérico',q)+'</span>' +
-      '<span style="font-size:8px;font-weight:800;color:#15803d;background:#dcfce7;padding:2px 8px;border-radius:99px">✓ Mejor coincidencia</span>' +
-    '</div>' +
-        '<div style="font-size:15px;font-weight:800;color:#111827;line-height:1.3;margin-bottom:4px">'+hl(featured.desc,q)+'</div>' +
-    (featured.unidad ? '<div style="font-size:10px;color:#9ca3af;background:#f3f4f6;border-radius:6px;padding:2px 7px;width:fit-content">'+featured.unidad+'</div>' : '') +
-    // 3. Botones con margin-top:auto para empujar al fondo
-    '<div style="margin-top:auto;padding-top:12px">' + precioBtns + '</div>' +
-  '</div>';
-
-    grid.appendChild(featCard);
+    var fCard = document.createElement('div');
+    fCard.style.cssText = 'background:#fff;border-radius:18px;border:2px solid ' + c1 + '33;box-shadow:0 4px 20px rgba(0,0,0,.1);overflow:hidden;animation:fadeUp .25s ease both';
+    fCard.innerHTML =
+      '<div style="width:100%;height:180px;background:#f8f9fa;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;border-bottom:1px solid #f0f0f0">'
+        + (hasImg ? '<img src="' + escFarmacia(featured.imagen) + '" style="width:100%;height:180px;object-fit:contain;padding:10px">' : '<span class="sym symf" style="font-size:70px;color:' + c1 + ';opacity:.15">' + icon + '</span>')
+        + '<button onclick="abrirPopupSheet(\'' + esc(featured.key) + '\')" style="position:absolute;bottom:8px;right:10px;width:28px;height:28px;border-radius:50%;border:none;cursor:pointer;background:' + c1 + ';display:flex;align-items:center;justify-content:center"><span class="sym" style="font-size:14px;color:#fff">zoom_in</span></button>'
+      + '</div>'
+      + '<div style="padding:12px 14px 14px">'
+        + '<div style="display:flex;gap:6px;margin-bottom:7px;flex-wrap:wrap">'
+          + '<span style="font-size:8px;font-weight:800;color:' + c1 + ';background:' + c1 + '18;padding:2px 8px;border-radius:99px;text-transform:uppercase">' + hl(featured.lab || 'Genérico', q) + '</span>'
+          + '<span style="font-size:8px;font-weight:800;color:#15803d;background:#dcfce7;padding:2px 8px;border-radius:99px">✓ Mejor resultado</span>'
+        + '</div>'
+        + '<div style="font-size:15px;font-weight:800;color:#111827;line-height:1.3;margin-bottom:4px">' + hl(featured.desc, q) + '</div>'
+        + (featured.unidad ? '<div style="font-size:10px;color:#9ca3af;background:#f3f4f6;border-radius:6px;padding:2px 7px;width:fit-content">' + featured.unidad + '</div>' : '')
+        + '<div style="margin-top:10px">' + precioBtns + '</div>'
+      + '</div>';
+    grid.appendChild(fCard);
   }
 
-  // ── RESTO en grid 2 columnas ──
   if (resto.length > 0) {
-    var subGrid = document.createElement('div');
-    subGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start';
+    var sub = document.createElement('div');
+    sub.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start';
 
-    resto.forEach(function(it, i) {
+    resto.forEach(function (it, i) {
       cache[it.key] = it;
-      var agotado  = it.stock !== undefined ? it.stock <= 0 : false;
-      var precio   = it.precio > 0 ? it.precio : (it.pUnit > 0 ? it.pUnit : 0);
-      var seed2    = it.key.split('').reduce(function(a,c){return a+c.charCodeAt(0);},0);
-      var c1r      = agotado ? '#9ca3af' : _PROD_GRADS[seed2 % _PROD_GRADS.length][0];
-      var iconr    = _PROD_ICONS[seed2 % _PROD_ICONS.length];
-      var hasImgR  = !!(it.imagen && it.imagen.startsWith('http'));
-      var uid      = 'rs_sub_'+i;
-      var inCart   = !!cart[it.key];
+      var ag  = it.stock !== undefined ? it.stock <= 0 : false;
+      var pr  = it.precio > 0 ? it.precio : (it.pUnit > 0 ? it.pUnit : 0);
+      var sd  = it.key.split('').reduce(function (a, c) { return a + c.charCodeAt(0); }, 0);
+      var c1r = ag ? '#9ca3af' : _PROD_GRADS[sd % _PROD_GRADS.length][0];
+      var icr = _PROD_ICONS[sd % _PROD_ICONS.length];
+      var hir = _tieneImagen(it);
+      var uid = 'rs_' + i;
+      var pu  = parsearPrecioUnidad(it);
+      var cc  = parsearCantidadCaja(it);
+      var lc  = cc ? 'Caja x' + cc : 'Caja';
+      var ku  = it.key + '__und';
+      cache[ku] = Object.assign({}, it, { key: ku, precio: pu, pUnit: pu });
 
-      var precioUndR = parsearPrecioUnidad(it);
-      var labelCajaR = parsearCantidadCaja(it) ? 'Caja ×'+parsearCantidadCaja(it) : 'Caja';
-      var keyUndR    = it.key+'__unidad';
-      var descUndR   = it.desc+' (unidad)';
-      cache[keyUndR] = Object.assign({}, it, { key:keyUndR, precio:precioUndR, pUnit:precioUndR });
-
-      var btnsR = '';
-      if (precioUndR && precioUndR !== precio && precio > precioUndR) {
-        btnsR =
-          '<div style="display:flex;flex-direction:column;gap:3px;margin-top:auto;padding-top:4px">' +
-            '<div style="display:flex;align-items:center;gap:4px">' +
-              '<div style="flex:1;background:#eef3ff;border-radius:8px;padding:4px 7px">' +
-                '<div style="font-size:7px;font-weight:700;color:#5272a8">'+labelCajaR+'</div>' +
-                '<div style="font-size:12px;font-weight:900;color:#003f87">'+fp(precio)+'</div>' +
-              '</div>' +
-              '<button onclick="addToCart(\''+esc(it.key)+'\',this)" style="background:#003f87;color:#fff;border:none;border-radius:8px;padding:5px 8px;font-size:10px;font-weight:800;cursor:pointer;flex-shrink:0">+ Caja</button>' +
-            '</div>' +
-            '<div style="display:flex;align-items:center;gap:4px">' +
-              '<div style="flex:1;background:#f3f4f6;border-radius:8px;padding:4px 7px">' +
-                '<div style="font-size:7px;font-weight:700;color:#9ca3af">Unidad</div>' +
-                '<div style="font-size:12px;font-weight:900;color:#374151">'+fp(precioUndR)+'</div>' +
-              '</div>' +
-              '<button onclick="sadd(\''+esc(keyUndR)+'\',\''+esc(descUndR)+'\',\''+esc(it.lab||'')+'\','+precioUndR+',this)" style="background:#374151;color:#fff;border:none;border-radius:8px;padding:5px 8px;font-size:10px;font-weight:800;cursor:pointer;flex-shrink:0">+ Und.</button>' +
-            '</div>' +
-          '</div>';
+      var btns = '';
+      if (pu && pu !== pr && pr > pu) {
+        btns =
+          '<div style="display:flex;flex-direction:column;gap:3px;margin-top:auto;padding-top:4px">'
+            + '<div style="display:flex;align-items:center;gap:4px">'
+              + '<div style="flex:1;background:#eef3ff;border-radius:8px;padding:4px 7px"><div style="font-size:7px;font-weight:700;color:#5272a8">' + lc + '</div><div style="font-size:12px;font-weight:900;color:#003f87">' + fp(pr) + '</div></div>'
+              + '<button onclick="addToCart(\'' + esc(it.key) + '\',this)" style="background:#003f87;color:#fff;border:none;border-radius:8px;padding:5px 8px;font-size:10px;font-weight:800;cursor:pointer;flex-shrink:0">+ Caja</button>'
+            + '</div>'
+            + '<div style="display:flex;align-items:center;gap:4px">'
+              + '<div style="flex:1;background:#f3f4f6;border-radius:8px;padding:4px 7px"><div style="font-size:7px;font-weight:700;color:#9ca3af">Unidad</div><div style="font-size:12px;font-weight:900;color:#374151">' + fp(pu) + '</div></div>'
+              + '<button onclick="sadd(\'' + esc(ku) + '\',\'' + esc(it.desc + ' (und)') + '\',\'' + esc(it.lab || '') + '\',' + pu + ',this)" style="background:#374151;color:#fff;border:none;border-radius:8px;padding:5px 8px;font-size:10px;font-weight:800;cursor:pointer;flex-shrink:0">+ Und.</button>'
+            + '</div>'
+          + '</div>';
       } else {
-        btnsR =
-          '<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:auto;padding-top:4px">' +
-            '<div style="font-size:14px;font-weight:900;color:'+(agotado?'#9ca3af':c1r)+'">'+( precio>0?fp(precio):'Consultar')+'</div>' +
-            (agotado
-              ? '<div style="font-size:8px;font-weight:800;color:#dc2626;background:#fee2e2;padding:4px 8px;border-radius:8px">Sin stock</div>'
-              : '<button onclick="addToCart(\''+esc(it.key)+'\',this)" style="background:'+c1r+';width:28px;height:28px;border-radius:8px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 3px 8px '+c1r+'44">' +
-                '<span class="sym symf" style="font-size:15px">add</span></button>'
-            ) +
-          '</div>';
+        btns =
+          '<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:auto;padding-top:4px">'
+            + '<div style="font-size:14px;font-weight:900;color:' + (ag ? '#9ca3af' : c1r) + '">' + (pr > 0 ? fp(pr) : 'Consultar') + '</div>'
+            + (ag
+                ? '<div style="font-size:8px;font-weight:800;color:#dc2626;background:#fee2e2;padding:4px 8px;border-radius:8px">Sin stock</div>'
+                : '<button onclick="addToCart(\'' + esc(it.key) + '\',this)" style="background:' + c1r + ';width:28px;height:28px;border-radius:8px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff"><span class="sym symf" style="font-size:15px">add</span></button>'
+              )
+          + '</div>';
       }
 
       var card = document.createElement('article');
-      card.style.cssText = 'background:#fff;border-radius:16px;border:1.5px solid #e5e7eb;box-shadow:0 2px 10px rgba(0,0,0,.06);display:flex;flex-direction:column;overflow:hidden;animation:fadeUp .25s ease both;animation-delay:'+Math.min(i*20,240)+'ms'+(agotado?';opacity:.82':'');
+      card.style.cssText = 'background:#fff;border-radius:16px;border:1.5px solid #e5e7eb;box-shadow:0 2px 10px rgba(0,0,0,.06);display:flex;flex-direction:column;overflow:hidden;animation:fadeUp .25s ease both;animation-delay:' + Math.min(i * 20, 240) + 'ms' + (ag ? ';opacity:.82' : '');
       card.innerHTML =
-        '<div style="height:110px;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;overflow:hidden;border-bottom:1px solid #f3f4f6">' +
-          (hasImgR ? '<img src="'+escFarmacia(it.imagen)+'" style="width:100%;height:110px;object-fit:contain;padding:6px" onerror="this.style.display=\'none\';document.getElementById(\''+uid+'\').style.display=\'flex\'">' : '') +
-          '<span id="'+uid+'" class="sym symf" style="font-size:42px;color:'+c1r+';opacity:'+(hasImgR?.15:1)+';display:'+(hasImgR?'none':'flex')+';align-items:center;justify-content:center;width:100%;height:110px">'+iconr+'</span>' +
-          (agotado ? '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(220,38,38,.9);color:#fff;font-size:8px;font-weight:900;text-transform:uppercase;padding:3px 10px;border-radius:99px;z-index:4;white-space:nowrap">AGOTADO</div>' : '') +
-          '<div style="position:absolute;top:6px;right:7px;background:'+c1r+';color:#fff;font-size:7px;font-weight:900;text-transform:uppercase;padding:2px 6px;border-radius:99px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escFarmacia(it.lab||'Genérico')+'</div>' +
-          '<button onclick="abrirPopupSheet(\''+esc(it.key)+'\')" style="position:absolute;bottom:5px;right:7px;width:22px;height:22px;border-radius:50%;border:none;cursor:pointer;background:'+c1r+';display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.2)">' +
-            '<span class="sym" style="font-size:12px;color:#fff">zoom_in</span>' +
-          '</button>' +
-        '</div>' +
-        '<div style="padding:8px 9px 10px;display:flex;flex-direction:column;gap:3px;flex:1">' +
-          '<div style="font-size:7.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:2px 6px;border-radius:99px;width:fit-content;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:'+c1r+'18;color:'+c1r+'">'+hl(it.lab||'Genérico',q)+'</div>' +
-          '<div style="font-size:11px;font-weight:700;color:'+(agotado?'#9ca3af':'#111827')+';line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.2em">'+hl(it.desc,q)+'</div>' +
-          (it.unidad ? '<span style="font-size:8px;color:#9ca3af;background:#f3f4f6;border-radius:5px;padding:1px 5px;width:fit-content">'+it.unidad+'</span>' : '') +
-          btnsR +
-        '</div>';
+        '<div style="height:110px;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;overflow:hidden;border-bottom:1px solid #f3f4f6">'
+          + (hir ? '<img src="' + escFarmacia(it.imagen) + '" style="width:100%;height:110px;object-fit:contain;padding:6px" onerror="this.style.display=\'none\';var f=document.getElementById(\'' + uid + '\');if(f)f.style.display=\'flex\'">' : '')
+          + '<span id="' + uid + '" class="sym symf" style="font-size:42px;color:' + c1r + ';opacity:' + (hir ? .15 : 1) + ';display:' + (hir ? 'none' : 'flex') + ';align-items:center;justify-content:center;width:100%;height:110px">' + icr + '</span>'
+          + (ag ? '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(220,38,38,.9);color:#fff;font-size:8px;font-weight:900;text-transform:uppercase;padding:3px 10px;border-radius:99px;z-index:4;white-space:nowrap">AGOTADO</div>' : '')
+          + '<div style="position:absolute;top:6px;right:7px;background:' + c1r + ';color:#fff;font-size:7px;font-weight:900;text-transform:uppercase;padding:2px 6px;border-radius:99px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escFarmacia(it.lab || 'Genérico') + '</div>'
+          + '<button onclick="abrirPopupSheet(\'' + esc(it.key) + '\')" style="position:absolute;bottom:5px;right:7px;width:22px;height:22px;border-radius:50%;border:none;cursor:pointer;background:' + c1r + ';display:flex;align-items:center;justify-content:center"><span class="sym" style="font-size:12px;color:#fff">zoom_in</span></button>'
+        + '</div>'
+        + '<div style="padding:8px 9px 10px;display:flex;flex-direction:column;gap:3px;flex:1">'
+          + '<div style="font-size:7.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:2px 6px;border-radius:99px;width:fit-content;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:' + c1r + '18;color:' + c1r + '">' + hl(it.lab || 'Genérico', q) + '</div>'
+          + '<div style="font-size:11px;font-weight:700;color:' + (ag ? '#9ca3af' : '#111827') + ';line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.2em">' + hl(it.desc, q) + '</div>'
+          + (it.unidad ? '<span style="font-size:8px;color:#9ca3af;background:#f3f4f6;border-radius:5px;padding:1px 5px;width:fit-content">' + it.unidad + '</span>' : '')
+          + btns
+        + '</div>';
 
-      subGrid.appendChild(card);
+      sub.appendChild(card);
     });
-
-    grid.appendChild(subGrid);
+    grid.appendChild(sub);
   }
 };
 
-console.log('[WIL] ✅ wil-fix-dedup-unitprice.js cargado — dedup + precio unitario activos');
-
-
+console.log('[WIL] v5 OK — key-only dedup, umbral 22, todas las marcas visibles');
 </script>
 
 <!-- ── POPUP CHAT FARMACIA ── -->
@@ -5673,167 +5644,6 @@ console.log('[WIL] ✅ wil-fix-dedup-unitprice.js cargado — dedup + precio uni
   </div>
 </div>
 
-<script>
-/* ═══════════════════════════════════════════════
-   PARCHE: Secciones → fotos primero, sin mezclar
-   Todas las cards de la sección, imagen arriba
-═══════════════════════════════════════════════ */
-(function() {
-  'use strict';
-
-  function aplicar() {
-    if (!window._renderProdEnScroll || window._renderProdEnScroll._patchOrden) return;
-
-    var _orig = window._renderProdEnScroll;
-
-    window._renderProdEnScroll = function(scrollId, productos, colorOffset) {
-      if (!productos || !productos.length) return;
-
-      /* Separar en dos grupos del MISMO scrollId */
-      var conFoto = [];
-      var sinFoto = [];
-
-      productos.forEach(function(p) {
-        var img = (p.imagen || '').trim();
-        var tieneImg = img.length > 4 &&
-          (img.startsWith('https://') || img.startsWith('http://') || img.startsWith('data:'));
-        if (tieneImg) conFoto.push(p);
-        else          sinFoto.push(p);
-      });
-
-      /* TODOS los productos de la sección: fotos primero, sin foto al final */
-      var ordenados = conFoto.concat(sinFoto);
-
-      return _orig.call(this, scrollId, ordenados, colorOffset);
-    };
-
-    window._renderProdEnScroll._patchOrden = true;
-    console.log('[PARCHE] ✅ Secciones con fotos primero — ' + new Date().toLocaleTimeString());
-  }
-
-  /* Intentar ya; si la función aún no existe, esperar */
-  aplicar();
-
-  if (!window._renderProdEnScroll || !window._renderProdEnScroll._patchOrden) {
-    var t = setInterval(function() {
-      aplicar();
-      if (window._renderProdEnScroll && window._renderProdEnScroll._patchOrden) clearInterval(t);
-    }, 120);
-    setTimeout(function() { clearInterval(t); }, 10000);
-  }
-
-})();
-</script>
-<script>
-/* ═══════════════════════════════════════════════════════════════
-   PARCHE: Secciones — stock+catálogo unificados, fotos primero,
-   dedup: mismo nombre+precio → 1 card; mismo nombre+precio distinto → ambas
-═══════════════════════════════════════════════════════════════ */
-(function() {
-  'use strict';
-
-  function norm(s) {
-    return (s || '').toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]/g, ' ')
-      .replace(/\s+/g, ' ').trim();
-  }
-
-  function parsePrecio(v) {
-    var s = String(v || '').replace(/[^0-9.,]/g, '');
-    if (!s) return 0;
-    var n = parseFloat(s.replace(/\./g, '').replace(',', '.'));
-    return isNaN(n) ? 0 : Math.round(n);
-  }
-
-  function tieneImagen(p) {
-    var img = (p.imagen || '').trim();
-    return img.length > 4 &&
-      (img.startsWith('https://') || img.startsWith('http://') || img.startsWith('data:'));
-  }
-
-  /* ── Deduplicación dentro de una sección ────────────────────
-     Clave = nombre_normalizado + precio
-     Si la clave ya existe → descartar, salvo que el nuevo tenga
-     foto y el existente no (en ese caso reemplazar).
-     Si mismo nombre pero precio distinto → son presentaciones
-     diferentes → conservar ambas.
-  ─────────────────────────────────────────────────────────────*/
-  function deduplicar(productos) {
-    var mapa   = {};   // clave → índice en resultado
-    var result = [];
-
-    productos.forEach(function(p) {
-      var nombreNorm = norm(p.nombre || p.desc || '');
-      var precio     = parsePrecio(p.precio || p.pUnit || 0);
-      var clave      = nombreNorm + '___' + precio;
-
-      if (!nombreNorm) { result.push(p); return; }   // sin nombre: pasar siempre
-
-      if (mapa[clave] !== undefined) {
-        /* Ya existe con mismo nombre+precio → conservar solo si
-           el nuevo tiene foto y el anterior no */
-        var prevIdx = mapa[clave];
-        if (tieneImagen(p) && !tieneImagen(result[prevIdx])) {
-          result[prevIdx] = p;   // reemplazar con el que tiene foto
-        }
-        // si no aporta foto nueva → descartar duplicado
-      } else {
-        mapa[clave] = result.length;
-        result.push(p);
-      }
-    });
-
-    return result;
-  }
-
-  /* ── Ordenar: fotos primero, sin foto al final ── */
-  function ordenarPorFoto(lista) {
-    var conFoto = lista.filter(tieneImagen);
-    var sinFoto = lista.filter(function(p) { return !tieneImagen(p); });
-    return conFoto.concat(sinFoto);
-  }
-
-  /* ── Parchar _renderProdEnScroll ── */
-  function aplicar() {
-    if (!window._renderProdEnScroll || window._renderProdEnScroll._patchDedup) return;
-
-    var _orig = window._renderProdEnScroll;
-
-    window._renderProdEnScroll = function(scrollId, productos, colorOffset) {
-      if (!productos || !productos.length) return;
-
-      /* 1. Deduplicar dentro de la sección */
-      var limpios = deduplicar(productos);
-
-      /* 2. Fotos primero, sin foto al final — muestra TODOS */
-      var ordenados = ordenarPorFoto(limpios);
-
-      console.log('[PARCHE]', scrollId,
-        '| total:', productos.length,
-        '→ dedup:', limpios.length,
-        '| con foto:', ordenados.filter(tieneImagen).length,
-        '| sin foto:', ordenados.filter(function(p){return !tieneImagen(p);}).length
-      );
-
-      return _orig.call(this, scrollId, ordenados, colorOffset);
-    };
-
-    window._renderProdEnScroll._patchDedup = true;
-    console.log('[PARCHE] ✅ dedup + fotos primero — activo');
-  }
-
-  aplicar();
-
-  if (!window._renderProdEnScroll || !window._renderProdEnScroll._patchDedup) {
-    var t = setInterval(function() {
-      aplicar();
-      if (window._renderProdEnScroll && window._renderProdEnScroll._patchDedup) clearInterval(t);
-    }, 120);
-    setTimeout(function() { clearInterval(t); }, 10000);
-  }
-
-})();
 </script>
 
 </body>
