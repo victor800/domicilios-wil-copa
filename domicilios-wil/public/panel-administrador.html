@@ -9374,7 +9374,41 @@ window.deleteMulta = async function(idx) {
 })();
 </script>
 
+<style>
+#pg-productos .pghdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  margin-bottom: 14px;
+}
+#pg-productos .pghdr h2 { margin-bottom: 0; flex-shrink: 0; }
+#pg-productos .pghdr p  { display: none; }
+#prod-paginacion        { padding: 0 !important; margin: 0 !important; }
+</style>
 
+<script>
+(function() {
+  function moverPaginacion() {
+    const pghdr = document.querySelector('#pg-productos .pghdr');
+    const bar   = document.getElementById('prod-paginacion');
+    if (pghdr && bar && bar.parentElement !== pghdr) {
+      pghdr.appendChild(bar);
+    }
+  }
+  const obs = new MutationObserver(moverPaginacion);
+  obs.observe(document.body, { childList: true, subtree: true });
+  const origRP = window.renderProductos;
+  if (origRP && !origRP._movPag) {
+    window.renderProductos = function() {
+      origRP.apply(this, arguments);
+      setTimeout(moverPaginacion, 80);
+    };
+    window.renderProductos._movPag = true;
+  }
+  setTimeout(moverPaginacion, 500);
+})();
+</script>
 
 </body>
 </html>
