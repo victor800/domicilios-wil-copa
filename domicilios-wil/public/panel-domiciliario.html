@@ -1091,16 +1091,13 @@ body{min-height:100dvh;font-family:'Inter',sans-serif;background:#f8f9fa;color:#
 <!-- FLOAT WAZE BTN -->
 <button id="wazeFloatBtn" onclick="abrirNavegacion()"
   style="position:fixed;bottom:104px;right:16px;z-index:492;width:60px;height:60px;
-  border-radius:50%;background:linear-gradient(135deg,#00aaff,#006fff);border:none;
+  border-radius:50%;background:linear-gradient(135deg,#1a73e8,#0d47a1);border:none;
   cursor:pointer;display:none;align-items:center;justify-content:center;
-  box-shadow:0 5px 24px rgba(0,110,255,.45);transition:transform .18s">
-  <svg width="30" height="30" viewBox="0 0 64 64" fill="white">
-    <path d="M32 4C17.6 4 6 15.6 6 30c0 8.4 3.9 15.9 10 20.7V58l8-6.4c2.6.6 5.2.9 8 .9
-      14.4 0 26-11.6 26-26S46.4 4 32 4z"/>
-    <circle cx="24" cy="30" r="3" fill="#00aaff"/>
-    <circle cx="40" cy="30" r="3" fill="#00aaff"/>
-    <path d="M22 38s4 6 10 6 10-6 10-6" stroke="#00aaff"
-      stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  box-shadow:0 5px 24px rgba(26,115,232,.5);transition:transform .18s">
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"
+      fill="white"/>
+    <circle cx="12" cy="9" r="2.5" fill="#1a73e8"/>
   </svg>
 </button>
 
@@ -3042,37 +3039,94 @@ function distHaversine(lat1,lng1,lat2,lng2){
 function abrirNavegacion() {
   if (!state.pedidoActivo) { alert('Sin pedido activo.'); return; }
 
-  // Coords recogida = ancla de la tienda (fija) o GPS del domi
-  var orLat = ANCLA_LAT;
-  var orLng = ANCLA_LNG;
+  // ── Destino: coordenadas del cliente ──
+  var destLat = destLatGlobal;
+  var destLng = destLngGlobal;
 
-  // Coords entrega = destino del cliente
-  var deLat = destLatGlobal;
-  var deLng = destLngGlobal;
-
-  // Según el paso: ir a recoger (0) o ir a entregar (1)
-  var esRecogida = (stepState === 0);
-  var lat = esRecogida ? orLat : deLat;
-  var lng = esRecogida ? orLng : deLng;
-  var label = esRecogida
-    ? (document.getElementById('tabOrigen').textContent || 'Punto de recogida')
-    : (document.getElementById('tabDestino').textContent || 'Entrega cliente');
-
-  if (!lat || !lng) {
-    alert('Sin coordenadas para ' + (esRecogida ? 'recogida' : 'entrega'));
+  // ── Origen: GPS real del domi en ESTE momento ──
+  // Si el tracker ya tiene señal, usarla directamente
+  if (TRK.lat && TRK.lng) {
+    _abrirMapsConOrigen(TRK.lat, TRK.lng, destLat, destLng);
     return;
   }
 
-  console.log('[Waze] paso=' + stepState + ' → ' + label + ' · ' + lat + ',' + lng);
-
-  // Android nativo (más confiable)
-  if (window.WilNativo && window.WilNativo.abrirWaze) {
-    window.WilNativo.abrirWaze(String(lat), String(lng));
+  // Si aún no hay señal en TRK, pedir una lectura fresca al GPS
+  if (!navigator.geolocation) {
+    alert('GPS no disponible en este dispositivo.');
     return;
   }
 
-  // Fallback: waze:// scheme
-  window.location.href = 'waze://?ll=' + lat + ',' + lng + '&navigate=yes';
+  // Mostrar feedback visual mientras obtiene GPS
+  var btn = document.getElementById('wazeFloatBtn');
+  if (btn) { btn.style.opacity = '0.5'; btn.style.pointerEvents = 'none'; }
+
+  navigator.geolocation.getCurrentPosition(
+    function(pos) {
+      // Actualizar TRK también
+      TRK.lat = pos.coords.latitude;
+      TRK.lng = pos.coords.longitude;
+      TRK.acc = Math.round(pos.coords.accuracy);
+
+      // Restaurar botón
+      if (btn) { btn.style.opacity = ''; btn.style.pointerEvents = ''; }
+
+      _abrirMapsConOrigen(TRK.lat, TRK.lng, destLat, destLng);
+    },
+    function(err) {
+      // Restaurar botón
+      if (btn) { btn.style.opacity = ''; btn.style.pointerEvents = ''; }
+      console.warn('[GPS Maps]', err.message);
+
+      // Fallback: abrir Maps solo con destino
+      if (destLat && destLng) {
+        window.location.href = 'https://www.google.com/maps/dir/?api=1'
+          + '&destination=' + destLat.toFixed(6) + ',' + destLng.toFixed(6)
+          + '&travelmode=driving';
+      } else {
+        var dir = document.getElementById('tabDestino').textContent || '';
+        if (dir && dir !== '—') {
+          window.location.href = 'https://www.google.com/maps/dir/?api=1'
+            + '&destination=' + encodeURIComponent(dir + ' Copacabana Antioquia Colombia')
+            + '&travelmode=driving';
+        } else {
+          alert('No se pudo obtener tu ubicación ni la del cliente.');
+        }
+      }
+    },
+    { enableHighAccuracy: true, timeout: 8000, maximumAge: 5000 }
+  );
+}
+
+// Función auxiliar que construye la URL y abre Maps
+function _abrirMapsConOrigen(oriLat, oriLng, destLat, destLng) {
+  // Android nativo (APK)
+  if (window.WilNativo && window.WilNativo.abrirMaps) {
+    window.WilNativo.abrirMaps(String(oriLat), String(oriLng),
+                                String(destLat || ''), String(destLng || ''));
+    return;
+  }
+
+  var mapsUrl;
+
+  if (destLat && destLng) {
+    // Ruta completa: origen real del domi → destino del cliente
+    mapsUrl = 'https://www.google.com/maps/dir/?api=1'
+      + '&origin='      + oriLat.toFixed(6) + ',' + oriLng.toFixed(6)
+      + '&destination=' + destLat.toFixed(6) + ',' + destLng.toFixed(6)
+      + '&travelmode=driving';
+  } else {
+    // Sin coords del cliente → solo texto de dirección como destino
+    var dir = (document.getElementById('tabDestino').textContent || '')
+                .replace('—', '').trim();
+    mapsUrl = 'https://www.google.com/maps/dir/?api=1'
+      + '&origin='      + oriLat.toFixed(6) + ',' + oriLng.toFixed(6)
+      + '&destination=' + encodeURIComponent(
+          dir ? dir + ' Copacabana Antioquia Colombia' : 'Copacabana Antioquia Colombia'
+        )
+      + '&travelmode=driving';
+  }
+
+  window.location.href = mapsUrl;
 }
 
 function _wazeDir(lat, lng, query) {
