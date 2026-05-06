@@ -5648,70 +5648,70 @@ console.log('[WIL] v5 OK — key-only dedup, umbral 22, todas las marcas visible
 </script>
 
  <script>
-    (function (W) {
-      'use strict';
+  (function (W) {
+  'use strict';
 
-      W.wcAgregar = function (idx) {
-        var wrap = document.getElementById('wc-last-productos');
-        if (!wrap) return;
-        var lista = [];
-        try { lista = JSON.parse(wrap.getAttribute('data-productos') || '[]'); } catch (e) {}
-        var item = lista[idx];
-        if (!item) return;
+  /* 1. wcAgregar — sin mensaje ni botón "Ver carrito" */
+  W.wcAgregar = function (idx) {
+    var wrap = document.getElementById('wc-last-productos');
+    if (!wrap) return;
+    var lista = [];
+    try { lista = JSON.parse(wrap.getAttribute('data-productos') || '[]'); } catch(e){}
+    var item = lista[idx];
+    if (!item) return;
 
-        var key = item.key || ('wc_' + (item.desc + '|||' + (item.lab || ''))
-          .toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/gi,'_'));
-        item.key = key;
+    var key = item.key || ('wc_' + (item.desc+'|||'+(item.lab||''))
+      .toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/gi,'_'));
+    item.key = key;
 
-        var existe = _wcCarrito.find(function(x){ return x.desc===item.desc && x.lab===item.lab; });
-        if (existe) { existe.qty++; }
-        else {
-          _wcCarrito.push({ desc:item.desc, lab:item.lab||'', precio:item.precio,
-            imagen:item.imagen||null, esOferta:item.esOferta||false, qty:1, key:key });
-        }
+    var existe = _wcCarrito.find(function(x){ return x.desc===item.desc && x.lab===item.lab; });
+    if (existe) { existe.qty++; }
+    else { _wcCarrito.push({ desc:item.desc, lab:item.lab||'', precio:item.precio,
+        imagen:item.imagen||null, esOferta:item.esOferta||false, qty:1, key:key }); }
 
-        wcActualizarFAB();
+    wcActualizarFAB();
 
-        var btn = document.getElementById('wc-btn-agregar-' + idx);
-        if (btn) {
-          btn.textContent='✓ Listo'; btn.style.background='#059669';
-          setTimeout(function(){ btn.textContent='+ Agregar'; btn.style.background='#003f87'; }, 1400);
-        }
+    var btn = document.getElementById('wc-btn-agregar-'+idx);
+    if (btn) {
+      btn.textContent='✓ Listo'; btn.style.background='#059669';
+      setTimeout(function(){ btn.textContent='+ Agregar'; btn.style.background='#003f87'; },1400);
+    }
 
-        var total = _wcCarrito.reduce(function(s,x){ return s+x.qty; }, 0);
-        if (total === 1) {
-          setTimeout(function(){
-            wcMostrarOpts(['🛒 Ver carrito / Confirmar','🔍 Buscar otro producto','🔙 Volver al menú']);
-          }, 500);
-        }
-      };
+    /* Solo estas dos opciones, sin "Ver carrito" */
+    setTimeout(function(){
+      wcMostrarOpts(['🔍 Buscar otro producto','🔙 Volver al menú']);
+    }, 500);
+  };
 
-      W.wcIniciarCheckout = function () {
-        var panel = document.getElementById('wc-carrito-panel');
-        if (panel) panel.style.display = 'none';
+  /* 2. wcIniciarCheckout — sync + delay para que el chat cierre primero */
+  W.wcIniciarCheckout = function () {
+    var panel = document.getElementById('wc-carrito-panel');
+    if (panel) panel.style.display = 'none';
 
-        _wcCarrito.forEach(function(item){
-          var key = item.key || ('wc_'+(item.desc+'|||'+(item.lab||''))
-            .toLowerCase().replace(/[^a-z0-9]/gi,'_'));
-          var precio = item.precio || 0;
-          W.cache[key] = { desc:item.desc, lab:item.lab||'', precio:precio,
-            pUnit:precio, unidad:'', imagen:item.imagen||'', stock:99, key:key };
-          if (W.cart[key]) { W.cart[key].qty += item.qty; }
-          else { W.cart[key] = { it:W.cache[key], qty:item.qty }; }
-        });
+    _wcCarrito.forEach(function(item){
+      var key = item.key || ('wc_'+(item.desc+'|||'+(item.lab||''))
+        .toLowerCase().replace(/[^a-z0-9]/gi,'_'));
+      var precio = item.precio || 0;
+      W.cache[key] = { desc:item.desc, lab:item.lab||'', precio:precio,
+        pUnit:precio, unidad:'', imagen:item.imagen||'', stock:99, key:key };
+      if (W.cart[key]) { W.cart[key].qty += item.qty; }
+      else { W.cart[key] = { it:W.cache[key], qty:item.qty }; }
+    });
 
-        _wcCarrito = [];
-        wcActualizarFAB();
-        if (typeof W.updFAB==='function') W.updFAB();
-        if (typeof W.renderCart==='function') W.renderCart();
+    _wcCarrito = [];
+    wcActualizarFAB();
+    if (typeof W.updFAB==='function') W.updFAB();
+    if (typeof W.renderCart==='function') W.renderCart();
 
-        wilCerrarChat();
+    /* Cerrar chat PRIMERO, luego abrir checkout con delay */
+    wilCerrarChat();
+    setTimeout(function(){
+      if (typeof W.abrirCheckout==='function') W.abrirCheckout();
+    }, 380);
+  };
 
-        if (typeof W.abrirCheckout==='function') W.abrirCheckout();
-      };
-
-      console.log('[WIL] ✅ patch checkout OK');
-    }(window));
+  console.log('[WIL] ✅ patch v2 OK');
+}(window));
     </script>
 
 
