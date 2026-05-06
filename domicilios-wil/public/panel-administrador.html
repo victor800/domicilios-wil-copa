@@ -9374,6 +9374,84 @@ window.deleteMulta = async function(idx) {
 })();
 </script>
 
+<script>
+/* ── Paginación rápida: show/hide sin re-render ── */
+(function() {
+  const POR_PAG = 30; // sweet spot visual/performance
+
+  function paginaRapida(n) {
+    const grid  = document.getElementById('prod-grid');
+    const bar   = document.getElementById('prod-paginacion');
+    if (!grid) return;
+
+    const cards = Array.from(grid.children).filter(
+      el => el.classList.contains('ofert-card')
+    );
+    const total     = cards.length;
+    const totalPags = Math.max(1, Math.ceil(total / POR_PAG));
+
+    if (n < 1) n = 1;
+    if (n > totalPags) n = totalPags;
+    window.__pagActual = n;
+
+    const ini = (n - 1) * POR_PAG;
+    const fin = n * POR_PAG;
+
+    /* Solo toggle display — sin tocar innerHTML */
+    cards.forEach((c, i) => {
+      c.style.display = (i >= ini && i < fin) ? '' : 'none';
+    });
+
+    /* Actualizar barra */
+    if (bar) renderBarRapida(bar, total, n, totalPags);
+
+    /* Scroll suave al título */
+    document.querySelector('#pg-productos .pghdr')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function renderBarRapida(bar, total, pag, totalPags) {
+    if (totalPags <= 1) { bar.innerHTML = ''; return; }
+
+    const desde = (pag - 1) * POR_PAG + 1;
+    const hasta  = Math.min(pag * POR_PAG, total);
+
+    let ini = Math.max(1, pag - 2);
+    let fin = Math.min(totalPags, ini + 4);
+    if (fin - ini < 4) ini = Math.max(1, fin - 4);
+
+    let h = `<button class="ppag-btn" ${pag===1?'disabled':''} onclick="__ppag(${pag-1})">← Ant</button>`;
+    if (ini > 1) {
+      h += `<button class="ppag-btn" onclick="__ppag(1)">1</button>`;
+      if (ini > 2) h += `<span class="ppag-sep">…</span>`;
+    }
+    for (let p = ini; p <= fin; p++) {
+      h += `<button class="ppag-btn${p===pag?' on':''}" onclick="__ppag(${p})">${p}</button>`;
+    }
+    if (fin < totalPags) {
+      if (fin < totalPags - 1) h += `<span class="ppag-sep">…</span>`;
+      h += `<button class="ppag-btn" onclick="__ppag(${totalPags})">${totalPags}</button>`;
+    }
+    h += `<button class="ppag-btn" ${pag===totalPags?'disabled':''} onclick="__ppag(${pag+1})">Sig →</button>`;
+    h += `<span class="ppag-info">${desde}–${hasta} de ${total}</span>`;
+    bar.innerHTML = h;
+  }
+
+  /* Reemplazar __ppag global con la versión rápida */
+  window.__ppag = function(n) { paginaRapida(n); };
+
+  /* Al renderizar productos: dejar el DOM listo y paginar sin re-render */
+  const origRP = window.renderProductos;
+  if (origRP && !origRP._rapido) {
+    window.renderProductos = function() {
+      origRP.apply(this, arguments);
+      setTimeout(() => paginaRapida(window.__pagActual || 1), 80);
+    };
+    window.renderProductos._rapido = true;
+  }
+})();
+</script>
+
 <style>
 #pg-productos .pghdr {
   display: flex;
