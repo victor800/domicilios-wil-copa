@@ -9141,5 +9141,240 @@ window.deleteMulta = async function(idx) {
 </script>
 
 </script>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     PARCHE PAGINACIÓN PRODUCTOS v3 — DEFINITIVO
+     Pega justo ANTES de </body>
+     100 productos por página. No desaparece.
+═══════════════════════════════════════════════════════ -->
+<style>
+#prod-paginacion {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px 0 8px;
+  flex-wrap: wrap;
+}
+.ppag-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1.5px solid #dde8ea;
+  background: #fff;
+  color: #3f6165;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .15s;
+  padding: 0 10px;
+  user-select: none;
+}
+.ppag-btn:hover:not(:disabled) { border-color: #7c3aed; color: #7c3aed; background: #faf5ff; }
+.ppag-btn.on { background: #7c3aed; color: #fff; border-color: #7c3aed; box-shadow: 0 3px 10px rgba(124,58,237,.28); }
+.ppag-btn:disabled { opacity: .32; cursor: not-allowed; }
+.ppag-info { font-size: 11px; color: #7da0a4; font-weight: 700; padding: 0 4px; white-space: nowrap; }
+.ppag-sep  { font-size: 13px; color: #b0bec5; padding: 0 2px; line-height: 36px; }
+@media(max-width:768px){
+  .ppag-btn { min-width:30px; height:30px; font-size:11px; padding:0 7px; }
+}
+</style>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   PAGINACIÓN PRODUCTOS v3
+   Estrategia: MutationObserver sobre #prod-grid
+   Cada vez que el original escribe el grid,
+   nosotros recortamos a la página actual al instante.
+   Así no importa cuántas veces se llame renderProductos.
+═══════════════════════════════════════════════════════ */
+(function() {
+  'use strict';
+
+  const POR_PAGINA = 100;
+  let _pag   = 1;
+  let _obs   = null;   // MutationObserver
+  let _guard = false;  // evitar loop observer ↔ escritura
+
+  /* ───────────────────────────────────────────
+     BARRA DE PAGINACIÓN
+  ─────────────────────────────────────────── */
+  function getBar() {
+    let bar = document.getElementById('prod-paginacion');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'prod-paginacion';
+      const grid = document.getElementById('prod-grid');
+      if (grid && grid.parentElement) {
+        grid.parentElement.insertBefore(bar, grid.nextSibling);
+      }
+    }
+    return bar;
+  }
+
+  function renderBar(total) {
+    const bar = getBar();
+    const totalPags = Math.max(1, Math.ceil(total / POR_PAGINA));
+
+    if (totalPags <= 1) { bar.innerHTML = ''; return; }
+
+    const desde = (_pag - 1) * POR_PAGINA + 1;
+    const hasta = Math.min(_pag * POR_PAGINA, total);
+
+    let ini = Math.max(1, _pag - 2);
+    let fin = Math.min(totalPags, ini + 4);
+    if (fin - ini < 4) ini = Math.max(1, fin - 4);
+
+    let h = `<button class="ppag-btn" ${_pag===1?'disabled':''} onclick="__ppag(${_pag-1})">← Ant</button>`;
+    if (ini > 1) {
+      h += `<button class="ppag-btn" onclick="__ppag(1)">1</button>`;
+      if (ini > 2) h += `<span class="ppag-sep">…</span>`;
+    }
+    for (let p = ini; p <= fin; p++) {
+      h += `<button class="ppag-btn${p===_pag?' on':''}" onclick="__ppag(${p})">${p}</button>`;
+    }
+    if (fin < totalPags) {
+      if (fin < totalPags - 1) h += `<span class="ppag-sep">…</span>`;
+      h += `<button class="ppag-btn" onclick="__ppag(${totalPags})">${totalPags}</button>`;
+    }
+    h += `<button class="ppag-btn" ${_pag===totalPags?'disabled':''} onclick="__ppag(${_pag+1})">Sig →</button>`;
+    h += `<span class="ppag-info">${desde}–${hasta} de ${total}</span>`;
+    bar.innerHTML = h;
+  }
+
+  window.__ppag = function(n) {
+    _pag = n;
+    /* Forzar re-render del original para que pinte todas las cards,
+       luego el observer las recorta de inmediato */
+    if (typeof window.renderProductos === 'function') {
+      window.renderProductos();
+    }
+    document.getElementById('pg-productos')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  /* ───────────────────────────────────────────
+     RECORTAR EL GRID A LA PÁGINA ACTUAL
+     Se llama cada vez que el observer detecta
+     que el grid fue reescrito.
+  ─────────────────────────────────────────── */
+  function recortarGrid() {
+    const grid = document.getElementById('prod-grid');
+    if (!grid) return;
+
+    /* Obtener todas las cards reales (excluir empty-state) */
+    const cards = Array.from(grid.children).filter(
+      el => !el.classList.contains('empty-state') && !el.querySelector('.empty-state')
+    );
+
+    const total = cards.length;
+    if (total === 0) {
+      renderBar(0);
+      return;
+    }
+
+    const totalPags = Math.max(1, Math.ceil(total / POR_PAGINA));
+    if (_pag > totalPags) _pag = totalPags;
+    if (_pag < 1)         _pag = 1;
+
+    const ini = (_pag - 1) * POR_PAGINA;
+    const fin = _pag * POR_PAGINA;
+
+    /* Mostrar solo las cards de esta página, ocultar el resto */
+    _guard = true;
+    cards.forEach((card, i) => {
+      card.style.display = (i >= ini && i < fin) ? '' : 'none';
+    });
+    _guard = false;
+
+    /* Actualizar contador visible */
+    const desde = ini + 1;
+    const hasta  = Math.min(fin, total);
+    const cntEl  = document.getElementById('prod-count');
+    if (cntEl) cntEl.textContent = `${total} producto${total !== 1 ? 's' : ''}`;
+
+    renderBar(total);
+
+    /* Carousel móvil */
+    if (typeof initProdCarousel === 'function') setTimeout(initProdCarousel, 60);
+  }
+
+  /* ───────────────────────────────────────────
+     MUTATIONOBSERVER — vigila #prod-grid
+     Cada vez que el original reescribe innerHTML
+     nosotros recortamos al instante.
+  ─────────────────────────────────────────── */
+  function arrancarObserver() {
+    const grid = document.getElementById('prod-grid');
+    if (!grid) return;
+    if (_obs) _obs.disconnect();
+
+    _obs = new MutationObserver(() => {
+      if (_guard) return;  // nosotros mismos escribimos, ignorar
+      recortarGrid();
+    });
+
+    _obs.observe(grid, { childList: true, subtree: false });
+    console.info('[PAG v3] Observer activo sobre #prod-grid');
+  }
+
+  /* ───────────────────────────────────────────
+     INTERCEPTAR filterProductos (tabs) y
+     filterProductosBusqueda (búsqueda/sección)
+     para resetear a página 1 antes de render
+  ─────────────────────────────────────────── */
+  function patchFiltros() {
+    /* Tab Todos / Activos / Inactivos */
+    const origFP = window.filterProductos;
+    if (origFP && !origFP._v3) {
+      window.filterProductos = function(f, btn) {
+        _pag = 1;
+        origFP.apply(this, arguments);
+      };
+      window.filterProductos._v3 = true;
+    }
+
+    /* Búsqueda + filtro sección */
+    const origFB = window.filterProductosBusqueda;
+    if (origFB && !origFB._v3) {
+      window.filterProductosBusqueda = function() {
+        _pag = 1;
+        origFB.apply(this, arguments);
+      };
+      window.filterProductosBusqueda._v3 = true;
+    }
+  }
+
+  /* ───────────────────────────────────────────
+     BOOT — esperar a que todo esté listo
+  ─────────────────────────────────────────── */
+  let intentos = 0;
+  const boot = setInterval(() => {
+    intentos++;
+    const grid = document.getElementById('prod-grid');
+    const ok   = typeof window.renderProductos === 'function'
+              && typeof window.filterProductos  === 'function'
+              && grid;
+
+    if (ok) {
+      clearInterval(boot);
+      patchFiltros();
+      arrancarObserver();
+      /* Si ya hay cards en el grid al cargar, recortar de inmediato */
+      if (grid.children.length > 0) recortarGrid();
+      console.info('[PAG v3] ✅ Listo');
+    }
+    if (intentos > 100) clearInterval(boot);
+  }, 200);
+
+})();
+</script>
+
+
+
 </body>
 </html>
