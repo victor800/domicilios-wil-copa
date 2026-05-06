@@ -212,9 +212,6 @@ mark{background:#dbeafe;color:#1e40af;border-radius:3px;padding:0 2px}
 .skel{background:linear-gradient(90deg,#f0f0f0 25%,#e0e8ff 50%,#f0f0f0 75%);background-size:200% 100%;animation:skelShimmer 1.2s infinite}
 @keyframes skelShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
-/* ── FIX: ocultar textos fantasma de paneles ocultos ── */
-#wc-carrito-panel { display: none !important; }
-#wc-carrito-panel.abierto { display: flex !important; }
 
 #v-cats { display: none; }
 #v-cats[style*="block"] { display: block !important; }
@@ -222,11 +219,7 @@ mark{background:#dbeafe;color:#1e40af;border-radius:3px;padding:0 2px}
 #cats-res-count:empty { display: none; }
 
 /* Asegurar que el panel del carrito no rompa el flujo */
-#wc-carrito-panel {
-  position: fixed !important;
-  inset: 0 !important;
-  z-index: 999990 !important;
-}
+
 
 </style>
 </head>
@@ -1979,6 +1972,19 @@ function cerrarFichaTecnica(uid) {
   if (!el) return;
   el.style.display = 'none';
   document.body.style.overflow = '';
+}
+
+function cerrarWAFarmacia() {
+  // ... tu lógica existente de cierre ...
+  document.getElementById('wil-chat-ov').style.display = 'none';
+  document.body.style.overflow = '';
+
+  // ✅ FIX: remover FAB y panel para que no queden huérfanos
+  var fab = document.getElementById('wc-fab-carrito');
+  if (fab) fab.remove();
+
+  var panel = document.getElementById('wc-carrito-panel');
+  if (panel) panel.remove();
 }
 
 function formatPrecioFarmacia(v) {
@@ -3834,7 +3840,8 @@ var _wcMapas = {
 
     /* ── Panel carrito: DENTRO del sheet ── */
     /* FIX 1: contenido dentro del chat, arriba del input */
-    '#wc-carrito-panel{position:fixed!important;bottom:160px!important;right:12px!important;left:12px!important;z-index:99980!important;background:#fff!important;border-radius:18px!important;box-shadow:0 12px 40px rgba(0,0,0,.28)!important;overflow:hidden!important;display:none!important;flex-direction:column!important;max-height:60vh!important;border:1.5px solid rgba(0,63,135,.15)!important;}',
+    '#wc-carrito-panel{position:fixed!important;top:0!important;left:0!important;right:0!important;bottom:0!important;width:100%!important;height:100%!important;z-index:9999999!important;background:#fff!important;display:none!important;visibility:hidden!important;flex-direction:column!important;overflow:hidden!important;margin:0!important;padding:0!important;}',
+
 '#wc-carrito-panel.abierto{display:flex!important;animation:wcCartSlide .2s ease!important;}',
     '#wc-carrito-panel.abierto{display:flex;animation:wcCartSlide .2s ease;}',
     '#wc-carrito-panel table{width:100%;border-collapse:collapse;}',
@@ -4025,19 +4032,28 @@ function abrirWAFarmacia() {
 ══════════════════════════════════════════════ */
 function wcInyectarFAB() {
   if (document.getElementById('wc-fab-carrito')) return;
+
+  // ✅ FIX: va al sheet del chat, no al body
+  var sheet = wcGetSheet();
+  if (!sheet) return;
+
   var fab = document.createElement('div');
   fab.id = 'wc-fab-carrito';
-  fab.setAttribute('style', 'position:fixed;bottom:88px;right:18px;z-index:999999;');
+  // position:absolute relativo al sheet (que ya tiene position:relative)
+  fab.setAttribute('style',
+    'position:absolute;bottom:72px;right:12px;z-index:9999;pointer-events:auto;'
+  );
   fab.innerHTML =
     '<button onclick="wcToggleCarrito()" title="Ver carrito" '
-    + 'style="width:56px;height:56px;border-radius:50%;background:#003f87;color:#fff;border:none;font-size:24px;cursor:pointer;'
-    + 'box-shadow:0 4px 20px rgba(0,63,135,.65);display:flex;align-items:center;justify-content:center;position:relative;">'
+    + 'style="width:48px;height:48px;border-radius:50%;background:#003f87;color:#fff;border:none;font-size:22px;cursor:pointer;'
+    + 'box-shadow:0 4px 16px rgba(0,63,135,.55);display:flex;align-items:center;justify-content:center;position:relative;">'
     + '🛒'
     + '<span id="wc-fab-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#ef4444;'
-    + 'color:#fff;border-radius:50%;font-size:10px;font-weight:900;width:21px;height:21px;'
+    + 'color:#fff;border-radius:50%;font-size:10px;font-weight:900;width:20px;height:20px;'
     + 'align-items:center;justify-content:center;border:2px solid #fff;line-height:1;">0</span>'
     + '</button>';
-  document.body.appendChild(fab); // <- body, no el sheet
+
+  sheet.appendChild(fab); // ← sheet, no body
 }
 
 function wcActualizarFAB() {
@@ -4054,14 +4070,10 @@ function wcToggleCarrito() {
   var abierto = panel.style.display === 'flex';
   if (abierto) {
     panel.style.display = 'none';
-    panel.style.visibility = 'hidden';   // ← AGREGAR
-    document.body.style.overflow = '';
+    // ✅ FIX: ya no tocamos body.style — el panel vive dentro del chat
   } else {
     wcRenderCarritoPanel();
     panel.style.display = 'flex';
-    panel.style.visibility = 'visible';  // ← AGREGAR
-    panel.style.flexDirection = 'column';
-    document.body.style.overflow = 'hidden';
   }
 }
 /* ══════════════════════════════════════════════
@@ -4071,14 +4083,19 @@ function wcToggleCarrito() {
 function wcInyectarPanelCarrito() {
   var viejo = document.getElementById('wc-carrito-panel');
   if (viejo) viejo.remove();
+
+  var sheet = wcGetSheet();
+  if (!sheet) return;
+
   var panel = document.createElement('div');
   panel.id = 'wc-carrito-panel';
-  // Ocupa toda la pantalla en móvil, panel lateral en desktop
+  // ✅ FIX: absolute → ocupa exactamente el chat, no la pantalla completa
   panel.setAttribute('style',
-  'position:fixed;inset:0;z-index:999990;background:#fff;' +
-  'display:none;visibility:hidden;flex-direction:column;overflow:hidden;'
-);
-  document.body.appendChild(panel);
+    'position:absolute;inset:0;z-index:9998;background:#fff;' +
+    'display:none;flex-direction:column;overflow:hidden;border-radius:inherit;'
+  );
+
+  sheet.appendChild(panel); // ← sheet, no body
 }
 
 function wcRenderCarritoPanel() {
