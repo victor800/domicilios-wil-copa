@@ -5673,6 +5673,168 @@ console.log('[WIL] ✅ wil-fix-dedup-unitprice.js cargado — dedup + precio uni
   </div>
 </div>
 
+<script>
+/* ═══════════════════════════════════════════════
+   PARCHE: Secciones → fotos primero, sin mezclar
+   Todas las cards de la sección, imagen arriba
+═══════════════════════════════════════════════ */
+(function() {
+  'use strict';
+
+  function aplicar() {
+    if (!window._renderProdEnScroll || window._renderProdEnScroll._patchOrden) return;
+
+    var _orig = window._renderProdEnScroll;
+
+    window._renderProdEnScroll = function(scrollId, productos, colorOffset) {
+      if (!productos || !productos.length) return;
+
+      /* Separar en dos grupos del MISMO scrollId */
+      var conFoto = [];
+      var sinFoto = [];
+
+      productos.forEach(function(p) {
+        var img = (p.imagen || '').trim();
+        var tieneImg = img.length > 4 &&
+          (img.startsWith('https://') || img.startsWith('http://') || img.startsWith('data:'));
+        if (tieneImg) conFoto.push(p);
+        else          sinFoto.push(p);
+      });
+
+      /* TODOS los productos de la sección: fotos primero, sin foto al final */
+      var ordenados = conFoto.concat(sinFoto);
+
+      return _orig.call(this, scrollId, ordenados, colorOffset);
+    };
+
+    window._renderProdEnScroll._patchOrden = true;
+    console.log('[PARCHE] ✅ Secciones con fotos primero — ' + new Date().toLocaleTimeString());
+  }
+
+  /* Intentar ya; si la función aún no existe, esperar */
+  aplicar();
+
+  if (!window._renderProdEnScroll || !window._renderProdEnScroll._patchOrden) {
+    var t = setInterval(function() {
+      aplicar();
+      if (window._renderProdEnScroll && window._renderProdEnScroll._patchOrden) clearInterval(t);
+    }, 120);
+    setTimeout(function() { clearInterval(t); }, 10000);
+  }
+
+})();
+</script>
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   PARCHE: Secciones — stock+catálogo unificados, fotos primero,
+   dedup: mismo nombre+precio → 1 card; mismo nombre+precio distinto → ambas
+═══════════════════════════════════════════════════════════════ */
+(function() {
+  'use strict';
+
+  function norm(s) {
+    return (s || '').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+  }
+
+  function parsePrecio(v) {
+    var s = String(v || '').replace(/[^0-9.,]/g, '');
+    if (!s) return 0;
+    var n = parseFloat(s.replace(/\./g, '').replace(',', '.'));
+    return isNaN(n) ? 0 : Math.round(n);
+  }
+
+  function tieneImagen(p) {
+    var img = (p.imagen || '').trim();
+    return img.length > 4 &&
+      (img.startsWith('https://') || img.startsWith('http://') || img.startsWith('data:'));
+  }
+
+  /* ── Deduplicación dentro de una sección ────────────────────
+     Clave = nombre_normalizado + precio
+     Si la clave ya existe → descartar, salvo que el nuevo tenga
+     foto y el existente no (en ese caso reemplazar).
+     Si mismo nombre pero precio distinto → son presentaciones
+     diferentes → conservar ambas.
+  ─────────────────────────────────────────────────────────────*/
+  function deduplicar(productos) {
+    var mapa   = {};   // clave → índice en resultado
+    var result = [];
+
+    productos.forEach(function(p) {
+      var nombreNorm = norm(p.nombre || p.desc || '');
+      var precio     = parsePrecio(p.precio || p.pUnit || 0);
+      var clave      = nombreNorm + '___' + precio;
+
+      if (!nombreNorm) { result.push(p); return; }   // sin nombre: pasar siempre
+
+      if (mapa[clave] !== undefined) {
+        /* Ya existe con mismo nombre+precio → conservar solo si
+           el nuevo tiene foto y el anterior no */
+        var prevIdx = mapa[clave];
+        if (tieneImagen(p) && !tieneImagen(result[prevIdx])) {
+          result[prevIdx] = p;   // reemplazar con el que tiene foto
+        }
+        // si no aporta foto nueva → descartar duplicado
+      } else {
+        mapa[clave] = result.length;
+        result.push(p);
+      }
+    });
+
+    return result;
+  }
+
+  /* ── Ordenar: fotos primero, sin foto al final ── */
+  function ordenarPorFoto(lista) {
+    var conFoto = lista.filter(tieneImagen);
+    var sinFoto = lista.filter(function(p) { return !tieneImagen(p); });
+    return conFoto.concat(sinFoto);
+  }
+
+  /* ── Parchar _renderProdEnScroll ── */
+  function aplicar() {
+    if (!window._renderProdEnScroll || window._renderProdEnScroll._patchDedup) return;
+
+    var _orig = window._renderProdEnScroll;
+
+    window._renderProdEnScroll = function(scrollId, productos, colorOffset) {
+      if (!productos || !productos.length) return;
+
+      /* 1. Deduplicar dentro de la sección */
+      var limpios = deduplicar(productos);
+
+      /* 2. Fotos primero, sin foto al final — muestra TODOS */
+      var ordenados = ordenarPorFoto(limpios);
+
+      console.log('[PARCHE]', scrollId,
+        '| total:', productos.length,
+        '→ dedup:', limpios.length,
+        '| con foto:', ordenados.filter(tieneImagen).length,
+        '| sin foto:', ordenados.filter(function(p){return !tieneImagen(p);}).length
+      );
+
+      return _orig.call(this, scrollId, ordenados, colorOffset);
+    };
+
+    window._renderProdEnScroll._patchDedup = true;
+    console.log('[PARCHE] ✅ dedup + fotos primero — activo');
+  }
+
+  aplicar();
+
+  if (!window._renderProdEnScroll || !window._renderProdEnScroll._patchDedup) {
+    var t = setInterval(function() {
+      aplicar();
+      if (window._renderProdEnScroll && window._renderProdEnScroll._patchDedup) clearInterval(t);
+    }, 120);
+    setTimeout(function() { clearInterval(t); }, 10000);
+  }
+
+})();
+</script>
 
 </body>
 </html>
