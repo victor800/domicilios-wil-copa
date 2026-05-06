@@ -3041,36 +3041,38 @@ function distHaversine(lat1,lng1,lat2,lng2){
 /* ═══ NAVEGAR CON WAZE (sin splash, sin perder sesión) ═══ */
 function abrirNavegacion() {
   if (!state.pedidoActivo) { alert('Sin pedido activo.'); return; }
-  try { localStorage.setItem('wil_domi', JSON.stringify(domi)); } catch(e) {}
 
-  var lat = destLatGlobal, lng = destLngGlobal;
-  if (!lat) {
-    var coords = extraerCoordenadasPedido(state.pedidoActivo);
-    if (coords) { lat = coords.lat; lng = coords.lng; }
+  // Coords recogida = ancla de la tienda (fija) o GPS del domi
+  var orLat = ANCLA_LAT;
+  var orLng = ANCLA_LNG;
+
+  // Coords entrega = destino del cliente
+  var deLat = destLatGlobal;
+  var deLng = destLngGlobal;
+
+  // Según el paso: ir a recoger (0) o ir a entregar (1)
+  var esRecogida = (stepState === 0);
+  var lat = esRecogida ? orLat : deLat;
+  var lng = esRecogida ? orLng : deLng;
+  var label = esRecogida
+    ? (document.getElementById('tabOrigen').textContent || 'Punto de recogida')
+    : (document.getElementById('tabDestino').textContent || 'Entrega cliente');
+
+  if (!lat || !lng) {
+    alert('Sin coordenadas para ' + (esRecogida ? 'recogida' : 'entrega'));
+    return;
   }
 
-  var _abrir = function(la, lo) {
-    // ── Android nativo: sin splash, sin perder sesión ──
-    if (window.WilNativo && window.WilNativo.abrirWaze) {
-      window.WilNativo.abrirWaze(String(la), String(lo));
-      return;
-    }
-    // ── Fallback web ──
-    _wazeDir(la, lo, null);
-  };
+  console.log('[Waze] paso=' + stepState + ' → ' + label + ' · ' + lat + ',' + lng);
 
-  if (lat && lng) {
-    _abrir(lat, lng);
-  } else {
-    var dir = (state.pedidoActivo.direccion || '')
-      .replace(/\s*\(Ref:[^)]+\)/g,'').replace(/\s*\[.+?\]/g,'')
-      .replace(/\s*—\s*\S+/g,'').trim();
-    if (!dir) { alert('Sin dirección de entrega.'); return; }
-    geocodificarDireccion(dir + ' Copacabana Antioquia Colombia', function(la, lo) {
-      if (la && lo) { destLatGlobal = la; destLngGlobal = lo; _abrir(la, lo); }
-      else _wazeDir(null, null, dir + ' Copacabana Antioquia Colombia');
-    });
+  // Android nativo (más confiable)
+  if (window.WilNativo && window.WilNativo.abrirWaze) {
+    window.WilNativo.abrirWaze(String(lat), String(lng));
+    return;
   }
+
+  // Fallback: waze:// scheme
+  window.location.href = 'waze://?ll=' + lat + ',' + lng + '&navigate=yes';
 }
 
 function _wazeDir(lat, lng, query) {
