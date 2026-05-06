@@ -1088,32 +1088,20 @@ body{min-height:100dvh;font-family:'Inter',sans-serif;background:#f8f9fa;color:#
   </div>
 </div>
 
-<!-- FLOAT WAZE BTN -->
+
+<!-- FLOAT MAPS BTN -->
 <button id="wazeFloatBtn" onclick="abrirNavegacion()"
   style="position:fixed;bottom:104px;right:16px;z-index:492;width:60px;height:60px;
   border-radius:50%;background:linear-gradient(135deg,#1a73e8,#0d47a1);border:none;
   cursor:pointer;display:none;align-items:center;justify-content:center;
   box-shadow:0 5px 24px rgba(26,115,232,.5);transition:transform .18s">
-  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"
-      fill="white"/>
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="white"/>
     <circle cx="12" cy="9" r="2.5" fill="#1a73e8"/>
   </svg>
 </button>
 
-<!-- BOTÓN VOLVER AL PANEL -->
-<button id="btnVolverPanel" onclick="window.focus();history.back();"
-  style="position:fixed;bottom:104px;left:16px;z-index:492;
-  display:none;align-items:center;justify-content:center;gap:6px;
-  padding:0 16px;height:48px;
-  background:linear-gradient(135deg,#006970,#00bcc9);
-  border:none;border-radius:24px;cursor:pointer;
-  box-shadow:0 5px 20px rgba(0,105,112,.4);
-  font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;
-  font-size:12px;color:#fff;white-space:nowrap;transition:transform .18s">
-  <span class="material-symbols-outlined" style="font-size:18px;font-variation-settings:'FILL' 1">arrow_back</span>
-  Volver al panel
-</button>
+
 
 
 <!-- PANEL NAVEGACIÓN FLOTANTE -->
@@ -1749,8 +1737,7 @@ function switchTab(tab){
   /* Float Waze: visible en tab ruta solo si hay pedido activo */
   var waze = document.getElementById('wazeFloatBtn');
   if(waze) waze.style.display = (tab==='ruta' && state.pedidoActivo) ? 'flex' : 'none';
-  var btnVolver = document.getElementById('btnVolverPanel');
-  if(btnVolver) btnVolver.style.display = (tab==='ruta' && state.pedidoActivo) ? 'flex' : 'none';
+
   if(tab==='ruta'&&state.pedidoActivo){
     /* Inicializar mapa si no está listo */
     if(!_tabMapInit){
@@ -3094,7 +3081,7 @@ function abrirNavegacion() {
 
       // Fallback: abrir Maps solo con destino
       if (destLat && destLng) {
-        window.location.href = 'https://www.google.com/maps/dir/?api=1'
+       window.location.href = 'https://www.google.com/maps/dir/?api=1'
           + '&destination=' + destLat.toFixed(6) + ',' + destLng.toFixed(6)
           + '&travelmode=driving';
       } else {
@@ -3141,7 +3128,7 @@ function _abrirMapsConOrigen(oriLat, oriLng, destLat, destLng) {
       + '&travelmode=driving';
   }
 
-  window.location.href = mapsUrl;
+    window.open(mapsUrl, '_blank');
 }
 
 function _wazeDir(lat, lng, query) {
@@ -3251,8 +3238,6 @@ function renderStepper(paso){
     if(btnCamino){ btnCamino.style.display='flex'; btnCamino.disabled=false; btnCamino.innerHTML='<span class="material-symbols-outlined text-white" style="font-size:17px;font-variation-settings:\'FILL\' 1">two_wheeler</span> Ponerte en camino'; }
     if(btnEntrego) btnEntrego.style.display='none';
     if(waze){ waze.style.display='flex'; waze.classList.remove('live'); }
-    var bv = document.getElementById('btnVolverPanel');
-    if(bv) bv.style.display = 'flex';
     if(chip){chip.innerHTML='<span class="material-symbols-outlined" style="font-size:12px;font-variation-settings:\'FILL\' 1">notifications_active</span> Confirmado';chip.style.cssText='display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:10px;font-weight:800;font-family:\'Plus Jakarta Sans\',sans-serif;background:rgba(255,255,255,.15);color:#fff';}
   } else if(paso===1){
     setStepStyle('tab_step2Icon','done'); setStepLabelColor('tab_step2Label','#2a9d5c');
@@ -5076,8 +5061,6 @@ async function cancelarPedidoActivo() {
     detenerNavegacion();
     detenerChatPoll();
     document.getElementById('wazeFloatBtn').style.display = 'none';
-    var bv = document.getElementById('btnVolverPanel');
-if(bv) bv.style.display = 'none';
     state.pedidoActivo = null;
     state.estadoPedido = null;
     destLatGlobal      = null;
