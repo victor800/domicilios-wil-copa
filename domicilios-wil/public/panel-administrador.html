@@ -10,6 +10,7 @@
 <title>Domicilios WIL — Panel Admin</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,500,0,0&display=swap" rel="stylesheet"/>
+<script src="PARCHE_DOS_FIXES.js"></script>
 <style>
 :root{
   --teal:#28B9C1;--teal-d:#1e9aa1;--teal-m:rgba(40,185,193,.13);--teal-s:rgba(40,185,193,.06);
@@ -8285,7 +8286,7 @@ body.apro-fs #pg-actividad{position:fixed!important;inset:0!important;height:100
 ═══════════════════════════════════════════════ */
 (function patchContableV2() {
 
-  const GAS = 'https://script.google.com/macros/s/AKfycbyJwNf3OZk5el-kIsnw42GtMa7AoT6p3Wd0i6IMF1VSfyNNuTzzxUwKCUcuw9xnikm3Wg/exec';
+  const GAS = 'https://script.google.com/macros/s/AKfycbzWMOlAwaKem-SRFOkheerjvD84hpdKwy8Ry2WWGXHOmJ3NLnEbJR9XgSQqmMoDvy3lTg/exec';
 
   /* ── 1. CSS crítico para móvil ── */
   const s = document.createElement('style');
@@ -8618,7 +8619,7 @@ body.apro-fs #pg-actividad{position:fixed!important;inset:0!important;height:100
 
   const GAS = typeof SHEET_SCRIPT_URL !== 'undefined'
     ? SHEET_SCRIPT_URL
-    : 'https://script.google.com/macros/s/AKfycbwbypqPgL16lssPdQsktDx9dHs0My_cMaS7YNQrMSkzY8Kw7HPmFgJHZeImkW2EJ48H7A/exec';
+    : 'https://script.google.com/macros/s/AKfycbzWMOlAwaKem-SRFOkheerjvD84hpdKwy8Ry2WWGXHOmJ3NLnEbJR9XgSQqmMoDvy3lTg/exec';
 
   function whenReady(fn) {
     if (document.getElementById('modal-multa-overlay') &&
@@ -9485,6 +9486,855 @@ window.deleteMulta = async function(idx) {
     window.renderProductos._movPag = true;
   }
   setTimeout(moverPaginacion, 500);
+})();
+</script>
+
+<script>
+  /* ═══════════════════════════════════════════════════════════════
+   PARCHE MODAL CIERRE ESPECIAL — 5 campos del sheet
+   Fecha Inicio | Hora Inicio | Fecha Fin | Hora Fin | MOTIVO
+   
+   Reemplaza SOLO las funciones:
+     - _reemplazarHtmlHorario()  → bloque del modal
+     - window.saveHorario
+     - window.openHorModal
+     - window._confirmarDeleteHorarioNuevo
+═══════════════════════════════════════════════════════════════ */
+(function () {
+'use strict';
+
+const HORARIO_BASE = {
+  horaIni:  '09:00',
+  horaFin:  '23:00',
+  etiqueta: '9:00 AM – 11:00 PM'
+};
+
+/* ── ¿Está el servicio disponible ahora mismo? ── */
+function _estaDisponible() {
+  const ahora    = new Date();
+  const hoy      = ahora.toISOString().slice(0, 10);
+  const minAhora = ahora.getHours() * 60 + ahora.getMinutes();
+  if (_horarios && _horarios.some(h => (h.fecha || h.fechaIni) === hoy))
+    return { disponible: false, razon: 'dia-especial' };
+  const [hIni, mIni] = HORARIO_BASE.horaIni.split(':').map(Number);
+  const [hFin, mFin] = HORARIO_BASE.horaFin.split(':').map(Number);
+  if (minAhora < hIni * 60 + mIni || minAhora >= hFin * 60 + mFin)
+    return { disponible: false, razon: 'fuera-horario' };
+  return { disponible: true, razon: '' };
+}
+
+/* ── Estado actual en tiempo real ── */
+function _renderEstadoActual() {
+  const el = document.getElementById('hor-estado-actual');
+  if (!el) return;
+  const { disponible, razon } = _estaDisponible();
+  const ahora   = new Date();
+  const horaStr = ahora.toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit' });
+  const badge   = document.getElementById('hor-badge-estado');
+  if (disponible) {
+    if (badge) { badge.textContent = 'En línea ✓'; badge.style.background = 'var(--green)'; }
+    el.style.display = 'none';
+    return;
+  }
+  let mensaje = '';
+  if (razon === 'dia-especial') {
+    const h = _horarios.find(h => (h.fecha || h.fechaIni) === ahora.toISOString().slice(0,10));
+    mensaje = `Hoy está marcado como cerrado${h ? ': ' + (h.motivo || '') : ''}.`;
+    if (badge) { badge.textContent = '🚫 Cerrado hoy'; badge.style.background = 'var(--red)'; }
+  } else {
+    const minAhora = ahora.getHours() * 60 + ahora.getMinutes();
+    const [hIni]   = HORARIO_BASE.horaIni.split(':').map(Number);
+    mensaje = minAhora < hIni * 60
+      ? `Todavía no ha iniciado. El servicio abre a las ${HORARIO_BASE.horaIni}.`
+      : `El servicio ya cerró. Abre mañana a las ${HORARIO_BASE.horaIni}.`;
+    if (badge) { badge.textContent = '⏸ Fuera de horario'; badge.style.background = '#6b7280'; }
+  }
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div style="background:linear-gradient(135deg,#fef2f2,#fff1f1);
+                border:1.5px solid rgba(220,38,38,.3);border-radius:16px;
+                padding:16px 20px;display:flex;align-items:center;gap:16px;margin-bottom:20px;">
+      <div style="width:44px;height:44px;border-radius:12px;background:var(--red-l);
+                  display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">🚫</div>
+      <div style="flex:1;">
+        <div style="font-size:14px;font-weight:800;color:var(--red);margin-bottom:3px;">
+          Servicio no disponible en este momento
+        </div>
+        <div style="font-size:12px;color:#991b1b;">${mensaje}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-size:11px;font-weight:800;color:var(--text3);">Hora actual</div>
+        <div style="font-size:18px;font-weight:800;color:var(--red);">${horaStr}</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:2px;">Horario: ${HORARIO_BASE.etiqueta}</div>
+      </div>
+    </div>`;
+}
+
+/* ── Grid 7 días ── */
+const DIAS_SEMANA = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+const DIAS_FULL   = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+function _renderizarDiasSemana() {
+  const grid = document.getElementById('hor-dias-grid');
+  if (!grid) return;
+  const hoy    = new Date().getDay();
+  const hoyIdx = hoy === 0 ? 6 : hoy - 1;
+  grid.innerHTML = DIAS_SEMANA.map((d, i) => {
+    const esHoy = i === hoyIdx;
+    return `
+      <div style="background:${esHoy ? 'var(--green)' : 'rgba(22,163,74,.12)'};
+                  border-radius:12px;padding:10px 8px;text-align:center;
+                  border:1.5px solid ${esHoy ? 'var(--green)' : 'rgba(22,163,74,.25)'};"
+           title="${DIAS_FULL[i]}${esHoy ? ' — HOY' : ''}">
+        <div style="font-size:11px;font-weight:800;
+                    color:${esHoy ? '#fff' : 'var(--green)'};margin-bottom:4px;">${d}</div>
+        <div style="font-size:15px;">${esHoy ? '📍' : '✓'}</div>
+        <div style="font-size:8px;color:${esHoy ? 'rgba(255,255,255,.8)' : 'var(--green)'};
+                    margin-top:3px;font-weight:700;">${esHoy ? 'HOY' : 'Abierto'}</div>
+      </div>`;
+  }).join('');
+}
+
+/* ── Preview en el modal ── */
+function _actualizarPreviewHor() {
+  const fechaIni = document.getElementById('hor-fecha-ini')?.value;
+  const horaIni  = document.getElementById('hor-hora-ini')?.value  || '';
+  const fechaFin = document.getElementById('hor-fecha-fin')?.value || fechaIni;
+  const horaFin  = document.getElementById('hor-hora-fin')?.value  || '';
+  const motivo   = (document.getElementById('hor-motivo')?.value   || '').trim();
+  const box      = document.getElementById('hor-preview-box');
+
+  if (!fechaIni || !motivo) { if (box) box.style.display = 'none'; return; }
+
+  const dIni = new Date(fechaIni + 'T12:00:00');
+  const dFin = fechaFin ? new Date(fechaFin + 'T12:00:00') : dIni;
+  const fmtFecha = (d) => isNaN(d) ? '' :
+    d.toLocaleDateString('es-CO', { weekday:'short', day:'numeric', month:'short' });
+
+  const mismaFecha = fechaIni === (fechaFin || fechaIni);
+  const rangoTexto = mismaFecha
+    ? fmtFecha(dIni)
+    : `${fmtFecha(dIni)} → ${fmtFecha(dFin)}`;
+  const horaTexto  = (horaIni || horaFin)
+    ? ` · ${horaIni || '?'} – ${horaFin || '?'}`
+    : '';
+
+  const pfecha  = document.getElementById('hor-preview-fecha');
+  const pmotivo = document.getElementById('hor-preview-motivo');
+  const phora   = document.getElementById('hor-preview-hora');
+
+  if (pfecha)  pfecha.textContent  = rangoTexto.charAt(0).toUpperCase() + rangoTexto.slice(1);
+  if (phora)   phora.textContent   = horaTexto;
+  if (pmotivo) pmotivo.textContent = motivo;
+  if (box)     box.style.display   = 'block';
+}
+
+/* ════════════════════════════════════════════════════════════════
+   HTML DE LA PESTAÑA HORARIO
+════════════════════════════════════════════════════════════════ */
+function _reemplazarHtmlHorario() {
+  const pg = document.getElementById('pg-horario');
+  if (!pg || pg._nuevoHorario) return;
+  pg._nuevoHorario = true;
+
+  pg.innerHTML = `
+    <div class="pghdr">
+      <h2>Horario del Servicio 📅</h2>
+      <p>El servicio opera todos los días. Registra fechas especiales en que NO habrá servicio.</p>
+    </div>
+
+    <!-- ESTADO ACTUAL -->
+    <div id="hor-estado-actual"></div>
+
+    <!-- HORARIO BASE -->
+    <div style="background:linear-gradient(135deg,var(--green-l),#f0fdf4);
+                border:1.5px solid rgba(22,163,74,.25);border-radius:18px;
+                padding:20px 22px;margin-bottom:20px;">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;flex-wrap:wrap;">
+        <div style="width:46px;height:46px;border-radius:13px;background:var(--green);
+                    display:flex;align-items:center;justify-content:center;font-size:22px;
+                    flex-shrink:0;box-shadow:0 4px 14px rgba(22,163,74,.3);">✓</div>
+        <div style="flex:1;">
+          <div style="font-size:10px;font-weight:800;color:var(--green);text-transform:uppercase;
+                      letter-spacing:.1em;margin-bottom:3px;">Horario base</div>
+          <div style="font-size:17px;font-weight:800;color:var(--text);">Lunes a Domingo</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:5px;flex-wrap:wrap;">
+            <span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:800;
+                         color:var(--green);background:rgba(22,163,74,.12);padding:4px 12px;
+                         border-radius:99px;border:1px solid rgba(22,163,74,.25);">
+              <span class="material-symbols-rounded" style="font-size:14px;">schedule</span>
+              Hora Inicio: ${HORARIO_BASE.horaIni}
+            </span>
+            <span style="font-size:14px;color:var(--text3);">→</span>
+            <span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:800;
+                         color:var(--green);background:rgba(22,163,74,.12);padding:4px 12px;
+                         border-radius:99px;border:1px solid rgba(22,163,74,.25);">
+              <span class="material-symbols-rounded" style="font-size:14px;">schedule</span>
+              Hora Fin: ${HORARIO_BASE.horaFin}
+            </span>
+          </div>
+        </div>
+        <div id="hor-badge-estado"
+             style="padding:6px 16px;border-radius:99px;font-size:12px;font-weight:800;
+                    background:var(--green);color:#fff;white-space:nowrap;">
+          Calculando…
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;" id="hor-dias-grid"></div>
+    </div>
+
+    <!-- DÍAS ESPECIALES -->
+    <div style="background:var(--white);border:1.5px solid var(--border);border-radius:18px;overflow:hidden;">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);
+                  display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:8px;flex:1;">
+          <div style="width:36px;height:36px;border-radius:10px;background:var(--red-l);
+                      display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <span class="material-symbols-rounded" style="font-size:18px;color:var(--red);">event_busy</span>
+          </div>
+          <div>
+            <div style="font-size:13px;font-weight:800;color:var(--text);">Días especiales cerrados</div>
+            <div style="font-size:10px;color:var(--text3);margin-top:1px;">
+              Navidad, festivos, emergencias — el servicio NO opera esos días
+            </div>
+          </div>
+        </div>
+        <button onclick="openHorModal()"
+          style="display:inline-flex;align-items:center;gap:7px;background:var(--red);color:#fff;
+                 border:none;border-radius:11px;padding:9px 18px;
+                 font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:800;
+                 cursor:pointer;white-space:nowrap;box-shadow:0 4px 14px rgba(220,38,38,.3);transition:all .18s;"
+          onmouseover="this.style.transform='translateY(-1px)'"
+          onmouseout="this.style.transform=''">
+          <span class="material-symbols-rounded" style="font-size:16px;">add</span>
+          Agregar día cerrado
+        </button>
+        <span style="font-size:11px;color:var(--text3);font-weight:700;" id="hor-count">0 fechas</span>
+      </div>
+      <div style="padding:16px 20px;min-height:80px;" id="hor-grid">
+        <div class="empty-state">
+          <div class="ico" style="font-size:36px;opacity:.2;">📅</div>
+          <p style="font-size:12px;">Sin días especiales — el servicio opera con normalidad</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════
+         MODAL — 5 campos: Fecha Inicio | Hora Inicio
+                           Fecha Fin    | Hora Fin
+                           MOTIVO
+    ══════════════════════════════════════════════════ -->
+    <div id="modal-hor" onclick="if(event.target===this)closeHorModal()"
+         style="position:fixed;inset:0;background:rgba(4,18,20,.82);backdrop-filter:blur(12px);
+                z-index:300;display:none;align-items:center;justify-content:center;padding:16px;">
+      <div style="background:var(--white);border-radius:22px;width:min(480px,100%);
+                  overflow:hidden;box-shadow:0 32px 80px rgba(4,18,20,.45);
+                  animation:invUp .3s cubic-bezier(.34,1.2,.64,1);">
+
+        <!-- Header -->
+        <div style="background:linear-gradient(135deg,#3d0000 0%,#7f1d1d 100%);
+                    padding:20px 24px 18px;display:flex;align-items:center;gap:12px;
+                    position:relative;overflow:hidden;">
+          <div style="position:absolute;top:-40px;right:-40px;width:140px;height:140px;border-radius:50%;
+                      background:radial-gradient(circle,rgba(220,38,38,.2) 0%,transparent 65%);pointer-events:none;"></div>
+          <div style="width:40px;height:40px;border-radius:12px;background:rgba(220,38,38,.25);
+                      border:1.5px solid rgba(220,38,38,.4);display:flex;align-items:center;
+                      justify-content:center;color:#fca5a5;flex-shrink:0;position:relative;z-index:1;">
+            <span class="material-symbols-rounded" style="font-size:20px;">event_busy</span>
+          </div>
+          <div style="position:relative;z-index:1;flex:1;">
+            <div style="font-size:15px;font-weight:800;color:#fff;" id="hor-modal-title">Agregar día cerrado</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:2px;">
+              Coincide con las columnas del sheet: Fecha Inicio · Hora Inicio · Fecha Fin · Hora Fin · MOTIVO
+            </div>
+          </div>
+          <button onclick="closeHorModal()"
+                  style="width:32px;height:32px;border-radius:9px;background:rgba(255,255,255,.07);
+                         border:1.5px solid rgba(255,255,255,.12);cursor:pointer;display:flex;
+                         align-items:center;justify-content:center;color:rgba(255,255,255,.6);
+                         position:relative;z-index:1;transition:all .15s;"
+                  onmouseover="this.style.background='rgba(220,38,38,.35)';this.style.color='#fff'"
+                  onmouseout="this.style.background='rgba(255,255,255,.07)';this.style.color='rgba(255,255,255,.6)'">
+            <span class="material-symbols-rounded" style="font-size:16px;">close</span>
+          </button>
+        </div>
+
+        <!-- Body -->
+        <div style="padding:22px 24px 10px;">
+          <input type="hidden" id="hor-edit-idx" value="">
+
+          <!-- Etiqueta de columnas del sheet -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;margin-bottom:14px;">
+            <div style="font-size:8px;font-weight:800;color:var(--text3);text-transform:uppercase;
+                        letter-spacing:.1em;padding:6px 10px;background:var(--bg2);
+                        border-radius:8px 0 0 8px;border:1px solid var(--border);text-align:center;">
+              📅 Fecha Inicio
+            </div>
+            <div style="font-size:8px;font-weight:800;color:var(--text3);text-transform:uppercase;
+                        letter-spacing:.1em;padding:6px 10px;background:var(--bg2);
+                        border-radius:0 8px 8px 0;border:1px solid var(--border);border-left:none;text-align:center;">
+              ⏰ Hora Inicio
+            </div>
+          </div>
+
+          <!-- Fila 1: Fecha Inicio + Hora Inicio -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+            <div class="om-field" style="margin:0;">
+              <div class="om-label" style="font-size:9px;">
+                <span class="material-symbols-rounded" style="font-size:13px;">calendar_today</span>
+                Fecha Inicio *
+              </div>
+              <input class="om-input" id="hor-fecha-ini" type="date"
+                     style="font-size:13px;font-weight:700;">
+            </div>
+            <div class="om-field" style="margin:0;">
+              <div class="om-label" style="font-size:9px;">
+                <span class="material-symbols-rounded" style="font-size:13px;">schedule</span>
+                Hora Inicio *
+              </div>
+              <input class="om-input" id="hor-hora-ini" type="time"
+                     value="${HORARIO_BASE.horaIni}"
+                     style="font-size:13px;font-weight:700;">
+            </div>
+          </div>
+
+          <!-- Separador visual con flecha -->
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+            <div style="flex:1;height:1px;background:var(--border);"></div>
+            <div style="font-size:10px;font-weight:800;color:var(--text3);
+                        background:var(--bg2);padding:3px 10px;border-radius:99px;
+                        border:1px solid var(--border);display:flex;align-items:center;gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:12px;">arrow_downward</span>
+              hasta
+            </div>
+            <div style="flex:1;height:1px;background:var(--border);"></div>
+          </div>
+
+          <!-- Etiqueta Fecha Fin / Hora Fin -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;margin-bottom:14px;">
+            <div style="font-size:8px;font-weight:800;color:var(--text3);text-transform:uppercase;
+                        letter-spacing:.1em;padding:6px 10px;background:var(--bg2);
+                        border-radius:8px 0 0 8px;border:1px solid var(--border);text-align:center;">
+              📅 Fecha Fin
+            </div>
+            <div style="font-size:8px;font-weight:800;color:var(--text3);text-transform:uppercase;
+                        letter-spacing:.1em;padding:6px 10px;background:var(--bg2);
+                        border-radius:0 8px 8px 0;border:1px solid var(--border);border-left:none;text-align:center;">
+              ⏰ Hora Fin
+            </div>
+          </div>
+
+          <!-- Fila 2: Fecha Fin + Hora Fin -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+            <div class="om-field" style="margin:0;">
+              <div class="om-label" style="font-size:9px;">
+                <span class="material-symbols-rounded" style="font-size:13px;">event</span>
+                Fecha Fin *
+              </div>
+              <input class="om-input" id="hor-fecha-fin" type="date"
+                     style="font-size:13px;font-weight:700;">
+            </div>
+            <div class="om-field" style="margin:0;">
+              <div class="om-label" style="font-size:9px;">
+                <span class="material-symbols-rounded" style="font-size:13px;">schedule</span>
+                Hora Fin *
+              </div>
+              <input class="om-input" id="hor-hora-fin" type="time"
+                     value="${HORARIO_BASE.horaFin}"
+                     style="font-size:13px;font-weight:700;">
+            </div>
+          </div>
+
+          <!-- Separador -->
+          <div style="height:1px;background:var(--border);margin-bottom:14px;"></div>
+
+          <!-- MOTIVO -->
+          <div class="om-field" style="margin-bottom:0;">
+            <div class="om-label" style="font-size:9px;">
+              <span class="material-symbols-rounded" style="font-size:13px;">notes</span>
+              MOTIVO *
+            </div>
+            <input class="om-input" id="hor-motivo" type="text"
+                   placeholder="Ej: Navidad, Año Nuevo, Festivo nacional, Emergencia…"
+                   style="font-size:13px;">
+          </div>
+
+          <!-- Vista previa -->
+          <div id="hor-preview-box" style="display:none;margin-top:14px;background:var(--red-l);
+               border:1.5px solid rgba(220,38,38,.25);border-radius:12px;padding:12px 14px;">
+            <div style="font-size:9px;font-weight:800;color:var(--red);text-transform:uppercase;
+                        letter-spacing:.1em;margin-bottom:8px;">Vista previa — así quedará en el sheet</div>
+            <div style="display:flex;align-items:flex-start;gap:10px;">
+              <span style="font-size:22px;flex-shrink:0;">🚫</span>
+              <div style="flex:1;">
+                <div style="font-size:13px;font-weight:800;color:var(--text);" id="hor-preview-fecha">–</div>
+                <div style="font-size:11px;color:var(--text2);margin-top:2px;font-weight:700;" id="hor-preview-hora"></div>
+                <div style="font-size:11px;color:var(--text2);margin-top:3px;" id="hor-preview-motivo">–</div>
+              </div>
+              <!-- Mini tabla simulando las 5 columnas del sheet -->
+              <div style="font-size:9px;color:var(--text3);text-align:right;flex-shrink:0;">
+                <div style="font-weight:800;margin-bottom:2px;">Columnas del sheet</div>
+                <div>Fecha Inicio ✓</div>
+                <div>Hora Inicio ✓</div>
+                <div>Fecha Fin ✓</div>
+                <div>Hora Fin ✓</div>
+                <div>MOTIVO ✓</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="padding:16px 24px 22px;display:flex;gap:10px;
+                    border-top:1.5px solid var(--border);margin-top:10px;">
+          <button class="om-btn-cancel" onclick="closeHorModal()">
+            <span class="material-symbols-rounded" style="font-size:15px;">close</span>Cancelar
+          </button>
+          <button id="hor-btn-save" onclick="saveHorario()"
+                  style="flex:2;background:var(--red);color:#fff;border:none;border-radius:11px;
+                         padding:12px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;
+                         font-weight:800;cursor:pointer;display:flex;align-items:center;
+                         justify-content:center;gap:8px;box-shadow:0 4px 16px rgba(220,38,38,.3);transition:all .18s;">
+            <span class="material-symbols-rounded">event_busy</span>
+            Guardar cierre
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  setTimeout(() => {
+    ['hor-fecha-ini','hor-hora-ini','hor-fecha-fin','hor-hora-fin','hor-motivo'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', _actualizarPreviewHor);
+    });
+    // Al cambiar Fecha Inicio, copiar a Fecha Fin si está vacía
+    const fi = document.getElementById('hor-fecha-ini');
+    if (fi) fi.addEventListener('change', () => {
+      const ff = document.getElementById('hor-fecha-fin');
+      if (ff && !ff.value) ff.value = fi.value;
+      _actualizarPreviewHor();
+    });
+  }, 200);
+
+  _renderizarDiasSemana();
+  _renderEstadoActual();
+}
+
+/* ════════════════════════════════════════════════════════════════
+   renderHorarios
+════════════════════════════════════════════════════════════════ */
+window.renderHorarios = function () {
+  _reemplazarHtmlHorario();
+  _renderEstadoActual();
+
+  const el  = document.getElementById('hor-grid');
+  const cnt = document.getElementById('hor-count');
+  if (!el) return;
+
+  const hoyStr = new Date().toISOString().slice(0, 10);
+  if (cnt) cnt.textContent = _horarios.length + ' fecha' + (_horarios.length !== 1 ? 's' : '');
+
+  if (!_horarios.length) {
+    el.innerHTML = `
+      <div class="empty-state">
+        <div class="ico" style="font-size:36px;opacity:.2;">📅</div>
+        <p style="font-size:12px;">Sin días especiales — el servicio opera con normalidad</p>
+      </div>`;
+    return;
+  }
+
+  const futuros = _horarios.filter(h => (h.fecha || h.fechaIni) >= hoyStr);
+  const pasados  = _horarios.filter(h => (h.fecha || h.fechaIni) <  hoyStr);
+
+  function tarjetaCierre(h, idx) {
+    const fechaKey  = h.fecha || h.fechaIni || '';
+    const esCerrado = fechaKey === hoyStr;
+    const esFuturo  = fechaKey > hoyStr;
+    const dI = new Date(fechaKey + 'T12:00:00');
+    const dF = h.fechaFin && h.fechaFin !== fechaKey ? new Date(h.fechaFin + 'T12:00:00') : null;
+
+    const fmtCorto = d => isNaN(d) ? '' :
+      d.toLocaleDateString('es-CO', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
+
+    const rango = dF ? `${fmtCorto(dI)} → ${fmtCorto(dF)}` : fmtCorto(dI);
+    const horas = (h.horaIni || h.horaFin)
+      ? `${h.horaIni || HORARIO_BASE.horaIni} – ${h.horaFin || HORARIO_BASE.horaFin}`
+      : HORARIO_BASE.etiqueta;
+
+    const dotColor = esCerrado ? 'var(--red)' : esFuturo ? 'var(--orange)' : 'var(--text3)';
+    const bgColor  = esCerrado ? '#fee2e2'    : esFuturo ? '#fef3c7'       : 'var(--bg2)';
+    const badgeTxt = esCerrado ? '🚫 Hoy'    : esFuturo ? '⏳ Próximo'    : '✓ Pasado';
+    const badgeBg  = esCerrado ? 'var(--red)' : esFuturo ? 'var(--orange)' : 'var(--border)';
+    const badgeClr = esCerrado || esFuturo ? '#fff' : 'var(--text3)';
+    const borderC  = esCerrado ? 'var(--red)' : esFuturo ? 'var(--orange)' : 'var(--border)';
+
+    return `
+      <div style="background:${bgColor};border:1.5px solid ${borderC};
+                  border-radius:14px;padding:14px 16px;margin-bottom:10px;
+                  display:flex;align-items:center;gap:14px;"
+           onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,.08)'"
+           onmouseout="this.style.boxShadow='none'">
+        <div style="width:40px;height:40px;border-radius:11px;background:${bgColor};
+                    border:1px solid ${borderC};display:flex;align-items:center;
+                    justify-content:center;flex-shrink:0;font-size:20px;">
+          ${esCerrado ? '🚫' : esFuturo ? '📅' : '✓'}
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+            <span style="font-size:13px;font-weight:800;color:var(--text);">${rango}</span>
+            <span style="font-size:9px;font-weight:800;padding:2px 9px;border-radius:99px;
+                         background:${badgeBg};color:${badgeClr};">${badgeTxt}</span>
+          </div>
+          <!-- Hora inicio — hora fin -->
+          <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">
+            <span class="material-symbols-rounded" style="font-size:13px;color:var(--text3);">schedule</span>
+            <span style="font-size:11px;font-weight:700;color:var(--text2);">${horas}</span>
+          </div>
+          <!-- Motivo -->
+          <div style="display:flex;align-items:center;gap:5px;">
+            <span class="material-symbols-rounded" style="font-size:13px;color:var(--text3);">notes</span>
+            <span style="font-size:11px;color:var(--text2);">${h.motivo || 'Sin motivo especificado'}</span>
+          </div>
+        </div>
+        <button onclick="deleteHorario(${idx})"
+          style="width:34px;height:34px;border-radius:10px;background:var(--red-l);
+                 border:1.5px solid rgba(220,38,38,.2);cursor:pointer;display:flex;
+                 align-items:center;justify-content:center;color:var(--red);transition:all .15s;flex-shrink:0;"
+          onmouseover="this.style.background='var(--red)';this.style.color='#fff';this.style.borderColor='var(--red)'"
+          onmouseout="this.style.background='var(--red-l)';this.style.color='var(--red)';this.style.borderColor='rgba(220,38,38,.2)'"
+          title="Eliminar del sheet">
+          <span class="material-symbols-rounded" style="font-size:16px;">delete</span>
+        </button>
+      </div>`;
+  }
+
+  let html = '';
+  if (futuros.length) {
+    html += `<div style="font-size:9px;font-weight:800;color:var(--text3);text-transform:uppercase;
+                          letter-spacing:.1em;margin-bottom:10px;display:flex;align-items:center;gap:5px;">
+               <span class="material-symbols-rounded" style="font-size:14px;">upcoming</span>
+               Próximos cierres (${futuros.length})
+             </div>`;
+    futuros.forEach(h => { html += tarjetaCierre(h, _horarios.indexOf(h)); });
+  }
+  if (pasados.length) {
+    if (futuros.length) html += `<div style="height:1px;background:var(--border);margin:12px 0;"></div>`;
+    html += `<div style="font-size:9px;font-weight:800;color:var(--text3);text-transform:uppercase;
+                          letter-spacing:.1em;margin-bottom:10px;display:flex;align-items:center;gap:5px;">
+               <span class="material-symbols-rounded" style="font-size:14px;">history</span>
+               Cierres pasados (${pasados.length})
+             </div>`;
+    pasados.forEach(h => { html += tarjetaCierre(h, _horarios.indexOf(h)); });
+  }
+  el.innerHTML = html;
+};
+
+/* ════════════════════════════════════════════════════════════════
+   openHorModal
+════════════════════════════════════════════════════════════════ */
+window.openHorModal = function (idx) {
+  _reemplazarHtmlHorario();
+  const modal = document.getElementById('modal-hor');
+  if (!modal) return;
+
+  // Resetear
+  document.getElementById('hor-edit-idx').value  = idx !== undefined ? idx : '';
+  document.getElementById('hor-fecha-ini').value = '';
+  document.getElementById('hor-hora-ini').value  = HORARIO_BASE.horaIni;
+  document.getElementById('hor-fecha-fin').value = '';
+  document.getElementById('hor-hora-fin').value  = HORARIO_BASE.horaFin;
+  document.getElementById('hor-motivo').value    = '';
+  document.getElementById('hor-modal-title').textContent =
+    idx !== undefined ? 'Editar día cerrado' : 'Agregar día cerrado';
+  const box = document.getElementById('hor-preview-box');
+  if (box) box.style.display = 'none';
+
+  // Si es edición, cargar valores existentes
+  if (idx !== undefined && _horarios[idx]) {
+    const h = _horarios[idx];
+    document.getElementById('hor-fecha-ini').value = h.fechaIni || h.fecha || '';
+    document.getElementById('hor-hora-ini').value  = h.horaIni  || HORARIO_BASE.horaIni;
+    document.getElementById('hor-fecha-fin').value = h.fechaFin || h.fecha || '';
+    document.getElementById('hor-hora-fin').value  = h.horaFin  || HORARIO_BASE.horaFin;
+    document.getElementById('hor-motivo').value    = h.motivo   || '';
+    _actualizarPreviewHor();
+  }
+
+  modal.style.display = 'flex';
+};
+
+/* ════════════════════════════════════════════════════════════════
+   closeHorModal
+════════════════════════════════════════════════════════════════ */
+window.closeHorModal = function () {
+  const modal = document.getElementById('modal-hor');
+  if (modal) modal.style.display = 'none';
+};
+
+/* ════════════════════════════════════════════════════════════════
+   saveHorario — envía los 5 campos al sheet
+════════════════════════════════════════════════════════════════ */
+window.saveHorario = async function () {
+  const fechaIni = document.getElementById('hor-fecha-ini')?.value?.trim();
+  const horaIni  = document.getElementById('hor-hora-ini')?.value?.trim()  || HORARIO_BASE.horaIni;
+  const fechaFin = document.getElementById('hor-fecha-fin')?.value?.trim() || fechaIni;
+  const horaFin  = document.getElementById('hor-hora-fin')?.value?.trim()  || HORARIO_BASE.horaFin;
+  const motivo   = (document.getElementById('hor-motivo')?.value || '').trim();
+  const editIdx  = document.getElementById('hor-edit-idx')?.value;
+
+  if (!fechaIni) { if (typeof showToast === 'function') showToast('w','Falta Fecha Inicio','Selecciona la fecha de inicio del cierre'); return; }
+  if (!motivo)   { if (typeof showToast === 'function') showToast('w','Falta MOTIVO','Describe el motivo del cierre'); return; }
+
+  const btn = document.getElementById('hor-btn-save');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-rounded" style="animation:spin .8s linear infinite;font-size:15px;">progress_activity</span> Guardando…'; }
+
+  try {
+    // Payload con los 5 campos exactos del sheet
+    const payload = {
+      accion:      editIdx !== '' ? 'editar-horario' : 'guardar-horario',
+      fechaIni,   // col A — Fecha Inicio
+      horaIni,    // col B — Hora Inicio
+      fechaFin,   // col C — Fecha Fin
+      horaFin,    // col D — Hora Fin
+      motivo      // col E — MOTIVO
+    };
+    if (editIdx !== '' && _horarios[parseInt(editIdx)]) {
+      const prev = _horarios[parseInt(editIdx)];
+      payload.fechaIniOrig = prev.fechaIni || prev.fecha;
+      payload.horaIniOrig  = prev.horaIni  || HORARIO_BASE.horaIni;
+    }
+
+    // Actualizar memoria local (UI optimista)
+    const item = { fecha: fechaIni, fechaIni, horaIni, fechaFin, horaFin, motivo };
+    if (editIdx !== '' && _horarios[parseInt(editIdx)]) {
+      _horarios[parseInt(editIdx)] = item;
+    } else {
+      _horarios.push(item);
+      _horarios.sort((a, b) => (b.fechaIni || b.fecha) > (a.fechaIni || a.fecha) ? 1 : -1);
+    }
+
+    if (typeof window.renderHorarios === 'function') window.renderHorarios();
+    window.closeHorModal();
+
+    const dI = new Date(fechaIni + 'T12:00:00');
+    const fechaStr = dI.toLocaleDateString('es-CO', { weekday:'short', day:'numeric', month:'long' });
+    if (typeof showToast === 'function') showToast('i','Guardando cierre…', `${fechaStr} · ${horaIni}–${horaFin} · ${motivo}`);
+
+    const SCRIPT_URL = typeof SHEET_SCRIPT_URL !== 'undefined' ? SHEET_SCRIPT_URL : '';
+    if (SCRIPT_URL) {
+      const res  = await fetch(SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payload) });
+      const json = await res.json().catch(() => ({}));
+      if (json.ok !== false) {
+        if (typeof showToast === 'function') showToast('s','✓ Cierre guardado en el sheet', `${fechaStr} · ${motivo}`);
+      } else {
+        if (typeof showToast === 'function') showToast('e','Error al guardar', json.error || '');
+      }
+    }
+
+    if (typeof fetchHorario === 'function') await fetchHorario();
+
+  } catch (e) {
+    if (typeof showToast === 'function') showToast('e','Error de red', e.message.substring(0, 80));
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-rounded">event_busy</span>Guardar cierre'; }
+  }
+};
+
+/* ════════════════════════════════════════════════════════════════
+   deleteHorario
+════════════════════════════════════════════════════════════════ */
+window.deleteHorario = function (idx) {
+  const h = _horarios[idx];
+  if (!h) return;
+  const fechaKey = h.fechaIni || h.fecha || '';
+  const d = new Date(fechaKey + 'T12:00:00');
+  const fechaStr = isNaN(d) ? fechaKey
+    : d.toLocaleDateString('es-CO', { weekday:'long', day:'numeric', month:'long' });
+
+  const ex = document.getElementById('modal-del-hor');
+  if (ex) ex.remove();
+
+  const ov = document.createElement('div');
+  ov.id = 'modal-del-hor';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(4,18,20,.82);backdrop-filter:blur(10px);z-index:500;display:flex;align-items:center;justify-content:center;padding:16px;';
+  ov.innerHTML = `
+    <div style="background:#fff;border-radius:20px;width:min(380px,96%);overflow:hidden;
+                box-shadow:0 32px 80px rgba(4,18,20,.4);animation:invUp .3s cubic-bezier(.34,1.2,.64,1);">
+      <div style="background:linear-gradient(135deg,#1a0000,#3d1515);padding:22px 22px 18px;text-align:center;">
+        <div style="width:52px;height:52px;border-radius:14px;background:rgba(220,38,38,.18);
+                    border:1.5px solid rgba(220,38,38,.35);display:flex;align-items:center;
+                    justify-content:center;margin:0 auto 12px;font-size:24px;">🚫</div>
+        <div style="font-size:16px;font-weight:800;color:#fff;margin-bottom:5px;">¿Eliminar cierre?</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.4);">
+          Se eliminará del sheet — el servicio volverá activo ese día
+        </div>
+      </div>
+      <div style="padding:18px 20px;background:#fef2f2;border-bottom:1px solid #fecaca;">
+        <div style="display:flex;align-items:flex-start;gap:10px;">
+          <span style="font-size:26px;flex-shrink:0;">📅</span>
+          <div>
+            <div style="font-size:14px;font-weight:800;color:#1a0000;">
+              ${fechaStr.charAt(0).toUpperCase() + fechaStr.slice(1)}
+              ${h.fechaFin && h.fechaFin !== fechaKey ? ' → ' + h.fechaFin : ''}
+            </div>
+            <div style="font-size:11px;color:#991b1b;margin-top:2px;">
+              ⏰ ${h.horaIni || HORARIO_BASE.horaIni} – ${h.horaFin || HORARIO_BASE.horaFin}
+            </div>
+            <div style="font-size:11px;color:#991b1b;margin-top:2px;">${h.motivo || 'Sin motivo'}</div>
+          </div>
+        </div>
+      </div>
+      <div style="padding:16px 20px 20px;display:flex;gap:10px;">
+        <button onclick="document.getElementById('modal-del-hor').remove()"
+                style="flex:1;background:transparent;color:#3f6165;border:1.5px solid #dde8ea;
+                       border-radius:11px;padding:12px;font-family:'Plus Jakarta Sans',sans-serif;
+                       font-size:12px;font-weight:700;cursor:pointer;">Cancelar</button>
+        <button id="btn-del-hor-confirm" onclick="_confirmarDeleteHorarioNuevo(${idx})"
+                style="flex:1.3;background:#dc2626;color:#fff;border:none;border-radius:11px;
+                       padding:12px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;
+                       font-weight:800;cursor:pointer;display:flex;align-items:center;
+                       justify-content:center;gap:6px;box-shadow:0 4px 14px rgba(220,38,38,.3);">
+          <span class="material-symbols-rounded" style="font-size:16px;">delete_forever</span>Sí, eliminar
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+};
+
+/* ── Confirmar delete — envía los 5 campos para match robusto ── */
+window._confirmarDeleteHorarioNuevo = async function (idx) {
+  const h = _horarios[idx];
+  if (!h) return;
+  const btn = document.getElementById('btn-del-hor-confirm');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;animation:spin .8s linear infinite">progress_activity</span> Eliminando…'; }
+  try {
+    const payload = {
+      accion:   'eliminar-horario',
+      fechaIni: h.fechaIni || h.fecha || '',
+      horaIni:  h.horaIni  || HORARIO_BASE.horaIni,
+      fechaFin: h.fechaFin || h.fecha || '',
+      horaFin:  h.horaFin  || HORARIO_BASE.horaFin,
+      motivo:   h.motivo   || ''
+    };
+    const SCRIPT_URL = typeof SHEET_SCRIPT_URL !== 'undefined' ? SHEET_SCRIPT_URL : '';
+    if (SCRIPT_URL) {
+      const res  = await fetch(SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payload) });
+      let json = {};
+      try { json = await res.json(); } catch (e2) {}
+      if (json.ok === false) {
+        if (typeof showToast === 'function') showToast('e','Error al eliminar del sheet', json.error || '');
+      }
+    }
+    _horarios.splice(idx, 1);
+    const modal = document.getElementById('modal-del-hor');
+    if (modal) modal.remove();
+    if (typeof showToast === 'function')
+      showToast('s','✓ Cierre eliminado del sheet', (h.fechaIni || h.fecha) + ' — ' + (h.motivo || ''));
+    if (typeof window.renderHorarios === 'function') window.renderHorarios();
+  } catch (e) {
+    const modal = document.getElementById('modal-del-hor');
+    if (modal) modal.remove();
+    if (typeof showToast === 'function') showToast('e','Error de conexión', e.message.substring(0, 70));
+  }
+};
+
+/* ── fetchHorario — lee el sheet y normaliza los 5 campos ── */
+const _origFetchHorario = window.fetchHorario;
+window.fetchHorario = async function () {
+  try {
+    const text  = await fetchSheetCSV('HorarioEspecial', 10000);
+    const lines = parseCSVText(text);
+    _horarios = lines.map(c => {
+      // Columnas: A=fechaIni, B=horaIni, C=fechaFin, D=horaFin, E=motivo
+      const fi = _normFecha ? _normFecha((c[0] || '').trim()) : (c[0] || '').trim();
+      if (!fi) return null;
+      return {
+        fecha:    fi,
+        fechaIni: fi,
+        horaIni:  (c[1] || HORARIO_BASE.horaIni).trim(),
+        fechaFin: _normFecha ? _normFecha((c[2] || '').trim()) || fi : (c[2] || fi).trim(),
+        horaFin:  (c[3] || HORARIO_BASE.horaFin).trim(),
+        motivo:   (c[4] || '').trim()
+      };
+    }).filter(Boolean);
+    _horarios.sort((a, b) => (b.fechaIni > a.fechaIni ? 1 : -1));
+  } catch (e) {
+    console.warn('[fetchHorario]:', e.message);
+    _horarios = [];
+  }
+  if (typeof window.renderHorarios === 'function') window.renderHorarios();
+};
+
+/* ── Activar al entrar a la pestaña ── */
+const _origSP = window.sp;
+window.sp = function (id, el) {
+  if (_origSP) _origSP.apply(this, arguments);
+  if (id === 'horario') {
+    setTimeout(() => {
+      _reemplazarHtmlHorario();
+      fetchHorario().catch(e => console.warn('[horario]:', e));
+    }, 50);
+  }
+};
+
+/* ── Fix 1: overview pedidos activos ── */
+const _origRenderOverview = window.renderOverview;
+window.renderOverview = function () {
+  if (_origRenderOverview) _origRenderOverview.apply(this, arguments);
+  _renderOverviewActivos();
+};
+function _renderOverviewActivos() {
+  const actP = allPedidos.filter(p => p.estado !== 'entregado').slice(0, 8);
+  const pl   = document.getElementById('ov-pending-list');
+  if (!pl) return;
+  const OV_ST = {
+    pendiente: { dot:'#d97706', bg:'#fef3c7', ico:'schedule',         lbl:'Pendiente'    },
+    asignado:  { dot:'#7c3aed', bg:'#ede9fe', ico:'person_pin_circle', lbl:'Asignado ✦'  },
+    proceso:   { dot:'#2563eb', bg:'#dbeafe', ico:'local_shipping',    lbl:'En proceso'   },
+    encamino:  { dot:'#7c3aed', bg:'#ede9fe', ico:'directions_bike',   lbl:'🛵 En camino' },
+  };
+  if (!actP.length) {
+    pl.innerHTML = `<div class="empty-state"><div class="ico">${allPedidos.length > 0 ? '✅' : '📦'}</div>
+      <p>${allPedidos.length > 0 ? 'Sin pedidos activos — todos entregados' : 'Sin pedidos todavía'}</p></div>`;
+    return;
+  }
+  pl.innerHTML = actP.map(p => {
+    const st = OV_ST[p.estado] || OV_ST.pendiente;
+    const sinDomi = !p.domi || !p.domi.trim();
+    const subtotal = (typeof calcSubtotal === 'function') ? calcSubtotal(p) : 0;
+    const totalMostrar = (typeof parsePrecio === 'function' && p.total) ? parsePrecio(p.total) : subtotal;
+    return `
+      <div class="oi" style="border-left:3px solid ${st.dot};padding-left:10px;gap:10px;align-items:flex-start;">
+        <div style="width:34px;height:34px;border-radius:10px;background:${st.bg};
+                    display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;">
+          <span class="material-symbols-rounded" style="font-size:17px;color:${st.dot};">${st.ico}</span>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;">
+            <span style="font-size:12px;font-weight:800;color:var(--text);">${p.cliente || 'Sin nombre'}</span>
+            <span class="stag ${p.estado}" style="font-size:7px;padding:1px 7px;font-weight:800;">${st.lbl}</span>
+            ${p.estado === 'pendiente' && sinDomi
+              ? `<span style="font-size:8px;font-weight:800;color:var(--red);background:var(--red-l);
+                              padding:1px 7px;border-radius:99px;border:1px solid rgba(220,38,38,.2);">⚠ Sin asignar</span>`
+              : ''}
+          </div>
+          ${!sinDomi ? `<div style="font-size:10px;color:var(--text2);font-weight:700;margin-bottom:3px;">🛵 ${p.domi}</div>` : ''}
+          ${p.direccion ? `<div style="font-size:9px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;">
+            📍 ${p.direccion.substring(0,35)}${p.direccion.length>35?'…':''}</div>` : ''}
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:11px;font-weight:800;color:${st.dot};">${p.hora || '–'}</div>
+          <div style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px;">
+            ${totalMostrar > 0 ? '$\u2009' + totalMostrar.toLocaleString('es-CO') : '#' + p.id}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+if (window.allPedidos && allPedidos.length > 0) _renderOverviewActivos();
+console.log('[PARCHE HORARIO v3] ✅ Modal 5 campos (Fecha Inicio|Hora Inicio|Fecha Fin|Hora Fin|MOTIVO)');
 })();
 </script>
 
