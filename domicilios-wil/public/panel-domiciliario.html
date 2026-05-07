@@ -7355,8 +7355,10 @@ document.addEventListener('change', function(e) {
   );
 
 })();
+
+
 let yaEnviado = false;
-  let panelVisible = false;
+let panelVisible = false;
 
   function togglePanel() {
     if (yaEnviado) return; // si ya envió, el botón principal no hace nada
@@ -7394,30 +7396,58 @@ let yaEnviado = false;
     document.getElementById('btnEnviar').disabled = true;
   }
 
-  function enviar() {
-    const btn = document.getElementById('btnEnviar');
-    btn.disabled = true;
-    btn.textContent = 'Enviando...';
+  function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = e => resolve(e.target.result);
+    reader.onerror = () => reject('Error leyendo archivo');
+    reader.readAsDataURL(file);
+  });
+}
 
-    setTimeout(() => {
-      yaEnviado = true;
+async function enviar() {
+  const btn       = document.getElementById('btnEnviar');
+  const fileInput = document.getElementById('fileInput');
+  const file      = fileInput.files[0];
+  if (!file) return;
 
-      // Oculta botón principal, muestra chip
-      document.getElementById('btnPrincipal').style.display = 'none';
-      document.getElementById('chipEnviado').style.display = 'flex';
+  btn.disabled    = true;
+  btn.textContent = 'Enviando...';
 
-      // Colapsa el panel
-      panelVisible = false;
-      document.getElementById('panel').classList.remove('open');
-      document.getElementById('chipArrow').classList.remove('open');
+  try {
+    const base64 = await fileToBase64(file);
 
-      // Bloquea dropzone y quitar
-      document.getElementById('dropzone').classList.add('bloqueado');
-      document.getElementById('btnQuitar').style.display = 'none';
+    const res = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        accion:   'comprobante-tardanza',
+        pedidoId: pedidoActivo.id,
+        imagen:   base64
+      })
+    });
 
-      btn.textContent = '✓ Enviado';
-    }, 1200);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Error servidor');
+
+    // ── igual que antes ──
+    yaEnviado = true;
+    document.getElementById('btnPrincipal').style.display = 'none';
+    document.getElementById('chipEnviado').style.display  = 'flex';
+    panelVisible = false;
+    document.getElementById('panel').classList.remove('open');
+    document.getElementById('chipArrow').classList.remove('open');
+    document.getElementById('dropzone').classList.add('bloqueado');
+    document.getElementById('btnQuitar').style.display = 'none';
+    btn.textContent = '✓ Enviado';
+
+  } catch (err) {
+    console.error('Error al enviar:', err);
+    btn.disabled    = false;
+    btn.textContent = '✉️ Enviar comprobante';
+    alert('No se pudo enviar. Intenta de nuevo.');
   }
+}
  
 </script>
 
