@@ -5307,36 +5307,38 @@ document.addEventListener('click', function (e) {
 
 }(window));
 
-
 /* ═══════════════════════════════════════════════════════════════
-   WIL — FIX BÚSQUEDA v5
-   ─────────────────────────────────────────────────────────────
-   REGLAS:
-   1. Dedup SOLO por key exacta (el sheet ya deduplicó al cargar)
-      → Todos los panitos, shampoos, cepillos de distintas marcas
-        y presentaciones aparecen como cards separadas.
-   2. Umbral de score 22 (antes 8) → no aparecen productos
-      sin relación con lo buscado.
-   3. Fotos primero en resultados y secciones.
-   4. Sobrescribe cualquier patch anterior.
+   WIL — fix-dedup-unitprice.js  v6
+   ───────────────────────────────────────────────────────────────
+   ÚNICO archivo de parche de búsqueda.
+   Sustituye cualquier versión anterior (v4, v5, etc.).
+
+   Qué hace:
+   1. doSearch estricto — solo substring, sin Levenshtein falso-positivo
+      · "shampoo"  → solo productos que contengan "shampoo"
+      · "pañales"  → solo pañales
+      · "crema"    → solo cremas
+   2. _rebuildSearchIndex — dedup por key exacta
+   3. _renderProdEnScroll — fotos primero, dedup por key
+   4. renderResults       — card destacada + grid 2 col + precio unidad
 ═══════════════════════════════════════════════════════════════ */
 
-/* ── Helpers ── */
+/* ── helpers reutilizados por otros módulos ── */
 function _tieneImagen(it) {
-  var img = ((it && it.imagen) || '').trim();
-  return img.length > 4 && (img.startsWith('https://') || img.startsWith('http://'));
+  var img = ((it && it.imagen) || '').replace(/\s/g, '');
+  return img.length > 8 && (img.startsWith('https://') || img.startsWith('http://'));
 }
 
 function parsearPrecioUnidad(it) {
-  var texto = ((it.unidad || '') + ' ' + (it.desc || '')).toLowerCase()
+  var txt = ((it.unidad || '') + ' ' + (it.desc || '')).toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  var patrones = [
+  var pats = [
     /\$\s*([\d.,]+)\s*c\/u/,
     /c\/u\s*[:\-]?\s*\$\s*([\d.,]+)/,
-    /\$\s*([\d.,]+)\s*(?:cada\s+una?|individual|por\s+unidad|x\s*unidad)/,
+    /\$\s*([\d.,]+)\s*(?:cada\s+una?|individual|por\s+unidad|x\s*unidad)/
   ];
-  for (var i = 0; i < patrones.length; i++) {
-    var m = texto.match(patrones[i]);
+  for (var i = 0; i < pats.length; i++) {
+    var m = txt.match(pats[i]);
     if (m) {
       var n = parseFloat(m[1].replace(/\./g, '').replace(',', '.'));
       if (!isNaN(n) && n > 0 && n < 10000000) return Math.round(n);
@@ -5346,15 +5348,113 @@ function parsearPrecioUnidad(it) {
 }
 
 function parsearCantidadCaja(it) {
-  var texto = ((it.unidad || '') + ' ' + (it.desc || '')).toLowerCase()
+  var txt = ((it.unidad || '') + ' ' + (it.desc || '')).toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  var m = texto.match(/x\s*(\d+)\s*(?:unidades?|tabs?|capsulas?|comprimidos?|sobres?)?/);
+  var m = txt.match(/x\s*(\d+)\s*(?:unidades?|tabs?|caps?|comprimidos?|sobres?)?/);
   return m ? parseInt(m[1], 10) : null;
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   1. _rebuildSearchIndex — dedup solo por key exacta
-═══════════════════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════
+   1. doSearch — SOLO SUBSTRING, sin Levenshtein
+   ════════════════════════════════════════════════════════════════ */
+window.doSearch = function (q) {
+  if (!q) { setSt('empty'); return; }
+  setSt('loading');
+
+  setTimeout(function () {
+    if (!allData.length) {
+      document.getElementById('nores-txt').textContent = 'Cargando inventario, intenta en segundos.';
+      setSt('nores'); return;
+    }
+
+    /* ── normalizar query ── */
+    var nq = nrm(q);
+    var qWords = nq.split(/\s+/).filter(function (w) { return w.length >= 2; });
+    if (!qWords.length) { setSt('empty'); return; }
+
+    var pool = (_searchAllData && _searchAllData.length) ? _searchAllData : allData;
+    var seenKey = {};
+    var scored  = [];
+
+    pool.forEach(function (it) {
+      if (!it || !it.key) return;
+      if (seenKey[it.key]) return;
+      seenKey[it.key] = true;
+
+      var td = nrm(it.desc  || '');
+      var tl = nrm(it.lab   || '');
+      var tu = nrm(it.unidad|| '');
+      var score = 0;
+
+      /* ── reglas de puntuación estrictas (solo substring) ── */
+
+      // Coincidencia exacta completa
+      if (td === nq || tl === nq) {
+        score = 100;
+
+      // Query completa dentro del texto
+      } else if (td.includes(nq)) {
+        score = td.startsWith(nq) ? 97 : 90;
+
+      } else if (tl.includes(nq)) {
+        score = 78;
+
+      } else if (tu.includes(nq)) {
+        score = 60;
+
+      // Multi-palabra: todas las palabras deben estar presentes
+      } else if (qWords.length >= 2) {
+        var allInDesc = qWords.every(function (w) { return td.includes(w); });
+        var allInLab  = qWords.every(function (w) { return tl.includes(w); });
+        var allMixed  = qWords.every(function (w) { return td.includes(w) || tl.includes(w); });
+
+        if (allInDesc)        score = 85;
+        else if (allInLab)    score = 72;
+        else if (allMixed)    score = 68;
+        else {
+          // mayoría de palabras (≥ 80 %)
+          var hits = qWords.filter(function (w) {
+            return td.includes(w) || tl.includes(w);
+          }).length;
+          if (hits / qWords.length >= 0.8) score = 58;
+        }
+
+      // Una sola palabra: debe estar en el nombre (al inicio de alguna palabra del texto)
+      } else if (qWords.length === 1) {
+        var w0 = qWords[0];
+        var tdWords = td.split(/\s+/);
+        var tlWords = tl.split(/\s+/);
+        if (tdWords.some(function (w) { return w.startsWith(w0); })) score = 82;
+        else if (tlWords.some(function (w) { return w.startsWith(w0); })) score = 65;
+      }
+
+      if (score >= 55) scored.push({ it: it, s: score });
+    });
+
+    /* ── ordenar: foto primero (prioridad absoluta) → score → stock ── */
+    scored.sort(function (a, b) {
+      var af = _tieneImagen(a.it) ? 1 : 0;
+      var bf = _tieneImagen(b.it) ? 1 : 0;
+      if (bf !== af) return bf - af;          // foto > sin foto siempre
+      if (b.s !== a.s) return b.s - a.s;     // mismo grupo: mayor score primero
+      var as = (a.it.stock !== undefined ? a.it.stock : 3) > 0 ? 1 : 0;
+      var bs = (b.it.stock !== undefined ? b.it.stock : 3) > 0 ? 1 : 0;
+      return bs - as;
+    });
+
+    if (!scored.length) {
+      document.getElementById('nores-txt').textContent =
+        'No encontramos "' + q + '". Intenta con otro nombre.';
+      setSt('nores'); return;
+    }
+
+    renderResults(scored.slice(0, 60).map(function (x) { return x.it; }), q);
+  }, 55);
+};
+
+/* ════════════════════════════════════════════════════════════════
+   2. _rebuildSearchIndex — dedup por key exacta
+   ════════════════════════════════════════════════════════════════ */
 window._rebuildSearchIndex = function () {
   var seenKey = {};
   var extras = (_searchAllData || []).filter(function (it) {
@@ -5374,95 +5474,45 @@ window._rebuildSearchIndex = function () {
   extras.forEach(push);
 };
 
-/* ═══════════════════════════════════════════════════════════════
-   2. doSearch — dedup solo por key, umbral 22, fotos primero
-═══════════════════════════════════════════════════════════════ */
-window.doSearch = function (q) {
-  if (!q) { setSt('empty'); return; }
-  setSt('loading');
-
-  setTimeout(function () {
-    if (!allData.length) {
-      document.getElementById('nores-txt').textContent =
-        'Cargando inventario, intenta en segundos.';
-      setSt('nores'); return;
-    }
-
-    var pool = (_searchAllData && _searchAllData.length) ? _searchAllData : allData;
-
-    var seenKey = {};
-    var scored  = [];
-
-    pool.forEach(function (it) {
-      if (!it || !it.key) return;
-      if (seenKey[it.key]) return;
-      seenKey[it.key] = true;
-
-      var s = Math.max(scr2(it.desc, q), scr2(it.lab, q) * 0.7);
-      if (s >= 22) scored.push({ it: it, s: s });
-    });
-
-    scored.sort(function (a, b) {
-      if (b.s !== a.s) return b.s - a.s;
-      var as = (a.it.stock !== undefined ? a.it.stock : 3) > 0 ? 1 : 0;
-      var bs = (b.it.stock !== undefined ? b.it.stock : 3) > 0 ? 1 : 0;
-      if (bs !== as) return bs - as;
-      return (_tieneImagen(b.it) ? 1 : 0) - (_tieneImagen(a.it) ? 1 : 0);
-    });
-
-    if (!scored.length) {
-      document.getElementById('nores-txt').textContent =
-        'No encontramos "' + q + '". Intenta con otro nombre.';
-      setSt('nores'); return;
-    }
-
-    renderResults(scored.slice(0, 60).map(function (x) { return x.it; }), q);
-  }, 55);
-};
-
-/* ═══════════════════════════════════════════════════════════════
-   3. _renderProdEnScroll — fotos primero, dedup solo por key
-═══════════════════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════
+   3. _renderProdEnScroll — fotos primero, dedup por key
+   ════════════════════════════════════════════════════════════════ */
 (function () {
   function patch() {
-    if (!window._renderProdEnScroll || window._renderProdEnScroll._v5) return;
+    if (!window._renderProdEnScroll || window._renderProdEnScroll._v6) return;
     var _orig = window._renderProdEnScroll;
 
     window._renderProdEnScroll = function (scrollId, productos, colorOffset) {
       if (!productos || !productos.length) return;
-
       var seenKey = {};
       var unicos  = [];
       productos.forEach(function (p) {
-        var k = p.key || (p.nombre + '|||' + p.id);
+        var k = p.key || (p.nombre + '|||' + (p.id || ''));
         if (!k || seenKey[k]) return;
         seenKey[k] = true;
         unicos.push(p);
       });
-
       var conFoto = unicos.filter(_tieneImagen);
       var sinFoto = unicos.filter(function (p) { return !_tieneImagen(p); });
-
       return _orig.call(this, scrollId, conFoto.concat(sinFoto), colorOffset);
     };
 
-    window._renderProdEnScroll._v5 = true;
-    console.log('[WIL v5] _renderProdEnScroll OK');
+    window._renderProdEnScroll._v6 = true;
   }
 
   patch();
-  if (!window._renderProdEnScroll || !window._renderProdEnScroll._v5) {
+  if (!window._renderProdEnScroll || !window._renderProdEnScroll._v6) {
     var t = setInterval(function () {
       patch();
-      if (window._renderProdEnScroll && window._renderProdEnScroll._v5) clearInterval(t);
+      if (window._renderProdEnScroll && window._renderProdEnScroll._v6) clearInterval(t);
     }, 150);
     setTimeout(function () { clearInterval(t); }, 12000);
   }
 })();
 
-/* ═══════════════════════════════════════════════════════════════
-   4. renderResults — featured + grid 2 col + precio unitario
-═══════════════════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════
+   4. renderResults — card destacada + grid 2 col + precio unidad
+   ════════════════════════════════════════════════════════════════ */
 window.renderResults = function (items, q) {
   setSt('results');
   document.getElementById('res-count').textContent =
@@ -5475,28 +5525,29 @@ window.renderResults = function (items, q) {
   var featured = items[0];
   var resto    = items.slice(1);
 
+  /* ── Card destacada (primer resultado) ── */
   if (featured) {
     cache[featured.key] = featured;
-    var precio    = featured.precio > 0 ? featured.precio : (featured.pUnit > 0 ? featured.pUnit : 0);
-    var agotado   = featured.stock !== undefined ? featured.stock <= 0 : false;
-    var hasImg    = _tieneImagen(featured);
-    var precioUnd = parsearPrecioUnidad(featured);
-    var cantCaja  = parsearCantidadCaja(featured);
-    var labelCaja = cantCaja ? 'Caja x' + cantCaja : 'Caja';
-    var keyUnd    = featured.key + '__und';
-    cache[keyUnd] = Object.assign({}, featured, { key: keyUnd, precio: precioUnd, pUnit: precioUnd });
+    var precio   = featured.precio > 0 ? featured.precio : (featured.pUnit > 0 ? featured.pUnit : 0);
+    var agotado  = featured.stock !== undefined ? featured.stock <= 0 : false;
+    var hasImg   = _tieneImagen(featured);
+    var precioU  = parsearPrecioUnidad(featured);
+    var cantCaja = parsearCantidadCaja(featured);
+    var lblCaja  = cantCaja ? 'Caja x' + cantCaja : 'Caja';
+    var keyUnd   = featured.key + '__und';
+    cache[keyUnd] = Object.assign({}, featured, { key: keyUnd, precio: precioU, pUnit: precioU });
 
     var seed = featured.key.split('').reduce(function (a, c) { return a + c.charCodeAt(0); }, 0);
     var c1   = _PROD_GRADS[seed % _PROD_GRADS.length][0];
     var icon = _PROD_ICONS[seed % _PROD_ICONS.length];
 
     var precioBtns = '';
-    if (precioUnd && precioUnd !== precio && precio > precioUnd) {
+    if (precioU && precioU !== precio && precio > precioU) {
       precioBtns =
         '<div style="display:flex;gap:8px;margin-top:10px">'
           + '<div style="display:flex;align-items:center;gap:6px;flex:1">'
             + '<div style="flex:1;background:#eef3ff;border-radius:10px;padding:7px 10px">'
-              + '<div style="font-size:8px;font-weight:700;color:#5272a8">' + labelCaja + '</div>'
+              + '<div style="font-size:8px;font-weight:700;color:#5272a8">' + lblCaja + '</div>'
               + '<div style="font-size:15px;font-weight:900;color:#003f87">' + fp(precio) + '</div>'
             + '</div>'
             + '<button onclick="addToCart(\'' + esc(featured.key) + '\',this)" style="background:#003f87;color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:800;cursor:pointer;flex-shrink:0">+ Caja</button>'
@@ -5504,9 +5555,9 @@ window.renderResults = function (items, q) {
           + '<div style="display:flex;align-items:center;gap:6px;flex:1">'
             + '<div style="flex:1;background:#f3f4f6;border-radius:10px;padding:7px 10px">'
               + '<div style="font-size:8px;font-weight:700;color:#9ca3af">Unidad</div>'
-              + '<div style="font-size:15px;font-weight:900;color:#374151">' + fp(precioUnd) + '</div>'
+              + '<div style="font-size:15px;font-weight:900;color:#374151">' + fp(precioU) + '</div>'
             + '</div>'
-            + '<button onclick="sadd(\'' + esc(keyUnd) + '\',\'' + esc(featured.desc + ' (und)') + '\',\'' + esc(featured.lab || '') + '\',' + precioUnd + ',this)" style="background:#374151;color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:800;cursor:pointer;flex-shrink:0">+ Und.</button>'
+            + '<button onclick="sadd(\'' + esc(keyUnd) + '\',\'' + esc(featured.desc + ' (und)') + '\',\'' + esc(featured.lab || '') + '\',' + precioU + ',this)" style="background:#374151;color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:800;cursor:pointer;flex-shrink:0">+ Und.</button>'
           + '</div>'
         + '</div>';
     } else {
@@ -5539,23 +5590,24 @@ window.renderResults = function (items, q) {
     grid.appendChild(fCard);
   }
 
+  /* ── Grid 2 columnas para el resto ── */
   if (resto.length > 0) {
     var sub = document.createElement('div');
     sub.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start';
 
     resto.forEach(function (it, i) {
       cache[it.key] = it;
-      var ag  = it.stock !== undefined ? it.stock <= 0 : false;
-      var pr  = it.precio > 0 ? it.precio : (it.pUnit > 0 ? it.pUnit : 0);
-      var sd  = it.key.split('').reduce(function (a, c) { return a + c.charCodeAt(0); }, 0);
-      var c1r = ag ? '#9ca3af' : _PROD_GRADS[sd % _PROD_GRADS.length][0];
-      var icr = _PROD_ICONS[sd % _PROD_ICONS.length];
-      var hir = _tieneImagen(it);
-      var uid = 'rs_' + i;
-      var pu  = parsearPrecioUnidad(it);
-      var cc  = parsearCantidadCaja(it);
-      var lc  = cc ? 'Caja x' + cc : 'Caja';
-      var ku  = it.key + '__und';
+      var ag   = it.stock !== undefined ? it.stock <= 0 : false;
+      var pr   = it.precio > 0 ? it.precio : (it.pUnit > 0 ? it.pUnit : 0);
+      var sd   = it.key.split('').reduce(function (a, c) { return a + c.charCodeAt(0); }, 0);
+      var c1r  = ag ? '#9ca3af' : _PROD_GRADS[sd % _PROD_GRADS.length][0];
+      var icr  = _PROD_ICONS[sd % _PROD_ICONS.length];
+      var hir  = _tieneImagen(it);
+      var uid  = 'rs_' + i;
+      var pu   = parsearPrecioUnidad(it);
+      var cc   = parsearCantidadCaja(it);
+      var lc   = cc ? 'Caja x' + cc : 'Caja';
+      var ku   = it.key + '__und';
       cache[ku] = Object.assign({}, it, { key: ku, precio: pu, pUnit: pu });
 
       var btns = '';
@@ -5605,7 +5657,7 @@ window.renderResults = function (items, q) {
   }
 };
 
-console.log('[WIL] v5 OK — key-only dedup, umbral 22, todas las marcas visibles');
+console.log('[WIL] v6 ✅ — búsqueda estricta por substring, sin falsos positivos');
 </script>
 
 <!-- ── POPUP CHAT FARMACIA ── -->
