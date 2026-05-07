@@ -451,11 +451,7 @@ body{min-height:100dvh;font-family:'Inter',sans-serif;background:#f8f9fa;color:#
 .wf-pill span{font-size:11px;font-weight:800;color:#92400e;font-family:'Plus Jakarta Sans',sans-serif}
 .wf-pill button{background:none;border:none;cursor:pointer;display:flex;align-items:center;padding:0;color:#b45309}
 
-
-
-
-
-.btn-comprobante {
+ .btn-comprobante {
     width: 100%;
     background: #2d7a6e;
     color: #fff;
@@ -474,15 +470,40 @@ body{min-height:100dvh;font-family:'Inter',sans-serif;background:#f8f9fa;color:#
     font-family: 'Segoe UI', sans-serif;
   }
   .btn-comprobante:hover { background: #236058; }
+  .btn-comprobante.enviado { background: #1a6a50; }
 
+  /* Chip colapsado — se muestra tras enviar */
+  .chip-enviado {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    background: #d4f0e8;
+    border: 1.5px solid #a0d8c8;
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-top: 10px;
+    font-family: 'Segoe UI', sans-serif;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .chip-enviado:hover { background: #c4e8d8; }
+  .chip-left { display: flex; align-items: center; gap: 8px; }
+  .chip-left span { font-size: 12.5px; font-weight: 600; color: #1a6a50; }
+  .chip-arrow {
+    font-size: 13px; color: #1a6a50;
+    transition: transform 0.25s;
+  }
+  .chip-arrow.open { transform: rotate(180deg); }
+
+  /* Panel colapsable */
   .panel {
     overflow: hidden;
     max-height: 0;
     opacity: 0;
     transition: max-height 0.38s ease, opacity 0.3s ease;
-    margin-top: 10px;
+    margin-top: 8px;
   }
-  .panel.open { max-height: 500px; opacity: 1; }
+  .panel.open { max-height: 600px; opacity: 1; }
 
   .panel-inner {
     background: #fff;
@@ -509,19 +530,24 @@ body{min-height:100dvh;font-family:'Inter',sans-serif;background:#f8f9fa;color:#
     margin: 14px;
     border: 2px dashed #a8d5cd;
     border-radius: 10px;
-    padding: 22px 14px;
+    min-height: 140px;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
     gap: 8px; cursor: pointer;
     background: #f4faf9;
     position: relative;
     text-align: center;
+    overflow: hidden;
     transition: background 0.2s, border-color 0.2s;
   }
   .dropzone:hover { background: #e8f5f2; border-color: #2d7a6e; }
   .dropzone input[type="file"] {
-    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; z-index: 2;
   }
+  /* Bloquear input tras enviar */
+  .dropzone.bloqueado input[type="file"] { pointer-events: none; }
+
+  .dz-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 22px 14px; }
   .cam-circle {
     width: 48px; height: 48px; border-radius: 50%;
     border: 2px solid #a8d5cd;
@@ -531,13 +557,19 @@ body{min-height:100dvh;font-family:'Inter',sans-serif;background:#f8f9fa;color:#
   .dz-label { font-size: 13px; font-weight: 600; color: #1a3a35; }
   .dz-hint  { font-size: 11px; color: #6aaa9a; }
 
-  .preview-wrap { display: none; flex-direction: column; align-items: center; gap: 5px; margin: 0 14px; }
-  .preview-wrap img { max-width: 100%; max-height: 110px; border-radius: 8px; border: 1px solid #a8d5cd; object-fit: cover; }
-  .preview-name { font-size: 11px; color: #3a7a70; }
-  .remove-btn { font-size: 11px; color: #c0392b; background: none; border: none; cursor: pointer; text-decoration: underline; }
+  .dz-preview { display: none; width: 100%; position: relative; min-height: 160px; }
+  .dz-preview img { width: 100%; height: 180px; object-fit: cover; display: block; border-radius: 8px; }
+  .dz-preview .overlay {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: rgba(0,0,0,0.45);
+    padding: 6px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .dz-preview .fname { font-size: 11px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%; }
+  .remove-btn { font-size: 11px; color: #ffaaaa; background: none; border: none; cursor: pointer; font-weight: 600; z-index: 3; position: relative; }
 
   .btn-enviar {
-    margin: 12px 14px 14px;
+    margin: 0 14px 14px;
     width: calc(100% - 28px);
     padding: 13px;
     background: #2d7a6e;
@@ -551,15 +583,6 @@ body{min-height:100dvh;font-family:'Inter',sans-serif;background:#f8f9fa;color:#
   }
   .btn-enviar:hover { background: #236058; }
   .btn-enviar:disabled { background: #9ac8c2; cursor: not-allowed; }
-
-  .success-msg {
-    display: none;
-    margin: 0 14px 14px;
-    font-size: 12px; font-weight: 600; color: #1a6a50;
-    background: #d4f0e8; border-radius: 8px;
-    padding: 10px 14px; text-align: center;
-    font-family: 'Segoe UI', sans-serif;
-  }
 </style>
 </head>
 <body>
@@ -805,16 +828,23 @@ body{min-height:100dvh;font-family:'Inter',sans-serif;background:#f8f9fa;color:#
   <!-- BOTONES DE ACCIÓN -->
   <div id="inlineStepBtns" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
 
-   <!-- Botón principal (va ARRIBA del ícono del mapa) -->
-<button class="btn-comprobante" onclick="togglePanel()">
+ <!-- Botón principal (cambia al enviar) -->
+<button class="btn-comprobante" id="btnPrincipal" onclick="togglePanel()">
   📋 Adjuntar comprobante de tardanza
 </button>
 
-<!-- Panel expandible -->
+<!-- Chip compacto (aparece tras enviar, permite ver/colapsar) -->
+<div class="chip-enviado" id="chipEnviado" onclick="toggleVerEnviado()">
+  <div class="chip-left">
+    <span>✅ Comprobante enviado</span>
+  </div>
+  <span class="chip-arrow" id="chipArrow">▼</span>
+</div>
+
+<!-- Panel -->
 <div class="panel" id="panel">
   <div class="panel-inner">
 
-    <!-- Aviso al cliente -->
     <div class="aviso">
       <span class="aviso-icon">ℹ️</span>
       <div class="aviso-text">
@@ -823,32 +853,30 @@ body{min-height:100dvh;font-family:'Inter',sans-serif;background:#f8f9fa;color:#
       </div>
     </div>
 
-    <!-- Zona de carga -->
     <label class="dropzone" id="dropzone">
       <input type="file" id="fileInput" accept="image/*" capture="environment" onchange="handleFile(this)" />
-      <div class="cam-circle">
-        <svg viewBox="0 0 24 24">
-          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-          <circle cx="12" cy="13" r="4"/>
-        </svg>
+      <div class="dz-empty" id="dzEmpty">
+        <div class="cam-circle">
+          <svg viewBox="0 0 24 24">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+        </div>
+        <span class="dz-label">Toca para tomar foto o adjuntar</span>
+        <span class="dz-hint">JPG · PNG · máx 2MB</span>
       </div>
-      <span class="dz-label" id="dzLabel">Toca para tomar foto o adjuntar</span>
-      <span class="dz-hint">JPG · PNG · máx 2MB</span>
+      <div class="dz-preview" id="dzPreview">
+        <img id="previewImg" src="" alt="Vista previa" />
+        <div class="overlay">
+          <span class="fname" id="previewName"></span>
+          <button class="remove-btn" id="btnQuitar" onclick="removeFile(event)">✕ Quitar</button>
+        </div>
+      </div>
     </label>
 
-    <!-- Preview -->
-    <div class="preview-wrap" id="previewWrap">
-      <img id="previewImg" src="" alt="Vista previa" />
-      <span class="preview-name" id="previewName"></span>
-      <button class="remove-btn" onclick="removeFile()">✕ Quitar</button>
-    </div>
-
-    <!-- Botón enviar -->
     <button class="btn-enviar" id="btnEnviar" disabled onclick="enviar()">
       ✉️ Enviar comprobante
     </button>
-
-    <div class="success-msg" id="successMsg">✅ Comprobante enviado correctamente</div>
 
   </div>
 </div>
@@ -7327,9 +7355,19 @@ document.addEventListener('change', function(e) {
   );
 
 })();
+let yaEnviado = false;
+  let panelVisible = false;
 
- function togglePanel() {
-    document.getElementById('panel').classList.toggle('open');
+  function togglePanel() {
+    if (yaEnviado) return; // si ya envió, el botón principal no hace nada
+    panelVisible = !panelVisible;
+    document.getElementById('panel').classList.toggle('open', panelVisible);
+  }
+
+  function toggleVerEnviado() {
+    panelVisible = !panelVisible;
+    document.getElementById('panel').classList.toggle('open', panelVisible);
+    document.getElementById('chipArrow').classList.toggle('open', panelVisible);
   }
 
   function handleFile(input) {
@@ -7339,30 +7377,44 @@ document.addEventListener('change', function(e) {
     const reader = new FileReader();
     reader.onload = e => {
       document.getElementById('previewImg').src = e.target.result;
-      document.getElementById('previewWrap').style.display = 'flex';
+      document.getElementById('previewName').textContent = file.name;
+      document.getElementById('dzEmpty').style.display = 'none';
+      document.getElementById('dzPreview').style.display = 'block';
+      document.getElementById('btnEnviar').disabled = false;
     };
     reader.readAsDataURL(file);
-    document.getElementById('previewName').textContent = file.name;
-    document.getElementById('dzLabel').textContent = 'Archivo adjunto ✓';
-    document.getElementById('btnEnviar').disabled = false;
-    document.getElementById('successMsg').style.display = 'none';
   }
 
-  function removeFile() {
+  function removeFile(e) {
+    e.preventDefault();
     document.getElementById('fileInput').value = '';
-    document.getElementById('previewWrap').style.display = 'none';
     document.getElementById('previewImg').src = '';
-    document.getElementById('dzLabel').textContent = 'Toca para tomar foto o adjuntar';
+    document.getElementById('dzEmpty').style.display = 'flex';
+    document.getElementById('dzPreview').style.display = 'none';
     document.getElementById('btnEnviar').disabled = true;
-    document.getElementById('successMsg').style.display = 'none';
   }
 
   function enviar() {
     const btn = document.getElementById('btnEnviar');
     btn.disabled = true;
     btn.textContent = 'Enviando...';
+
     setTimeout(() => {
-      document.getElementById('successMsg').style.display = 'block';
+      yaEnviado = true;
+
+      // Oculta botón principal, muestra chip
+      document.getElementById('btnPrincipal').style.display = 'none';
+      document.getElementById('chipEnviado').style.display = 'flex';
+
+      // Colapsa el panel
+      panelVisible = false;
+      document.getElementById('panel').classList.remove('open');
+      document.getElementById('chipArrow').classList.remove('open');
+
+      // Bloquea dropzone y quitar
+      document.getElementById('dropzone').classList.add('bloqueado');
+      document.getElementById('btnQuitar').style.display = 'none';
+
       btn.textContent = '✓ Enviado';
     }, 1200);
   }
