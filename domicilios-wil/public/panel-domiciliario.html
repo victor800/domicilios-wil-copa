@@ -6644,8 +6644,512 @@ function _wflMostrarResumenExito(totalFact, domiNum, urlFact) {
   console.log('[WIL Parche Móvil Factura] ✅ Activo');
 })();
 
-
-
 </script>
+
+<script>
+
+
+/* ═══════════════════════════════════════════════════════════════
+   WIL — TIEMPO DE ESPERA EN COMERCIO v1.0
+   ─────────────────────────────────────────────────────────────
+   INSERTAR justo antes de </body> en domi-panel.html
+ 
+   FLUJO:
+   1. Domi acepta pedido → aparece card "Llegué al comercio"
+   2. Al presionar el botón → cronómetro arranca en tiempo real
+   3. Primeros 15 min: GRATIS (barra verde)
+   4. Min 15 en adelante: +$2.000 planos (barra roja, vibración)
+   5. Al tocar "Ponerte en camino" → cronómetro se detiene SOLO
+   6. Registro se envía a hoja TiempoExtra del Sheet
+   7. Si el domi envía factura: aparece chip "Tiempo extra +$2.000"
+      en el resumen final de la factura
+   ─────────────────────────────────────────────────────────────
+   APPS SCRIPT → añadir el case 'tiempo-extra' al doPost:
+   (ver bloque al final de este archivo)
+═══════════════════════════════════════════════════════════════ */
+ 
+(function parcheTiempoEspera() {
+  'use strict';
+ 
+  /* ══ CONFIGURACIÓN ══ */
+  var MIN_LIBRE   = 15;    // minutos gratuitos
+  var COBRO_EXTRA = 2000;  // COP planos por espera ≥ MIN_LIBRE
+  var TZ          = 'America/Bogota';
+ 
+  /* ══ ESTADO GLOBAL ══ */
+  window._TE = {
+    activo:     false,
+    inicio:     null,
+    duracion:   0,      // segundos acumulados
+    cobro:      0,      // COP cobrados (0 o COBRO_EXTRA)
+    horaInicio: '',
+    timer:      null,
+    _alerted:   false   // vibración de alerta solo una vez
+  };
+ 
+  /* ══ CSS ══ */
+  var _st = document.createElement('style');
+  _st.textContent =
+    /* Card wrapper */
+    '#teCard{'
+      +'background:#fff;border-radius:20px;overflow:hidden;'
+      +'border:1.5px solid rgba(245,158,11,.2);'
+      +'box-shadow:0 2px 12px rgba(245,158,11,.08);'
+      +'margin-bottom:12px;transition:border-color .3s,box-shadow .3s}'
+    +'#teCard.te-on{'
+      +'border-color:rgba(245,158,11,.45);'
+      +'box-shadow:0 3px 22px rgba(245,158,11,.2)}'
+    +'#teCard.te-err{'
+      +'border-color:rgba(186,26,26,.4);'
+      +'box-shadow:0 3px 22px rgba(186,26,26,.18)}'
+ 
+    /* Display cronómetro */
+    +'#teDisplay{'
+      +"font-family:'Plus Jakarta Sans',sans-serif;"
+      +'font-weight:900;font-size:32px;'
+      +'letter-spacing:.04em;line-height:1;transition:color .3s}'
+    +'#teDisplay.te-ok   {color:#2a9d5c}'
+    +'@keyframes teBlip{0%,100%{opacity:1}50%{opacity:.45}}'
+    +'#teDisplay.te-warn {color:#ba1a1a;animation:teBlip .85s ease-in-out infinite}'
+ 
+    /* Barra de progreso */
+    +'#teBarFill{'
+      +'height:100%;width:0%;'
+      +'background:linear-gradient(90deg,#2a9d5c 0%,#f59e0b 60%,#ef4444 100%);'
+      +'border-radius:4px;transition:width .6s linear}'
+ 
+    /* Botón iniciar pulsante */
+    +'@keyframes tePulseBtn{'
+      +'0%,100%{box-shadow:0 3px 14px rgba(245,158,11,.3)}'
+      +'50%{box-shadow:0 3px 24px rgba(245,158,11,.65),0 0 0 6px rgba(245,158,11,.1)}}'
+    +'#teBtnIniciar{animation:tePulseBtn 2.4s ease-in-out infinite}'
+ 
+    /* Chip tiempo extra en factura */
+    +'.te-chip-extra{'
+      +'background:rgba(186,26,26,.06);'
+      +'border:1.5px solid rgba(186,26,26,.2);'
+      +'border-radius:10px;padding:8px 10px;margin-top:7px;'
+      +'display:flex;align-items:center;justify-content:space-between;gap:8px}';
+  document.head.appendChild(_st);
+ 
+  /* ══ INYECTAR CARD EN EL DOM ══ */
+  function _inyectar() {
+    if (document.getElementById('teCard')) return;
+    var btns = document.getElementById('inlineStepBtns');
+    if (!btns || !btns.parentNode) return;
+ 
+    var div = document.createElement('div');
+    div.id  = 'teCard';
+    div.innerHTML =
+ 
+      /* ── HEADER ── */
+      '<div style="padding:12px 14px 0;display:flex;align-items:center;gap:9px">'
+        +'<div style="width:36px;height:36px;border-radius:11px;flex-shrink:0;'
+          +'background:linear-gradient(135deg,#f59e0b,#f97316);'
+          +'display:flex;align-items:center;justify-content:center">'
+          +'<span class="material-symbols-outlined" '
+            +'style="font-size:18px;color:#fff;font-variation-settings:\'FILL\' 1">timer</span>'
+        +'</div>'
+        +'<div style="flex:1;min-width:0">'
+          +'<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;'
+            +'font-size:12px;color:#191c1d;margin:0">Tiempo de espera en comercio</p>'
+          +'<p style="font-size:10px;color:#6c7a7b;margin:2px 0 0">'
+            +'Primeros 15 min gratis · desde min 15 → +$2.000</p>'
+        +'</div>'
+      +'</div>'
+ 
+      /* ── IDLE: Botón iniciar ── */
+      +'<div id="teIdle" style="padding:10px 14px 13px">'
+        +'<button id="teBtnIniciar" onclick="teIniciar()" '
+          +'style="width:100%;padding:12px;'
+          +'background:linear-gradient(135deg,#f59e0b,#f97316);'
+          +'color:#fff;border:none;border-radius:13px;'
+          +"font-family:'Plus Jakarta Sans',sans-serif;"
+          +'font-weight:800;font-size:12px;cursor:pointer;'
+          +'display:flex;align-items:center;justify-content:center;gap:8px">'
+          +'<span class="material-symbols-outlined" '
+            +'style="font-size:17px;font-variation-settings:\'FILL\' 1">storefront</span>'
+          +'Llegué al comercio — Iniciar espera'
+        +'</button>'
+      +'</div>'
+ 
+      /* ── ACTIVO: Cronómetro en tiempo real ── */
+      +'<div id="teActivo" style="display:none;padding:0 14px 13px">'
+ 
+        /* Barra de progreso 15 min */
+        +'<div style="height:4px;background:#f3f4f5;border-radius:4px;'
+          +'margin-bottom:12px;overflow:hidden">'
+          +'<div id="teBarFill"></div>'
+        +'</div>'
+ 
+        /* Cronómetro + cobro extra */
+        +'<div style="display:flex;gap:8px;margin-bottom:10px">'
+ 
+          /* — Tiempo — */
+          +'<div style="flex:1;background:#fefce8;border-radius:14px;padding:11px 10px;'
+            +'text-align:center;border:1.5px solid rgba(245,158,11,.2)">'
+            +'<div id="teDisplay" class="te-ok">00:00</div>'
+            +'<div style="font-size:9px;font-weight:800;color:#9eaaac;'
+              +'text-transform:uppercase;letter-spacing:.04em;margin-top:5px">'
+              +'Tiempo esperando</div>'
+          +'</div>'
+ 
+          /* — Separador + ícono — */
+          +'<div style="display:flex;flex-direction:column;align-items:center;'
+            +'justify-content:center;gap:2px;padding:0 2px">'
+            +'<div style="width:1px;flex:1;background:#e7e8e9"></div>'
+            +'<span class="material-symbols-outlined" '
+              +'style="font-size:13px;color:#e7e8e9">add</span>'
+            +'<div style="width:1px;flex:1;background:#e7e8e9"></div>'
+          +'</div>'
+ 
+          /* — Cobro extra — */
+          +'<div id="teCobroBox" style="flex:1;border-radius:14px;padding:11px 10px;'
+            +'text-align:center;border:1.5px solid rgba(245,158,11,.1);'
+            +'background:#f3f4f5;transition:all .3s">'
+            +'<div id="teCobroDisplay" '
+              +"style=\"font-family:'Plus Jakarta Sans',sans-serif;font-weight:900;"
+              +'font-size:22px;color:#9eaaac;transition:color .3s\">$0</div>'
+            +'<div style="font-size:9px;font-weight:800;color:#9eaaac;'
+              +'text-transform:uppercase;letter-spacing:.04em;margin-top:5px">'
+              +'Tiempo extra</div>'
+          +'</div>'
+        +'</div>'
+ 
+        /* Alerta overtime */
+        +'<div id="teAlerta" style="display:none;background:rgba(186,26,26,.07);'
+          +'border-radius:11px;padding:8px 11px;'
+          +'border:1px solid rgba(186,26,26,.18);margin-bottom:10px">'
+          +'<p style="font-size:11px;font-weight:800;color:#ba1a1a;margin:0;'
+            +'display:flex;align-items:center;gap:5px">'
+            +'<span>⏱</span>'
+            +'<span id="teAlertaTxt">¡Superaste 15 min! Se cobrarán +$2.000 adicionales</span>'
+          +'</p>'
+        +'</div>'
+ 
+        /* Fila inferior: info + botón cancelar */
+        +'<div style="display:flex;gap:8px;align-items:center">'
+          +'<div style="flex:1;background:#f3f4f5;border-radius:11px;padding:8px 10px;text-align:center">'
+            +'<p style="font-size:9px;font-weight:700;color:#6c7a7b;margin:0;line-height:1.5">'
+              +'🛵 Se detiene solo al<br>ponerte en camino</p>'
+          +'</div>'
+          +'<button onclick="teDetener(false)" '
+            +'style="padding:9px 13px;background:rgba(186,26,26,.07);'
+            +'border:1.5px solid rgba(186,26,26,.2);border-radius:11px;'
+            +"font-family:'Plus Jakarta Sans',sans-serif;"
+            +'font-weight:800;font-size:11px;color:#ba1a1a;cursor:pointer;'
+            +'display:flex;align-items:center;gap:5px;flex-shrink:0">'
+            +'<span class="material-symbols-outlined" style="font-size:13px">stop_circle</span>'
+            +'Cancelar'
+          +'</button>'
+        +'</div>'
+      +'</div>'
+ 
+      /* ── RESUMEN post-espera (visible tras ponerse en camino) ── */
+      +'<div id="teResumen" style="display:none;padding:0 14px 13px">'
+        +'<div id="teResumenBox" style="border-radius:13px;padding:10px 12px;'
+          +'display:flex;align-items:center;gap:9px"></div>'
+      +'</div>';
+ 
+    btns.parentNode.insertBefore(div, btns);
+  }
+ 
+  /* ══ UTILIDADES ══ */
+  function _fmt(s) {
+    var m = Math.floor(s / 60), sec = s % 60;
+    return String(m).padStart(2,'0') + ':' + String(sec).padStart(2,'0');
+  }
+  function _hora() {
+    return new Date().toLocaleTimeString('es-CO',
+      { hour:'2-digit', minute:'2-digit', timeZone: TZ });
+  }
+  function _fmtCOP(n) {
+    return '$' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+ 
+  /* ══ INICIAR CRONÓMETRO ══ */
+  window.teIniciar = function() {
+    if (window._TE.activo) return;
+ 
+    window._TE.activo     = true;
+    window._TE.inicio     = Date.now();
+    window._TE.duracion   = 0;
+    window._TE.cobro      = 0;
+    window._TE._alerted   = false;
+    window._TE.horaInicio = _hora();
+ 
+    /* Mostrar sección activa */
+    var card = document.getElementById('teCard');
+    if (card) card.classList.add('te-on');
+    var idle = document.getElementById('teIdle');
+    var act  = document.getElementById('teActivo');
+    var res  = document.getElementById('teResumen');
+    if (idle) idle.style.display = 'none';
+    if (act)  act.style.display  = 'block';
+    if (res)  res.style.display  = 'none';
+ 
+    /* Vibración inicio */
+    if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
+ 
+    /* Tick cada segundo */
+    window._TE.timer = setInterval(function() {
+      var d   = Math.floor((Date.now() - window._TE.inicio) / 1000);
+      window._TE.duracion = d;
+      var min = Math.floor(d / 60);
+      var pct = Math.min(100, (d / (MIN_LIBRE * 60)) * 100);
+ 
+      /* — Display tiempo — */
+      var dp = document.getElementById('teDisplay');
+      if (dp) {
+        dp.textContent = _fmt(d);
+        dp.className   = min >= MIN_LIBRE ? 'te-warn' : 'te-ok';
+      }
+ 
+      /* — Barra de progreso — */
+      var bf = document.getElementById('teBarFill');
+      if (bf) bf.style.width = pct + '%';
+ 
+      /* — Cobro extra — */
+      window._TE.cobro = min >= MIN_LIBRE ? COBRO_EXTRA : 0;
+      var cel  = document.getElementById('teCobroDisplay');
+      var cbox = document.getElementById('teCobroBox');
+      if (cel) {
+        cel.textContent = window._TE.cobro > 0 ? _fmtCOP(COBRO_EXTRA) : '$0';
+        cel.style.color = window._TE.cobro > 0 ? '#ba1a1a' : '#9eaaac';
+      }
+      if (cbox) {
+        var hasExtra = window._TE.cobro > 0;
+        cbox.style.background  = hasExtra ? 'rgba(186,26,26,.05)' : '#f3f4f5';
+        cbox.style.borderColor = hasExtra ? 'rgba(186,26,26,.25)' : 'rgba(245,158,11,.1)';
+      }
+ 
+      /* — Alerta overtime (solo la primera vez) — */
+      if (min >= MIN_LIBRE) {
+        var al = document.getElementById('teAlerta');
+        if (al) al.style.display = 'block';
+        var card2 = document.getElementById('teCard');
+        if (card2) card2.classList.add('te-err');
+        if (!window._TE._alerted) {
+          window._TE._alerted = true;
+          if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 400]);
+        }
+      }
+    }, 1000);
+  };
+ 
+  /* ══ DETENER CRONÓMETRO ══ */
+  window.teDetener = function(esAutoStop) {
+    if (!window._TE.activo) {
+      /* Si se cancela sin estar activo (p.ej. doble click), solo limpiar UI */
+      var idle2 = document.getElementById('teIdle');
+      var act2  = document.getElementById('teActivo');
+      if (idle2) idle2.style.display = 'block';
+      if (act2)  act2.style.display  = 'none';
+      return;
+    }
+ 
+    window._TE.activo   = false;
+    window._TE._alerted = false;
+    clearInterval(window._TE.timer);
+    window._TE.timer = null;
+ 
+    var horaFin = _hora();
+    var min     = Math.floor(window._TE.duracion / 60);
+    var cobro   = window._TE.cobro;
+ 
+    /* Enviar registro al Sheet */
+    _logSheet(horaFin, min, cobro, esAutoStop);
+ 
+    /* — Actualizar UI — */
+    var card = document.getElementById('teCard');
+    var act  = document.getElementById('teActivo');
+    var idle = document.getElementById('teIdle');
+    var res  = document.getElementById('teResumen');
+    var rbox = document.getElementById('teResumenBox');
+ 
+    if (card) card.classList.remove('te-on', 'te-err');
+    if (act)  act.style.display = 'none';
+ 
+    if (esAutoStop) {
+      /* Mostrar resumen */
+      if (rbox && res) {
+        res.style.display = 'block';
+        if (cobro > 0) {
+          rbox.style.cssText =
+            'border-radius:13px;padding:10px 12px;display:flex;align-items:center;gap:9px;'
+            +'background:rgba(186,26,26,.06);border:1.5px solid rgba(186,26,26,.22)';
+          rbox.innerHTML =
+            '<span style="font-size:22px">⏱</span>'
+            +'<div style="flex:1">'
+              +'<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;'
+                +'font-size:12px;color:#ba1a1a;margin:0">Espera de '+min+' min registrada</p>'
+              +'<p style="font-size:10px;color:#9eaaac;margin:2px 0 0">'
+                +'+'+_fmtCOP(cobro)+' incluido en la factura</p>'
+            +'</div>'
+            +'<span style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:900;'
+              +'font-size:16px;color:#ba1a1a">'+_fmtCOP(cobro)+'</span>';
+        } else {
+          rbox.style.cssText =
+            'border-radius:13px;padding:10px 12px;display:flex;align-items:center;gap:9px;'
+            +'background:#f0fdf4;border:1.5px solid #86efac';
+          rbox.innerHTML =
+            '<span style="font-size:22px">✅</span>'
+            +'<div><p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;'
+              +'font-size:12px;color:#166534;margin:0">'+min+' min de espera — sin cobro extra</p>'
+              +'<p style="font-size:10px;color:#6c7a7b;margin:2px 0 0">'
+                +'Dentro del tiempo gratuito (15 min) ✓</p></div>';
+        }
+      }
+    } else {
+      /* Cancelado manualmente → volver a idle, resetear */
+      window._TE.duracion = 0;
+      window._TE.cobro    = 0;
+      if (idle) idle.style.display = 'block';
+    }
+  };
+ 
+  /* ══ ENVIAR REGISTRO A GOOGLE SHEET ══ */
+  function _logSheet(horaFin, min, cobro, esAutoStop) {
+    var p   = window.state && window.state.pedidoActivo;
+    var url = window.SCRIPT_URL_DOMI;
+    if (!p || !url) return;
+ 
+    var payload = {
+      accion:        'tiempo-extra',
+      pedidoId:      String(p.id || '').trim(),
+      cliente:       p.cliente || '',
+      domi:          (window.domi && window.domi.nombre) || '',
+      fecha:         new Date().toLocaleDateString('es-CO', { timeZone: TZ }),
+      horaInicio:    window._TE.horaInicio,
+      horaFin:       horaFin,
+      minutosTotal:  min,
+      minutosExtra:  Math.max(0, min - MIN_LIBRE),
+      cobroExtra:    cobro,
+      autoDetenido:  esAutoStop ? 'Si' : 'No'
+    };
+ 
+    fetch(url, {
+      method:  'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body:    JSON.stringify(payload),
+      signal:  AbortSignal.timeout(18000)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) { console.log('[TE log ok]', d); })
+    .catch(function(e) { console.warn('[TE log err]', e.message); });
+  }
+ 
+  /* ══ CHIP TIEMPO EXTRA EN RESUMEN DE FACTURA ══
+     MutationObserver: detecta cuando se crea #wfl-exito-card
+     y añade la línea "Tiempo extra +$2.000" si aplica.      */
+  function _addTeChip(card) {
+    if (card.querySelector('.te-chip-extra')) return; // ya añadido
+    var cobro = window._TE && window._TE.cobro > 0 ? window._TE.cobro : 0;
+    if (cobro <= 0) return;
+ 
+    var min  = Math.floor((window._TE.duracion || 0) / 60);
+    var chip = document.createElement('div');
+    chip.className = 'te-chip-extra';
+    chip.innerHTML =
+      '<div style="display:flex;align-items:center;gap:8px">'
+        +'<div style="width:30px;height:30px;border-radius:9px;flex-shrink:0;'
+          +'background:linear-gradient(135deg,#ba1a1a,#d93c3c);'
+          +'display:flex;align-items:center;justify-content:center">'
+          +'<span class="material-symbols-outlined" '
+            +'style="font-size:15px;color:#fff;font-variation-settings:\'FILL\' 1">timer</span>'
+        +'</div>'
+        +'<div>'
+          +'<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;'
+            +'font-size:11px;color:#ba1a1a;margin:0">Tiempo extra en comercio</p>'
+          +'<p style="font-size:10px;color:#9eaaac;margin:1px 0 0">'+min+' min de espera</p>'
+        +'</div>'
+      +'</div>'
+      +'<span style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:900;'
+        +'font-size:15px;color:#ba1a1a;flex-shrink:0">+'+_fmtCOP(cobro)+'</span>';
+ 
+    /* Insertar después del bloque de chips (div con gap:6px) */
+    var allDivs = card.querySelectorAll('div');
+    var chipsDiv = null;
+    for (var i = 0; i < allDivs.length; i++) {
+      var st2 = allDivs[i].getAttribute('style') || '';
+      if (st2.indexOf('gap:6px') !== -1 && st2.indexOf('flex') !== -1) {
+        chipsDiv = allDivs[i];
+        break;
+      }
+    }
+    if (chipsDiv) chipsDiv.insertAdjacentElement('afterend', chip);
+    else card.appendChild(chip);
+  }
+ 
+  /* Observer sobre el body para detectar #wfl-exito-card */
+  var _teObs = new MutationObserver(function(muts) {
+    muts.forEach(function(m) {
+      m.addedNodes.forEach(function(node) {
+        if (node.nodeType !== 1) return;
+        var target = node.id === 'wfl-exito-card' ? node
+          : node.querySelector && node.querySelector('#wfl-exito-card');
+        if (!target) return;
+        setTimeout(function() { _addTeChip(target); }, 80);
+      });
+    });
+  });
+  _teObs.observe(document.body, { childList: true, subtree: true });
+ 
+  /* ══ HOOKS ══ */
+ 
+  /* 1 ── marcarEncamino → auto-detener cronómetro */
+  var _origMEC = window.marcarEncamino;
+  window.marcarEncamino = function() {
+    if (window._TE && window._TE.activo) window.teDetener(true);
+    if (typeof _origMEC === 'function') _origMEC.apply(this, arguments);
+  };
+ 
+  /* 2 ── activarPedidoEnRuta → inyectar card + resetear estado */
+  var _origAPER = window.activarPedidoEnRuta;
+  window.activarPedidoEnRuta = function(p) {
+    /* Reset por si había un pedido previo */
+    if (window._TE.timer) { clearInterval(window._TE.timer); window._TE.timer = null; }
+    window._TE.activo   = false;
+    window._TE.duracion = 0;
+    window._TE.cobro    = 0;
+    var viejaTe = document.getElementById('teCard');
+    if (viejaTe) viejaTe.remove();
+ 
+    if (typeof _origAPER === 'function') _origAPER.apply(this, arguments);
+    setTimeout(_inyectar, 650);
+  };
+ 
+  /* 3 ── cancelarPedidoActivo → detener cronómetro */
+  var _origCAP = window.cancelarPedidoActivo;
+  window.cancelarPedidoActivo = function() {
+    if (window._TE && window._TE.activo) window.teDetener(false);
+    if (typeof _origCAP === 'function') _origCAP.apply(this, arguments);
+  };
+ 
+  /* 4 ── marcarEntregado → detener si quedó activo (edge case) */
+  var _origMEN = window.marcarEntregado;
+  window.marcarEntregado = function() {
+    if (window._TE && window._TE.activo) window.teDetener(true);
+    if (typeof _origMEN === 'function') _origMEN.apply(this, arguments);
+  };
+ 
+  /* Si al cargar la página ya hay un pedido activo (restaurado de localStorage) */
+  setTimeout(function() {
+    if (window.state && window.state.pedidoActivo) _inyectar();
+  }, 2800);
+ 
+  console.log(
+    '[WIL Tiempo Espera v1.0] ✅ Listo — Libre: '
+    + MIN_LIBRE + ' min · Cobro extra: $'
+    + COBRO_EXTRA.toLocaleString('es-CO')
+  );
+ 
+})();
+ 
+</script>
+
+
+
+
 </body>
 </html>
