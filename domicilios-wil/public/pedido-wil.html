@@ -6877,12 +6877,796 @@ function _copiarFallback(txt){
 
 })(window);
 
-
-
-
-
-
 </script>
+
+
+<script>
+  /* ═══════════════════════════════════════════════════════════════════════
+   PATCH URGENTE — PAQUETERÍA: BARRIOS CON PRECIO + OOZ CON CALCULO KM
+   Reemplaza las funciones relacionadas con el formulario de envío por zona.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+(function(W) {
+  'use strict';
+
+  /* ── CONSTANTES ─────────────────────────────────────────────────── */
+  var PRECIO_KM      = 1800;
+  var TARIFA_BASE    = 24000;      // Unidades de Madera (base)
+  var KM_FIJO_MIN    = 0.5;        // km mínimo antes de cobrar extra
+  var LIMITE_KM_FIJA = 45;         // km a partir del cual tarifa fija
+  var TARIFA_FIJA    = 50000;      // municipios muy lejanos
+
+  var MUNICIPIOS_FIJOS = [
+    'envigado', 'itagui', 'itagüí', 'sabaneta', 'la estrella', 'estrella',
+    'caldas', 'girardota', 'barbosa', 'heliconia', 'sopetran', 'sopetrán',
+    'san jeronimo', 'san jeronimo', 'ebejico', 'san antonio de prado'
+  ];
+
+  /* Sede WIL (Unidades de Madera, Copacabana) */
+  var SEDE = { lat: 6.3208, lng: -75.5563 };
+
+  /* ── Helper: distancia entre dos coordenadas (km) ───────────────── */
+  function _distKm(lat1, lng1, lat2, lng2) {
+    var R = 6371,
+        dL = (lat2 - lat1) * Math.PI / 180,
+        dO = (lng2 - lng1) * Math.PI / 180,
+        a = Math.sin(dL/2) * Math.sin(dL/2)
+          + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180)
+          * Math.sin(dO/2) * Math.sin(dO/2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  /* ── Calcular tarifa por distancia (desde Sede WIL) ─────────────── */
+  function _calcularTarifaPorKm(lat, lng, direccionTexto) {
+    var txt = (direccionTexto || '').toLowerCase();
+    var esFijo = MUNICIPIOS_FIJOS.some(function(m) {
+      return txt.indexOf(m) !== -1;
+    });
+    if (esFijo) return TARIFA_FIJA;
+
+    var km = _distKm(SEDE.lat, SEDE.lng, lat, lng);
+    var extra = Math.max(0, km - KM_FIJO_MIN);
+    var tarifa = TARIFA_BASE + (extra * PRECIO_KM);
+    /* Redondear a 500 */
+    return Math.round(tarifa / 500) * 500;
+  }
+
+  /* ── Normalizar texto ─────────────────────────────────────────────── */
+  function _norm(s) {
+    return (s || '').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9 ]/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+  }
+
+  /* ── Escapar HTML ────────────────────────────────────────────────── */
+  function _esc(t) {
+    return (t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /* ── Data global de paquete ───────────────────────────────────────── */
+  W._pqSz      = null;
+  W._pqTarifa  = 0;
+  W._pqData    = {};
+  W._pqCache   = {};  // caché de geocodificación para evitar múltiples llamadas
+
+  /* ───────────────────────────────────────────────────────────────────
+     CONSTRUIR FORMULARIO DE PAQUETERÍA CON BARRIOS Y PRECIOS
+     ─────────────────────────────────────────────────────────────────── */
+  function _buildPaqForm() {
+    var v = document.getElementById('view-paquete-form');
+    if (!v || v.dataset.pqPatch === '2') return;
+    v.dataset.pqPatch = '2';
+
+    // Eliminar cards viejas para reemplazar
+    Array.from(v.querySelectorAll('.card')).forEach(function(c) { c.remove(); });
+
+    var actRow = v.querySelector('.act-row');
+
+    var html = `
+<!-- TAMAÑO DEL PAQUETE -->
+<div class="card">
+  <div class="card-tit"><span class="sym f">inventory_2</span>Tamaño del paquete <span style="font-size:11px;font-weight:500;color:var(--on3)">(máx. 15 kg)</span></div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
+    <div class="pq-sz-opt" data-sz="pequeno" data-extra="0" onclick="pqSelTam(this)"
+      style="border:1.5px solid #dce3ea;border-radius:13px;padding:13px 6px;cursor:pointer;text-align:center;background:#f8fafb;transition:.18s">
+      <div style="font-size:30px">📦</div>
+      <div style="font-size:12px;font-weight:800;color:var(--on);margin-top:4px">Pequeño</div>
+      <div style="font-size:10px;color:var(--on3);margin-top:1px">Hasta 5 kg</div>
+    </div>
+    <div class="pq-sz-opt" data-sz="mediano" data-extra="3000" onclick="pqSelTam(this)"
+      style="border:1.5px solid #dce3ea;border-radius:13px;padding:13px 6px;cursor:pointer;text-align:center;background:#f8fafb;transition:.18s">
+      <div style="font-size:30px">🧳</div>
+      <div style="font-size:12px;font-weight:800;color:var(--on);margin-top:4px">Mediano</div>
+      <div style="font-size:10px;color:var(--on3);margin-top:1px">5 – 10 kg</div>
+    </div>
+    <div class="pq-sz-opt" data-sz="grande" data-extra="7000" onclick="pqSelTam(this)"
+      style="border:1.5px solid #dce3ea;border-radius:13px;padding:13px 6px;cursor:pointer;text-align:center;background:#f8fafb;transition:.18s">
+      <div style="font-size:30px">📫</div>
+      <div style="font-size:12px;font-weight:800;color:var(--on);margin-top:4px">Grande</div>
+      <div style="font-size:10px;color:var(--on3);margin-top:1px">10 – 15 kg</div>
+    </div>
+  </div>
+  <div class="field">
+    <label>Descripción del paquete</label>
+    <textarea id="paquete-descripcion" placeholder="Ej: Ropa, documentos, mercancía, regalo…" style="min-height:60px"></textarea>
+  </div>
+</div>
+
+<!-- ORIGEN (RECOGIDA) -->
+<div class="card">
+  <div class="card-tit"><span class="sym f">location_on</span>📍 Origen (recogida)</div>
+  <div class="field">
+    <label>Barrio de recogida *</label>
+    <div style="position:relative">
+      <input type="text" id="pq-barrio-rec-txt" class="pq-barrio-input"
+        placeholder="Escribe el barrio donde está el paquete…"
+        autocomplete="off"
+        oninput="pqSearchBarrio('rec', this.value)"
+        onfocus="pqSearchBarrio('rec', this.value)"
+        onblur="setTimeout(function(){ pqCloseSugs('rec'); }, 200)"/>
+      <input type="hidden" id="pq-barrio-rec" data-precio="0" data-ooz="0" data-lat="" data-lng=""/>
+      <div id="pq-sugs-rec" class="pq-sugs" style="display:none"></div>
+    </div>
+    <div class="field-note" id="pq-rec-note">Selecciona un barrio de la lista. Si no aparece, usa el botón naranja.</div>
+  </div>
+
+  <!-- Panel OOZ (Fuera de cobertura) - Recogida -->
+  <div id="pq-ooz-rec" class="wil-ooz-panel" style="display:none">
+    <div class="wil-ooz-header">
+      <div class="wil-ooz-icon">🟠</div>
+      <div>
+        <div class="wil-ooz-title">Barrio fuera de la zona de cobertura</div>
+        <div class="wil-ooz-sub">Escribe la dirección completa para calcular la tarifa por kilómetro</div>
+      </div>
+    </div>
+    <div class="wil-ooz-addr-wrap">
+      <input type="text" id="pq-ooz-addr-rec" placeholder="Ej: Calle 50 #80-20, Robledo, Medellín"/>
+      <button class="wil-ooz-btn" onclick="pqCalcularOOZ('rec')">
+        <span class="sym">my_location</span> Calcular tarifa
+      </button>
+      <div id="pq-ooz-result-rec" class="wil-ooz-result" style="display:none">
+        <span class="sym" style="font-size:16px">✅</span>
+        <span id="pq-ooz-result-rec-txt"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DESTINO (ENTREGA) -->
+<div class="card">
+  <div class="card-tit"><span class="sym f">location_on</span>📍 Destino (entrega)</div>
+  <div class="field">
+    <label>Barrio de entrega *</label>
+    <div style="position:relative">
+      <input type="text" id="pq-barrio-ent-txt" class="pq-barrio-input"
+        placeholder="Escribe el barrio de destino…"
+        autocomplete="off"
+        oninput="pqSearchBarrio('ent', this.value)"
+        onfocus="pqSearchBarrio('ent', this.value)"
+        onblur="setTimeout(function(){ pqCloseSugs('ent'); }, 200)"/>
+      <input type="hidden" id="pq-barrio-ent" data-precio="0" data-ooz="0" data-lat="" data-lng=""/>
+      <div id="pq-sugs-ent" class="pq-sugs" style="display:none"></div>
+    </div>
+    <div class="field-note" id="pq-ent-note">Selecciona un barrio de la lista. Si no aparece, usa el botón naranja.</div>
+  </div>
+
+  <!-- Panel OOZ (Fuera de cobertura) - Entrega -->
+  <div id="pq-ooz-ent" class="wil-ooz-panel" style="display:none">
+    <div class="wil-ooz-header">
+      <div class="wil-ooz-icon">🟠</div>
+      <div>
+        <div class="wil-ooz-title">Barrio fuera de la zona de cobertura</div>
+        <div class="wil-ooz-sub">Escribe la dirección completa de entrega para calcular la tarifa por kilómetro</div>
+      </div>
+    </div>
+    <div class="wil-ooz-addr-wrap">
+      <input type="text" id="pq-ooz-addr-ent" placeholder="Ej: Calle 10 #43-15, El Poblado, Medellín"/>
+      <button class="wil-ooz-btn" onclick="pqCalcularOOZ('ent')">
+        <span class="sym">my_location</span> Calcular tarifa
+      </button>
+      <div id="pq-ooz-result-ent" class="wil-ooz-result" style="display:none">
+        <span class="sym" style="font-size:16px">✅</span>
+        <span id="pq-ooz-result-ent-txt"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TARIFA CALCULADA PILL -->
+<div class="wil-tarifa-pill hidden" id="pq-tarifa-pill">
+  <span class="sym f" style="font-size:22px;color:#15803d">delivery_dining</span>
+  <div>
+    <div style="font-size:20px;font-weight:900;color:#15803d" id="pq-tarifa-val">$0</div>
+    <div style="font-size:11px;color:#166534;font-weight:600" id="pq-tarifa-sub">Tarifa estimada de envío</div>
+  </div>
+</div>
+
+<!-- DIRECCIÓN DE ENTREGA COMPLETA -->
+<div class="card">
+  <div class="card-tit"><span class="sym f">home</span>Dirección de entrega</div>
+  <div class="field">
+    <label>Dirección completa *</label>
+    <input type="text" id="paquete-direccion" placeholder="Cra 43 #18-20, Barrio El Poblado, Medellín"/>
+    <div class="field-note">Incluye calle, número, barrio y ciudad</div>
+  </div>
+  <div class="field">
+    <label>Punto de referencia</label>
+    <input type="text" id="paquete-referencia" placeholder="Edificio azul, frente al parque, piso 2…"/>
+  </div>
+</div>
+
+<!-- QUIEN RECIBE -->
+<div class="card">
+  <div class="card-tit"><span class="sym f">person_pin</span>Quien recibe</div>
+  <div class="field"><label>Nombre completo *</label><input type="text" id="paquete-nombre" placeholder="Nombre del destinatario"/></div>
+  <div class="field"><label>Teléfono *</label><input type="tel" id="paquete-telefono" placeholder="310 123 4567"/></div>
+</div>
+
+<!-- QUIEN ENVÍA (REMITE) -->
+<div class="card">
+  <div class="card-tit"><span class="sym f">send</span>Quien envía (tú)</div>
+  <div class="field"><label>Tu nombre *</label><input type="text" id="pq-envia-nom" placeholder="Tu nombre completo"/></div>
+  <div class="field"><label>Tu teléfono *</label><input type="tel" id="pq-envia-tel" placeholder="310 987 6543"/></div>
+</div>
+
+<!-- MÉTODO DE PAGO -->
+<div class="card">
+  <div class="card-tit"><span class="sym f">payments</span>¿Cómo pagas?</div>
+  <div class="pago-grid">
+    <div class="pago-c" id="pago-efectivo-p" onclick="selectPagoPaquete('EFECTIVO')">
+      <div class="pago-ico">💵</div><div class="pago-lbl">Efectivo</div>
+      <div class="pago-sub">El domi cobra al entregar</div>
+    </div>
+    <div class="pago-c" id="pago-transferencia-p" onclick="selectPagoPaquete('TRANSFERENCIA')">
+      <div class="pago-ico">🏦</div><div class="pago-lbl">Transferencia</div>
+      <div class="pago-sub">Pagas al confirmar entrega</div>
+    </div>
+  </div>
+</div>
+`;
+
+    var temp = document.createElement('div');
+    temp.innerHTML = html;
+    while (temp.firstChild) v.insertBefore(temp.firstChild, actRow);
+
+    // Inyectar CSS adicional si no existe
+    if (!document.getElementById('pq-styles')) {
+      var s = document.createElement('style');
+      s.id = 'pq-styles';
+      s.textContent = `
+        .pq-sugs {
+          position: absolute;
+          left: 0; right: 0; top: 100%;
+          z-index: 999;
+          background: #fff;
+          border: 1.5px solid var(--plb);
+          border-radius: var(--r-lg);
+          box-shadow: var(--sh2);
+          max-height: 220px;
+          overflow-y: auto;
+          margin-top: 4px;
+        }
+        .pq-sug-item {
+          padding: 10px 14px;
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--on);
+          cursor: pointer;
+          border-bottom: 1px solid #f0f3f6;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          transition: background .12s;
+        }
+        .pq-sug-item:last-child { border-bottom: none; }
+        .pq-sug-item:active { background: var(--pl); }
+        .pq-sug-match { color: var(--p); font-weight: 800; }
+        .pq-sug-precio {
+          font-size: 11px;
+          font-weight: 700;
+          color: #15803d;
+          background: #f0fdf4;
+          border: 1px solid #86efac;
+          border-radius: 6px;
+          padding: 2px 7px;
+          flex-shrink: 0;
+        }
+        .pq-sug-ooz {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 12px 14px;
+          cursor: pointer;
+          background: #fff7ed;
+          border-top: 1.5px solid #fed7aa;
+          font-size: 12.5px;
+          color: #c2410c;
+          font-weight: 600;
+          transition: background .15s;
+        }
+        .pq-sug-ooz:hover { background: #ffedd5; }
+        .wil-ooz-panel {
+          margin-top: 8px;
+          border: 2px solid #f97316;
+          border-radius: 14px;
+          background: #fff7ed;
+          padding: 14px;
+          animation: oozIn .22s ease;
+        }
+        @keyframes oozIn {
+          from { opacity: 0; transform: translateY(-6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .wil-ooz-header {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 10px;
+        }
+        .wil-ooz-icon { font-size: 22px; flex-shrink: 0; }
+        .wil-ooz-title {
+          font-size: 13px;
+          font-weight: 800;
+          color: #c2410c;
+          line-height: 1.3;
+        }
+        .wil-ooz-sub {
+          font-size: 11px;
+          color: #ea580c;
+          margin-top: 1px;
+          font-weight: 500;
+        }
+        .wil-ooz-addr-wrap {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .wil-ooz-addr-wrap input {
+          border: 1.5px solid #fdba74;
+          border-radius: 10px;
+          padding: 10px 12px;
+          font-size: 13px;
+          background: #fff;
+          width: 100%;
+          box-sizing: border-box;
+          font-family: inherit;
+          outline: none;
+        }
+        .wil-ooz-addr-wrap input:focus { border-color: #f97316; }
+        .wil-ooz-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          width: 100%;
+          padding: 11px;
+          border-radius: 10px;
+          border: none;
+          background: #f97316;
+          color: #fff;
+          font-size: 13px;
+          font-weight: 800;
+          cursor: pointer;
+          transition: background .18s;
+        }
+        .wil-ooz-btn:active { transform: scale(.98); background: #ea580c; }
+        .wil-ooz-btn:disabled { opacity: .6; cursor: default; }
+        .wil-ooz-result {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 8px;
+          padding: 9px 12px;
+          border-radius: 10px;
+          background: #f0fdf4;
+          border: 1.5px solid #86efac;
+          color: #15803d;
+          font-size: 12px;
+          font-weight: 700;
+        }
+      `;
+      document.head.appendChild(s);
+    }
+  }
+
+  /* Ejecutar construcción del formulario */
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _buildPaqForm);
+  } else {
+    setTimeout(_buildPaqForm, 0);
+  }
+
+  /* ── SELECCIÓN DE TAMAÑO ─────────────────────────────────────────── */
+  W.pqSelTam = function(el) {
+    document.querySelectorAll('.pq-sz-opt').forEach(function(t) {
+      t.style.borderColor = '#dce3ea';
+      t.style.background = '#f8fafb';
+    });
+    el.style.borderColor = 'var(--p)';
+    el.style.background = 'var(--pl)';
+    W._pqSz = {
+      sz: el.dataset.sz,
+      extra: parseInt(el.dataset.extra) || 0
+    };
+    _pqCalcularTarifaFinal();
+  };
+
+  /* ── BÚSQUEDA DE BARRIOS (CON PRECIO) ───────────────────────────── */
+  W.pqSearchBarrio = function(campo, query) {
+    var txt = (query || '').trim();
+    var sugEl = document.getElementById('pq-sugs-' + campo);
+    var hidEl = document.getElementById('pq-barrio-' + campo);
+    var oozEl = document.getElementById('pq-ooz-' + campo);
+    var txtEl = document.getElementById('pq-barrio-' + campo + '-txt');
+
+    // Resetear selección previa
+    if (hidEl) {
+      hidEl.value = '';
+      hidEl.dataset.precio = '0';
+      hidEl.dataset.ooz = '0';
+    }
+
+    if (!txt) {
+      if (sugEl) sugEl.style.display = 'none';
+      if (oozEl) oozEl.style.display = 'none';
+      _pqCalcularTarifaFinal();
+      return;
+    }
+
+    if (txt.length < 2) {
+      if (sugEl) sugEl.style.display = 'none';
+      return;
+    }
+
+    var q = _norm(txt);
+    var B = (typeof WIL_BARRIOS !== 'undefined') ? WIL_BARRIOS : [];
+
+    // Filtrar barrios
+    var exactas = B.filter(function(b) { return _norm(b[0]) === q; });
+    var parciales = B.filter(function(b) {
+      var n = _norm(b[0]);
+      if (n === q) return false;
+      return n.indexOf(q) !== -1 || q.split(' ').every(function(w) { return n.indexOf(w) !== -1; });
+    });
+    var resultados = exactas.concat(parciales).slice(0, 8);
+
+    function resaltar(nombre, q) {
+      var idx = _norm(nombre).indexOf(q);
+      if (idx < 0) return _esc(nombre);
+      return _esc(nombre.slice(0, idx))
+        + '<span class="pq-sug-match">' + _esc(nombre.slice(idx, idx + q.length)) + '</span>'
+        + _esc(nombre.slice(idx + q.length));
+    }
+
+    var itemsHtml = resultados.map(function(b) {
+      return '<div class="pq-sug-item" onmousedown="pqSeleccionarBarrio(\'' + campo + '\', \'' +
+        b[0].replace(/'/g, "\\'") + '\', ' + b[1] + ')">' +
+        '<span>' + resaltar(b[0], q) + '</span>' +
+        '<span class="pq-sug-precio">$' + b[1].toLocaleString('es-CO') + '</span>' +
+        '</div>';
+    }).join('');
+
+    // Opción OOZ (Fuera de cobertura)
+    var oozHtml = '<div class="pq-sug-ooz" onmousedown="pqActivarOOZ(\'' + campo + '\')">' +
+      '<span style="font-size:18px">🟠</span>' +
+      '<span>' + (resultados.length ? '¿No aparece? Usar cálculo por distancia' : 'Barrio no encontrado — calcular por distancia') + '</span>' +
+      '</div>';
+
+    sugEl.innerHTML = itemsHtml + oozHtml;
+    sugEl.style.display = 'block';
+  };
+
+  /* ── SELECCIONAR BARRIO DE LA LISTA ─────────────────────────────── */
+  W.pqSeleccionarBarrio = function(campo, nombre, precio) {
+    var txtEl = document.getElementById('pq-barrio-' + campo + '-txt');
+    var hidEl = document.getElementById('pq-barrio-' + campo);
+    var sugEl = document.getElementById('pq-sugs-' + campo);
+    var oozEl = document.getElementById('pq-ooz-' + campo);
+    var noteEl = document.getElementById('pq-' + campo + '-note');
+
+    if (txtEl) txtEl.value = nombre;
+    if (hidEl) {
+      hidEl.value = nombre;
+      hidEl.dataset.precio = precio;
+      hidEl.dataset.ooz = '0';
+      hidEl.dataset.lat = '';
+      hidEl.dataset.lng = '';
+    }
+    if (sugEl) sugEl.style.display = 'none';
+    if (oozEl) oozEl.style.display = 'none';
+    if (noteEl) noteEl.innerHTML = '✓ Barrio seleccionado: <strong>' + _esc(nombre) + '</strong> · Tarifa base $' + precio.toLocaleString('es-CO');
+
+    _pqCalcularTarifaFinal();
+  };
+
+  /* ── ACTIVAR MODO OOZ (Fuera de cobertura) ───────────────────────── */
+  W.pqActivarOOZ = function(campo) {
+    var sugEl = document.getElementById('pq-sugs-' + campo);
+    var oozEl = document.getElementById('pq-ooz-' + campo);
+    var hidEl = document.getElementById('pq-barrio-' + campo);
+    var txtEl = document.getElementById('pq-barrio-' + campo + '-txt');
+    var oozAddr = document.getElementById('pq-ooz-addr-' + campo);
+    var noteEl = document.getElementById('pq-' + campo + '-note');
+
+    if (sugEl) sugEl.style.display = 'none';
+    if (oozEl) oozEl.style.display = 'block';
+    if (hidEl) {
+      hidEl.value = '__OOZ_PENDING__';
+      hidEl.dataset.precio = '0';
+      hidEl.dataset.ooz = '1';
+    }
+    if (noteEl) {
+      noteEl.innerHTML = '🔸 <strong>Fuera de cobertura</strong> — Usa el botón naranja para calcular la tarifa por distancia';
+      noteEl.style.color = '#c2410c';
+    }
+
+    // Pre-llenar dirección con lo que escribió el usuario
+    if (oozAddr && txtEl && !oozAddr.value.trim()) {
+      oozAddr.value = txtEl.value.trim();
+    }
+
+    // Limpiar resultado previo
+    var resultEl = document.getElementById('pq-ooz-result-' + campo);
+    if (resultEl) resultEl.style.display = 'none';
+
+    _pqCalcularTarifaFinal();
+  };
+
+  W.pqCloseSugs = function(campo) {
+    var el = document.getElementById('pq-sugs-' + campo);
+    if (el) setTimeout(function() { el.style.display = 'none'; }, 150);
+  };
+
+  /* ── CALCULAR TARIFA OOZ (Geocodificación + cálculo por km) ───────── */
+  W.pqCalcularOOZ = function(campo) {
+    var addrEl = document.getElementById('pq-ooz-addr-' + campo);
+    var addr = addrEl ? addrEl.value.trim() : '';
+    var btn = document.getElementById('pq-ooz-btn-' + campo);
+    var resultEl = document.getElementById('pq-ooz-result-' + campo);
+    var resultTxt = document.getElementById('pq-ooz-result-' + campo + '-txt');
+    var hidEl = document.getElementById('pq-barrio-' + campo);
+    var noteEl = document.getElementById('pq-' + campo + '-note');
+    var T = (typeof mostrarToast === 'function') ? mostrarToast : function() {};
+
+    if (!addr) {
+      T('Escribe la dirección completa para calcular la tarifa.', 'location_on');
+      if (addrEl) addrEl.focus();
+      return;
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spin" style="width:14px;height:14px;border-width:2px"></span> Calculando…';
+    }
+    if (resultEl) resultEl.style.display = 'none';
+
+    // Verificar caché
+    var cacheKey = campo + '_' + addr.toLowerCase();
+    if (W._pqCache && W._pqCache[cacheKey]) {
+      _aplicarResultadoOOZ(campo, W._pqCache[cacheKey], btn, resultEl, resultTxt, hidEl, noteEl, T);
+      return;
+    }
+
+    // Consultar Nominatim
+    var queries = [
+      addr + ', Copacabana, Antioquia, Colombia',
+      addr + ', Bello, Antioquia, Colombia',
+      addr + ', Medellín, Antioquia, Colombia',
+      addr + ', Antioquia, Colombia',
+      addr + ', Colombia'
+    ];
+
+    function _tryGeo(idx) {
+      if (idx >= queries.length) {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<span class="sym">my_location</span> Reintentar'; }
+        T('No se pudo ubicar esa dirección. Verifica e intenta de nuevo.', 'location_off');
+        if (resultTxt) resultTxt.innerHTML = 'No se pudo calcular — el domi confirmará la tarifa';
+        if (resultEl) resultEl.style.display = 'flex';
+        return;
+      }
+
+      fetch(
+        'https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(queries[idx]) +
+        '&format=json&limit=1&accept-language=es',
+        { headers: { 'User-Agent': 'DomiciliosWIL/1.0' } }
+      )
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data || !data.length) {
+            _tryGeo(idx + 1);
+            return;
+          }
+
+          var lat = parseFloat(data[0].lat);
+          var lng = parseFloat(data[0].lon);
+          var tarifa = _calcularTarifaPorKm(lat, lng, addr);
+          var esFijo = MUNICIPIOS_FIJOS.some(function(m) { return addr.toLowerCase().indexOf(m) !== -1; });
+
+          var resultado = { lat: lat, lng: lng, tarifa: tarifa, esFijo: esFijo, direccion: addr };
+          W._pqCache = W._pqCache || {};
+          W._pqCache[cacheKey] = resultado;
+          _aplicarResultadoOOZ(campo, resultado, btn, resultEl, resultTxt, hidEl, noteEl, T);
+        })
+        .catch(function() { _tryGeo(idx + 1); });
+    }
+
+    _tryGeo(0);
+  };
+
+  function _aplicarResultadoOOZ(campo, res, btn, resultEl, resultTxt, hidEl, noteEl, T) {
+    var tarifa = res.tarifa;
+    var km = _distKm(SEDE.lat, SEDE.lng, res.lat, res.lng);
+
+    if (hidEl) {
+      hidEl.value = res.direccion || 'OOZ';
+      hidEl.dataset.precio = tarifa;
+      hidEl.dataset.ooz = '1';
+      hidEl.dataset.lat = res.lat;
+      hidEl.dataset.lng = res.lng;
+    }
+
+    var tarifaStr = '$' + tarifa.toLocaleString('es-CO');
+    var kmStr = km.toFixed(1);
+    var mensaje = res.esFijo
+      ? tarifaStr + ' · Municipio lejano'
+      : tarifaStr + ' · ' + kmStr + ' km desde Copacabana';
+
+    if (resultTxt) resultTxt.innerHTML = '<b>' + tarifaStr + '</b><span style="font-weight:400"> · ' + kmStr + ' km desde Copacabana</span>';
+    if (resultEl) resultEl.style.display = 'flex';
+    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="sym">my_location</span> Recalcular'; }
+    if (noteEl) {
+      noteEl.innerHTML = '🔸 <strong>Tarifa por distancia:</strong> ' + tarifaStr + ' (' + kmStr + ' km)';
+      noteEl.style.color = '#15803d';
+    }
+
+    T('✅ Tarifa calculada: ' + tarifaStr, 'check_circle');
+    _pqCalcularTarifaFinal();
+  }
+
+  /* ── CALCULAR TARIFA FINAL (máximo entre recogida y entrega + tamaño) ── */
+  function _pqCalcularTarifaFinal() {
+    var hR = document.getElementById('pq-barrio-rec');
+    var hE = document.getElementById('pq-barrio-ent');
+    var pill = document.getElementById('pq-tarifa-pill');
+    var valEl = document.getElementById('pq-tarifa-val');
+    var subEl = document.getElementById('pq-tarifa-sub');
+
+    if (!hR || !hE) return;
+
+    var precioR = parseInt(hR.dataset.precio || 0);
+    var precioE = parseInt(hE.dataset.precio || 0);
+    var extra = (W._pqSz && W._pqSz.extra) ? W._pqSz.extra : 0;
+
+    // Necesitamos al menos un barrio con precio
+    if (precioR === 0 && precioE === 0) {
+      if (pill) pill.classList.add('hidden');
+      return;
+    }
+
+    // La tarifa base es el máximo entre recogida y entrega
+    var base = Math.max(precioR, precioE);
+    var total = base + extra;
+    W._pqTarifa = total;
+
+    // Determinar si está fuera de cobertura
+    var esOoz = (hR.dataset.ooz === '1' || hE.dataset.ooz === '1');
+    var notas = [];
+
+    if (precioR > 0) notas.push('Recogida: $' + precioR.toLocaleString('es-CO'));
+    if (precioE > 0) notas.push('Entrega: $' + precioE.toLocaleString('es-CO'));
+    if (esOoz) notas.push('Tarifa por distancia');
+    if (extra > 0) notas.push('+' + extra.toLocaleString('es-CO') + ' por tamaño');
+
+    var notaTexto = notas.join(' · ');
+
+    if (valEl) valEl.textContent = '$' + total.toLocaleString('es-CO');
+    if (subEl) subEl.textContent = notaTexto || 'Tarifa estimada de envío';
+    if (pill) pill.classList.remove('hidden');
+
+    // Mostrar mensaje especial si es OOZ
+    if (esOoz && subEl) {
+      subEl.innerHTML = '🚚 ' + notaTexto + ' · <span style="color:#ea580c">El domi confirma la tarifa exacta</span>';
+    }
+  }
+
+  /* ── SOBREESCRIBIR generarFacturaPaquete ─────────────────────────── */
+  var _origGenFactura = W.generarFacturaPaquete;
+  W.generarFacturaPaquete = function() {
+    var g = function(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; };
+
+    var dir   = g('paquete-direccion');
+    var ref   = g('paquete-referencia');
+    var nom   = g('paquete-nombre');
+    var tel   = g('paquete-telefono');
+    var eNom  = g('pq-envia-nom');
+    var eTel  = g('pq-envia-tel');
+    var desc  = g('paquete-descripcion');
+
+    var hR = document.getElementById('pq-barrio-rec');
+    var hE = document.getElementById('pq-barrio-ent');
+
+    function _obtenerBarrioTexto(hid, campo) {
+      if (!hid) return '';
+      if (hid.value && hid.value !== '__OOZ_PENDING__') return hid.value;
+      var oozAddr = g('pq-ooz-addr-' + campo);
+      if (oozAddr) return oozAddr;
+      return g('pq-barrio-' + campo + '-txt');
+    }
+
+    var barR = _obtenerBarrioTexto(hR, 'rec');
+    var barE = _obtenerBarrioTexto(hE, 'ent');
+
+    var T = typeof mostrarToast === 'function' ? mostrarToast : function(){};
+
+    if (!W._pqSz) { T('Selecciona el tamaño del paquete.', 'inventory_2'); return; }
+    if (!barR)    { T('Escribe el barrio o dirección de recogida.', 'location_on'); return; }
+    if (!barE)    { T('Escribe el barrio o dirección de entrega.', 'location_on'); return; }
+    if (!dir || !nom || !tel) { T('Completa dirección, nombre y teléfono del destinatario.', 'warning'); return; }
+    if (!eNom || !eTel)       { T('Completa tus datos como remitente.', 'person'); return; }
+    if (!W.state.metodoPagoPaquete) { T('Selecciona método de pago.', 'payments'); return; }
+
+    var tarifa = W._pqTarifa || 0;
+    var tarifaPorConfirmar = tarifa === 0;
+
+    var SZ_NAMES = { pequeno: 'Pequeño (hasta 5 kg)', mediano: 'Mediano (5-10 kg)', grande: 'Grande (10-15 kg)' };
+    var szNom = SZ_NAMES[W._pqSz.sz] || W._pqSz.sz;
+    var oozRec = (hR && hR.dataset.ooz === '1');
+    var oozEnt = (hE && hE.dataset.ooz === '1');
+    var oozMsg = (oozRec || oozEnt) ? ' · Tarifa por distancia (confirmar domi)' : '';
+
+    W._pqData = {
+      dir, ref, nom, tel, eNom, eTel, barR, barE, desc, szNom,
+      szExtra: W._pqSz.extra, tarifa: tarifa,
+      tarifaPorConfirmar: tarifaPorConfirmar,
+      pago: W.state.metodoPagoPaquete,
+      oozRec: oozRec, oozEnt: oozEnt
+    };
+
+    W.state.nombre          = nom;
+    W.state.telefono        = tel;
+    W.state.direccion       = dir;
+    W.state.referencia      = ref;
+    W.state.metodoPago      = W.state.metodoPagoPaquete;
+    W.state.precioDomicilio = tarifa;
+    W.state.barrio          = barE;
+    W.state.paqueteZonaNombre = barE;
+
+    var set = function(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
+    set('fp-zona',   '📦 Recogida: ' + barR + ' → Entrega: ' + barE + oozMsg);
+    set('fp-desc',   szNom + (desc ? ' · ' + desc : ''));
+    set('fp-dir',    dir);
+    set('fp-ref',    ref || '—');
+    set('fp-nombre', nom + ' · ' + tel);
+    set('fp-tel',    '👤 Remite: ' + eNom + ' · ' + eTel);
+    set('fp-pago',   W.state.metodoPagoPaquete === 'EFECTIVO' ? '💵 Efectivo' : '🏦 Transferencia');
+
+    var fac = document.querySelector('#view-factura-paquete .factura');
+    var old = document.getElementById('fp-tarifa-row');
+    if (old) old.remove();
+
+    if (fac) {
+      var tr = document.createElement('div');
+      tr.id = 'fp-tarifa-row';
+      tr.className = 'fac-row';
+      var tarifaDisplay = tarifaPorConfirmar
+        ? '<span style="font-size:12px;color:#ea580c;font-weight:700">🚚 El domi confirmará la tarifa exacta</span>'
+        : '<span style="font-weight:900;color:var(--p);font-size:15px">$' + tarifa.toLocaleString('es-CO') + '</span>';
+      tr.innerHTML = '<div class="fac-lbl">🛵 Tarifa envío</div><div class="fac-val">' + tarifaDisplay + '</div>';
+      var nota = fac.querySelector('.fac-nota');
+      if (nota) fac.insertBefore(tr, nota);
+      else fac.appendChild(tr);
+    }
+
+    if (typeof showView === 'function') showView('view-factura-paquete');
+  };
+
+  console.log('[WIL] ✅ Paquetería parchada: barrios con precio + OOZ con cálculo por km');
+
+})(window);
+</script>
+
 
 </body>
 </html>
