@@ -7167,9 +7167,9 @@ document.addEventListener('change', function(e) {
      Solo cuando esAutoStop=true. Registra siempre (con o sin cobro).  */
   function _logSheet(horaFin, min, cobro) {
   var p   = window.state && window.state.pedidoActivo;
-  var url = window.SCRIPT_URL_DOMI;
+  var url = SCRIPT_URL_DOMI;   // ← QUITA el window. — const no vive en window
   if (!p || !url) {
-    console.warn('[TE] _logSheet: falta pedidoActivo o SCRIPT_URL_DOMI', { p: !!p, url: !!url });
+    console.warn('[TE] _logSheet: falta pedidoActivo o URL');
     return;
   }
 
@@ -7185,15 +7185,8 @@ document.addEventListener('change', function(e) {
     minutosTotal: min,
     minutosExtra: Math.max(0, min - MIN_LIBRE),
     cobroExtra:   cobro,
-    superoLimite: cobro > 0 ? 'Si' : 'No',
-    fotoComprobante: fotoBase64 || ''
+    superoLimite: cobro > 0 ? 'Si' : 'No'
   };
-
-  /* ── LOG NAVEGADOR ── */
-  console.group('[TE] Enviando a Sheet');
-  console.log('URL:', url);
-  console.log('Payload:', JSON.stringify(payload, null, 2));
-  console.groupEnd();
 
   fetch(url, {
     method:  'POST',
@@ -7201,34 +7194,21 @@ document.addEventListener('change', function(e) {
     body:    JSON.stringify(payload),
     signal:  AbortSignal.timeout(18000)
   })
-  .then(function(r) {
-    console.log('[TE] HTTP status:', r.status);
-    return r.json();
-  })
+  .then(function(r) { return r.json(); })
   .then(function(res) {
-    console.group('[TE] Respuesta Sheet');
-    console.log(JSON.stringify(res, null, 2));
-    console.groupEnd();
-
+    console.log('[TE] Sheet OK →', res);
     if (res.ok && res.cobro > 0 && window.state && window.state.pedidoActivo) {
       window.state.pedidoActivo.domicilio = String(res.domiNuevo);
       window.state.pedidoActivo.total     = String(res.totalNuevo);
-
       var elTotal = document.getElementById('tabTotal');
       var elDomi  = document.getElementById('tabCostoDomi');
-      var elFinal = document.getElementById('tabTotalProd');
       if (elTotal) elTotal.textContent = _fmtCOP(res.totalNuevo);
       if (elDomi)  elDomi.textContent  = _fmtCOP(res.domiNuevo);
-      if (elFinal) elFinal.textContent = _fmtCOP(res.totalNuevo);
-
       _toastTE('⏱ +' + _fmtCOP(res.cobro) + ' sumado al domicilio');
     }
   })
-  .catch(function(e) {
-    console.error('[TE] Error fetch:', e.message);
-  });
+  .catch(function(e) { console.error('[TE]', e.message); });
 }
-
   /* ══ TOAST ══ */
   function _toastTE(msg) {
     if (!document.getElementById('_teFadeKF')) {
@@ -7404,33 +7384,40 @@ let panelVisible = false;
     reader.readAsDataURL(file);
   });
 }
-
+// ══ REEMPLAZA enviar() ══
 async function enviar() {
+  if (!state || !state.pedidoActivo) {
+    alert('No hay pedido activo. Recarga la página.');
+    return;
+  }
+
   const btn       = document.getElementById('btnEnviar');
   const fileInput = document.getElementById('fileInput');
-  const file      = fileInput.files[0];
+  const file      = fileInput && fileInput.files[0];
   if (!file) return;
 
   btn.disabled    = true;
-  btn.textContent = 'Enviando...';
+  btn.textContent = '⏳ Subiendo imagen…';
 
   try {
     const base64 = await fileToBase64(file);
 
-    const res = await fetch(SCRIPT_URL, {
-      method: 'POST',
+    btn.textContent = '📡 Enviando…';
+
+    const res = await fetch(SCRIPT_URL_DOMI, {   // ← directo, no window.
+      method:  'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({
         accion:   'comprobante-tardanza',
-        pedidoId: pedidoActivo.id,
+        pedidoId: String(state.pedidoActivo.id).trim(),
         imagen:   base64
-      })
+      }),
+      signal: AbortSignal.timeout(35000)          // ← 35s para Drive
     });
 
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || 'Error servidor');
 
-    // ── igual que antes ──
     yaEnviado = true;
     document.getElementById('btnPrincipal').style.display = 'none';
     document.getElementById('chipEnviado').style.display  = 'flex';
@@ -7442,10 +7429,10 @@ async function enviar() {
     btn.textContent = '✓ Enviado';
 
   } catch (err) {
-    console.error('Error al enviar:', err);
+    console.error('[enviar comprobante]', err);
     btn.disabled    = false;
     btn.textContent = '✉️ Enviar comprobante';
-    alert('No se pudo enviar. Intenta de nuevo.');
+    alert('Error: ' + (err.message || 'Sin conexión. Intenta de nuevo.'));
   }
 }
  
