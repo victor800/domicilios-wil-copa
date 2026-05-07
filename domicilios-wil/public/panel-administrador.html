@@ -2017,7 +2017,7 @@ const SECCION_COLORS = {
 /* ═══════════════════════════════════════════════
    CONSTANTES
 ═══════════════════════════════════════════════ */
-const SHEET_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyJwNf3OZk5el-kIsnw42GtMa7AoT6p3Wd0i6IMF1VSfyNNuTzzxUwKCUcuw9xnikm3Wg/exec';
+const SHEET_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwVNZPXHEcGqNc9KAY3QZk2p3yv1W3W8vTNoLpMUrXADbEbwISnJ9TGpLX1K2UR_DGGug/exec';
 const SHEET_ID         = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
 const APP_LINK         = 'https://domicilios-wil.vercel.app/index.html';
 const OFERTAS_KEY      = 'wil_ofertas_v3';
@@ -8286,7 +8286,7 @@ body.apro-fs #pg-actividad{position:fixed!important;inset:0!important;height:100
 ═══════════════════════════════════════════════ */
 (function patchContableV2() {
 
-  const GAS = 'https://script.google.com/macros/s/AKfycbzWMOlAwaKem-SRFOkheerjvD84hpdKwy8Ry2WWGXHOmJ3NLnEbJR9XgSQqmMoDvy3lTg/exec';
+  const GAS = 'https://script.google.com/macros/s/AKfycbwVNZPXHEcGqNc9KAY3QZk2p3yv1W3W8vTNoLpMUrXADbEbwISnJ9TGpLX1K2UR_DGGug/exec';
 
   /* ── 1. CSS crítico para móvil ── */
   const s = document.createElement('style');
@@ -8619,7 +8619,7 @@ body.apro-fs #pg-actividad{position:fixed!important;inset:0!important;height:100
 
   const GAS = typeof SHEET_SCRIPT_URL !== 'undefined'
     ? SHEET_SCRIPT_URL
-    : 'https://script.google.com/macros/s/AKfycbzWMOlAwaKem-SRFOkheerjvD84hpdKwy8Ry2WWGXHOmJ3NLnEbJR9XgSQqmMoDvy3lTg/exec';
+    : 'https://script.google.com/macros/s/AKfycbwVNZPXHEcGqNc9KAY3QZk2p3yv1W3W8vTNoLpMUrXADbEbwISnJ9TGpLX1K2UR_DGGug/exec';
 
   function whenReady(fn) {
     if (document.getElementById('modal-multa-overlay') &&
@@ -9514,12 +9514,23 @@ function _estaDisponible() {
   const ahora    = new Date();
   const hoy      = ahora.toISOString().slice(0, 10);
   const minAhora = ahora.getHours() * 60 + ahora.getMinutes();
+
+  // 1. Chequear días especiales puntuales (lógica existente, no cambia)
   if (_horarios && _horarios.some(h => (h.fecha || h.fechaIni) === hoy))
     return { disponible: false, razon: 'dia-especial' };
-  const [hIni, mIni] = HORARIO_BASE.horaIni.split(':').map(Number);
-  const [hFin, mFin] = HORARIO_BASE.horaFin.split(':').map(Number);
-  if (minAhora < hIni * 60 + mIni || minAhora >= hFin * 60 + mFin)
-    return { disponible: false, razon: 'fuera-horario' };
+
+  // 2. Chequear ventana de cierre global (cruza medianoche)
+  const pMin = t => { const [h, m] = (t||'').split(':').map(Number); return h * 60 + m; };
+  const cIni = pMin(CIERRE_GLOBAL.horaIni); // ej. 23:30 → 1410
+  const cFin = pMin(CIERRE_GLOBAL.horaFin); // ej. 08:00 → 480
+
+  const enCierre = cIni > cFin
+    ? (minAhora >= cIni || minAhora < cFin)  // cruza medianoche ← tu caso
+    : (minAhora >= cIni && minAhora < cFin); // mismo día
+
+  if (enCierre)
+    return { disponible: false, razon: 'cierre-global' };
+
   return { disponible: true, razon: '' };
 }
 
@@ -10336,6 +10347,407 @@ function _renderOverviewActivos() {
 if (window.allPedidos && allPedidos.length > 0) _renderOverviewActivos();
 console.log('[PARCHE HORARIO v3] ✅ Modal 5 campos (Fecha Inicio|Hora Inicio|Fecha Fin|Hora Fin|MOTIVO)');
 })();
+
+/* ════════════════════════════════════════════════════════════════
+   PARCHE 2: Cierre Global desde hoja "Cierre"
+   Encabezados: HoraInicio | HoraFin  (solo 1 fila de datos)
+════════════════════════════════════════════════════════════════ */
+(function () {
+'use strict';
+
+window.CIERRE_GLOBAL = {
+
+  horaIni: '23:30',
+  horaFin: '08:00'
+};
+
+/* ── Leer hoja Cierre y poblar CIERRE_GLOBAL ── */
+window.fetchCierreGlobal = async function () {
+  try {
+    const text  = await fetchSheetCSV('Cierre', 500);
+    const lines = parseCSVText(text);
+    const fila  = lines[1] || lines[0];
+    if (!fila) return;
+    const hIni = (fila[0] || '').trim();
+    const hFin = (fila[1] || '').trim();
+    if (hIni) CIERRE_GLOBAL.horaIni = hIni;
+    if (hFin) CIERRE_GLOBAL.horaFin = hFin;
+    /* Poblar inputs si el modal ya está en el DOM */
+    const elIni = document.getElementById('cierre-ini');
+    const elFin = document.getElementById('cierre-fin');
+    if (elIni) elIni.value = CIERRE_GLOBAL.horaIni;
+    if (elFin) elFin.value = CIERRE_GLOBAL.horaFin;
+    _actualizarBadgeCierreCard();
+  } catch (e) {
+    console.warn('[fetchCierreGlobal]:', e.message);
+  }
+};
+
+/* ── Badge del CARD (siempre visible) ── */
+function _actualizarBadgeCierreCard() {
+  const badge = document.getElementById('cierre-badge');
+  const label = document.getElementById('cierre-label');
+  const ini   = CIERRE_GLOBAL.horaIni;
+  const fin   = CIERRE_GLOBAL.horaFin;
+  const pMin  = t => { const [h,m] = (t||'00:00').split(':').map(Number); return h*60+m; };
+  const now   = new Date().getHours()*60 + new Date().getMinutes();
+  const cIni  = pMin(ini);
+  const cFin  = pMin(fin);
+  const cerrado = cIni > cFin
+    ? (now >= cIni || now < cFin)
+    : (now >= cIni && now < cFin);
+  if (badge) {
+    badge.textContent      = cerrado ? '🚫 Cerrado ahora' : '✓ Abierto ahora';
+    badge.style.background = cerrado ? 'var(--red)' : 'var(--green)';
+  }
+  if (label) label.textContent = `Cierre diario: ${ini} → ${fin}`;
+}
+
+/* ── Badge + preview DENTRO del modal ── */
+window._actualizarBadgeCierreModal = function () {
+  const ini = document.getElementById('cierre-ini')?.value || '';
+  const fin  = document.getElementById('cierre-fin')?.value || '';
+  if (!ini || !fin) return;
+  const pMin    = t => { const [h,m] = t.split(':').map(Number); return h*60+m; };
+  const now     = new Date().getHours()*60 + new Date().getMinutes();
+  const cIni    = pMin(ini);
+  const cFin    = pMin(fin);
+  const cerrado = cIni > cFin
+    ? (now >= cIni || now < cFin)
+    : (now >= cIni && now < cFin);
+  const mb = document.getElementById('cierre-modal-badge');
+  const pt = document.getElementById('cierre-preview-txt');
+  const pv = document.getElementById('cierre-modal-preview');
+  if (mb) {
+    mb.textContent      = cerrado ? '🚫 Cerrado ahora' : '✓ Abierto ahora';
+    mb.style.background = cerrado ? 'var(--red)' : 'var(--green)';
+  }
+  if (pt) pt.textContent = `Sin servicio: ${ini} → ${fin} (todos los días)`;
+  if (pv) pv.style.display = 'flex';
+};
+
+/* ── Abrir modal ── */
+window.abrirModalCierreGlobal = function () {
+  const modal = document.getElementById('modal-cierre-global');
+  if (!modal) return;
+  const elIni = document.getElementById('cierre-ini');
+  const elFin = document.getElementById('cierre-fin');
+  if (elIni) elIni.value = CIERRE_GLOBAL.horaIni;
+  if (elFin) elFin.value = CIERRE_GLOBAL.horaFin;
+  window._actualizarBadgeCierreModal();
+  modal.style.display = 'flex';
+};
+
+/* ── Cerrar modal ── */
+window.cerrarModalCierreGlobal = function () {
+  const modal = document.getElementById('modal-cierre-global');
+  if (modal) modal.style.display = 'none';
+};
+
+/* ── Guardar en sheet ── */
+window.saveCierreGlobal = async function () {
+  const ini = document.getElementById('cierre-ini')?.value?.trim();
+  const fin  = document.getElementById('cierre-fin')?.value?.trim();
+  if (!ini || !fin) {
+    if (typeof showToast==='function') showToast('w','Faltan horas','Completa las dos horas');
+    return;
+  }
+  const btn = document.getElementById('cierre-btn-save');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;animation:spin .8s linear infinite">progress_activity</span> Guardando…';
+  }
+  try {
+    const payload = { accion:'guardar-cierre-global', horaIni:ini, horaFin:fin };
+    const SCRIPT_URL = typeof SHEET_SCRIPT_URL !== 'undefined' ? SHEET_SCRIPT_URL : '';
+    if (SCRIPT_URL) {
+      const res  = await fetch(SCRIPT_URL, {
+        method:  'POST',
+        headers: { 'Content-Type':'text/plain' },
+        body:    JSON.stringify(payload)
+      });
+      const json = await res.json().catch(() => ({}));
+      if (json.ok === false) {
+        if (typeof showToast==='function') showToast('e','Error al guardar', json.error||'');
+        return;
+      }
+    }
+    CIERRE_GLOBAL.horaIni = ini;
+    CIERRE_GLOBAL.horaFin = fin;
+    window.cerrarModalCierreGlobal();
+    _actualizarBadgeCierreCard();
+    if (typeof showToast==='function')
+      showToast('s','✓ Cierre habitual guardado', `Todos los días: ${ini} → ${fin}`);
+  } catch(e) {
+    if (typeof showToast==='function') showToast('e','Error de red', e.message.substring(0,80));
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:16px;">save</span> Guardar cierre habitual';
+    }
+  }
+};
+
+/* ── Inyectar card + modal en pg-horario ── */
+function _inyectarBloqueCierre() {
+  if (document.getElementById('hor-cierre-global-wrap')) return;
+  const pg = document.getElementById('pg-horario');
+  if (!pg) return;
+
+  const bloque = document.createElement('div');
+  bloque.id    = 'hor-cierre-global-wrap';
+  bloque.style.cssText = 'margin-bottom:20px;';
+  bloque.innerHTML = `
+
+    <!-- CARD -->
+    <div style="background:var(--white);border:1.5px solid var(--border);
+                border-radius:18px;overflow:hidden;">
+      <div style="padding:14px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div style="width:38px;height:38px;border-radius:10px;background:var(--red-l);
+                    display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <span class="material-symbols-rounded" style="font-size:20px;color:var(--red);">bedtime</span>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:800;color:var(--text);">Cierre habitual nocturno</div>
+          <div id="cierre-label" style="font-size:10px;color:var(--text3);margin-top:1px;">
+            Leyendo desde el sheet…
+          </div>
+        </div>
+        <div id="cierre-badge"
+             style="padding:5px 14px;border-radius:99px;font-size:11px;
+                    font-weight:800;background:#6b7280;color:#fff;white-space:nowrap;">
+          Calculando…
+        </div>
+        <button onclick="window.abrirModalCierreGlobal()"
+          style="display:inline-flex;align-items:center;gap:7px;background:var(--red);
+                 color:#fff;border:none;border-radius:11px;padding:9px 16px;
+                 font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:800;
+                 cursor:pointer;white-space:nowrap;
+                 box-shadow:0 4px 14px rgba(220,38,38,.25);transition:all .18s;"
+          onmouseover="this.style.transform='translateY(-1px)'"
+          onmouseout="this.style.transform=''">
+          <span class="material-symbols-rounded" style="font-size:15px;">edit</span>
+          Configurar cierre
+        </button>
+      </div>
+    </div>
+
+    <!-- MODAL -->
+    <div id="modal-cierre-global"
+         onclick="if(event.target===this)window.cerrarModalCierreGlobal()"
+         style="position:fixed;inset:0;background:rgba(4,18,20,.82);
+                backdrop-filter:blur(12px);z-index:400;display:none;
+                align-items:center;justify-content:center;padding:16px;">
+      <div style="background:var(--white);border-radius:22px;width:min(420px,100%);
+                  overflow:hidden;box-shadow:0 32px 80px rgba(4,18,20,.45);
+                  animation:invUp .3s cubic-bezier(.34,1.2,.64,1);">
+
+        <!-- Header modal -->
+        <div style="background:linear-gradient(135deg,#1a0000 0%,#3d1515 100%);
+                    padding:20px 24px 18px;display:flex;align-items:center;gap:12px;">
+          <div style="width:42px;height:42px;border-radius:12px;
+                      background:rgba(220,38,38,.2);border:1.5px solid rgba(220,38,38,.35);
+                      display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <span class="material-symbols-rounded" style="font-size:22px;color:#fca5a5;">bedtime</span>
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:15px;font-weight:800;color:#fff;">Cierre habitual nocturno</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:2px;">
+              Aplica todos los días · guardado en hoja Cierre
+            </div>
+          </div>
+          <button onclick="window.cerrarModalCierreGlobal()"
+                  style="width:32px;height:32px;border-radius:9px;
+                         background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.12);
+                         cursor:pointer;display:flex;align-items:center;justify-content:center;
+                         color:rgba(255,255,255,.6);transition:all .15s;"
+                  onmouseover="this.style.background='rgba(220,38,38,.35)';this.style.color='#fff'"
+                  onmouseout="this.style.background='rgba(255,255,255,.07)';this.style.color='rgba(255,255,255,.6)'">
+            <span class="material-symbols-rounded" style="font-size:16px;">close</span>
+          </button>
+        </div>
+
+        <!-- Body modal -->
+        <div style="padding:22px 24px 10px;">
+          <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;
+                      padding:12px 14px;margin-bottom:18px;
+                      display:flex;align-items:center;gap:10px;">
+            <span style="font-size:26px;flex-shrink:0;">🌙</span>
+            <div style="font-size:11px;color:var(--text2);line-height:1.5;">
+              Define cuándo el servicio <strong>NO atiende</strong> cada noche.<br>
+              <span style="color:var(--text3);">Ej: 23:30 → 08:00 cierra a las 11:30 PM
+              y abre a las 8:00 AM del día siguiente.</span>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr auto 1fr;
+                      gap:8px;align-items:flex-end;margin-bottom:14px;">
+            <div class="om-field" style="margin:0;">
+              <div class="om-label" style="font-size:9px;">
+                <span class="material-symbols-rounded" style="font-size:13px;">nights_stay</span>
+                Inicia cierre
+              </div>
+              <input class="om-input" id="cierre-ini" type="time"
+                     style="font-size:18px;font-weight:800;text-align:center;"
+                     oninput="window._actualizarBadgeCierreModal()">
+            </div>
+            <div style="font-size:22px;color:var(--text3);padding-bottom:10px;text-align:center;">→</div>
+            <div class="om-field" style="margin:0;">
+              <div class="om-label" style="font-size:9px;">
+                <span class="material-symbols-rounded" style="font-size:13px;">wb_sunny</span>
+                Abre de nuevo
+              </div>
+              <input class="om-input" id="cierre-fin" type="time"
+                     style="font-size:18px;font-weight:800;text-align:center;"
+                     oninput="window._actualizarBadgeCierreModal()">
+            </div>
+          </div>
+
+          <!-- Preview -->
+          <div id="cierre-modal-preview"
+               style="display:none;background:var(--red-l);
+                      border:1.5px solid rgba(220,38,38,.2);border-radius:12px;
+                      padding:10px 14px;align-items:center;gap:10px;">
+            <span style="font-size:20px;flex-shrink:0;">🚫</span>
+            <div style="flex:1;">
+              <div style="font-size:12px;font-weight:800;color:var(--red);"
+                   id="cierre-preview-txt">–</div>
+              <div style="font-size:10px;color:#991b1b;margin-top:2px;">
+                Todos los días — sin fechas, sin repetición
+              </div>
+            </div>
+            <div id="cierre-modal-badge"
+                 style="padding:3px 10px;border-radius:99px;font-size:10px;
+                        font-weight:800;background:#6b7280;color:#fff;white-space:nowrap;">–</div>
+          </div>
+        </div>
+
+        <!-- Footer modal -->
+        <div style="padding:14px 24px 22px;display:flex;gap:10px;
+                    border-top:1.5px solid var(--border);margin-top:12px;">
+          <button class="om-btn-cancel" onclick="window.cerrarModalCierreGlobal()">
+            <span class="material-symbols-rounded" style="font-size:15px;">close</span>Cancelar
+          </button>
+          <button id="cierre-btn-save" onclick="window.saveCierreGlobal()"
+                  style="flex:2;background:var(--red);color:#fff;border:none;
+                         border-radius:11px;padding:12px;
+                         font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;
+                         font-weight:800;cursor:pointer;display:flex;align-items:center;
+                         justify-content:center;gap:8px;
+                         box-shadow:0 4px 16px rgba(220,38,38,.3);transition:all .18s;">
+            <span class="material-symbols-rounded" style="font-size:16px;">save</span>
+            Guardar cierre habitual
+          </button>
+        </div>
+      </div>
+    </div>`;
+
+  /* ── Insertar después del card verde (hor-dias-grid) ── */
+  const cardVerde = document.getElementById('hor-dias-grid')?.parentNode?.parentNode;
+  if (cardVerde?.parentNode) {
+    cardVerde.parentNode.insertBefore(bloque, cardVerde.nextSibling);
+  } else {
+    /* Fallback: antes del card de días especiales */
+    const anchor = pg.querySelector('#hor-grid')?.parentNode;
+    if (anchor?.parentNode) anchor.parentNode.insertBefore(bloque, anchor);
+    else pg.appendChild(bloque);
+  }
+
+  /* Leer sheet y actualizar */
+  window.fetchCierreGlobal();
+}
+
+/* ── Enganchar a sp (cambio de pestaña) ── */
+const _origSP2 = window.sp;
+window.sp = function (id, el) {
+  if (_origSP2) _origSP2.apply(this, arguments);
+  if (id === 'horario') {
+    setTimeout(() => {
+      _inyectarBloqueCierre();
+      window.fetchCierreGlobal();
+    }, 250);
+  }
+};
+
+/* ── Enganchar a renderHorarios como respaldo ── */
+const _origRH2 = window.renderHorarios;
+window.renderHorarios = function () {
+  if (_origRH2) _origRH2.apply(this, arguments);
+  if (!document.getElementById('hor-cierre-global-wrap')) {
+    setTimeout(_inyectarBloqueCierre, 200);
+  }
+};
+
+/* ── Leer al inicio ── */
+window.fetchCierreGlobal();
+
+console.log('[PARCHE CIERRE GLOBAL v2] ✅ Hoja Cierre · HoraInicio | HoraFin');
+
+/* ── Sobrescribir _estaDisponible para que use CIERRE_GLOBAL ── */
+window._estaDisponible = function () {
+  const ahora    = new Date();
+  const hoy      = ahora.toISOString().slice(0, 10);
+  const minAhora = ahora.getHours() * 60 + ahora.getMinutes();
+  const pMin     = t => { const [h,m] = (t||'00:00').split(':').map(Number); return h*60+m; };
+
+  /* 1. Días especiales puntuales (igual que antes) */
+  if (typeof _horarios !== 'undefined' && _horarios &&
+      _horarios.some(h => (h.fecha || h.fechaIni) === hoy))
+    return { disponible: false, razon: 'dia-especial' };
+
+  /* 2. Ventana de cierre global nocturno (cruza medianoche) */
+  const cIni    = pMin(CIERRE_GLOBAL.horaIni);  // ej. 23:30 → 1410
+  const cFin    = pMin(CIERRE_GLOBAL.horaFin);  // ej. 08:00 → 480
+
+  const enCierre = cIni > cFin
+    ? (minAhora >= cIni || minAhora < cFin)   // cruza medianoche ← tu caso
+    : (minAhora >= cIni && minAhora < cFin);  // mismo día
+
+  if (enCierre)
+    return { disponible: false, razon: 'cierre-global' };
+
+  return { disponible: true, razon: '' };
+  _programarRefreshCierre
+};
+})();
+
+/* ── Releer sheet en los momentos exactos de cierre y apertura ── */
+function _programarRefreshCierre() {
+  const ahora  = new Date();
+  const minNow = ahora.getHours() * 60 + ahora.getMinutes();
+  const segNow = ahora.getSeconds();
+  const pMin   = t => { const [h,m] = (t||'00:00').split(':').map(Number); return h*60+m; };
+
+  const cIni = pMin(CIERRE_GLOBAL.horaIni); // ej. 1410 = 23:30
+  const cFin = pMin(CIERRE_GLOBAL.horaFin); // ej.  480 = 08:00
+
+  /* Minutos que faltan para cada evento */
+  const minutosHastaCierre  = (cIni - minNow + 1440) % 1440;
+  const minutosHastaApertura = (cFin - minNow + 1440) % 1440;
+
+  /* Disparar exactamente al minuto de cierre */
+  const msCierre = (minutosHastaCierre * 60 - segNow) * 1000;
+  setTimeout(async () => {
+    await window.fetchCierreGlobal();
+    if (typeof window._renderEstadoActual === 'function') window._renderEstadoActual();
+    if (typeof window.renderHorarios      === 'function') window.renderHorarios();
+    console.log('[CIERRE] Hora de cierre alcanzada →', CIERRE_GLOBAL.horaIni);
+    _programarRefreshCierre(); // reprogramar para el día siguiente
+  }, Math.max(msCierre, 1000));
+
+  /* Disparar exactamente al minuto de apertura */
+  const msApertura = (minutosHastaApertura * 60 - segNow) * 1000;
+  setTimeout(async () => {
+    await window.fetchCierreGlobal();
+    if (typeof window._renderEstadoActual === 'function') window._renderEstadoActual();
+    if (typeof window.renderHorarios      === 'function') window.renderHorarios();
+    console.log('[CIERRE] Hora de apertura alcanzada →', CIERRE_GLOBAL.horaFin);
+    _programarRefreshCierre(); // reprogramar para el día siguiente
+  }, Math.max(msApertura, 1000));
+
+  console.log(`[CIERRE] Próximo cierre en ${minutosHastaCierre} min · apertura en ${minutosHastaApertura} min`);
+}
+
 </script>
 
 </body>
