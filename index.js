@@ -5,6 +5,8 @@ require('dotenv').config();
 const express = require('express');
 const path    = require('path');
 const moment  = require('moment-timezone');
+const { monitorMiddleware, startMonitor } = require('./services/monitor'); 
+
 
 const { wilBot, iniciarCron, saludarAlArrancar, getPool, getDrivers } = require('./src/bot/wilBot');
 const { router: apiRouter, setPoolRef, setBotRef } = require('./api/routes');
@@ -80,6 +82,8 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use(monitorMiddleware);
+
 // Servir el HTML del chat — coloca DomiciliosWIL.html en /public
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -96,6 +100,7 @@ app.listen(PORT, () => {
   console.log(`🌐 HTTP en puerto ${PORT}`);
   console.log(`🔗 API en /api`);
   console.log(`🌍 Chat en /`);
+  startMonitor();
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
