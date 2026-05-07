@@ -911,7 +911,7 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
  
   <!-- ¿YA TIENES EL COMERCIO? -->
   <div class="card">
-    <div class="card-tit"><span class="sym f">storefront</span>¿Ya tienes el comercio?</div>
+    <div class="card-tit"><span class="sym f">storefront</span>¿Ya tienes claro el lugar de recogida?</div>
     <div class="yn-grid">
       <button class="yn-btn" id="yn-si" onclick="wilSelComercio(true)">
         <span class="sym f" style="font-size:22px">check_circle</span>Sí, ya sé dónde
@@ -4586,21 +4586,24 @@ function wilGoLibre2(){
   if(typeof goLibre2 === 'function') goLibre2();
   showView('view-libre-2');
 }
- function wilPoblarResumenP3(){
+
+function wilPoblarResumenP3(){
   const L   = window.WIL_LIBRE || {};
   const div = document.getElementById('wil-p3-resumen-body');
   if(!div) return;
 
   const fmtPeso = v => '$' + (v||0).toLocaleString('es-CO');
 
- var recogidaTxt = L.barrioRecogida || '—';
-if(L.comercio && L.comercioNombre) recogidaTxt += ' · ' + L.comercioNombre;
-else if(L.comercioNombre)           recogidaTxt += ' · ' + L.comercioNombre;
+  var recogidaTxt = L.barrioRecogida || '—';
+  if(L.comercio && L.comercioNombre) recogidaTxt += ' · ' + L.comercioNombre;
+  else if(L.comercioNombre)           recogidaTxt += ' · ' + L.comercioNombre;
 
-html += `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f5f7">
-           <span style="color:var(--on3)">🗺️ Recogida</span>
-           <span style="font-weight:700;text-align:right;max-width:65%">${escHTML(recogidaTxt)}</span>
-         </div>`;
+  var html = '';   // ← ESTA LÍNEA FALTABA — causa el crash en móvil
+
+  html += `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f5f7">
+             <span style="color:var(--on3)">🗺️ Recogida</span>
+             <span style="font-weight:700;text-align:right;max-width:65%">${escHTML(recogidaTxt)}</span>
+           </div>`;
   html += `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f5f7">
              <span style="color:var(--on3)">📍 Entrega</span>
              <span style="font-weight:700">${escHTML(L.barrioEntrega||'—')}</span>
@@ -4634,12 +4637,11 @@ html += `<div style="display:flex;justify-content:space-between;padding:3px 0;bo
              <span style="color:var(--on3)">🛵 Tarifa domi</span>
              <span style="font-weight:900;color:#15803d;font-size:15px">${fmtPeso(L.tarifaDomi)}</span>
            </div>`;
-           html += `<div style="margin-top:10px;padding:10px 12px;background:#fef2f2;border:1px solid rgba(220,38,38,.2);border-radius:var(--r-md);font-size:11.5px;color:#dc2626;font-weight:600;line-height:1.5;display:flex;align-items:flex-start;gap:6px">
+  html += `<div style="margin-top:10px;padding:10px 12px;background:#fef2f2;border:1px solid rgba(220,38,38,.2);border-radius:var(--r-md);font-size:11.5px;color:#dc2626;font-weight:600;line-height:1.5;display:flex;align-items:flex-start;gap:6px">
              <span style="font-size:15px;flex-shrink:0">🧾</span>
              <span><strong>Nota:</strong> El domi te adjuntará la factura al comprar tu pedido.</span>
            </div>`;
   div.innerHTML = html;
- 
 
   /* Productos listados */
   const card  = document.getElementById('wil-p3-prods-card');
