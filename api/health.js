@@ -1,15 +1,31 @@
-const { sendTelegram, stats } = require('../domicilios-wil/services/monitor');
+const https = require('https');
 
 module.exports = (req, res) => {
-  sendTelegram(
-    `📊 *Reporte de salud*\n\n` +
-    `📡 Requests: *${stats.totalRequests}*\n` +
-    `👥 IPs únicas: *${stats.uniqueIPs.size}*\n` +
-    `🚨 Hits sospechosos: *${stats.suspiciousHits}*\n` +
-    `⚠️ Errores 4xx: *${stats.errors4xx}*\n` +
-    `💀 Errores 5xx: *${stats.errors5xx}*\n` +
-    `📥 Descargas APK: *${stats.apkDownloads}*`
-  );
+  const token = process.env.MONITOR_TOKEN;
+  const chat  = process.env.MONITOR_CHAT;
 
-  res.json({ ok: true });
+  console.log('TOKEN:', token ? '✅' : '❌');
+  console.log('CHAT:', chat ? '✅' : '❌');
+
+  const text = '📊 Prueba de salud desde Vercel ✅';
+  const body = JSON.stringify({ chat_id: chat, text, parse_mode: 'Markdown' });
+
+  const options = {
+    hostname: 'api.telegram.org',
+    path: `/bot${token}/sendMessage`,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+  };
+
+  const req2 = https.request(options, (r) => {
+    let data = '';
+    r.on('data', d => data += d);
+    r.on('end', () => {
+      console.log('Telegram response:', data);
+      res.json({ ok: true, telegram: data });
+    });
+  });
+  req2.on('error', e => res.json({ ok: false, error: e.message }));
+  req2.write(body);
+  req2.end();
 };
