@@ -1,6 +1,7 @@
 const https  = require("https");
 const { google } = require("googleapis");
 const moment = require("moment-timezone");
+const fs     = require("fs");
 
 // ─── CONFIG ──────────────────────────────────────────────────
 const TELEGRAM_TOKEN  = process.env.MONITOR_TOKEN;
@@ -9,13 +10,20 @@ const APP_NAME        = process.env.APP_NAME || "DomiciliosWil";
 const REPORT_INTERVAL = 60 * 60 * 1000;
 const ALERT_COOLDOWN  = 30 * 1000;
 
+// ─── SHEETS HABILITADO ────────────────────────────────────────
+// Solo intenta usar Sheets si las credenciales están configuradas
+const SHEETS_ENABLED = !!(process.env.GOOGLE_CREDENTIALS || fs.existsSync('./credentials.json'));
+
 // ─── RUTAS SENSIBLES ─────────────────────────────────────────
 const SENSITIVE_ROUTES = [
   "/panel-administrador", "/login-administrador", "/instalar.html",
   "/pedido-farmacia.html", "/pedido-wil.html", "/domi-login",
   "/api/admin", "/api/usuarios", "/api/pedidos",
-  "/.env", "/wp-admin", "/phpMyAdmin", "/.git",
+  "/.env", "/wp-admin", "/phpmyadmin", "/.git",
 ];
+
+// ─── RUTAS EXCLUIDAS DEL MONITOREO ───────────────────────────
+const EXCLUDED_ROUTES = ["/api/health", "/favicon.ico"];
 
 // ─── ESTADO INTERNO ──────────────────────────────────────────
 const stats = {
@@ -27,9 +35,16 @@ const stats = {
 
 // ─── GOOGLE SHEETS AUTH ──────────────────────────────────────
 async function getSheetsClient() {
+  if (!SHEETS_ENABLED) throw new Error('Sheets no configurado');
+
   let auth;
   if (process.env.GOOGLE_CREDENTIALS) {
-    const creds = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+    let creds;
+    try {
+      creds = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+    } catch {
+      throw new Error('GOOGLE_CREDENTIALS no es un JSON válido');
+    }
     auth = new google.auth.GoogleAuth({
       credentials: creds,
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
@@ -40,12 +55,14 @@ async function getSheetsClient() {
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
   }
+
   const client = await auth.getClient();
   return google.sheets({ version: 'v4', auth: client });
 }
 
 // ─── GUARDAR EVENTO EN SHEETS ────────────────────────────────
 async function registrarEvento(ip, ruta, tipo, metodo, userAgent, prioridad) {
+  if (!SHEETS_ENABLED) return; // Salir silenciosamente si no hay Sheets
   try {
     const sheets = await getSheetsClient();
     const ahora  = moment().tz('America/Bogota');
@@ -59,9 +76,9 @@ async function registrarEvento(ip, ruta, tipo, metodo, userAgent, prioridad) {
           ahora.format('hh:mm:ss A'),
           ip, ruta, tipo, metodo,
           userAgent.substring(0, 100),
-          prioridad
-        ]]
-      }
+          prioridad,
+        ]],
+      },
     });
   } catch (e) {
     console.error('[Monitor] Error guardando en Sheets:', e.message);
@@ -78,37 +95,52 @@ function sendTelegram(message, priority = "normal") {
     hostname: 'api.telegram.org',
     path: `/bot${TELEGRAM_TOKEN}/sendMessage`,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(body),
+    },
   });
-  req.on('error', () => {});
+  req.on('error', () => {}); // Ignorar errores de red silenciosamente
   req.write(body);
   req.end();
 }
 
 // ─── COOLDOWN ────────────────────────────────────────────────
 function canAlert(key) {
-  const now = Date.now();
+  const now  = Date.now();
   const last = stats.lastAlerts[key] || 0;
-  if (now - last > ALERT_COOLDOWN) { stats.lastAlerts[key] = now; return true; }
+  if (now - last > ALERT_COOLDOWN) {
+    stats.lastAlerts[key] = now;
+    return true;
+  }
   return false;
 }
 
 // ─── ANALIZAR REQUEST ────────────────────────────────────────
 function analyzeRequest(req, res) {
-  const ip        = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+  const ip        = req.headers["x-forwarded-for"]?.split(",")[0]?.trim()
+                    || req.socket?.remoteAddress
+                    || "unknown";
   const route     = req.url?.split("?")[0].toLowerCase() || "/";
   const userAgent = req.headers["user-agent"] || "";
   const method    = req.method || "GET";
 
+  // No monitorear rutas internas
+  if (EXCLUDED_ROUTES.includes(route)) return;
+
   stats.totalRequests++;
   stats.uniqueIPs.add(ip);
 
-  if (!stats.ipHitMap[ip]) stats.ipHitMap[ip] = { count: 0, firstSeen: Date.now(), routes: [] };
+  if (!stats.ipHitMap[ip]) {
+    stats.ipHitMap[ip] = { count: 0, firstSeen: Date.now(), routes: [] };
+  }
   stats.ipHitMap[ip].count++;
-  if (!stats.ipHitMap[ip].routes.includes(route)) stats.ipHitMap[ip].routes.push(route);
+  if (!stats.ipHitMap[ip].routes.includes(route)) {
+    stats.ipHitMap[ip].routes.push(route);
+  }
   stats.routeHitMap[route] = (stats.routeHitMap[route] || 0) + 1;
 
-  // APK
+  // ── APK Download ──────────────────────────────────────────
   if (route.includes("app-release.apk")) {
     stats.apkDownloads++;
     if (canAlert("apk")) {
@@ -117,41 +149,54 @@ function analyzeRequest(req, res) {
     }
   }
 
-  // Ruta sensible
+  // ── Rutas sensibles ───────────────────────────────────────
   const isSensitive = SENSITIVE_ROUTES.some(r => route.includes(r.toLowerCase()));
   if (isSensitive) {
     stats.suspiciousHits++;
     if (canAlert(`sensitive_${ip}`)) {
       registrarEvento(ip, route, 'RUTA_SENSIBLE', method, userAgent, 'medium');
-      sendTelegram(`🔐 *Acceso a ruta sensible*\n• Ruta: \`${route}\`\n• IP: \`${ip}\`\n• Método: ${method}`, "medium");
+      sendTelegram(
+        `🔐 *Acceso a ruta sensible*\n• Ruta: \`${route}\`\n• IP: \`${ip}\`\n• Método: ${method}`,
+        "medium"
+      );
     }
   }
 
-  // Bots/Scanners
-  const botPatterns = ["sqlmap", "nikto", "masscan", "nmap", "zgrab", "dirbuster", "python-requests/2", "curl/"];
+  // ── Bots / Scanners ───────────────────────────────────────
+  // NOTA: "curl/" removido — era demasiado amplio y bloqueaba pruebas legítimas
+  const botPatterns = ["sqlmap", "nikto", "masscan", "nmap", "zgrab", "dirbuster", "python-requests/2"];
   const isBot = botPatterns.some(b => userAgent.toLowerCase().includes(b));
   if (isBot && canAlert(`bot_${ip}`)) {
     stats.suspiciousHits++;
     registrarEvento(ip, route, 'SCANNER_BOT', method, userAgent, 'high');
-    sendTelegram(`🤖 *Scanner / Bot detectado*\n• IP: \`${ip}\`\n• Agente: \`${userAgent.substring(0, 100)}\``, "high");
+    sendTelegram(
+      `🤖 *Scanner / Bot detectado*\n• IP: \`${ip}\`\n• Agente: \`${userAgent.substring(0, 100)}\``,
+      "high"
+    );
   }
 
-  // Fuerza bruta
+  // ── Fuerza bruta ──────────────────────────────────────────
   const ipData  = stats.ipHitMap[ip];
   const elapsed = (Date.now() - ipData.firstSeen) / 1000;
   if (ipData.count > 50 && elapsed < 60 && canAlert(`brute_${ip}`)) {
     stats.suspiciousHits++;
     registrarEvento(ip, route, 'FUERZA_BRUTA', method, userAgent, 'high');
-    sendTelegram(`💥 *Posible fuerza bruta*\n• IP: \`${ip}\`\n• Hits: *${ipData.count}* en *${Math.round(elapsed)}s*`, "high");
+    sendTelegram(
+      `💥 *Posible fuerza bruta*\n• IP: \`${ip}\`\n• Hits: *${ipData.count}* en *${Math.round(elapsed)}s*`,
+      "high"
+    );
   }
 
-  // Métodos inusuales
+  // ── Métodos inusuales ─────────────────────────────────────
   if (["DELETE", "PUT", "PATCH"].includes(method) && canAlert(`method_${ip}_${method}`)) {
     registrarEvento(ip, route, 'METODO_INUSUAL', method, userAgent, 'medium');
-    sendTelegram(`🛠️ *Método inusual*\n• Método: \`${method}\`\n• Ruta: \`${route}\`\n• IP: \`${ip}\``, "medium");
+    sendTelegram(
+      `🛠️ *Método inusual*\n• Método: \`${method}\`\n• Ruta: \`${route}\`\n• IP: \`${ip}\``,
+      "medium"
+    );
   }
 
-  // Errores
+  // ── Errores HTTP ──────────────────────────────────────────
   res.on("finish", () => {
     const code = res.statusCode;
     if (code >= 400 && code < 500) {
@@ -165,7 +210,10 @@ function analyzeRequest(req, res) {
       stats.errors5xx++;
       if (canAlert(`server_error_${route}`)) {
         registrarEvento(ip, route, `ERROR_${code}`, method, userAgent, 'high');
-        sendTelegram(`💀 *Error del servidor (${code})*\n• Ruta: \`${route}\`\n• IP: \`${ip}\``, "high");
+        sendTelegram(
+          `💀 *Error del servidor (${code})*\n• Ruta: \`${route}\`\n• IP: \`${ip}\``,
+          "high"
+        );
       }
     }
   });
@@ -173,15 +221,28 @@ function analyzeRequest(req, res) {
 
 // ─── MIDDLEWARE ───────────────────────────────────────────────
 function monitorMiddleware(req, res, next) {
-  analyzeRequest(req, res);
+  try {
+    analyzeRequest(req, res);
+  } catch (e) {
+    console.error('[Monitor] Error en analyzeRequest:', e.message);
+  }
   next();
 }
 
 // ─── REPORTE PERIÓDICO ────────────────────────────────────────
 function sendReport() {
   const uptime    = Math.round((Date.now() - stats.startTime) / 1000 / 60);
-  const topIPs    = Object.entries(stats.ipHitMap).sort((a,b) => b[1].count - a[1].count).slice(0,3).map(([ip,d]) => `\`${ip}\` → ${d.count} hits`).join("\n");
-  const topRoutes = Object.entries(stats.routeHitMap).sort((a,b) => b[1]-a[1]).slice(0,5).map(([r,c]) => `\`${r}\` → ${c}`).join("\n");
+  const topIPs    = Object.entries(stats.ipHitMap)
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 3)
+    .map(([ip, d]) => `\`${ip}\` → ${d.count} hits`)
+    .join("\n");
+  const topRoutes = Object.entries(stats.routeHitMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([r, c]) => `\`${r}\` → ${c}`)
+    .join("\n");
+
   sendTelegram(
     `📊 *Reporte de salud*\n\n` +
     `⏱ Uptime: *${uptime} min*\n` +
@@ -198,10 +259,12 @@ function sendReport() {
 
 // ─── ARRANQUE ─────────────────────────────────────────────────
 function startMonitor() {
-  console.log("[Monitor] ✅ Monitoreo activo");
+  console.log(`[Monitor] ✅ Monitoreo activo | Sheets: ${SHEETS_ENABLED ? 'ON' : 'OFF (sin credenciales)'}`);
   sendTelegram(`🟢 *Servidor iniciado*\nMonitoreo activo para *${APP_NAME}*`);
   setInterval(sendReport, REPORT_INTERVAL);
+
   process.on("uncaughtException", err => {
+    console.error('[Monitor] uncaughtException:', err);
     sendTelegram(`💥 *Error crítico*\n\`\`\`\n${err.message}\n\`\`\``, "high");
   });
   process.on("unhandledRejection", reason => {
