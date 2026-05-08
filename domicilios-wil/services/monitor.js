@@ -47,6 +47,10 @@ const stats = {
 
 // ─── TELEGRAM SENDER ─────────────────────────────────────────
 function sendTelegram(message, priority = "normal") {
+  if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT) {
+    console.error("[Monitor] ❌ Faltan MONITOR_TOKEN o MONITOR_CHAT en .env");
+    return;
+  }
   const prefix = priority === "high" ? "🚨🚨🚨" : priority === "medium" ? "⚠️" : "ℹ️";
   const text   = `${prefix} *${APP_NAME}*\n\n${message}\n\n_${new Date().toLocaleString("es-CO", { timeZone: "America/Bogota" })}_`;
 
@@ -253,6 +257,13 @@ function startMonitor() {
     sendTelegram(`🔴 *Servidor detenido (SIGTERM)*`, "high");
   });
 }
+
+// TEST — bórralo después de probar
+setTimeout(() => {
+  console.log('[Monitor] Token:', TELEGRAM_TOKEN ? '✅ OK' : '❌ Vacío');
+  console.log('[Monitor] Chat:', TELEGRAM_CHAT  ? '✅ OK' : '❌ Vacío');
+  sendTelegram('🧪 Prueba de monitor — si ves esto funciona ✅');
+}, 5000);
 
 // ─── EXPORTS ──────────────────────────────────────────────────
 module.exports = { monitorMiddleware, startMonitor, sendTelegram, stats };
