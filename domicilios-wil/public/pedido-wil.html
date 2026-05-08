@@ -2963,18 +2963,63 @@ try {
 
     /* ── 6. Card del domi (elegante) ── */
   /* ── 6. Card del domi (elegante) con foto real ── */
+/* ── 6. Card del domi (elegante) con foto real y teléfono ── */
 var dc = document.getElementById('domiCard');
 if(p.domiciliario && p.domiciliario.trim()){
   dc.style.display = 'block';
   var nombreDomi = p.domiciliario.replace(/\s*\([^)]+\)/,'').trim();
   document.getElementById('domiNombre').textContent = nombreDomi;
   
-  // ✅ Mostrar inicial mientras carga la foto
   var avEl = document.getElementById('domiFotoWrap');
   avEl.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff;">${nombreDomi.charAt(0).toUpperCase()}</div>`;
-  
-  // ✅ Cargar foto desde el sheet
   cargarFotoDomi(nombreDomi, avEl);
+
+  // ✅ BUSCAR TELÉFONO DEL DOMI en la hoja Domiciliarios
+  var telefonoDomi = '';
+  var primerNom = nombreDomi.split(' ')[0].toLowerCase();
+  var nombreLower = nombreDomi.toLowerCase();
+  
+  try {
+    var urlDomis = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID_DOMI + '/gviz/tq?tqx=out:csv&sheet=Domiciliarios&cachebust=' + Date.now();
+    var resDomis = await fetch(urlDomis, { cache: 'no-store' });
+    var txtDomis = await resDomis.text();
+    var linesDomis = txtDomis.trim().split('\n');
+    
+    for (var idx = 1; idx < linesDomis.length; idx++) {
+      var cols = parseCsvLine(linesDomis[idx]);
+      var nombreSheet = (cols[1] || '').trim().toLowerCase();
+      if (!nombreSheet) continue;
+      
+      // Comparación flexible
+      if (nombreSheet === nombreLower || 
+          nombreLower.indexOf(nombreSheet) !== -1 || 
+          nombreSheet.indexOf(nombreLower) !== -1) {
+        telefonoDomi = (cols[2] || '').trim(); // Col C = teléfono
+        console.log('[DOMI TELEFONO] Encontrado:', nombreDomi, '→', telefonoDomi);
+        break;
+      }
+    }
+  } catch(e) {
+    console.warn('[DOMI TELEFONO] Error:', e.message);
+  }
+  
+  // Configurar botones con el teléfono del DOMI
+  var waBtn = document.getElementById('domiWABtn');
+  var callBtn = document.getElementById('domiCallBtn');
+  
+  if (telefonoDomi) {
+    var telLimpio = telefonoDomi.replace(/\D/g, '');
+    if (waBtn) {
+      waBtn.href = 'https://wa.me/57' + telLimpio + '?text=' + encodeURIComponent('Hola, soy cliente de WIL. Consulta sobre mi pedido #' + p.id);
+      waBtn.style.display = 'flex';
+    }
+    if (callBtn) {
+      callBtn.href = 'tel:+57' + telLimpio;
+      callBtn.style.display = 'flex';
+    }
+  } else {
+    console.warn('[DOMI TELEFONO] No encontrado para:', nombreDomi);
+  }
 
   var estadoTxtMap = {
     'En camino':'En camino hacia ti 🛵',
@@ -2985,7 +3030,6 @@ if(p.domiciliario && p.domiciliario.trim()){
   document.getElementById('domiEstadoTxt').textContent =
     estadoTxtMap[p.estado] || p.estado;
 
-  // Hora clave según estado
   var horaClave = p.horaEnCamino || p.horaEnProceso || '';
   if(horaClave){
     document.getElementById('domiEstadoTxt').textContent += '  ·  ' + horaClave;
@@ -4643,7 +4687,7 @@ function wilPoblarResumenP3(){
   html += `<div style="margin-top:10px;padding:10px 12px;background:#fef2f2;border:1px solid rgba(220,38,38,.2);border-radius:var(--r-md);font-size:11.5px;color:#dc2626;font-weight:600;line-height:1.5;display:flex;align-items:flex-start;gap:6px">
              <span style="font-size:15px;flex-shrink:0">🧾</span>
             <span>✅ El domiciliario confirmará disponibilidad y te enviará la <strong>foto de la factura real</strong> antes del cobro. 
-⚠️ <strong>Importante:</strong> Por alta demanda y posibles filas en algunos comercios, se aplicará un cargo de <strong>$2.000 COP por cada 15 minutos de espera adicionales</strong> (los primeros 15 minutos son gratuitos). 
+⚠️ <strong>Importante:</strong> Por alta demanda y posibles filas en algunos comercios, se aplicará un cargo de <strong>$2.000 COP por cada 15 minutos de espera adicionales</strong> (EL TIEMPO INICIA CUANDO EL DOMI TE ENVIA LA EVIDENCIA). 
 🔒 <strong>Tú apruebas el pedido antes de pagar.</strong></span>
            </div>`;
   div.innerHTML = html;
