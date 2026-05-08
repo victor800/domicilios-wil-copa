@@ -16,6 +16,8 @@
      <script src="wil-patch-v2.js"></script>
      <script src="wil-rastrear-patch.js"></script>
      <script src="wil-farmacia-barrio.js"></script>
+     <script src="wil-paquete-dir-recogida.js"></script>
+     <script src="wil-patch-v5.js"></script>
     
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -1224,7 +1226,7 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
         <div class="wil-ticket-nota">
           <span class="sym">verified</span>
           <span>✅ El domiciliario confirmará disponibilidad y te enviará la <strong>foto de la factura real</strong> antes del cobro. 
-⚠️ <strong>Importante:</strong> Por alta demanda y posibles filas en algunos comercios, se aplicará un cargo de <strong>$2.000 COP por cada 15 minutos de espera adicionales</strong> (los primeros 15 minutos son gratuitos). 
+⚠️ <strong>Importante:</strong> Por alta demanda y posibles filas en algunos comercios, se aplicará un cargo de <strong>$2.000 COP por cada 15 minutos de espera adicionales</strong>. 
 🔒 <strong>Tú apruebas el pedido antes de pagar.</strong></span>
         </div>
       </div>
@@ -8763,6 +8765,921 @@ function _copiarFallback(txt){
   })();
 
   console.log('[WIL Rastrear v3.0] ✅ Polling 3s + FAB + Popup unificado (Factura + TiempoExtra)');
+
+})(window);
+
+</script>
+
+<script>
+  
+/* ═══════════════════════════════════════════════════════════
+   WIL PATCH — Dirección de recogida en Envío por Zona
+   Agrega campo de dirección al seleccionar barrio de recogida.
+   Esa dirección va a la factura y a Google Sheets.
+═══════════════════════════════════════════════════════════ */
+;(function (W) {
+  'use strict';
+
+  /* ── CSS del campo de recogida ── */
+  var s = document.createElement('style');
+  s.textContent = `
+    #pq-dir-rec-wrap {
+      margin-top: 10px;
+      animation: pqDirIn .22s ease;
+    }
+    @keyframes pqDirIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    #pq-dir-rec-wrap label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--on3);
+      margin-bottom: 5px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    #pq-dir-rec {
+      width: 100%;
+      border: 1.5px solid #dce3ea;
+      border-radius: var(--r-lg, 13px);
+      padding: 11px 13px;
+      font-size: 14px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      color: var(--on);
+      background: #fff;
+      outline: none;
+      transition: border-color .15s;
+      box-sizing: border-box;
+    }
+    #pq-dir-rec:focus {
+      border-color: var(--p, #006970);
+      box-shadow: 0 0 0 3px rgba(0,105,112,.08);
+    }
+    #pq-dir-rec::placeholder { color: var(--on3); }
+    #pq-dir-rec-note {
+      font-size: 10.5px;
+      color: var(--on3);
+      margin-top: 4px;
+      font-weight: 500;
+    }
+  `;
+  document.head.appendChild(s);
+
+  /* ── Inyectar campo después del bloque de barrio recogida ── */
+  function _inyectarCampoDirRec() {
+    /* Buscar el .field que contiene el input de barrio recogida */
+    var inputRec = document.getElementById('pq-barrio-rec-txt');
+    if (!inputRec) return;
+
+    /* ¿Ya existe el campo? */
+    if (document.getElementById('pq-dir-rec-wrap')) return;
+
+    /* El .field padre del input */
+    var fieldPadre = inputRec.closest('.field') || inputRec.parentElement;
+    if (!fieldPadre) return;
+
+    var wrap = document.createElement('div');
+    wrap.id = 'pq-dir-rec-wrap';
+    wrap.style.display = 'none';
+    wrap.innerHTML =
+      '<label>Dirección de recogida *</label>' +
+      '<input type="text" id="pq-dir-rec"' +
+      ' placeholder="Ej: Calle 52 #48-09, piso 2, portería azul…"/>' +
+      '<div id="pq-dir-rec-note">Dirección completa donde el domi recoge el paquete</div>';
+
+    /* Insertar después del fieldPadre (o del panel OOZ de recogida si existe) */
+    var oozRec = document.getElementById('pq-ooz-rec');
+    var ancla  = oozRec || fieldPadre;
+    ancla.parentNode.insertBefore(wrap, ancla.nextSibling);
+  }
+
+  /* ── Mostrar campo al seleccionar barrio ── */
+  function _mostrarCampo() {
+    var wrap = document.getElementById('pq-dir-rec-wrap');
+    if (wrap) { wrap.style.display = 'block'; }
+  }
+
+  /* ── Ocultar campo al resetear barrio ── */
+  function _ocultarCampo() {
+    var wrap = document.getElementById('pq-dir-rec-wrap');
+    if (wrap) { wrap.style.display = 'none'; }
+    var inp = document.getElementById('pq-dir-rec');
+    if (inp) inp.value = '';
+  }
+
+  /* ── Parchear pqSeleccionarBarrio ── */
+  var _origSel = W.pqSeleccionarBarrio;
+  W.pqSeleccionarBarrio = function (campo, nombre, precio) {
+    if (typeof _origSel === 'function') _origSel.apply(this, arguments);
+    if (campo === 'rec') {
+      _inyectarCampoDirRec();
+      _mostrarCampo();
+      var inp = document.getElementById('pq-dir-rec');
+      if (inp) setTimeout(function () { inp.focus(); }, 120);
+    }
+  };
+
+  /* ── Parchear pqActivarOOZ (cuando barrio no está en la lista) ── */
+  var _origOOZ = W.pqActivarOOZ;
+  W.pqActivarOOZ = function (campo) {
+    if (typeof _origOOZ === 'function') _origOOZ.apply(this, arguments);
+    if (campo === 'rec') {
+      _inyectarCampoDirRec();
+      _mostrarCampo();
+    }
+  };
+
+  /* ── Parchear pqSearchBarrio: ocultar campo si el usuario borra el texto ── */
+  var _origSearch = W.pqSearchBarrio;
+  W.pqSearchBarrio = function (campo, query) {
+    if (typeof _origSearch === 'function') _origSearch.apply(this, arguments);
+    if (campo === 'rec' && !((query || '').trim())) {
+      _ocultarCampo();
+    }
+  };
+
+  /* ── Parchear generarFacturaPaquete: validar + incluir dirección ── */
+  var _origGen = W.generarFacturaPaquete;
+  W.generarFacturaPaquete = function () {
+
+    /* Validar que se haya ingresado la dirección de recogida si el campo es visible */
+    var wrapRec = document.getElementById('pq-dir-rec-wrap');
+    var inpRec  = document.getElementById('pq-dir-rec');
+    if (wrapRec && wrapRec.style.display !== 'none' && inpRec) {
+      var dirRec = inpRec.value.trim();
+      if (!dirRec) {
+        if (typeof W.mostrarToast === 'function')
+          W.mostrarToast('Escribe la dirección de recogida.', 'location_on');
+        inpRec.focus();
+        return;
+      }
+    }
+
+    /* Llamar función original */
+    if (typeof _origGen === 'function') _origGen.apply(this, arguments);
+
+    /* Inyectar en la factura (view-factura-paquete) */
+    _actualizarFactura();
+  };
+
+  function _actualizarFactura() {
+    var inpRec = document.getElementById('pq-dir-rec');
+    var dirRec = inpRec ? inpRec.value.trim() : '';
+    if (!dirRec) return;
+
+    /* Actualizar campo fp-zona para incluir la dirección de recogida */
+    var fpZona = document.getElementById('fp-zona');
+    if (fpZona && fpZona.textContent.indexOf('Dir. recogida') === -1) {
+      fpZona.innerHTML = fpZona.innerHTML + '<br><span style="font-size:11px;color:var(--on3);font-weight:500">📍 Dir. recogida: </span><strong>' + _esc(dirRec) + '</strong>';
+    }
+
+    /* Agregar fila dedicada si no existe */
+    var fac = document.querySelector('#view-factura-paquete .factura');
+    if (!fac || document.getElementById('fp-dir-rec-row')) return;
+
+    var row = document.createElement('div');
+    row.id = 'fp-dir-rec-row';
+    row.className = 'fac-row';
+    row.innerHTML = '<div class="fac-lbl">📦 Dir. recogida</div>'
+                  + '<div class="fac-val">' + _esc(dirRec) + '</div>';
+
+    /* Insertar después de fp-zona */
+    var fpZonaRow = fpZona ? fpZona.closest('.fac-row') : null;
+    if (fpZonaRow && fpZonaRow.nextSibling) {
+      fac.insertBefore(row, fpZonaRow.nextSibling);
+    } else {
+      fac.appendChild(row);
+    }
+  }
+
+  /* ── Parchear enviarPedido (paquete): añadir dirección de recogida a las rows ── */
+  var _origEnviar = W.enviarPedido;
+  W.enviarPedido = async function (tipo) {
+    if (tipo !== 'paquete') return _origEnviar.apply(this, arguments);
+
+    /* Guardar dirección en _pqData antes de llamar al original */
+    var inpRec = document.getElementById('pq-dir-rec');
+    var dirRec = inpRec ? inpRec.value.trim() : '';
+    if (W._pqData) W._pqData.dirRecogida = dirRec;
+
+    /* Llamar cadena original */
+    var resultado = await _origEnviar.apply(this, arguments);
+    return resultado;
+  };
+
+  /* ── Parche FINAL: interceptar el fetch al GAS para añadir dirRecogida ── */
+  var GAS_MARCA = 'AKfycbyYpNT9yizFaHrxjKPq2TZkzroMUqXpCmdC_ztC-Y7WL3jov6E7IluzKX_dZRB80yHFpQ';
+
+  var _origFetch = window.fetch;
+  window.fetch = async function (url, opts) {
+    if (typeof url === 'string' && url.indexOf(GAS_MARCA) !== -1
+        && opts && opts.method === 'POST' && opts.mode === 'no-cors') {
+      try {
+        var body = JSON.parse(opts.body || '{}');
+        if (body.sede === 'wil-paqueteria' && body.rows && body.rows.length) {
+          var inpRec2 = document.getElementById('pq-dir-rec');
+          var dirRec2 = inpRec2 ? inpRec2.value.trim() : (W._pqData && W._pqData.dirRecogida ? W._pqData.dirRecogida : '');
+          if (dirRec2) {
+            /* Añadir como segunda fila de detalle (o anexar a la primera) */
+            /* La primera fila ya tiene barR en el texto "Recogida: ..."
+               Buscamos esa fila de texto y le añadimos la dirección */
+            var agregado = false;
+            for (var i = 0; i < body.rows.length; i++) {
+              var celG = (body.rows[i][6] || '').toString();
+              if (celG.indexOf('Recogida:') !== -1) {
+                body.rows[i][6] = celG + ' — Dir: ' + dirRec2;
+                agregado = true;
+                break;
+              }
+            }
+            /* Si no encontramos la fila de recogida, insertamos una nueva */
+            if (!agregado) {
+              body.rows.push([
+                '', '', '', '', '', '',
+                'Dir. recogida: ' + dirRec2,
+                '', 1, '', '',
+                '', '', '', '', '', '', '', '', '', '', '', ''
+              ]);
+            }
+            opts = Object.assign({}, opts, { body: JSON.stringify(body) });
+          }
+        }
+      } catch (ex) {
+        console.warn('[WIL dir-recogida] fetch patch:', ex.message);
+      }
+    }
+    return _origFetch.apply(this, arguments);
+  };
+
+  /* ── Limpiar al resetear el formulario ── */
+  var _origReset = W.resetAll;
+  if (typeof _origReset === 'function') {
+    W.resetAll = function () {
+      _origReset.apply(this, arguments);
+      _ocultarCampo();
+    };
+  }
+
+  /* ── Inyectar campo cuando el formulario ya esté en el DOM ── */
+  function _intentarInyectar() {
+    if (document.getElementById('pq-barrio-rec-txt')) {
+      _inyectarCampoDirRec();
+    } else {
+      setTimeout(_intentarInyectar, 300);
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _intentarInyectar);
+  } else {
+    setTimeout(_intentarInyectar, 0);
+  }
+
+  function _esc(t) {
+    return (t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  console.log('[WIL] ✅ Dir. recogida paquete — campo + factura + Sheets');
+
+})(window);
+</script>
+
+
+<script>
+  /* ═══════════════════════════════════════════════════════════════
+   WIL PATCH v5
+   1. Ocultar pill de tarifa en formulario paquete y libre
+      (se captura internamente, solo aparece en factura / Sheets)
+   2. Bloque de cuenta bancaria al seleccionar TRANSFERENCIA
+      (Pedido Libre P3 + Paquete factura + Libre factura)
+   3. Persistencia de pedido en curso (localStorage)
+      — si el usuario sale y regresa, retoma desde donde estaba
+═══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   WIL PATCH v5
+   1. Ocultar pill de tarifa en formulario paquete y libre
+      (se captura internamente, solo aparece en factura / Sheets)
+   2. Tarjeta bancaria al seleccionar TRANSFERENCIA
+      (Pedido Libre P3 + Paquete factura + Libre factura)
+      — Diseño tipo tarjeta real con número, chip dorado y
+        campo integrado para adjuntar comprobante
+   3. Persistencia de pedido en curso (localStorage)
+      — si el usuario sale y regresa, retoma desde donde estaba
+═══════════════════════════════════════════════════════════════ */
+;(function (W) {
+  'use strict';
+
+  /* ─────────────────────────────────────────────────────────
+     0. DATOS DE CUENTA — edita aquí
+  ───────────────────────────────────────────────────────── */
+  var CUENTA = {
+    banco:   'Bancolombia',
+    numero:  '55555555-5555',
+    titular: 'Domicilios WIL',
+    tipo:    'Cuenta de ahorros'
+  };
+
+  /* ─────────────────────────────────────────────────────────
+     1. CSS
+  ───────────────────────────────────────────────────────── */
+  var st = document.createElement('style');
+  st.textContent = `
+    /* Ocultar pills de tarifa en formulario */
+    #wil-tarifa-calc,
+    #pq-tarifa-pill { display: none !important; }
+
+    /* ── Tarjeta bancaria ── */
+    .wil-tf-block {
+      margin-top: 14px;
+      animation: wtbIn .22s ease;
+    }
+    @keyframes wtbIn {
+      from { opacity:0; transform:translateY(-6px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+
+    .wtb-card {
+      position: relative;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #006970 0%, #00898f 55%, #00a99d 100%);
+      padding: 22px 20px 18px;
+      color: #fff;
+      overflow: hidden;
+      box-shadow: 0 8px 28px rgba(0,105,112,.32);
+    }
+    .wtb-card::before {
+      content: ''; position: absolute;
+      top: -30px; right: -30px;
+      width: 140px; height: 140px; border-radius: 50%;
+      background: rgba(255,255,255,.07);
+    }
+    .wtb-card::after {
+      content: ''; position: absolute;
+      bottom: -40px; left: 30px;
+      width: 100px; height: 100px; border-radius: 50%;
+      background: rgba(255,255,255,.05);
+    }
+    .wtb-card-top {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; margin-bottom: 22px;
+    }
+    .wtb-card-lbl {
+      font-size: 9px; font-weight: 700;
+      letter-spacing: .1em; opacity: .6;
+      text-transform: uppercase; margin-bottom: 2px;
+    }
+    .wtb-card-banco { font-size: 13px; font-weight: 700; opacity: .85; }
+    .wtb-card-chip {
+      width: 34px; height: 26px; border-radius: 5px;
+      background: linear-gradient(135deg,#e8c97a,#c8a040);
+      position: relative; overflow: hidden; flex-shrink: 0;
+    }
+    .wtb-card-chip::after  { content:''; position:absolute; width:100%; height:1px; background:rgba(0,0,0,.18); top:50%; }
+    .wtb-card-chip::before { content:''; position:absolute; height:100%; width:1px; background:rgba(0,0,0,.18); left:50%; }
+    .wtb-card-num {
+      font-size: 19px; font-weight: 800;
+      letter-spacing: .18em; margin-bottom: 16px;
+      display: flex; align-items: center; gap: 8px;
+      font-family: 'Plus Jakarta Sans', monospace;
+    }
+    .wtb-card-num-dot { font-size: 22px; letter-spacing: .06em; opacity: .5; }
+    .wtb-card-bottom {
+      display: flex; justify-content: space-between; align-items: flex-end;
+    }
+    .wtb-card-val  { font-size: 13px; font-weight: 700; }
+    .wtb-card-tipo { font-size: 10px; opacity: .7; font-weight: 600; }
+
+    /* Botón copiar */
+    .wtb-copy-btn {
+      margin-top: 12px; width: 100%;
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+      padding: 12px; border-radius: 12px;
+      border: 1.5px solid rgba(0,105,112,.22);
+      background: rgba(0,105,112,.06);
+      color: #006970; font-size: 13px; font-weight: 700;
+      cursor: pointer; transition: background .15s, transform .1s;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .wtb-copy-btn:active { background: rgba(0,105,112,.14); transform: scale(.97); }
+
+    /* Upload comprobante */
+    .wtb-upload {
+      margin-top: 12px;
+      border: 1.5px dashed rgba(0,105,112,.28);
+      border-radius: 12px;
+      background: rgba(0,105,112,.04);
+      padding: 16px; cursor: pointer;
+      text-align: center; transition: background .15s;
+    }
+    .wtb-upload:active { background: rgba(0,105,112,.1); }
+    .wtb-upload-ico {
+      font-size: 26px; display: block; margin-bottom: 6px;
+      color: #006970;
+    }
+    .wtb-upload-tit { font-size: 13px; font-weight: 700; color: #006970; margin-bottom: 2px; }
+    .wtb-upload-sub { font-size: 11px; color: #7a8fa6; font-weight: 500; }
+
+    /* Preview comprobante adjunto */
+    .wtb-upload-done {
+      margin-top: 12px; border-radius: 12px;
+      border: 1.5px solid rgba(21,128,61,.25);
+      background: #f0fdf4;
+      padding: 12px 14px;
+      display: none; align-items: center; gap: 10px;
+    }
+    .wtb-upload-done-ico { font-size: 20px; color: #15803d; }
+    .wtb-upload-done-nom { flex: 1; font-size: 12px; font-weight: 700; color: #15803d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .wtb-upload-del {
+      background: none; border: none; cursor: pointer;
+      color: #7a8fa6; font-size: 13px; padding: 2px 6px; border-radius: 6px;
+    }
+    .wtb-nota {
+      margin-top: 10px; font-size: 11px;
+      color: #7a8fa6; line-height: 1.55;
+      font-weight: 500; text-align: center;
+    }
+
+    /* ── Banner "Pedido en curso" en la pantalla de inicio ── */
+    #wil-persist-banner {
+      margin: 0 16px 12px;
+      border: 1.5px solid var(--plb);
+      border-radius: var(--r-lg, 13px);
+      background: var(--pl);
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    #wil-persist-banner:active { background: var(--plb); }
+    .wpb-ico  { font-size: 26px; flex-shrink: 0; }
+    .wpb-txt  { flex: 1; min-width: 0; }
+    .wpb-tit  { font-size: 13px; font-weight: 800; color: var(--p, #006970); margin-bottom: 2px; }
+    .wpb-sub  { font-size: 11px; color: var(--on3); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .wpb-arrow { font-size: 20px; color: var(--p); flex-shrink: 0; }
+  `;
+  document.head.appendChild(st);
+
+  /* ─────────────────────────────────────────────────────────
+     2. BLOQUE TRANSFERENCIA — tarjeta bancaria + comprobante
+  ───────────────────────────────────────────────────────── */
+
+  /* Últimos 4 dígitos del número de cuenta para la tarjeta */
+  function _ultimos4() {
+    var partes = CUENTA.numero.split('-');
+    return partes[partes.length - 1];
+  }
+
+  /* HTML único del bloque (idSufijo = 'libre3' | 'paquete') */
+  function _htmlBloque(idSufijo) {
+    var uid = 'wtf_' + idSufijo;
+    return `
+<div class="wil-tf-block" id="${uid}">
+
+  <!-- Tarjeta visual -->
+  <div class="wtb-card">
+    <div class="wtb-card-top">
+      <div>
+        <div class="wtb-card-lbl">Banco</div>
+        <div class="wtb-card-banco">${CUENTA.banco}</div>
+      </div>
+      <div class="wtb-card-chip"></div>
+    </div>
+
+    <div class="wtb-card-num">
+      <span class="wtb-card-num-dot">••••</span>
+      <span class="wtb-card-num-dot">••••</span>
+      <span class="wtb-card-num-dot">••••</span>
+      <span>${_ultimos4()}</span>
+    </div>
+
+    <div class="wtb-card-bottom">
+      <div>
+        <div class="wtb-card-lbl">Titular</div>
+        <div class="wtb-card-val">${CUENTA.titular}</div>
+        <div class="wtb-card-tipo">${CUENTA.tipo}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="wtb-card-lbl">Número completo</div>
+        <div class="wtb-card-val">${CUENTA.numero}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Copiar número -->
+  <button class="wtb-copy-btn" onclick="wilCopiarCuenta(this)">
+    <span class="sym" style="font-size:16px">content_copy</span>
+    Copiar número de cuenta
+  </button>
+
+  <!-- Adjuntar comprobante -->
+  <div class="wtb-upload" id="uparea_${uid}"
+       onclick="document.getElementById('upinp_${uid}').click()">
+    <input type="file" id="upinp_${uid}" accept="image/*" capture="environment"
+      style="display:none"
+      onchange="wilSubirComprobante(this,'${uid}')"/>
+    <span class="sym wtb-upload-ico">add_photo_alternate</span>
+    <div class="wtb-upload-tit">Adjuntar comprobante de pago</div>
+    <div class="wtb-upload-sub">Toca para subir la foto · JPG, PNG · máx 4 MB</div>
+  </div>
+
+  <!-- Estado: comprobante listo -->
+  <div class="wtb-upload-done" id="updone_${uid}">
+    <span class="sym wtb-upload-done-ico">check_circle</span>
+    <span class="wtb-upload-done-nom" id="upnom_${uid}">comprobante.jpg</span>
+    <button class="wtb-upload-del"
+            onclick="wilEliminarComprobante(event,'${uid}')">✕</button>
+  </div>
+
+  <p class="wtb-nota">🛵 El domiciliario verifica el pago antes de salir.</p>
+
+</div>`;
+  }
+
+  /* ── Copiar número de cuenta ── */
+  W.wilCopiarCuenta = function (btn) {
+    var num = CUENTA.numero;
+    var _ok = function () {
+      if (btn) {
+        var orig = btn.innerHTML;
+        btn.innerHTML = '<span class="sym" style="font-size:16px">check_circle</span> ¡Copiado!';
+        setTimeout(function () { btn.innerHTML = orig; }, 2000);
+      }
+      if (typeof W.mostrarToast === 'function')
+        W.mostrarToast('Número ' + num + ' copiado ✓', 'content_copy');
+    };
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(num).then(_ok);
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = num; ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); _ok(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  };
+
+  /* ── Subir comprobante ── */
+  W.wilSubirComprobante = function (inp, uid) {
+    if (!inp.files || !inp.files[0]) return;
+    document.getElementById('uparea_' + uid).style.display = 'none';
+    var done = document.getElementById('updone_' + uid);
+    done.style.display = 'flex';
+    document.getElementById('upnom_' + uid).textContent = inp.files[0].name;
+    W._wilComprobante = W._wilComprobante || {};
+    W._wilComprobante[uid] = inp.files[0];
+  };
+
+  /* ── Eliminar comprobante ── */
+  W.wilEliminarComprobante = function (e, uid) {
+    e.stopPropagation();
+    var inp = document.getElementById('upinp_' + uid);
+    if (inp) inp.value = '';
+    document.getElementById('updone_' + uid).style.display = 'none';
+    document.getElementById('uparea_' + uid).style.display = 'block';
+    if (W._wilComprobante) delete W._wilComprobante[uid];
+  };
+
+  /* ── Mostrar / ocultar bloque según método de pago ── */
+  function _syncTransferBlock(contenedorId, pagoSel) {
+    var uid    = 'wtf_' + contenedorId;
+    var bloque = document.getElementById(uid);
+    if (pagoSel === 'TRANSFERENCIA') {
+      if (!bloque) {
+        var card = document.getElementById('pago-transferencia')
+                 || document.getElementById('pago-transferencia-p');
+        if (!card) return;
+        var grid = card.closest('.pago-ticket-grid') || card.closest('.pago-grid');
+        if (!grid) return;
+        grid.insertAdjacentHTML('afterend', _htmlBloque(contenedorId));
+      } else {
+        bloque.style.display = 'block';
+      }
+    } else {
+      if (bloque) bloque.style.display = 'none';
+    }
+  }
+
+  /* Parchear selectPago (Pedido Libre) */
+  var _origSelectPago = W.selectPago;
+  W.selectPago = function (tipo) {
+    if (typeof _origSelectPago === 'function') _origSelectPago.apply(this, arguments);
+    _syncTransferBlock('libre3', tipo);
+  };
+
+  /* Parchear selectPagoPaquete */
+  var _origSelectPagoPaq = W.selectPagoPaquete;
+  W.selectPagoPaquete = function (tipo) {
+    if (typeof _origSelectPagoPaq === 'function') _origSelectPagoPaq.apply(this, arguments);
+    _syncTransferBlock('paquete', tipo);
+  };
+
+  /* ─────────────────────────────────────────────────────────
+     3. PERSISTENCIA DE PEDIDO EN CURSO (localStorage)
+  ───────────────────────────────────────────────────────── */
+  var LS_KEY_LIBRE = 'wil_pedido_libre_v1';
+  var LS_KEY_PAQ   = 'wil_pedido_paquete_v1';
+  var LS_KEY_VIEW  = 'wil_vista_actual_v1';
+
+  /* Capturar datos actuales del formulario libre */
+  function _capturarLibre() {
+    try {
+      var L = W.WIL_LIBRE || {};
+      var data = {
+        ts: Date.now(),
+        vista: (W.state && W._vistaActual) || 'view-libre-1',
+        comercio:       L.comercio,
+        comercioNombre: L.comercioNombre || '',
+        destino:        L.destino,
+        barrioRec:      L.barrioRecogida || '',
+        barrioEnt:      L.barrioEntrega  || '',
+        tarifaDomi:     L.tarifaDomi     || 0,
+        direccion:      L.direccion      || '',
+        referencia:     L.referencia     || '',
+        recibeTel:      L.recibeTel      || '',
+        enviaNombre:    L.enviaNombre    || '',
+        enviaTel:       L.enviaTel       || '',
+        recibeNombre:   L.recibeNombre   || '',
+        nombre:         L.nombre         || '',
+        /* campos del formulario */
+        comercioInput:  (document.getElementById('comercio-nombre')         || {}).value || '',
+        dirMi:          (document.getElementById('wil-dir-mi')              || {}).value || '',
+        refMi:          (document.getElementById('wil-ref-mi')              || {}).value || '',
+        telMi:          (document.getElementById('wil-tel-mi')              || {}).value || '',
+        nombreMi:       (document.getElementById('wil-nombre-mi')           || {}).value || '',
+        dirOtro:        (document.getElementById('wil-dir-otro')            || {}).value || '',
+        refOtro:        (document.getElementById('wil-ref-otro')            || {}).value || '',
+        enviaNomInput:  (document.getElementById('wil-envia-nombre')        || {}).value || '',
+        enviaTelInput:  (document.getElementById('wil-envia-tel')           || {}).value || '',
+        recibeNomInput: (document.getElementById('wil-recibe-nombre')       || {}).value || '',
+        recibeTelInput: (document.getElementById('wil-recibe-tel')          || {}).value || '',
+        barrioRecTxt:   (document.getElementById('wil-barrio-recogida-txt') || {}).value || '',
+        barrioEntTxt:   (document.getElementById('wil-barrio-entrega-txt')  || {}).value || '',
+        barrioRecVal:   (document.getElementById('wil-barrio-recogida')     || {}).value || '',
+        barrioEntVal:   (document.getElementById('wil-barrio-entrega')      || {}).value || '',
+        barrioRecPrecio: ((document.getElementById('wil-barrio-recogida') || {}).dataset || {}).precio || '0',
+        barrioEntPrecio: ((document.getElementById('wil-barrio-entrega')  || {}).dataset || {}).precio || '0',
+        textoLibre:     (document.getElementById('libreTextoLibre')         || {}).value || '',
+        productos:      (W.state && W.state.productos) || [],
+        metodoPago:     W._wilPago || ''
+      };
+      localStorage.setItem(LS_KEY_LIBRE, JSON.stringify(data));
+    } catch (e) {}
+  }
+
+  /* Restaurar formulario libre */
+  function _restaurarLibre(data) {
+    try {
+      W.WIL_LIBRE = W.WIL_LIBRE || {};
+      var L = W.WIL_LIBRE;
+      L.comercio       = data.comercio;
+      L.comercioNombre = data.comercioNombre;
+      L.destino        = data.destino;
+      L.barrioRecogida = data.barrioRec;
+      L.barrioEntrega  = data.barrioEnt;
+      L.tarifaDomi     = data.tarifaDomi;
+      L.direccion      = data.direccion;
+      L.referencia     = data.referencia;
+      L.recibeTel      = data.recibeTel;
+      L.enviaNombre    = data.enviaNombre;
+      L.enviaTel       = data.enviaTel;
+      L.recibeNombre   = data.recibeNombre;
+      L.nombre         = data.nombre;
+
+      if (W.state && data.productos && data.productos.length) {
+        W.state.productos = data.productos;
+      }
+
+      setTimeout(function () {
+        _setVal('comercio-nombre',      data.comercioInput);
+        _setVal('wil-dir-mi',           data.dirMi);
+        _setVal('wil-ref-mi',           data.refMi);
+        _setVal('wil-tel-mi',           data.telMi);
+        _setVal('wil-nombre-mi',        data.nombreMi);
+        _setVal('wil-dir-otro',         data.dirOtro);
+        _setVal('wil-ref-otro',         data.refOtro);
+        _setVal('wil-envia-nombre',     data.enviaNomInput);
+        _setVal('wil-envia-tel',        data.enviaTelInput);
+        _setVal('wil-recibe-nombre',    data.recibeNomInput);
+        _setVal('wil-recibe-tel',       data.recibeTelInput);
+        _setVal('libreTextoLibre',      data.textoLibre);
+
+        /* Barrios */
+        var hidR = document.getElementById('wil-barrio-recogida');
+        var hidE = document.getElementById('wil-barrio-entrega');
+        var txtR = document.getElementById('wil-barrio-recogida-txt');
+        var txtE = document.getElementById('wil-barrio-entrega-txt');
+        if (hidR && data.barrioRecVal) { hidR.value = data.barrioRecVal; hidR.dataset.precio = data.barrioRecPrecio; }
+        if (hidE && data.barrioEntVal) { hidE.value = data.barrioEntVal; hidE.dataset.precio = data.barrioEntPrecio; }
+        if (txtR && data.barrioRecTxt) txtR.value = data.barrioRecTxt;
+        if (txtE && data.barrioEntTxt) txtE.value = data.barrioEntTxt;
+
+        if (data.comercio !== null && typeof W.wilSelComercio === 'function') {
+          W.wilSelComercio(data.comercio);
+        }
+        if (data.destino && typeof W.wilSelDestino === 'function') {
+          W.wilSelDestino(data.destino);
+        }
+        if (data.metodoPago && typeof W.selectPago === 'function') {
+          W.selectPago(data.metodoPago);
+        }
+        if (typeof W.wilCalcTarifa === 'function') W.wilCalcTarifa();
+        if (data.productos && data.productos.length && typeof W.wilRenderListaProductos === 'function') {
+          W.wilRenderListaProductos();
+        }
+      }, 400);
+    } catch (e) { console.warn('[WIL persist restaurar libre]', e); }
+  }
+
+  /* ── Auto-guardar cada vez que el usuario interactúa ── */
+  var _guardarTimer = null;
+  function _guardarConDebounce() {
+    clearTimeout(_guardarTimer);
+    _guardarTimer = setTimeout(_capturarLibre, 800);
+  }
+
+  document.addEventListener('input', function (e) {
+    var id = (e.target && e.target.id) || '';
+    var ids = ['comercio-nombre','wil-dir-mi','wil-ref-mi','wil-tel-mi','wil-nombre-mi',
+               'wil-dir-otro','wil-ref-otro','wil-envia-nombre','wil-envia-tel',
+               'wil-recibe-nombre','wil-recibe-tel','wil-barrio-recogida-txt',
+               'wil-barrio-entrega-txt','libreTextoLibre'];
+    if (ids.indexOf(id) !== -1) _guardarConDebounce();
+  });
+
+  /* Guardar al avanzar de paso */
+  ['wilGoLibre2','goLibre3Async','confirmarPedidoDirecto'].forEach(function (fn) {
+    var orig = W[fn];
+    if (typeof orig !== 'function') return;
+    W[fn] = function () { _capturarLibre(); return orig.apply(this, arguments); };
+  });
+
+  /* Limpiar al confirmar con éxito */
+  var _origEnviar = W.enviarPedido;
+  if (typeof _origEnviar === 'function') {
+    W.enviarPedido = async function (tipo) {
+      var r = await _origEnviar.apply(this, arguments);
+      try {
+        localStorage.removeItem(tipo === 'paquete' ? LS_KEY_PAQ : LS_KEY_LIBRE);
+        localStorage.removeItem(LS_KEY_VIEW);
+      } catch (e) {}
+      return r;
+    };
+  }
+  var _origConfDir = W.confirmarPedidoDirecto;
+  if (typeof _origConfDir === 'function') {
+    W.confirmarPedidoDirecto = async function () {
+      var r = await _origConfDir.apply(this, arguments);
+      try { localStorage.removeItem(LS_KEY_LIBRE); localStorage.removeItem(LS_KEY_VIEW); } catch (e) {}
+      return r;
+    };
+  }
+
+  /* ── Banner "Pedido en curso" en la pantalla de inicio ── */
+  function _mostrarBanner(data, tipo) {
+    if (document.getElementById('wil-persist-banner')) return;
+    var secDom = document.getElementById('sec-domicilios');
+    if (!secDom) return;
+
+    var ts  = new Date(data.ts);
+    var hora = ts.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+    var subtexto = tipo === 'paquete'
+      ? ('📦 Paquete · ' + (data.barE || 'Destino pendiente'))
+      : ('🛍️ Pedido libre · ' + (data.barrioEntTxt || data.barrioEnt || 'Dirección pendiente'));
+
+    var banner = document.createElement('div');
+    banner.id = 'wil-persist-banner';
+    banner.innerHTML =
+      '<div class="wpb-ico">🛵</div>'
+      + '<div class="wpb-txt">'
+      + '<div class="wpb-tit">Tienes un pedido sin confirmar</div>'
+      + '<div class="wpb-sub">' + subtexto + ' · ' + hora + '</div>'
+      + '</div>'
+      + '<span class="sym wpb-arrow">arrow_forward_ios</span>';
+
+    banner.addEventListener('click', function () {
+      banner.remove();
+      if (tipo === 'paquete') {
+        _restaurarPaquete(data);
+        if (typeof W.showView === 'function') W.showView('view-paquete-form');
+      } else {
+        _restaurarLibre(data);
+        var vista = data.vista || 'view-libre-1';
+        if (typeof W.showView === 'function') W.showView(vista);
+      }
+    });
+
+    secDom.parentNode.insertBefore(banner, secDom);
+
+    /* Botón descartar (X) */
+    var x = document.createElement('button');
+    x.style.cssText = 'position:absolute;top:6px;right:6px;background:none;border:none;cursor:pointer;color:var(--on3);font-size:16px;padding:4px 6px';
+    x.innerHTML = '✕';
+    x.addEventListener('click', function (e) {
+      e.stopPropagation();
+      try { localStorage.removeItem(tipo === 'paquete' ? LS_KEY_PAQ : LS_KEY_LIBRE); } catch (e2) {}
+      banner.remove();
+    });
+    banner.style.position = 'relative';
+    banner.appendChild(x);
+  }
+
+  /* ── Guardar vista actual ── */
+  var _origShowView = W.showView;
+  if (typeof _origShowView === 'function') {
+    W.showView = function (id) {
+      _origShowView.apply(this, arguments);
+      W._vistaActual = id;
+      var libreViews = ['view-libre-1','view-libre-2','view-libre-3'];
+      if (libreViews.indexOf(id) !== -1) {
+        try { localStorage.setItem(LS_KEY_VIEW, id); } catch (e) {}
+        _capturarLibre();
+      }
+      /* Ocultar banner al navegar a los forms */
+      var b = document.getElementById('wil-persist-banner');
+      if (b && id !== 'view-inicio') b.remove();
+    };
+  }
+
+  /* ── Restaurar paquete ── */
+  function _restaurarPaquete(data) {
+    setTimeout(function () {
+      _setVal('paquete-descripcion', data.desc || '');
+      _setVal('paquete-direccion',   data.dir  || '');
+      _setVal('paquete-referencia',  data.ref  || '');
+      _setVal('paquete-nombre',      data.nom  || '');
+      _setVal('paquete-telefono',    data.tel  || '');
+      _setVal('pq-envia-nom',        data.eNom || '');
+      _setVal('pq-envia-tel',        data.eTel || '');
+    }, 400);
+  }
+
+  /* ── Helper ── */
+  function _setVal(id, val) {
+    var el = document.getElementById(id);
+    if (el && val) el.value = val;
+  }
+
+  /* ── Verificar persistencia al cargar ── */
+  function _verificarPersistencia() {
+    var MAX_AGE = 4 * 60 * 60 * 1000; /* 4 horas */
+    var ahora   = Date.now();
+    try {
+      var rawLibre = localStorage.getItem(LS_KEY_LIBRE);
+      if (rawLibre) {
+        var dl = JSON.parse(rawLibre);
+        if (ahora - dl.ts < MAX_AGE && (dl.barrioEntTxt || dl.barrioEnt || dl.comercioInput)) {
+          _mostrarBanner(dl, 'libre');
+          return;
+        } else {
+          localStorage.removeItem(LS_KEY_LIBRE);
+        }
+      }
+      var rawPaq = localStorage.getItem(LS_KEY_PAQ);
+      if (rawPaq) {
+        var dp = JSON.parse(rawPaq);
+        if (ahora - dp.ts < MAX_AGE && (dp.dir || dp.nom)) {
+          _mostrarBanner(dp, 'paquete');
+        } else {
+          localStorage.removeItem(LS_KEY_PAQ);
+        }
+      }
+    } catch (e) {}
+  }
+
+  /* ── Guardar paquete al avanzar ── */
+  var _origGenPaq = W.generarFacturaPaquete;
+  if (typeof _origGenPaq === 'function') {
+    W.generarFacturaPaquete = function () {
+      try {
+        var dataPaq = {
+          ts:   Date.now(),
+          dir:  (document.getElementById('paquete-direccion')   || {}).value || '',
+          ref:  (document.getElementById('paquete-referencia')  || {}).value || '',
+          nom:  (document.getElementById('paquete-nombre')      || {}).value || '',
+          tel:  (document.getElementById('paquete-telefono')    || {}).value || '',
+          eNom: (document.getElementById('pq-envia-nom')        || {}).value || '',
+          eTel: (document.getElementById('pq-envia-tel')        || {}).value || '',
+          desc: (document.getElementById('paquete-descripcion') || {}).value || '',
+          barE: (document.getElementById('pq-barrio-ent-txt')   || {}).value || ''
+        };
+        localStorage.setItem(LS_KEY_PAQ, JSON.stringify(dataPaq));
+      } catch (e) {}
+      return _origGenPaq.apply(this, arguments);
+    };
+  }
+
+  /* ── Iniciar al cargar ── */
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _verificarPersistencia);
+  } else {
+    setTimeout(_verificarPersistencia, 600);
+  }
+
+  console.log('[WIL v5] ✅ Tarifa oculta · Tarjeta bancaria · Comprobante integrado · Persistencia pedido');
 
 })(window);
 
