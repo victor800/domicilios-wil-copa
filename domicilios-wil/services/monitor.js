@@ -41,9 +41,14 @@ async function getSheetsClient() {
   if (process.env.GOOGLE_CREDENTIALS) {
     let creds;
     try {
-      creds = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+      // Limpia saltos de línea literales que Vercel puede introducir,
+      // pero preserva los \n dentro del private_key (ya escapados en JSON)
+      const raw = process.env.GOOGLE_CREDENTIALS
+        .replace(/\r?\n\s*/g, ' ')  // newlines literales → espacio
+        .trim();
+      creds = JSON.parse(raw);
     } catch {
-      throw new Error('GOOGLE_CREDENTIALS no es un JSON válido');
+      throw new Error('GOOGLE_CREDENTIALS no es un JSON válido — pégalo minificado en Vercel');
     }
     auth = new google.auth.GoogleAuth({
       credentials: creds,
