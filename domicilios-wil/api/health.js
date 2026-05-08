@@ -18,3 +18,14 @@ module.exports = (req, res) => {
 
   res.json({ ok: true });
 };
+
+module.exports = (req, res) => {
+  console.log('HEALTH_SECRET configurada:', !!process.env.HEALTH_SECRET);
+  console.log('Header recibido:', req.headers['x-health-key']);
+
+  const secret = req.headers['x-health-key'];
+  if (secret !== process.env.HEALTH_SECRET) {
+    return res.status(401).json({ error: 'No autorizado' });
+  }
+  // ...
+};
