@@ -1561,7 +1561,7 @@ var BARRIOS_COPA=[
   {n:'Pedrera',z:'Zona 1',c:'#006970'},
   {n:'San Francisco',z:'Zona 1',c:'#006970'},
   {n:'Shangay',z:'Zona 1',c:'#006970'},
-  {n:'Simón Bolívar',z:'Zona 1',c:'#006970'},
+  {n:'Parque Copacabana',z:'Zona 1',c:'#006970'},
   {n:'Tobón Quintero',z:'Zona 1',c:'#006970'},
   {n:'Monte Verde',z:'Zona 1',c:'#006970'},
   {n:'Remanso',z:'Zona 1',c:'#006970'},
@@ -7670,16 +7670,17 @@ function _copiarFallback(txt){
 </script>
 
 <script>
-  /* ═══════════════════════════════════════════════════════════════════
-   WIL RASTREAR PATCH — v3.0
+/* ═══════════════════════════════════════════════════════════════════
+   WIL RASTREAR PATCH — v3.1
    ─────────────────────────────────────────────────────────────────
-   1. Polling tiempo real (3s) con anti-caché agresivo
-   2. FAB "Docs del domi" — siempre visible mientras hay pedido rastreado
-   3. Popup unificado:
-      • Factura Libre  → hoja FacturaLibre  col A=ID  col F=URL  col J=NOTA
-      • Tiempo espera  → hoja TiempoExtra   col A=ID  col H=MIN  col J=COBRO
-                         col K=SUPERÓ col P=URL_TARDANZA
-   4. Zoom de imagen con pinch/drag en móvil
+   CAMBIOS vs v3.0:
+   1. Hoja factura: FacturaPedidoLibre
+      col A(0)=ID_PEDIDO  col E(4)=URL_FACTURA  col H(8)=NOTA
+   2. Hoja TiempoExtra:
+      col A(0)=ID_PEDIDO  col H(7)=MIN_TOTAL  col J(9)=COBRO_EXTRA
+      col K(10)=SUPERÓ    col P(15)=URL_TARDANZA
+   3. Popup: etiquetas claras en cada sección de imagen
+   4. Card del domi: muestra MIN_TOTAL + COBRO_EXTRA + total con domi
 ═══════════════════════════════════════════════════════════════════ */
 ;(function (W) {
   'use strict';
@@ -7710,7 +7711,7 @@ function _copiarFallback(txt){
     return '$' + num.toLocaleString('es-CO');
   }
 
-  /* Fetch anti-caché: parámetros únicos en cada llamada */
+  /* Fetch anti-caché */
   function _fetchSheet(hoja, tq) {
     var ts  = Date.now();
     var rnd = Math.random().toString(36).slice(2, 8);
@@ -7741,7 +7742,7 @@ function _copiarFallback(txt){
   }
 
   /* ─────────────────────────────────────────────
-     1. POLLING TIEMPO REAL (reemplaza todos los timers previos)
+     1. POLLING TIEMPO REAL (3 s)
   ───────────────────────────────────────────── */
   var _poll = {
     timer:     null,
@@ -7753,7 +7754,6 @@ function _copiarFallback(txt){
   (function _killOldTimers() {
     if (W._rtPollTimer)       { clearInterval(W._rtPollTimer); W._rtPollTimer = null; }
     if (W._domiPollUbicTimer) { clearInterval(W._domiPollUbicTimer); W._domiPollUbicTimer = null; }
-    /* Limpiar rango amplio de IDs */
     var id = setInterval(function(){}, 99999);
     for (var k = Math.max(0, id - 500); k <= id; k++) clearInterval(k);
     clearInterval(id);
@@ -7765,21 +7765,17 @@ function _copiarFallback(txt){
 
     var txt;
     try {
-      /* Intentar primero con query SQL (más rápido y sin caché de Google) */
       txt = await _fetchSheet('Pedidos', "select * where A='" + p.id + "' limit 1");
     } catch (e) { return; }
 
     var lines = txt.trim().split('\n');
     var f0 = null;
 
-    /* La respuesta con tq puede tener 0 o 1 fila de datos */
     if (lines.length >= 2 && lines[1].trim()) {
       var tmp = _csv(lines[1]);
-      /* Verificar que el ID coincide */
       if ((tmp[0] || '').replace(/^#+/, '').trim() === p.id) f0 = tmp;
     }
 
-    /* Fallback: leer CSV completo */
     if (!f0) {
       try {
         var full = await _fetchSheet('Pedidos');
@@ -7792,7 +7788,6 @@ function _copiarFallback(txt){
     }
     if (!f0) return;
 
-    /* ── Extraer campos ── */
     var estado    = (f0[4]  || '').trim();
     var domi      = (f0[15] || '').trim();
     var hProceso  = (f0[16] || '').trim();
@@ -7802,17 +7797,15 @@ function _copiarFallback(txt){
     if (!estado) return;
 
     var clave = [estado, domi, hProceso, hCamino, hEntrega].join('|');
-    if (clave === _poll.ultimaClave) return; /* sin cambios */
+    if (clave === _poll.ultimaClave) return;
     _poll.ultimaClave = clave;
 
-    /* ── Actualizar state ── */
     p.estado        = estado;
     p.domiciliario  = domi       || p.domiciliario;
     p.horaEnProceso = hProceso   || p.horaEnProceso;
     p.horaEnCamino  = hCamino    || p.horaEnCamino;
     p.horaEntrego   = hEntrega   || p.horaEntrego;
 
-    /* ── Colores por estado ── */
     var COLS = {
       'Pendiente': '#f59e0b', 'Confirmado': '#3b82f6',
       'En camino': '#8b5cf6', 'Entregado':  '#16a34a', 'Cancelado': '#dc2626'
@@ -7835,28 +7828,23 @@ function _copiarFallback(txt){
     var elLbl = document.getElementById('estadoLabel');
     if (elLbl) { elLbl.textContent = LABELS[estado] || estado; elLbl.style.color = col; }
 
-    /* ── Stepper ── */
     _actualizarStepper(estado, {
       hora: p.hora, horaEnProceso: p.horaEnProceso,
       horaEnCamino: p.horaEnCamino, horaEntrego: p.horaEntrego
     });
 
-    /* ── Toast + vibrar ── */
     if (typeof W.mostrarToast === 'function') W.mostrarToast('Estado: ' + estado, 'update');
     if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
 
-    /* ── Calificar ── */
     var secCal = document.getElementById('seccionCalificar');
     if (secCal) secCal.style.display = (estado === 'Entregado') ? 'block' : 'none';
 
-    /* ── Card domi ── */
     if (domi && domi.trim()) _actualizarCardDomi(p, domi);
 
-    /* ── Detener si terminó ── */
     if (estado === 'Entregado' || estado === 'Cancelado') _stopPolling();
   }
 
-  /* ── Stepper actualizado ── */
+  /* ── Stepper ── */
   function _actualizarStepper(estado, horas) {
     var STEP_MAP = { 'Pendiente': 0, 'Confirmado': 1, 'En camino': 2, 'Entregado': 3, 'Cancelado': 0 };
     var STEP_LBLS = ['Recibido', 'Confirmado', 'En camino', 'Entregado'];
@@ -7935,7 +7923,7 @@ function _copiarFallback(txt){
     var destEl = document.getElementById('domiEstadoTxt');
     if (destEl) destEl.textContent = (etMap[p.estado] || p.estado) + (hc ? '  ·  ' + hc : '');
 
-    /* Foto: solo si no hay imagen ya */
+    /* Foto inicial */
     var avEl = document.getElementById('domiFotoWrap');
     if (avEl && !avEl.querySelector('img') && !_poll.fotos[nd]) {
       _poll.fotos[nd] = true;
@@ -7944,7 +7932,78 @@ function _copiarFallback(txt){
         + nd.charAt(0).toUpperCase() + '</div>';
       _cargarFotoDomiSheet(nd, avEl, p);
     }
+
+    /* ── NUEVO: mini-resumen tiempo extra en card del domi ── */
+    _actualizarCardTiempoExtra(p.id);
   }
+
+  /* Inyectar / actualizar el bloque de tiempo extra dentro de la card del domi */
+  /* ── Tiempo extra: se muestra en sección de productos, NO en card domi ── */
+async function _actualizarCardTiempoExtra(idPedido) {
+  if (!idPedido) return;
+
+  /* Siempre quitar el bloque naranja de la card del domi */
+  var blk = document.getElementById('domiCardTiempoExtra');
+  if (blk) blk.remove();
+
+  /* Quitar también la fila "Valor domicilio" del bottom */
+  var domiValRow = document.getElementById('rt-domi-val-row');
+  if (domiValRow) domiValRow.remove();
+
+  var datos;
+  try { datos = await _leerDocsPedido(idPedido); } catch (e) { return; }
+  if (!datos.tardanza) return;
+
+  var t     = datos.tardanza;
+  var min   = t.minTotal || 0;
+  var cobro = t.cobro    || 0;
+  if (!min && !cobro) return;
+
+  var totalPedido = (W.state && W.state.pedidoRastreado && W.state.pedidoRastreado.total)
+    ? parseInt(String(W.state.pedidoRastreado.total).replace(/[^\d]/g, '')) || 0
+    : 0;
+  var totalConExtra = totalPedido > 0 ? totalPedido + cobro : 0;
+
+  /* Agregar filas al final de la sección de productos */
+  var sec = document.getElementById('rtProductosSection');
+  if (!sec) return;
+
+  /* Quitar si ya existe para no duplicar */
+  var viejo = document.getElementById('rt-tiempo-extra-rows');
+  if (viejo) viejo.remove();
+
+  var div = document.createElement('div');
+  div.id = 'rt-tiempo-extra-rows';
+  div.style.cssText = 'border-top:1.5px dashed #e2e9ef;margin-top:4px;padding-top:6px';
+
+  var filas = '';
+
+  if (cobro > 0) {
+    filas += '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 14px">'
+      + '<div style="display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:700;color:#c2410c">'
+      + '<div style="width:26px;height:26px;border-radius:7px;background:rgba(239,68,68,.09);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">⏱</div>'
+      + 'Tiempo extra (' + min + ' min)</div>'
+      + '<div style="font-size:13px;font-weight:900;color:#dc2626">+' + _fmtCOP(cobro) + '</div>'
+      + '</div>';
+  } else if (min > 0) {
+    filas += '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 14px">'
+      + '<div style="display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:700;color:#15803d">'
+      + '<div style="width:26px;height:26px;border-radius:7px;background:rgba(21,128,61,.09);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">⏱</div>'
+      + 'Tiempo extra (' + min + ' min)</div>'
+      + '<div style="font-size:13px;font-weight:900;color:#15803d">Gratis</div>'
+      + '</div>';
+  }
+
+  if (totalConExtra > 0) {
+    filas += '<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:linear-gradient(90deg,rgba(0,105,112,.05),transparent);border-top:1.5px dashed #e2e9ef;margin-top:2px">'
+      + '<div style="font-size:12px;font-weight:800;color:#3d5068">Total del pedido</div>'
+      + '<div style="font-size:16px;font-weight:900;color:#006970">' + _fmtCOP(totalConExtra) + '</div>'
+      + '</div>';
+  }
+
+  div.innerHTML = filas;
+  sec.appendChild(div);
+}
 
   async function _cargarFotoDomiSheet(nd, avEl, p) {
     var primer = nd.split(' ')[0].toLowerCase().replace(/'/g, "\\'");
@@ -7957,7 +8016,6 @@ function _copiarFallback(txt){
         var dn  = (c[1] || '').trim().toLowerCase();
         if (!dn || (dn !== ndl && ndl.indexOf(dn) === -1 && dn.indexOf(ndl) === -1)) continue;
 
-        /* Foto col E */
         var foto = (c[4] || '').trim();
         if (foto && !avEl.querySelector('img')) {
           var furl = _driveUrl(foto);
@@ -7967,7 +8025,6 @@ function _copiarFallback(txt){
             + ini + '</div>\'">';
         }
 
-        /* Teléfono col C */
         var tel = (c[2] || '').trim().replace(/\D/g, '');
         if (tel) {
           var waBtn   = document.getElementById('domiWABtn');
@@ -7977,7 +8034,6 @@ function _copiarFallback(txt){
           if (callBtn) { callBtn.href = 'tel:+57' + tel; callBtn.style.display = 'flex'; }
         }
 
-        /* GPS col G */
         var act = (c[6] || '').trim();
         if (act && W.mapResult && W.domiMarkerResult) {
           var gm = act.match(/(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
@@ -7993,7 +8049,7 @@ function _copiarFallback(txt){
     _stopPolling();
     _poll.ultimaClave = '';
     _poll.fotos       = {};
-    _pollCiclo(); /* llamada inmediata */
+    _pollCiclo();
     _poll.timer = setInterval(_pollCiclo, 3000);
     console.log('[WIL Poll] ✅ Arrancado — 3s');
   }
@@ -8004,11 +8060,9 @@ function _copiarFallback(txt){
     try { if (W.WilNativo && W.WilNativo.detenerRastreo) W.WilNativo.detenerRastreo(); } catch (e) {}
   }
 
-  /* Exponer globalmente */
   W.rtIniciarPolling = _startPolling;
   W.rtDetenerPolling = _stopPolling;
 
-  /* Reactivar al volver a primer plano */
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState !== 'visible') return;
     var p = W.state && W.state.pedidoRastreado;
@@ -8021,7 +8075,6 @@ function _copiarFallback(txt){
     if (!_poll.timer) _startPolling(); else _pollCiclo();
   });
 
-  /* Hook rastrearPedido */
   (function () {
     var orig = W.rastrearPedido;
     if (typeof orig !== 'function') return;
@@ -8034,74 +8087,111 @@ function _copiarFallback(txt){
   })();
 
   /* ═══════════════════════════════════════════════════════════════
-     2. LECTURA DE HOJAS: FacturaLibre + TiempoExtra
+     2. LECTURA DE HOJAS
+     FacturaPedidoLibre: A(0)=ID_PEDIDO  E(4)=URL_FACTURA  H(8)=NOTA
+     TiempoExtra:        A(0)=ID_PEDIDO  H(7)=MIN_TOTAL  J(9)=COBRO_EXTRA
+                         K(10)=SUPERÓ  P(15)=URL_TARDANZA
   ═══════════════════════════════════════════════════════════════ */
 
-  var _docsCache = {}; /* id_pedido → { factura, tardanza } */
+  var _docsCache = {};
 
   async function _leerDocsPedido(idPedido) {
     if (_docsCache[idPedido]) return _docsCache[idPedido];
 
     var resultado = { factura: null, tardanza: null };
 
+    /* ── FacturaPedidoLibre ──
+       col A(0) = ID_PEDIDO
+       col E(4) = URL_FACTURA
+       col H(8) = NOTA
+    ── */
     try {
-      /* ── FacturaLibre: col A=ID, col F(5)=URL, col J(9)=NOTA ── */
-      var txtF  = await _fetchSheet('FacturaLibre', "select * where A='" + idPedido + "' limit 1");
-      var lnsF  = txtF.trim().split('\n');
-      /* Con tq la línea 1 es el dato (si existe) */
+      var txtF = await _fetchSheet('FacturaPedidoLibre', "select * where A='" + idPedido + "' limit 1");
+      var lnsF = txtF.trim().split('\n');
+
+      var cf = null;
+      /* Respuesta con tq: línea 0 = encabezados (si los hay), línea 1 = dato */
       if (lnsF.length >= 2 && lnsF[1].trim()) {
-        var cf = _csv(lnsF[1]);
-        /* Verificar ID en col A */
-        if ((cf[0] || '').replace(/^#+/, '').trim() === idPedido) {
-          var urlFact = (cf[5]  || '').trim();
-          var nota    = (cf[9]  || '').trim();
-          if (urlFact || nota) resultado.factura = { url: urlFact, nota: nota };
-        }
+        var tmp = _csv(lnsF[1]);
+        if ((tmp[0] || '').replace(/^#+/, '').trim() === idPedido) cf = tmp;
       }
-      /* Fallback sin tq */
-      if (!resultado.factura) {
-        var txtFF = await _fetchSheet('FacturaLibre');
+
+      /* Fallback: leer CSV completo si tq no devolvió fila */
+      if (!cf) {
+        var txtFF = await _fetchSheet('FacturaPedidoLibre');
         txtFF.trim().split('\n').slice(1).forEach(function (l) {
+          if (cf) return;
           var c = _csv(l);
-          if ((c[0] || '').replace(/^#+/, '').trim() === idPedido) {
-            var u = (c[5] || '').trim(), n = (c[9] || '').trim();
-            if (u || n) resultado.factura = { url: u, nota: n };
-          }
+          if ((c[0] || '').replace(/^#+/, '').trim() === idPedido) cf = c;
         });
       }
-    } catch (e) { console.warn('[FacturaLibre]', e.message); }
 
-    try {
-      /* ── TiempoExtra:
-         A(0)=PEDIDO_ID  H(7)=MIN_TOTAL  J(9)=COBRO_EXTRA
-         K(10)=SUPERÓ    P(15)=URL_TARDANZA
-      ── */
-      var txtT = await _fetchSheet('TiempoExtra');
-      txtT.trim().split('\n').slice(1).forEach(function (l) {
-        if (resultado.tardanza) return; /* solo primera coincidencia */
-        var c = _csv(l);
-        if ((c[0] || '').replace(/^#+/, '').trim() !== idPedido) return;
-        var minTotal = (c[7]  || '').trim();
-        var cobro    = (c[9]  || '').trim();
-        var supero   = (c[10] || '').trim();
-        var urlT     = (c[15] || '').trim();
-        if (minTotal || cobro || urlT) {
-          resultado.tardanza = {
-            minTotal: parseInt(minTotal) || 0,
-            cobro:    parseInt(cobro.replace(/[^\d]/g, '')) || 0,
-            supero:   supero,
-            url:      urlT
-          };
-        }
-      });
-    } catch (e) { console.warn('[TiempoExtra]', e.message); }
+      if (cf) {
+        var urlFact = (cf[4] || '').trim();   /* col E */
+        var nota    = (cf[8] || '').trim();   /* col H */
+        if (urlFact || nota) resultado.factura = { url: urlFact, nota: nota };
+      }
+    } catch (e) { console.warn('[FacturaPedidoLibre]', e.message); }
+
+    /* ── TiempoExtra ──
+       col A(0)  = ID_PEDIDO
+       col H(7)  = MIN_TOTAL
+       col J(9)  = COBRO_EXTRA
+       col K(10) = SUPERÓ
+       col P(15) = URL_TARDANZA
+    ── */
+   /* ── TiempoExtra ── */
+/* ── TiempoExtra ── */
+try {
+  var txtT = await _fetchSheet('TiempoExtra');
+  var linesT = txtT.trim().split('\n');
+  if (linesT.length < 2) throw new Error('Hoja vacía');
+
+  var headers = _csv(linesT[0]);
+  var idxId = 0, idxMin = 7, idxCobro = 9, idxSupero = 10, idxUrl = 15;
+
+  headers.forEach(function(h, i) {
+    var hh = h.replace(/"/g,'').trim().toUpperCase()
+               .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    if (hh === 'MIN_TOTAL'   || hh === 'MINTOTAL')       idxMin    = i;
+    if (hh === 'COBRO_EXTRA' || hh === 'COBROEXTRA')     idxCobro  = i;
+    if (hh === 'SUPERO'      || hh === 'SUPERO_15')      idxSupero = i;
+    if (hh === 'URL_TARDANZA'|| hh === 'URL')            idxUrl    = i;
+  });
+
+  /* Acumular datos de TODAS las filas con ese ID */
+  var acum = { minTotal: 0, cobro: 0, supero: '', url: '' };
+  var encontrado = false;
+
+  linesT.slice(1).forEach(function(l) {
+    var c = _csv(l);
+    if ((c[idxId] || '').replace(/^#+/, '').trim() !== idPedido) return;
+    encontrado = true;
+
+    var min   = parseInt((c[idxMin]   || '').trim()) || 0;
+    var cobro = parseInt((c[idxCobro] || '').replace(/[^\d]/g,'')) || 0;
+    var sup   = (c[idxSupero] || '').trim();
+    var url   = (c[idxUrl]   || '').trim();
+
+    if (min)   acum.minTotal = min;
+    if (cobro) acum.cobro   = cobro;
+    if (sup)   acum.supero  = sup;
+    if (url)   acum.url     = url;
+  });
+
+  if (encontrado && (acum.minTotal || acum.cobro || acum.url)) {
+    resultado.tardanza = acum;
+  }
+
+  console.log('[TiempoExtra] Resultado combinado →', acum);
+} catch (e) { console.warn('[TiempoExtra]', e.message); }
 
     _docsCache[idPedido] = resultado;
     return resultado;
   }
 
   /* ═══════════════════════════════════════════════════════════════
-     3. FAB "Documentos del pedido" + POPUP UNIFICADO
+     3. FAB + POPUP UNIFICADO
   ═══════════════════════════════════════════════════════════════ */
 
   /* ── CSS ── */
@@ -8173,7 +8263,7 @@ function _copiarFallback(txt){
         to   { transform: translateY(0);    opacity: 1; }
       }
 
-      /* Header gradient */
+      /* Header */
       #wil-docs-hdr {
         background: linear-gradient(135deg,#003d45,#006970,#00a3b4);
         padding: 14px 16px;
@@ -8216,7 +8306,22 @@ function _copiarFallback(txt){
       .wd-section-hdr-lbl {
         font-size: 12.5px; font-weight: 800; color: #18222e; flex: 1;
       }
+      /* Subtítulo de sección */
+      .wd-section-hdr-sub {
+        font-size: 10px; font-weight: 600; color: #7a8fa6;
+        margin-top: 1px;
+      }
       .wd-section-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+
+      /* Etiqueta de imagen — identifica qué es la foto */
+      .wd-img-label {
+        font-size: 10px; font-weight: 900; text-transform: uppercase;
+        letter-spacing: .06em; color: #0369a1;
+        background: #e0f2fe; border-radius: 6px;
+        padding: 3px 9px; display: inline-block;
+        margin-bottom: 6px;
+      }
+      .wd-img-label.orange { color: #c2410c; background: #ffedd5; }
 
       /* Nota burbuja */
       .wd-nota {
@@ -8270,9 +8375,7 @@ function _copiarFallback(txt){
       }
       .wd-img-collapse.open { max-height: 500px; opacity: 1; }
 
-      .wd-img-inner {
-        padding-top: 10px;
-      }
+      .wd-img-inner { padding-top: 10px; }
       .wd-img-wrap {
         border-radius: 14px; overflow: hidden;
         border: 1.5px solid #e0f2fe; cursor: zoom-in;
@@ -8428,7 +8531,6 @@ function _copiarFallback(txt){
       if (pct) pct.textContent = Math.round(_zm.sc * 100) + '%';
     }
 
-    /* Mouse */
     img.addEventListener('mousedown', function (e) {
       if (_zm.sc <= 1) return;
       _zm.drag = true; _zm.ox = e.clientX - _zm.tx; _zm.oy = e.clientY - _zm.ty;
@@ -8439,7 +8541,6 @@ function _copiarFallback(txt){
     });
     window.addEventListener('mouseup', function () { _zm.drag = false; img.style.cursor = 'grab'; });
 
-    /* Touch */
     img.addEventListener('touchstart', function (e) {
       var now = Date.now();
       if (e.touches.length === 1 && now - _zm.lastTap < 300) {
@@ -8462,7 +8563,6 @@ function _copiarFallback(txt){
     }, { passive: false });
     img.addEventListener('touchend', function () { if (_zm.sc < 1) { _zm.sc = 1; _zm.tx = 0; _zm.ty = 0; _ap(true); } }, { passive: true });
 
-    /* Fondo cierra */
     document.getElementById('wil-docs-zoom-area').addEventListener('click', function (e) {
       if (e.target !== img) W.wdZoomCerrar();
     });
@@ -8502,10 +8602,7 @@ function _copiarFallback(txt){
     if (img) { img.style.transition = 'transform .25s cubic-bezier(.22,1,.36,1)'; img.style.transform = 'translate(' + _zm.tx + 'px,' + _zm.ty + 'px) scale(' + _zm.sc + ')'; }
     if (pct) pct.textContent = Math.round(_zm.sc * 100) + '%';
   };
-  W.wdZoomReset = function () {
-    _zm.sc = 1; _zm.tx = 0; _zm.ty = 0;
-    W.wdZoomStep(0);
-  };
+  W.wdZoomReset = function () { _zm.sc = 1; _zm.tx = 0; _zm.ty = 0; W.wdZoomStep(0); };
 
   /* ─────────────────────────────────────────────
      ABRIR / CERRAR POPUP
@@ -8525,7 +8622,6 @@ function _copiarFallback(txt){
     ov.classList.add('wdopen');
     document.body.style.overflow = 'hidden';
 
-    /* Ocultar badge */
     var badge = document.getElementById('wil-docs-fab-badge');
     if (badge) badge.style.display = 'none';
   };
@@ -8536,16 +8632,15 @@ function _copiarFallback(txt){
     document.body.style.overflow = '';
   };
 
-  /* Toggle imagen colapsable */
   W.wdToggleImg = function (uid, tipo) {
     var col = document.getElementById('wdcol_' + uid);
     var btn = document.getElementById('wdbtn_' + uid);
-    var ico = document.getElementById('wdico_' + uid);
     if (!col) return;
     var open = col.classList.contains('open');
     col.classList.toggle('open', !open);
-    if (btn) btn.textContent = open ? ('📷 Ver ' + tipo) : ('🔼 Ocultar ' + tipo);
-    if (ico) ico.textContent = open ? 'expand_more' : 'expand_less';
+    if (btn) btn.innerHTML = open
+      ? '📷 Ver ' + tipo + ' <span style="font-size:16px">expand_more</span>'
+      : '🔼 Ocultar ' + tipo + ' <span style="font-size:16px">expand_less</span>';
   };
 
   /* ─────────────────────────────────────────────
@@ -8555,15 +8650,23 @@ function _copiarFallback(txt){
     var html = '';
     var hayAlgo = false;
 
-    /* ── Sección Factura Libre ── */
+    /* ══════════════════════════════
+       Sección 1 — Factura del domi
+       (hoja FacturaPedidoLibre)
+       col E = URL_FACTURA, col H = NOTA
+    ══════════════════════════════ */
     if (datos.factura && (datos.factura.url || datos.factura.nota)) {
       hayAlgo = true;
       var uid = ++_wdUid;
       var imgUrl = datos.factura.url ? _driveUrl(datos.factura.url) : '';
+
       html += '<div class="wd-section">'
         + '<div class="wd-section-hdr">'
         + '<div class="wd-section-hdr-ico" style="background:rgba(14,165,233,.1)">🧾</div>'
-        + '<span class="wd-section-hdr-lbl">Factura del domiciliario</span>'
+        + '<div style="flex:1;min-width:0">'
+        + '<div class="wd-section-hdr-lbl">Factura del domiciliario</div>'
+        + '<div class="wd-section-hdr-sub">Foto tomada por el domi en el comercio</div>'
+        + '</div>'
         + '</div>'
         + '<div class="wd-section-body">';
 
@@ -8576,37 +8679,47 @@ function _copiarFallback(txt){
 
       if (imgUrl) {
         html += '<button id="wdbtn_' + uid + '" class="wd-img-toggle-btn" onclick="wdToggleImg(' + uid + ',\'factura\')">'
-          + '📷 Ver factura adjunta'
-          + '<span class="sym" id="wdico_' + uid + '" style="font-size:16px">expand_more</span>'
+          + '📷 Ver factura adjunta <span style="font-size:16px"></span>'
           + '</button>'
           + '<div class="wd-img-collapse" id="wdcol_' + uid + '">'
           + '<div class="wd-img-inner">'
-          + '<div class="wd-img-wrap" onclick="wdZoomAbrir(\'' + _escAttr(imgUrl) + '\',\'FACTURA\')">'
-          + '<img src="' + _escAttr(imgUrl) + '" alt="Factura" '
-          + 'onerror="this.parentElement.innerHTML=\'<div style=padding:24px;text-align:center;color:#9aa5ae>⚠️ No se pudo cargar</div>\'">'
+          /* Etiqueta identificadora */
+          + '<span class="wd-img-label">📄 Foto de la factura del comercio</span>'
+          + '<div class="wd-img-wrap" onclick="wdZoomAbrir(\'' + _escAttr(imgUrl) + '\',\'FACTURA DEL DOMICILIARIO\')">'
+          + '<img src="' + _escAttr(imgUrl) + '" alt="Factura del comercio"'
+          + ' onerror="this.parentElement.innerHTML=\'<div style=padding:24px;text-align:center;color:#9aa5ae>⚠️ No se pudo cargar la factura</div>\'">'
           + '</div>'
-          + '<p class="wd-img-hint">Toca para ampliar · Pellizca para zoom</p>'
+          + '<p class="wd-img-hint">Esta es la factura que tomó el domiciliario en el comercio · Toca para ampliar</p>'
           + '</div></div>';
       }
 
       html += '</div></div>';
     }
 
-    /* ── Sección Tiempo de Espera ── */
+    /* ══════════════════════════════
+       Sección 2 — Tiempo de espera
+       (hoja TiempoExtra)
+       col H = MIN_TOTAL, col J = COBRO_EXTRA
+       col K = SUPERÓ, col P = URL_TARDANZA
+    ══════════════════════════════ */
     if (datos.tardanza && (datos.tardanza.minTotal || datos.tardanza.cobro || datos.tardanza.url)) {
       hayAlgo = true;
       var uid2  = ++_wdUid;
       var imgT  = datos.tardanza.url ? _driveUrl(datos.tardanza.url) : '';
       var min   = datos.tardanza.minTotal || 0;
-      var cobro = datos.tardanza.cobro || 0;
+      var cobro = datos.tardanza.cobro    || 0;
       var supero= (datos.tardanza.supero || '').toLowerCase();
-      var superoLabel = (supero === 'si' || supero === 'sí' || supero === 'yes') ? 'Sí superó' : (supero === 'no' ? 'No superó' : '—');
-      var chipColor   = (supero === 'si' || supero === 'sí') ? 'rojo' : 'verde';
+      var superoSi = (supero === 'si' || supero === 'sí' || supero === 'yes');
+      var superoLabel = superoSi ? 'Sí superó' : (supero === 'no' ? 'No superó' : '—');
+      var chipColor   = superoSi ? 'rojo' : 'verde';
 
       html += '<div class="wd-section">'
         + '<div class="wd-section-hdr">'
         + '<div class="wd-section-hdr-ico" style="background:rgba(245,158,11,.1)">⏱</div>'
-        + '<span class="wd-section-hdr-lbl">Cobro por tiempo de espera</span>'
+        + '<div style="flex:1;min-width:0">'
+        + '<div class="wd-section-hdr-lbl">Cobro por tiempo de espera</div>'
+        + '<div class="wd-section-hdr-sub">Tiempo que el domi esperó en el comercio</div>'
+        + '</div>'
         + '</div>'
         + '<div class="wd-section-body">'
         + '<div class="wd-chips">'
@@ -8626,28 +8739,29 @@ function _copiarFallback(txt){
         + '<div class="wd-chip-val" style="font-size:12px">' + _esc(superoLabel) + '</div>'
         + '<div class="wd-chip-lbl">Límite 15 min</div>'
         + '</div>'
-        + '</div>';
+        + '</div>'; /* cierre chips */
 
       if (cobro > 0) {
         html += '<div class="wd-nota" style="background:#fff7ed;border-color:#fdba74;color:#92400e">'
           + '<b class="wd-nota-lbl" style="color:#b45309">ℹ️ Detalle del cobro</b>'
           + 'El domiciliario esperó <strong>' + min + ' minutos</strong> en el comercio. '
-          + 'Los primeros 15 min son gratuitos. Se cobra <strong>' + _fmtCOP(cobro) + '</strong> adicional por tiempo extra.'
+          + 'Se cobra <strong>' + _fmtCOP(cobro) + '</strong> adicional por cada 15 minutos en el comercio, haciendo fila.'
           + '</div>';
       }
 
       if (imgT) {
         html += '<button id="wdbtn_' + uid2 + '" class="wd-img-toggle-btn orange" onclick="wdToggleImg(' + uid2 + ',\'comprobante\')">'
-          + '📷 Ver comprobante de espera'
-          + '<span class="sym" id="wdico_' + uid2 + '" style="font-size:16px">expand_more</span>'
+          + '📷 Ver comprobante de espera <span style="font-size:16px"></span>'
           + '</button>'
           + '<div class="wd-img-collapse" id="wdcol_' + uid2 + '">'
           + '<div class="wd-img-inner">'
-          + '<div class="wd-img-wrap orange-border" onclick="wdZoomAbrir(\'' + _escAttr(imgT) + '\',\'COMPROBANTE\')">'
-          + '<img src="' + _escAttr(imgT) + '" alt="Comprobante" '
-          + 'onerror="this.parentElement.innerHTML=\'<div style=padding:24px;text-align:center;color:#9aa5ae>⚠️ No se pudo cargar</div>\'">'
+          /* Etiqueta identificadora */
+          + '<span class="wd-img-label orange">⏱ Foto del comprobante de tiempo de espera</span>'
+          + '<div class="wd-img-wrap orange-border" onclick="wdZoomAbrir(\'' + _escAttr(imgT) + '\',\'COMPROBANTE DE TIEMPO DE ESPERA\')">'
+          + '<img src="' + _escAttr(imgT) + '" alt="Comprobante de espera"'
+          + ' onerror="this.parentElement.innerHTML=\'<div style=padding:24px;text-align:center;color:#9aa5ae>⚠️ No se pudo cargar el comprobante</div>\'">'
           + '</div>'
-          + '<p class="wd-img-hint" style="color:#b45309">Toca para ampliar · Pellizca para zoom</p>'
+          + '<p class="wd-img-hint" style="color:#b45309">Esta foto muestra el tiempo que esperó el domiciliario · Toca para ampliar</p>'
           + '</div></div>';
       }
 
@@ -8673,7 +8787,7 @@ function _copiarFallback(txt){
     if (!fab) return;
 
     var count = 0;
-    if (datos.factura && (datos.factura.url || datos.factura.nota)) count++;
+    if (datos.factura  && (datos.factura.url || datos.factura.nota)) count++;
     if (datos.tardanza && (datos.tardanza.minTotal || datos.tardanza.cobro || datos.tardanza.url)) count++;
 
     fab.style.cssText = 'display:flex;opacity:0;transform:translateY(12px)';
@@ -8692,26 +8806,31 @@ function _copiarFallback(txt){
     if (fab) fab.style.display = 'none';
     W.wdCerrarPopup();
     clearInterval(_wdPollDocs);
+    /* Limpiar bloque tiempo extra de la card del domi */
+    var blk = document.getElementById('domiCardTiempoExtra');
+    if (blk) blk.remove();
   }
 
   /* ─────────────────────────────────────────────
-     POLLING DE DOCUMENTOS (15 s) — detecta cuando el domi sube la factura
+     POLLING DE DOCUMENTOS (15 s)
   ───────────────────────────────────────────── */
   var _wdPollDocs = null;
 
   function _iniciarPollDocs(idPedido) {
     clearInterval(_wdPollDocs);
     _wdPollDocs = setInterval(async function () {
-      /* Si ya tenemos ambos, detenemos */
       if (_wdDatosActuales && _wdDatosActuales.factura && _wdDatosActuales.tardanza) {
         clearInterval(_wdPollDocs); return;
       }
-      delete _docsCache[idPedido]; /* invalidar caché para forzar re-lectura */
+      delete _docsCache[idPedido];
       var datos = await _leerDocsPedido(idPedido);
-      var hayAlgo = (datos.factura && (datos.factura.url || datos.factura.nota))
+      var hayAlgo = (datos.factura  && (datos.factura.url  || datos.factura.nota))
                  || (datos.tardanza && (datos.tardanza.minTotal || datos.tardanza.cobro || datos.tardanza.url));
       if (hayAlgo) {
         _mostrarFAB(datos);
+        /* Actualizar también la card del domi si hay tiempo extra nuevo */
+        var p = W.state && W.state.pedidoRastreado;
+        if (p && p.id) _actualizarCardTiempoExtra(p.id);
         if (typeof W.mostrarToast === 'function') W.mostrarToast('📄 Nuevos documentos disponibles', 'receipt_long');
         if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
       }
@@ -8719,7 +8838,7 @@ function _copiarFallback(txt){
   }
 
   /* ─────────────────────────────────────────────
-     HOOK EN rastrearPedido — cargar docs después de rastrear
+     HOOK EN rastrearPedido
   ───────────────────────────────────────────── */
   (function () {
     var orig = W.rastrearPedido;
@@ -8727,19 +8846,20 @@ function _copiarFallback(txt){
     W.rastrearPedido = async function () {
       _ocultarFAB();
       clearInterval(_wdPollDocs);
-      
       _docsCache = {};
       await orig.apply(this, arguments);
 
       var p = W.state && W.state.pedidoRastreado;
       if (!p || !p.id) return;
 
-      /* Cargar docs (sin bloquear la UI) */
       setTimeout(async function () {
         var datos = await _leerDocsPedido(p.id);
-        var hayAlgo = (datos.factura && (datos.factura.url || datos.factura.nota))
+        var hayAlgo = (datos.factura  && (datos.factura.url  || datos.factura.nota))
                    || (datos.tardanza && (datos.tardanza.minTotal || datos.tardanza.cobro || datos.tardanza.url));
-        if (hayAlgo) _mostrarFAB(datos);
+        if (hayAlgo) {
+          _mostrarFAB(datos);
+          _actualizarCardTiempoExtra(p.id);
+        }
         _iniciarPollDocs(p.id);
       }, 1000);
     };
@@ -8760,10 +8880,9 @@ function _copiarFallback(txt){
     }
   })();
 
-  console.log('[WIL Rastrear v3.0] ✅ Polling 3s + FAB + Popup unificado (Factura + TiempoExtra)');
+  console.log('[WIL Rastrear v3.1] ✅ FacturaPedidoLibre(E,H) + TiempoExtra(H,J) + Card domi + Etiquetas popup');
 
 })(window);
-
 </script>
 
 <script>
