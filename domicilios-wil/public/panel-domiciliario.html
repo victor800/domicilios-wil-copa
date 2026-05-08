@@ -855,7 +855,8 @@ body{min-height:100dvh;font-family:'Inter',sans-serif;background:#f8f9fa;color:#
     </div>
 
     <label class="dropzone" id="dropzone">
-      <input type="file" id="fileInput" Multiple accept="image/*" capture="environment" onchange="handleFile(this)" />
+     <input type="file" id="fileInput" multiple accept="image/*" onchange="handleFile(this)" />
+
       <div class="dz-empty" id="dzEmpty">
         <div class="cam-circle">
           <svg viewBox="0 0 24 24">
@@ -5971,7 +5972,7 @@ function _buildHTML(domiNum) {
     '<div id="wfl-form-wrap" style="max-height:0;overflow:hidden;opacity:0;transition:max-height .38s cubic-bezier(.22,1,.36,1),opacity .28s ease">' +
       '<div class="wfl-body">' +
         '<div id="wfl-btn-wrap">' +
-          '<input type="file" id="wfl-file-input" accept="image/*" capture="environment" style="display:none"/>' +
+          '<input type="file" id="wfl-file-input" accept="image/*" style="display:none"/' +
           '<button class="wfl-upload-btn" onclick="document.getElementById(\'wfl-file-input\').click()">' +
             '<span class="material-symbols-outlined" style="font-size:18px;font-variation-settings:\'FILL\' 1">add_a_photo</span>' +
             'Subir factura / comprobante' +
@@ -7907,24 +7908,34 @@ async function enviar() {
   }
 
   window.wilDocZoomAbrir = function(src, titulo) {
-    _zmCreate();
-    _ZM.sc = 1; _ZM.tx = 0; _ZM.ty = 0;
-    _ZM.img.src = src;
-    _ZM.img.style.transition = 'none';
-    _ZM.img.style.transform  = '';
-    if (_ZM.pct) _ZM.pct.textContent = '100%';
-    var titEl = document.getElementById('_wilDocZoomTitle');
-    if (titEl) titEl.textContent = titulo || 'DOCUMENTO';
-    _ZM.modal.classList.add('zopen');
-    document.body.style.overflow = 'hidden';
-    if (_ZM.hint) {
-      _ZM.hint.style.opacity = '1';
-      clearTimeout(_ZM._ht);
-      _ZM._ht = setTimeout(function() {
-        if (_ZM.hint) _ZM.hint.style.opacity = '0';
-      }, 3000);
+  _zmCreate();
+  _zm.sc = 1; _zm.tx = 0; _zm.ty = 0;
+  
+  // ✅ Decodificar URL si es necesario
+  var urlLimpia = src;
+  try {
+    // Si está doblemente codificada, decodificar
+    while (urlLimpia !== decodeURIComponent(urlLimpia)) {
+      urlLimpia = decodeURIComponent(urlLimpia);
     }
-  };
+  } catch(e) { /* no hacer nada */ }
+  
+  _ZM.img.src = urlLimpia;
+  _ZM.img.style.transition = 'none';
+  _ZM.img.style.transform  = '';
+  if (_ZM.pct) _ZM.pct.textContent = '100%';
+  var titEl = document.getElementById('_wilDocZoomTitle');
+  if (titEl) titEl.textContent = titulo || 'DOCUMENTO';
+  _ZM.modal.classList.add('zopen');
+  document.body.style.overflow = 'hidden';
+  if (_ZM.hint) {
+    _ZM.hint.style.opacity = '1';
+    clearTimeout(_ZM._ht);
+    _ZM._ht = setTimeout(function() {
+      if (_ZM.hint) _ZM.hint.style.opacity = '0';
+    }, 3000);
+  }
+};
 
   window.wilDocZoomCerrar = function() {
     if (_ZM.modal) _ZM.modal.classList.remove('zopen');
@@ -7947,6 +7958,12 @@ async function enviar() {
 
   /* Construye el bloque colapsable para un documento */
   function _docBlock(pedidoId, tipo) {
+    var url = tipo === 'factura'
+    ? (window._cacheFacturasHist  && window._cacheFacturasHist[pedidoId])  || ''
+    : (window._cacheTardanzaHist  && window._cacheTardanzaHist[pedidoId])  || '';
+
+  // ✅ LOG para depuración
+  console.log(`[DocBlock] ${tipo} para pedido ${pedidoId}: URL = ${url ? '✅ existe' : '❌ no encontrada'}`);
     var url = tipo === 'factura'
       ? (window._cacheFacturasHist  && window._cacheFacturasHist[pedidoId])  || ''
       : (window._cacheTardanzaHist  && window._cacheTardanzaHist[pedidoId])  || '';
@@ -7978,51 +7995,54 @@ async function enviar() {
     }
 
     /* Con URL → botón colapsable + imagen */
-    return (
-      '<div style="margin-bottom:2px" id="' + uid + '_wrap">'
+  /* Con URL → botón colapsable + imagen */
+return (
+  '<div style="margin-bottom:2px" id="' + uid + '_wrap">'
 
-        /* ── Botón ── */
-        + '<button class="wil-doc-btn ' + tipo + '" id="' + uid + '_btn"'
-          + ' onclick="(function(){'
-          + 'var p=document.getElementById(\'' + uid + '_panel\');'
-          + 'var b=document.getElementById(\'' + uid + '_btn\');'
-          + 'var ic=document.getElementById(\'' + uid + '_ic\');'
-          + 'var op=p.classList.contains(\'open\');'
-          + 'if(op){p.classList.remove(\'open\');b.classList.remove(\'open\');'
-          + 'ic.textContent=\'expand_more\';}' 
-          + 'else{p.classList.add(\'open\');b.classList.add(\'open\');'
-          + 'ic.textContent=\'expand_less\';}'
-          + '})()">'
-          + '<div class="wil-doc-ico">'
-            + '<span class="material-symbols-outlined" '
-              + 'style="font-size:16px;color:#fff;font-variation-settings:\'FILL\' 1">'
-              + (esFact ? 'receipt_long' : 'timer')
-            + '</span>'
-          + '</div>'
-          + '<span class="wil-doc-label">' + label + '</span>'
-          + '<span class="wil-doc-badge">' + badge + '</span>'
-          + '<span class="material-symbols-outlined wil-doc-chev" '
-            + 'id="' + uid + '_ic" '
-            + 'style="font-size:16px;color:currentColor">expand_more</span>'
-        + '</button>'
-
-        /* ── Panel ── */
-        + '<div class="wil-doc-panel" id="' + uid + '_panel">'
-          + '<div style="padding:2px 2px 4px">'
-            + '<img src="' + _escAttr(url) + '" '
-              + 'class="wil-doc-img ' + imgBorder + '" '
-              + 'alt="' + (esFact ? 'Factura' : 'Comprobante') + '" '
-              + 'onclick="wilDocZoomAbrir(\'' + _escAttr(url) + '\',\'' + _escAttr(titulo) + '\')"/>'
-            + '<p class="wil-doc-hint ' + tipo + '">'
-              + '<span class="material-symbols-outlined" style="font-size:12px;font-variation-settings:\'FILL\' 1">'
-              + 'zoom_in</span>'
-              + 'Toca la imagen para ampliar'
-            + '</p>'
-          + '</div>'
-        + '</div>'
-
+    /* ── Botón ── */
+    + '<button class="wil-doc-btn ' + tipo + '" id="' + uid + '_btn"'
+      + ' onclick="(function(){'
+      + 'var p=document.getElementById(\'' + uid + '_panel\');'
+      + 'var b=document.getElementById(\'' + uid + '_btn\');'
+      + 'var ic=document.getElementById(\'' + uid + '_ic\');'
+      + 'var op=p.classList.contains(\'open\');'
+      + 'if(op){p.classList.remove(\'open\');b.classList.remove(\'open\');'
+      + 'ic.textContent=\'expand_more\';}' 
+      + 'else{p.classList.add(\'open\');b.classList.add(\'open\');'
+      + 'ic.textContent=\'expand_less\';}'
+      + '})()">'
+      + '<div class="wil-doc-ico">'
+        + '<span class="material-symbols-outlined" '
+          + 'style="font-size:16px;color:#fff;font-variation-settings:\'FILL\' 1">'
+          + (esFact ? 'receipt_long' : 'timer')
+        + '</span>'
       + '</div>'
-    );
+      + '<span class="wil-doc-label">' + label + '</span>'
+      + '<span class="wil-doc-badge">' + badge + '</span>'
+      + '<span class="material-symbols-outlined wil-doc-chev" '
+        + 'id="' + uid + '_ic" '
+        + 'style="font-size:16px;color:currentColor">expand_more</span>'
+    + '</button>'
+
+    /* ── Panel ── */
+    + '<div class="wil-doc-panel" id="' + uid + '_panel">'
+      + '<div style="padding:8px 4px">'
+        // ✅ IMAGEN CORREGIDA - con evento onclick directo
+        + '<img src="' + _escAttr(url) + '" '
+          + 'class="wil-doc-img ' + imgBorder + '" '
+          + 'alt="' + (esFact ? 'Factura' : 'Comprobante') + '" '
+          + 'style="cursor:pointer;width:100%;max-height:280px;object-fit:contain;border-radius:11px" '
+          + 'onclick="wilZoomAbrir(\'' + _escAttr(url) + '\', \'' + _escAttr(titulo) + '\')" '
+          + 'onerror="this.parentElement.innerHTML=\'<div style=&quot;padding:20px;text-align:center;color:#9eaaac&quot;>⚠️ No se pudo cargar la imagen</div>\'" />'
+        + '<p class="wil-doc-hint ' + tipo + '">'
+          + '<span class="material-symbols-outlined" style="font-size:12px;font-variation-settings:\'FILL\' 1">zoom_in</span>'
+          + 'Toca la imagen para ampliar'
+        + '</p>'
+      + '</div>'
+    + '</div>'
+
+  + '</div>'
+);
   }
 
   /* Escapar atributos HTML */
