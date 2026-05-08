@@ -855,7 +855,7 @@ body{min-height:100dvh;font-family:'Inter',sans-serif;background:#f8f9fa;color:#
     </div>
 
     <label class="dropzone" id="dropzone">
-      <input type="file" id="fileInput" accept="image/*" capture="environment" onchange="handleFile(this)" />
+      <input type="file" id="fileInput" Multiple accept="image/*" capture="environment" onchange="handleFile(this)" />
       <div class="dz-empty" id="dzEmpty">
         <div class="cam-circle">
           <svg viewBox="0 0 24 24">
@@ -6149,6 +6149,9 @@ W.wflToggleFactura = function() {
      ✅ CORREGIDO: Sin dependencias de Utilities ni Drive API
      Envía: ID, CLIENTE, FECHA, HORA, IMAGEN (base64), TOTAL, DOMI, ESTADO, NOTA
   */
+
+  let _facturasEnviadas = [];
+
 W.wflEnviarFactura = async function () {
   var p = W.state && W.state.pedidoActivo;
   if (!p) { alert('Sin pedido activo'); return; }
@@ -6156,23 +6159,34 @@ W.wflEnviarFactura = async function () {
   var manInp = document.getElementById('wfl-manual-input');
   var nota   = (document.getElementById('wfl-nota-cliente') || {}).value || '';
   var totalV = parseInt(String((manInp || {}).value || '0').replace(/\D/g,''),10) || 0;
-
-  if (!totalV) { alert('Ingresa el valor de la factura'); return; }
-
-  /* Deshabilitar botones */
-  document.querySelectorAll('.wfl-enviar-btn').forEach(function(b){
-    b.disabled = true;
-    b.textContent = 'Guardando…';
-  });
-
   var domiNum = parseInt((_parseCOP(p.domicilio || '0')),10) || 0;
-  var urlFact = (_b64 && _mime) ? 'data:'+_mime+';base64,'+_b64 : '';
 
-  /* Payload — campos directos (no rows[]) */
-  var payload = {
-    accion:       'factura-libre',
+  // Obtener la imagen actual (si hay)
+  var nuevaFactura = null;
+  if (_b64 && _mime) {
+    nuevaFactura = 'data:' + _mime + ';base64,' + _b64;
+  }
+
+  // Si no hay imagen nueva pero hay facturas previas, usar las previas
+  if (!nuevaFactura && _facturasEnviadas.length === 0) {
+    alert('Selecciona una factura primero');
+    return;
+  }
+
+  // Acumular la nueva factura
+  if (nuevaFactura) {
+    _facturasEnviadas.push({
+      url: nuevaFactura,
+      timestamp: new Date().toISOString(),
+      total: totalV
+    });
+  }
+
+  // Construir payload con TODAS las facturas acumuladas
+  const payload = {
+    accion:       'factura-libre-append',  // NUEVA ACCIÓN
     pedidoId:     String(p.id || '').trim(),
-    cliente:      p.cliente   || '',
+    cliente:      p.cliente || '',
     domi:         (window.domi && window.domi.nombre) || '',
     fecha:        new Date().toLocaleDateString('es-CO',{timeZone:'America/Bogota'}),
     hora:         new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',timeZone:'America/Bogota'}),
@@ -6180,34 +6194,134 @@ W.wflEnviarFactura = async function () {
     domicilio:    domiNum,
     totalCobrar:  totalV + domiNum,
     nota:         nota.trim(),
-    imagen:       urlFact
+    nuevaFactura: nuevaFactura,           // Solo la nueva (para el GAS)
+    facturasPrevias: _facturasEnviadas.slice(0, -1).map(f => f.url), // Las anteriores
+    todasFacturas: _facturasEnviadas.map(f => f.url)  // Todas concatenadas
   };
 
-  console.log('[wflEnviar] payload →', JSON.stringify({...payload, imagen: urlFact ? '[base64 ok]' : 'sin-imagen'}));
+  console.log('[Factura] Enviando factura #' + _facturasEnviadas.length + ' para pedido ' + p.id);
 
   try {
-    var r = await fetch(GAS_URL, {
-      method:  'POST',
+    var r = await fetch(SCRIPT_URL_DOMI, {
+      method: 'POST',
       headers: {'Content-Type':'text/plain'},
-      body:    JSON.stringify(payload),
-      signal:  AbortSignal.timeout(28000)
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(35000)
     });
-    var json = await r.json().catch(function(){ return {ok:false,error:'respuesta no JSON'}; });
-    console.log('[wflEnviar] respuesta GAS →', json);
+    var json = await r.json();
 
-    if (!json.ok) throw new Error(json.error || 'GAS respondió ok=false');
-
-    /* ─ ÉXITO: colapsar form y mostrar resumen ─ */
-    _wflMostrarResumenExito(totalV, domiNum, urlFact);
-
+    if (json.ok) {
+      // ✅ Mostrar resumen de TODAS las facturas enviadas
+      _wflMostrarResumenConHistorial(totalV, domiNum, _facturasEnviadas);
+      
+      // 🟢 IMPORTANTE: NO limpiar _facturasEnviadas
+      // Solo limpiar el input y preview actual
+      _b64 = null;
+      _mime = null;
+      
+      // Limpiar el campo de entrada
+      var fileInput = document.getElementById('wfl-file-input');
+      if (fileInput) fileInput.value = '';
+      
+      // Ocultar preview actual pero mantener historial
+      var previewWrap = document.getElementById('wfl-preview-wrap');
+      var btnWrap = document.getElementById('wfl-btn-wrap');
+      if (previewWrap) previewWrap.style.display = 'none';
+      if (btnWrap) btnWrap.style.display = 'block';
+      
+      // Mostrar mensaje de éxito
+      _toastFactura('✅ Factura #' + _facturasEnviadas.length + ' agregada');
+      
+      // Opcional: resetear el input manual para la siguiente factura
+      if (manInp) manInp.value = '';
+      
+    } else {
+      throw new Error(json.error || 'Error al guardar');
+    }
   } catch(err) {
     console.error('[wflEnviar] ERROR →', err.message);
-    document.querySelectorAll('.wfl-enviar-btn').forEach(function(b){
-      b.disabled = false;
-      b.textContent = '⚠️ Reintentar';
-    });
     alert('Error: ' + err.message);
+    // En caso de error, NO agregar la factura al array
+    _facturasEnviadas.pop();
   }
+};
+
+// Función auxiliar para mostrar toast
+function _toastFactura(msg) {
+  var toast = document.createElement('div');
+  toast.textContent = msg;
+  toast.style.cssText = `
+    position:fixed;bottom:100px;left:50%;transform:translateX(-50%);
+    background:#2a9d5c;color:#fff;border-radius:20px;
+    padding:8px 18px;font-weight:800;font-size:12px;
+    z-index:9999;animation:fadeOut 2.5s ease forwards;
+    font-family:'Plus Jakarta Sans',sans-serif;
+  `;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
+}
+
+// Nuevo resumen que muestra historial
+function _wflMostrarResumenConHistorial(totalFact, domiNum, facturas) {
+  var fmtCOP = function(n){ 
+    return '$'+Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.'); 
+  };
+  
+  var existente = document.getElementById('wfl-exito-card');
+  if (existente) existente.remove();
+  
+  var facturasHtml = facturas.map((f, idx) => `
+    <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px dashed rgba(0,105,112,.08)">
+      <span class="material-symbols-outlined" style="font-size:14px;color:#006970">receipt</span>
+      <span style="flex:1;font-size:10px;color:#3c494b">Factura #${idx+1}</span>
+      <span style="font-size:9px;color:#9eaaac">${new Date(f.timestamp).toLocaleTimeString()}</span>
+      <button onclick="wilDocZoomAbrir('${f.url.replace(/'/g, "\\'")}', 'Factura #${idx+1}')" 
+        style="background:rgba(0,105,112,.1);border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px">🔍</button>
+    </div>
+  `).join('');
+  
+  var card = document.createElement('div');
+  card.id = 'wfl-exito-card';
+  card.style.cssText = 'background:#f0fdf4;border:1.5px solid #86efac;border-radius:14px;padding:12px 14px;margin-top:10px;animation:cardIn .3s ease both';
+  
+  card.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <span style="font-size:20px">✅</span>
+      <div><p style="font-family:Plus Jakarta Sans,sans-serif;font-weight:900;font-size:13px;color:#166534;margin:0">¡${facturas.length} factura(s) registrada(s)!</p></div>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <div style="flex:1;background:#fff;border-radius:10px;padding:7px;text-align:center;border:1px solid #86efac">
+        <p style="font-size:9px;font-weight:700;color:#6c7a7b">Total acumulado</p>
+        <p style="font-weight:900;font-size:13px;color:#006970">${fmtCOP(totalFact * facturas.length)}</p>
+      </div>
+      <div style="flex:1;background:#fff;border-radius:10px;padding:7px;text-align:center;border:1px solid #86efac">
+        <p style="font-size:9px;font-weight:700;color:#6c7a7b">🚚 Domicilio</p>
+        <p style="font-weight:900;font-size:13px;color:#006970">${fmtCOP(domiNum)}</p>
+      </div>
+      <div style="flex:1;background:rgba(0,105,112,.05);border-radius:10px;padding:7px;text-align:center;border:1px solid rgba(0,105,112,.2)">
+        <p style="font-size:9px;font-weight:700;color:#6c7a7b">Cobrar</p>
+        <p style="font-weight:900;font-size:13px;color:#006970">${fmtCOP((totalFact * facturas.length) + domiNum)}</p>
+      </div>
+    </div>
+    <div style="background:#f8f9fa;border-radius:8px;padding:8px;margin-top:6px">
+      <p style="font-size:9px;font-weight:800;color:#9eaaac;margin:0 0 5px">📎 Historial de facturas (${facturas.length})</p>
+      ${facturasHtml}
+    </div>
+    <div style="margin-top:8px;font-size:10px;color:#2a9d5c;text-align:center;border-top:1px solid #86efac;padding-top:6px">
+      + Puedes seguir agregando más facturas a este pedido
+    </div>
+  `;
+  
+  var body = document.querySelector('#wil-factura-libre-section .wfl-body');
+  if (body) body.appendChild(card);
+}
+
+// Limpiar historial SOLO cuando se inicia un nuevo pedido
+var _origAPERFactura = window.activarPedidoEnRuta;
+window.activarPedidoEnRuta = function(p) {
+  // Limpiar acumulador de facturas al cambiar de pedido
+  _facturasEnviadas = [];
+  if (typeof _origAPERFactura === 'function') _origAPERFactura.apply(this, arguments);
 };
 
 /* ─ Resumen visual post-envío ─ */
