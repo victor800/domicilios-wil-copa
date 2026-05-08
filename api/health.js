@@ -1,4 +1,4 @@
-const { sendTelegram, stats } = require('../services/monitor');
+const { sendTelegram, stats } = require('../src/services/monitor');
 
 module.exports = (req, res) => {
   sendTelegram(
