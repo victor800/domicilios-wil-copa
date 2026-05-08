@@ -81,6 +81,12 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .pghdr h2{font-size:24px;font-weight:800;margin-bottom:3px;}
 .pghdr p{font-size:12px;color:var(--text2);}
 
+.stag.cancelado {
+  background: var(--red-l);
+  color: var(--red);
+  border: 1px solid rgba(220,38,38,.2);
+}
+
 .sg{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
 .sc{background:var(--white);border:1.5px solid var(--border);border-radius:16px;padding:20px 18px;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s;}
 .sc:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(40,185,193,.09);}
@@ -1144,6 +1150,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
   <div class="tab"     data-f="proceso"   onclick="filterPed('proceso',this)">En proceso</div>
 <div class="tab"     data-f="encamino"  onclick="filterPed('encamino',this)">En camino</div>
 <div class="tab"     data-f="entregado" onclick="filterPed('entregado',this)">Entregados</div>
+ <div class="tab"     data-f="cancelado" onclick="filterPed('cancelado',this)">Cancelados</div>  
 </div>
  
     <!-- Separador -->
@@ -2102,6 +2109,7 @@ function col(a, i) { return (a[i] || '').trim(); }
 function normEstado(s) {
   const v = s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   if (v.includes('entregad'))                               return 'entregado';
+   if (v.includes('cancelad'))                               return 'cancelado';  
   if (v.includes('asignad'))                                return 'asignado';
   if (v.includes('camino'))                                 return 'encamino';   // ← NUEVO
   if (v.includes('proceso') || v.includes('ruta'))          return 'proceso';
@@ -2711,6 +2719,7 @@ function renderAll() {
 function renderOverview() {
   const tot  = allPedidos.length;
   const ent  = allPedidos.filter(p => p.estado === 'entregado').length;
+  const canc = allPedidos.filter(p => p.estado === 'cancelado').length;
   const pend = allPedidos.filter(p => p.estado === 'pendiente').length;
   const proc = allPedidos.filter(p => p.estado === 'proceso').length;
   const act  = allDrivers.filter(d => d.activo).length;
@@ -4907,6 +4916,7 @@ function renderPedidosTable(filter) {
          : filter === 'proceso'   ? allPedidos.filter(p => p.estado === 'proceso')
          : filter === 'encamino'  ? allPedidos.filter(p => p.estado === 'encamino')  // ← NUEVO
          : filter === 'entregado' ? allPedidos.filter(p => p.estado === 'entregado')
+         : filter === 'cancelado' ? allPedidos.filter(p => p.estado === 'cancelado') 
          : allPedidos;
  
   if (domiSel) list = list.filter(p => (p.domi || '') === domiSel);
@@ -4957,6 +4967,7 @@ function renderPedidosTable(filter) {
 p.estado === 'proceso'   ? 'En proceso'  :
 p.estado === 'encamino'  ? '🛵 En camino' :  // ← NUEVO
 p.estado === 'asignado'  ? '✦ Asignado'  :
+p.estado === 'cancelado' ? '❌ Cancelado' :
 'Pendiente'
       }</span>
     </td>
@@ -10305,6 +10316,7 @@ function _renderOverviewActivos() {
     asignado:  { dot:'#7c3aed', bg:'#ede9fe', ico:'person_pin_circle', lbl:'Asignado ✦'  },
     proceso:   { dot:'#2563eb', bg:'#dbeafe', ico:'local_shipping',    lbl:'En proceso'   },
     encamino:  { dot:'#7c3aed', bg:'#ede9fe', ico:'directions_bike',   lbl:'🛵 En camino' },
+    cancelado: { dot:'#dc2626', bg:'#fee2e2', ico:'cancel',            lbl:'❌ Cancelado' }
   };
   if (!actP.length) {
     pl.innerHTML = `<div class="empty-state"><div class="ico">${allPedidos.length > 0 ? '✅' : '📦'}</div>
