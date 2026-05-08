@@ -7435,6 +7435,616 @@ async function enviar() {
     alert('Error: ' + (err.message || 'Sin conexión. Intenta de nuevo.'));
   }
 }
+
+
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   WIL — PARCHE HISTORIAL: Factura + Comprobante Tardanza
+   ─────────────────────────────────────────────────────────────────
+   · Lee FacturaLibre  → columna F  (índice 5)  → URL factura
+   · Lee TiempoExtra   → columna P  (índice 15) → URL comprobante
+   · Ambas caches se cargan en paralelo al pedir historial
+   · En cada card del historial muestra (siempre visible en el drawer):
+       ┌─────────────────────────────────┐
+       │  📄 Ver Factura          [▼]   │  ← colapsa / expande
+       │  ⏱ Ver Comprobante       [▼]   │  ← colapsa / expande
+       └─────────────────────────────────┘
+   · Zoom modal completo con pinch, drag y botones +/−/⟳
+   · Se actualiza en tiempo real cada vez que fetchHistorialSheet corre
+═══════════════════════════════════════════════════════════════════ */
+(function patchHistorialDocs() {
+  'use strict';
+
+  var SHEET_ID = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+
+  /* ── Caches globales ── */
+  window._cacheFacturasHist  = window._cacheFacturasHist  || {};
+  window._cacheTardanzaHist  = window._cacheTardanzaHist  || {};
+
+  /* ══════════════════════════════════════════════
+     1. CARGA DE SHEETS
+  ══════════════════════════════════════════════ */
+
+  /* Leer FacturaLibre → col A (pedidoId) col F (url) */
+  async function _cargarFacturasLibre() {
+    try {
+      var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
+              + '/gviz/tq?tqx=out:csv&sheet=FacturaLibre&cachebust=' + Date.now();
+      var r = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+      if (!r.ok) return;
+      var lines = (await r.text()).trim().split('\n').filter(Boolean).slice(1);
+      var fresh = {};
+      lines.forEach(function(line) {
+        var cols = _csvLine(line);
+        var id   = (cols[0] || '').replace(/^"|"$/g,'').trim();
+        var u    = (cols[5] || '').replace(/^"|"$/g,'').trim(); /* col F = índice 5 */
+        if (id && u) fresh[id] = u;
+      });
+      window._cacheFacturasHist = fresh;
+      console.log('[Docs] FacturaLibre cargadas:', Object.keys(fresh).length);
+    } catch(e) {
+      console.warn('[Docs] FacturaLibre error:', e.message);
+    }
+  }
+
+  /* Leer TiempoExtra → col A (pedidoId) col P (url) */
+  async function _cargarTardanza() {
+    try {
+      var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
+              + '/gviz/tq?tqx=out:csv&sheet=TiempoExtra&cachebust=' + Date.now();
+      var r = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+      if (!r.ok) return;
+      var lines = (await r.text()).trim().split('\n').filter(Boolean).slice(1);
+      var fresh = {};
+      lines.forEach(function(line) {
+        var cols = _csvLine(line);
+        var id   = (cols[0]  || '').replace(/^"|"$/g,'').trim();
+        var u    = (cols[15] || '').replace(/^"|"$/g,'').trim(); /* col P = índice 15 */
+        if (id && u) fresh[id] = u;
+      });
+      window._cacheTardanzaHist = fresh;
+      console.log('[Docs] TiempoExtra cargadas:', Object.keys(fresh).length);
+    } catch(e) {
+      console.warn('[Docs] TiempoExtra error:', e.message);
+    }
+  }
+
+  function _csvLine(line) {
+    var cols = [], cur = '', inQ = false;
+    for (var i = 0; i < line.length; i++) {
+      var ch = line[i];
+      if (ch === '"') inQ = !inQ;
+      else if (ch === ',' && !inQ) { cols.push(cur); cur = ''; }
+      else cur += ch;
+    }
+    cols.push(cur);
+    return cols;
+  }
+
+  /* Cargar ambas en paralelo */
+  async function _cargarTodosLosDocs() {
+    await Promise.all([_cargarFacturasLibre(), _cargarTardanza()]);
+    /* Repintar historial si está activo */
+    if (typeof window.renderHistorial === 'function'
+        && window.currentTab === 'historial') {
+      window.renderHistorial();
+    }
+  }
+
+  /* ══════════════════════════════════════════════
+     2. ESTILOS
+  ══════════════════════════════════════════════ */
+  (function _inyectarCSS() {
+    if (document.getElementById('_wilDocsCSS')) return;
+    var s = document.createElement('style');
+    s.id = '_wilDocsCSS';
+    s.textContent =
+
+      /* ── Botón doc ── */
+      '.wil-doc-btn{'
+        + 'width:100%;padding:10px 13px;border-radius:12px;cursor:pointer;'
+        + 'display:flex;align-items:center;gap:9px;border:none;'
+        + 'transition:background .18s,box-shadow .18s;margin-bottom:7px;'
+        + 'text-align:left;font-family:inherit;}'
+
+      + '.wil-doc-btn.factura{'
+        + 'background:linear-gradient(135deg,rgba(0,105,112,.07),rgba(0,188,200,.04));'
+        + 'border:1.5px solid rgba(0,105,112,.22);color:#005a60;}'
+      + '.wil-doc-btn.factura:hover{'
+        + 'background:rgba(0,105,112,.12);border-color:rgba(0,105,112,.38);'
+        + 'box-shadow:0 3px 12px rgba(0,105,112,.14);}'
+      + '.wil-doc-btn.factura.open{'
+        + 'background:rgba(0,105,112,.1);border-color:rgba(0,105,112,.35);'
+        + 'border-style:solid;}'
+
+      + '.wil-doc-btn.tardanza{'
+        + 'background:linear-gradient(135deg,rgba(245,158,11,.07),rgba(249,115,22,.04));'
+        + 'border:1.5px solid rgba(245,158,11,.28);color:#92400e;}'
+      + '.wil-doc-btn.tardanza:hover{'
+        + 'background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.44);'
+        + 'box-shadow:0 3px 12px rgba(245,158,11,.16);}'
+      + '.wil-doc-btn.tardanza.open{'
+        + 'background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.4);'
+        + 'border-style:solid;}'
+
+      /* ícono botón */
+      + '.wil-doc-ico{'
+        + 'width:32px;height:32px;border-radius:9px;flex-shrink:0;'
+        + 'display:flex;align-items:center;justify-content:center;}'
+      + '.factura .wil-doc-ico{background:linear-gradient(135deg,#006970,#00bcc9);}'
+      + '.tardanza .wil-doc-ico{background:linear-gradient(135deg,#f59e0b,#f97316);}'
+
+      /* texto */
+      + '.wil-doc-label{'
+        + "font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;"
+        + 'font-size:12px;flex:1;}'
+
+      /* badge "Disponible" */
+      + '.wil-doc-badge{'
+        + 'font-size:9px;font-weight:800;padding:2px 8px;border-radius:20px;'
+        + 'white-space:nowrap;flex-shrink:0;}'
+      + '.factura .wil-doc-badge{'
+        + 'background:rgba(0,105,112,.1);color:#005a60;}'
+      + '.tardanza .wil-doc-badge{'
+        + 'background:rgba(245,158,11,.12);color:#92400e;}'
+
+      /* chevron animado */
+      + '.wil-doc-chev{'
+        + 'transition:transform .3s cubic-bezier(.22,1,.36,1);flex-shrink:0;}'
+      + '.wil-doc-btn.open .wil-doc-chev{transform:rotate(180deg);}'
+
+      /* panel colapsable */
+      + '.wil-doc-panel{'
+        + 'max-height:0;overflow:hidden;opacity:0;'
+        + 'transition:max-height .38s cubic-bezier(.22,1,.36,1),opacity .28s ease;'
+        + 'margin-bottom:0;}'
+      + '.wil-doc-panel.open{'
+        + 'max-height:440px;opacity:1;margin-bottom:8px;}'
+
+      /* imagen dentro del panel */
+      + '.wil-doc-img{'
+        + 'width:100%;max-height:320px;object-fit:contain;border-radius:11px;'
+        + 'border:1.5px solid #e7e8e9;display:block;background:#f8f9fa;'
+        + 'cursor:zoom-in;}'
+      + '.wil-doc-img.factura-border{border-color:rgba(0,105,112,.2);}'
+      + '.wil-doc-img.tardanza-border{border-color:rgba(245,158,11,.25);}'
+
+      /* hint bajo la imagen */
+      + '.wil-doc-hint{'
+        + 'font-size:10px;font-weight:700;margin:5px 0 8px;'
+        + 'display:flex;align-items:center;gap:4px;}'
+      + '.factura .wil-doc-hint{color:#2a9d5c;}'
+      + '.tardanza .wil-doc-hint{color:#b45309;}'
+
+      /* ── ZOOM MODAL ── */
+      + '#_wilDocZoom{'
+        + 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.96);'
+        + 'display:none;flex-direction:column;'
+        + 'align-items:stretch;justify-content:stretch;'
+        + 'touch-action:none;user-select:none;-webkit-user-select:none;}'
+      + '#_wilDocZoom.zopen{display:flex;animation:_wilDZFI .2s ease both;}'
+      + '@keyframes _wilDZFI{from{opacity:0}to{opacity:1}}'
+
+      + '#_wilDocZoomBar{'
+        + 'display:flex;align-items:center;justify-content:space-between;'
+        + 'padding:14px 16px;flex-shrink:0;gap:10px;}'
+      + '#_wilDocZoomTitle{'
+        + "font-family:'Plus Jakarta Sans',sans-serif;"
+        + 'font-weight:800;font-size:12px;color:rgba(255,255,255,.65);'
+        + 'letter-spacing:.05em;text-transform:uppercase;flex:1;}'
+      + '#_wilDocZoomClose{'
+        + 'width:40px;height:40px;border-radius:50%;'
+        + 'background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.22);'
+        + 'color:#fff;font-size:19px;cursor:pointer;display:flex;'
+        + 'align-items:center;justify-content:center;flex-shrink:0;'
+        + 'transition:background .15s;-webkit-tap-highlight-color:transparent;}'
+      + '#_wilDocZoomClose:active{background:rgba(255,255,255,.28);}'
+
+      + '#_wilDocZoomArea{'
+        + 'flex:1;overflow:hidden;position:relative;display:flex;'
+        + 'align-items:center;justify-content:center;}'
+      + '#_wilDocZoomImg{'
+        + 'max-width:100%;max-height:100%;object-fit:contain;'
+        + 'transform-origin:center center;will-change:transform;'
+        + 'cursor:grab;-webkit-user-drag:none;}'
+      + '#_wilDocZoomImg.grab{cursor:grabbing;}'
+
+      + '#_wilDocZoomCtrls{'
+        + 'display:flex;align-items:center;justify-content:center;'
+        + 'gap:10px;padding:14px;flex-shrink:0;}'
+      + '.wdz-btn{'
+        + 'width:46px;height:46px;border-radius:50%;'
+        + 'background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.2);'
+        + 'color:#fff;font-size:22px;cursor:pointer;display:flex;'
+        + 'align-items:center;justify-content:center;'
+        + 'transition:background .15s,transform .12s;'
+        + '-webkit-tap-highlight-color:transparent;}'
+      + '.wdz-btn:active{background:rgba(255,255,255,.28);transform:scale(.88);}'
+      + '#_wilDocZoomPct{'
+        + "font-family:'Plus Jakarta Sans',sans-serif;"
+        + 'font-weight:900;font-size:13px;color:rgba(255,255,255,.7);'
+        + 'min-width:52px;text-align:center;}'
+
+      + '#_wilDocZoomHint{'
+        + 'position:absolute;bottom:76px;left:50%;transform:translateX(-50%);'
+        + 'background:rgba(0,0,0,.5);backdrop-filter:blur(4px);'
+        + 'color:rgba(255,255,255,.6);border-radius:20px;padding:5px 14px;'
+        + 'font-size:11px;font-weight:600;pointer-events:none;white-space:nowrap;'
+        + "font-family:'Plus Jakarta Sans',sans-serif;"
+        + 'transition:opacity .5s;opacity:1;}';
+
+    document.head.appendChild(s);
+  })();
+
+  /* ══════════════════════════════════════════════
+     3. ZOOM MODAL
+  ══════════════════════════════════════════════ */
+  var _ZM = { sc:1, tx:0, ty:0, dragging:false, ox:0, oy:0,
+              p0:0, s0:1, lastTap:0, MIN:.4, MAX:8,
+              modal:null, img:null, pct:null, hint:null };
+
+  function _zmCreate() {
+    if (document.getElementById('_wilDocZoom')) {
+      _ZM.modal = document.getElementById('_wilDocZoom');
+      _ZM.img   = document.getElementById('_wilDocZoomImg');
+      _ZM.pct   = document.getElementById('_wilDocZoomPct');
+      _ZM.hint  = document.getElementById('_wilDocZoomHint');
+      return;
+    }
+    var m = document.createElement('div');
+    m.id = '_wilDocZoom';
+    m.innerHTML =
+      '<div id="_wilDocZoomBar">'
+        + '<span id="_wilDocZoomTitle">DOCUMENTO</span>'
+        + '<button id="_wilDocZoomClose" onclick="wilDocZoomCerrar()">✕</button>'
+      + '</div>'
+      + '<div id="_wilDocZoomArea">'
+        + '<img id="_wilDocZoomImg" src="" alt=""/>'
+        + '<div id="_wilDocZoomHint">Pellizca · Arrastra · Doble tap para ajustar</div>'
+      + '</div>'
+      + '<div id="_wilDocZoomCtrls">'
+        + '<button class="wdz-btn" onclick="wilDocZoomStep(-0.4)">−</button>'
+        + '<span id="_wilDocZoomPct">100%</span>'
+        + '<button class="wdz-btn" onclick="wilDocZoomStep(0.4)">+</button>'
+        + '<button class="wdz-btn" style="font-size:16px" onclick="wilDocZoomReset()">⟳</button>'
+      + '</div>';
+    document.body.appendChild(m);
+
+    _ZM.modal = m;
+    _ZM.img   = document.getElementById('_wilDocZoomImg');
+    _ZM.pct   = document.getElementById('_wilDocZoomPct');
+    _ZM.hint  = document.getElementById('_wilDocZoomHint');
+
+    /* — mouse — */
+    _ZM.img.addEventListener('mousedown', function(e) {
+      if (_ZM.sc <= 1) return;
+      _ZM.dragging = true;
+      _ZM.ox = e.clientX - _ZM.tx;
+      _ZM.oy = e.clientY - _ZM.ty;
+      _ZM.img.classList.add('grab');
+      e.preventDefault();
+    });
+    window.addEventListener('mousemove', function(e) {
+      if (!_ZM.dragging) return;
+      _ZM.tx = e.clientX - _ZM.ox;
+      _ZM.ty = e.clientY - _ZM.oy;
+      _zmApply();
+    });
+    window.addEventListener('mouseup', function() {
+      _ZM.dragging = false;
+      _ZM.img.classList.remove('grab');
+    });
+
+    /* — touch — */
+    _ZM.img.addEventListener('touchstart', function(e) {
+      var now = Date.now();
+      if (e.touches.length === 1 && now - _ZM.lastTap < 300) {
+        _ZM.sc = _ZM.sc > 1.2 ? 1 : 2.5;
+        _ZM.tx = 0; _ZM.ty = 0;
+        _zmApply(true);
+        _ZM.lastTap = 0;
+        return;
+      }
+      _ZM.lastTap = now;
+      if (e.touches.length === 1) {
+        _ZM.ox = e.touches[0].clientX - _ZM.tx;
+        _ZM.oy = e.touches[0].clientY - _ZM.ty;
+      } else if (e.touches.length === 2) {
+        _ZM.p0 = Math.hypot(
+          e.touches[1].clientX - e.touches[0].clientX,
+          e.touches[1].clientY - e.touches[0].clientY
+        );
+        _ZM.s0 = _ZM.sc;
+      }
+    }, { passive: true });
+
+    _ZM.img.addEventListener('touchmove', function(e) {
+      e.preventDefault();
+      if (e.touches.length === 1 && _ZM.sc > 1) {
+        _ZM.tx = e.touches[0].clientX - _ZM.ox;
+        _ZM.ty = e.touches[0].clientY - _ZM.oy;
+        _zmApply();
+      } else if (e.touches.length === 2) {
+        var d = Math.hypot(
+          e.touches[1].clientX - e.touches[0].clientX,
+          e.touches[1].clientY - e.touches[0].clientY
+        );
+        _ZM.sc = Math.min(_ZM.MAX, Math.max(_ZM.MIN, _ZM.s0 * (d / _ZM.p0)));
+        _zmApply();
+      }
+    }, { passive: false });
+
+    _ZM.img.addEventListener('touchend', function() {
+      if (_ZM.sc < 1) { _ZM.sc = 1; _ZM.tx = 0; _ZM.ty = 0; _zmApply(true); }
+    }, { passive: true });
+
+    document.getElementById('_wilDocZoomArea').addEventListener('click', function(e) {
+      if (e.target !== _ZM.img) wilDocZoomCerrar();
+    });
+  }
+
+  function _zmApply(anim) {
+    if (!_ZM.img) return;
+    _ZM.img.style.transition = anim ? 'transform .25s cubic-bezier(.22,1,.36,1)' : 'none';
+    _ZM.img.style.transform  = 'translate('+_ZM.tx+'px,'+_ZM.ty+'px) scale('+_ZM.sc+')';
+    if (_ZM.pct) _ZM.pct.textContent = Math.round(_ZM.sc * 100) + '%';
+  }
+
+  window.wilDocZoomAbrir = function(src, titulo) {
+    _zmCreate();
+    _ZM.sc = 1; _ZM.tx = 0; _ZM.ty = 0;
+    _ZM.img.src = src;
+    _ZM.img.style.transition = 'none';
+    _ZM.img.style.transform  = '';
+    if (_ZM.pct) _ZM.pct.textContent = '100%';
+    var titEl = document.getElementById('_wilDocZoomTitle');
+    if (titEl) titEl.textContent = titulo || 'DOCUMENTO';
+    _ZM.modal.classList.add('zopen');
+    document.body.style.overflow = 'hidden';
+    if (_ZM.hint) {
+      _ZM.hint.style.opacity = '1';
+      clearTimeout(_ZM._ht);
+      _ZM._ht = setTimeout(function() {
+        if (_ZM.hint) _ZM.hint.style.opacity = '0';
+      }, 3000);
+    }
+  };
+
+  window.wilDocZoomCerrar = function() {
+    if (_ZM.modal) _ZM.modal.classList.remove('zopen');
+    document.body.style.overflow = '';
+  };
+
+  window.wilDocZoomStep = function(d) {
+    _ZM.sc = Math.min(_ZM.MAX, Math.max(_ZM.MIN, _ZM.sc + d));
+    if (_ZM.sc === 1) { _ZM.tx = 0; _ZM.ty = 0; }
+    _zmApply(true);
+  };
+
+  window.wilDocZoomReset = function() {
+    _ZM.sc = 1; _ZM.tx = 0; _ZM.ty = 0; _zmApply(true);
+  };
+
+  /* ══════════════════════════════════════════════
+     4. BUILDERS DE BLOQUE HTML
+  ══════════════════════════════════════════════ */
+
+  /* Construye el bloque colapsable para un documento */
+  function _docBlock(pedidoId, tipo) {
+    var url = tipo === 'factura'
+      ? (window._cacheFacturasHist  && window._cacheFacturasHist[pedidoId])  || ''
+      : (window._cacheTardanzaHist  && window._cacheTardanzaHist[pedidoId])  || '';
+
+    var esFact = tipo === 'factura';
+    var uid    = '_wdoc_' + tipo + '_' + String(pedidoId).replace(/\W/g,'') + '_' + Math.random().toString(36).slice(2,6);
+    var label  = esFact ? '📄 Ver Factura' : '⏱ Ver Comprobante Tardanza';
+    var titulo = esFact ? 'FACTURA #' + pedidoId : 'COMPROBANTE TARDANZA #' + pedidoId;
+    var imgBorder = esFact ? 'factura-border' : 'tardanza-border';
+    var badge  = esFact ? '📎 Factura' : '📸 Comprobante';
+
+    if (!url) {
+      /* Sin URL → botón deshabilitado (siempre visible pero inactivo) */
+      return (
+        '<div style="margin-bottom:7px">'
+          + '<button class="wil-doc-btn ' + tipo + '" disabled '
+            + 'style="opacity:.38;cursor:not-allowed;pointer-events:none">'
+            + '<div class="wil-doc-ico">'
+              + '<span class="material-symbols-outlined" '
+                + 'style="font-size:16px;color:#fff;font-variation-settings:\'FILL\' 1">'
+                + (esFact ? 'receipt_long' : 'timer')
+              + '</span>'
+            + '</div>'
+            + '<span class="wil-doc-label">' + label + '</span>'
+            + '<span class="wil-doc-badge">Sin registro</span>'
+          + '</button>'
+        + '</div>'
+      );
+    }
+
+    /* Con URL → botón colapsable + imagen */
+    return (
+      '<div style="margin-bottom:2px" id="' + uid + '_wrap">'
+
+        /* ── Botón ── */
+        + '<button class="wil-doc-btn ' + tipo + '" id="' + uid + '_btn"'
+          + ' onclick="(function(){'
+          + 'var p=document.getElementById(\'' + uid + '_panel\');'
+          + 'var b=document.getElementById(\'' + uid + '_btn\');'
+          + 'var ic=document.getElementById(\'' + uid + '_ic\');'
+          + 'var op=p.classList.contains(\'open\');'
+          + 'if(op){p.classList.remove(\'open\');b.classList.remove(\'open\');'
+          + 'ic.textContent=\'expand_more\';}' 
+          + 'else{p.classList.add(\'open\');b.classList.add(\'open\');'
+          + 'ic.textContent=\'expand_less\';}'
+          + '})()">'
+          + '<div class="wil-doc-ico">'
+            + '<span class="material-symbols-outlined" '
+              + 'style="font-size:16px;color:#fff;font-variation-settings:\'FILL\' 1">'
+              + (esFact ? 'receipt_long' : 'timer')
+            + '</span>'
+          + '</div>'
+          + '<span class="wil-doc-label">' + label + '</span>'
+          + '<span class="wil-doc-badge">' + badge + '</span>'
+          + '<span class="material-symbols-outlined wil-doc-chev" '
+            + 'id="' + uid + '_ic" '
+            + 'style="font-size:16px;color:currentColor">expand_more</span>'
+        + '</button>'
+
+        /* ── Panel ── */
+        + '<div class="wil-doc-panel" id="' + uid + '_panel">'
+          + '<div style="padding:2px 2px 4px">'
+            + '<img src="' + _escAttr(url) + '" '
+              + 'class="wil-doc-img ' + imgBorder + '" '
+              + 'alt="' + (esFact ? 'Factura' : 'Comprobante') + '" '
+              + 'onclick="wilDocZoomAbrir(\'' + _escAttr(url) + '\',\'' + _escAttr(titulo) + '\')"/>'
+            + '<p class="wil-doc-hint ' + tipo + '">'
+              + '<span class="material-symbols-outlined" style="font-size:12px;font-variation-settings:\'FILL\' 1">'
+              + 'zoom_in</span>'
+              + 'Toca la imagen para ampliar'
+            + '</p>'
+          + '</div>'
+        + '</div>'
+
+      + '</div>'
+    );
+  }
+
+  /* Escapar atributos HTML */
+  function _escAttr(s) {
+    return (s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  /* ══════════════════════════════════════════════
+     5. INYECTOR EN DRAWERS DEL HISTORIAL
+  ══════════════════════════════════════════════ */
+
+  function _inyectarDocsBloques() {
+    if (!window.state || !window.state.historial) return;
+
+    var drawers = document.querySelectorAll('[id^="hdrw_"]');
+    drawers.forEach(function(drawer) {
+      /* Evitar inyectar dos veces */
+      if (drawer.dataset.docsInjected === '1') return;
+
+      var hid = drawer.id.replace('hdrw_', '');
+      var h   = _buscarItem(hid);
+      if (!h) return;
+
+      var pidStr = String(h.id || '');
+
+      /* Buscar el contenedor interno del drawer */
+      var inner = drawer.querySelector('div[style*="border-top"]')
+                  || drawer.querySelector('div');
+      if (!inner) return;
+
+      /* Construir el bloque de documentos */
+      var bloque = document.createElement('div');
+      bloque.setAttribute('data-docs-pid', pidStr);
+      bloque.innerHTML =
+        '<div style="margin-bottom:10px">'
+          /* Separador */
+          + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:9px">'
+            + '<div style="flex:1;height:1px;background:rgba(0,105,112,.1)"></div>'
+            + '<span style="font-size:9px;font-weight:800;color:#9eaaac;'
+              + "font-family:'Plus Jakarta Sans',sans-serif;"
+              + 'text-transform:uppercase;letter-spacing:.06em">📁 Documentos del pedido</span>'
+            + '<div style="flex:1;height:1px;background:rgba(0,105,112,.1)"></div>'
+          + '</div>'
+          /* Botón Factura */
+          + _docBlock(pidStr, 'factura')
+          /* Botón Comprobante Tardanza */
+          + _docBlock(pidStr, 'tardanza')
+        + '</div>';
+
+      /* Insertar al inicio del drawer, antes de la dirección */
+      inner.insertBefore(bloque, inner.firstChild);
+      drawer.dataset.docsInjected = '1';
+    });
+  }
+
+  /* Buscar item en historial a partir del hid del drawer */
+  function _buscarItem(hid) {
+    if (!window.state || !window.state.historial) return null;
+    /* hid tiene formato: h{id_normalizado}_{fechaDigitos} */
+    var m = hid.match(/^h([a-z0-9]+)_(\d+)$/i);
+    if (!m) return null;
+    var idStr = m[1];
+    return window.state.historial.find(function(h) {
+      var norm = (h.id || '').replace(/[^a-z0-9]/gi, '');
+      return norm === idStr || String(h.id) === idStr;
+    }) || null;
+  }
+
+  /* ══════════════════════════════════════════════
+     6. ACTUALIZAR BLOQUES EXISTENTES (cuando caches se recargan)
+  ══════════════════════════════════════════════ */
+
+  function _actualizarBloques() {
+    /* Eliminar data-docs-injected para que se re-inyecten con URLs frescas */
+    document.querySelectorAll('[id^="hdrw_"][data-docs-injected="1"]').forEach(function(d) {
+      /* Eliminar el bloque de docs anterior */
+      var bloque = d.querySelector('[data-docs-pid]');
+      if (bloque) bloque.remove();
+      delete d.dataset.docsInjected;
+    });
+    /* Re-inyectar */
+    _inyectarDocsBloques();
+  }
+
+  /* ══════════════════════════════════════════════
+     7. HOOKS
+  ══════════════════════════════════════════════ */
+
+  /* Hook renderHistorial → inyectar después */
+  var _origRH = window.renderHistorial;
+  window.renderHistorial = function() {
+    if (typeof _origRH === 'function') _origRH.apply(this, arguments);
+    /* Pequeño delay para que el DOM esté pintado */
+    setTimeout(_inyectarDocsBloques, 60);
+  };
+
+  /* Hook toggleDetalleHist → inyectar al abrir drawer */
+  var _origTDH = window.toggleDetalleHist;
+  window.toggleDetalleHist = function(hid) {
+    if (typeof _origTDH === 'function') _origTDH.apply(this, arguments);
+    setTimeout(_inyectarDocsBloques, 50);
+  };
+
+  /* Hook fetchHistorialSheet → cargar también los docs */
+  var _origFHS = window.fetchHistorialSheet;
+  window.fetchHistorialSheet = async function() {
+    /* Cargar historial y documentos en paralelo */
+    await Promise.all([
+      typeof _origFHS === 'function' ? _origFHS.apply(this, arguments) : Promise.resolve(),
+      _cargarTodosLosDocs()
+    ]);
+    /* Actualizar bloques con URLs frescas */
+    _actualizarBloques();
+  };
+
+  /* ══════════════════════════════════════════════
+     8. ARRANQUE INICIAL
+  ══════════════════════════════════════════════ */
+
+  /* Carga inicial de documentos */
+  _cargarTodosLosDocs();
+
+  /* Si el historial ya está renderizado al cargar el script */
+  setTimeout(function() {
+    _inyectarDocsBloques();
+    _zmCreate(); /* Crear modal zoom con anticipación */
+  }, 1500);
+
+  /* Recarga de docs cada 60s (alineado con el poll de historial) */
+  setInterval(_cargarTodosLosDocs, 60000);
+
+  console.log('[WIL Docs Historial v1.0] ✅ Factura (FacturaLibre col F) + Tardanza (TiempoExtra col P)');
+
+})();
+
+
+
  
 </script>
 
