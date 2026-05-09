@@ -14,6 +14,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.2/tesseract.min.js"></script>
 <script src="factura-libre-corregido.js"></script>
 <script src="patch-historial-documentos.js"></script>
+<script src="patch-comprobante-factura.js"></script>
+
 
 
 
@@ -1392,7 +1394,7 @@ var _cacheFacturasHist = {}; // id_pedido → url_factura
 
 
 const SHEET_ID_DOMI   = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
-const SCRIPT_URL_DOMI = 'https://script.google.com/macros/s/AKfycbyYpNT9yizFaHrxjKPq2TZkzroMUqXpCmdC_ztC-Y7WL3jov6E7IluzKX_dZRB80yHFpQ/exec';
+const SCRIPT_URL_DOMI = 'https://script.google.com/macros/s/AKfycbyWgOMcpudJ7pvZvO_3_J7S_PnXTPcEin0C5NMEfZEw8kV7TbyRqzE1eZtk4W7SNMUbuQ/exec';
 var _idsAsignadosNotificados = new Set(); // solo RAM, se resetea al reabrir ✓
 function _guardarIdsNotif() { /* sin localStorage */ }
 
@@ -2957,12 +2959,11 @@ async function aceptarPedido(id) {
       method:  'POST',
       headers: { 'Content-Type':'text/plain' },
       body: JSON.stringify({
-        accion:    'asignar-domi',
-        pedidoId:  String(id).trim(),
-        domi:      domi.nombre,
-        estado:    'En proceso',
-        horaAsign: hora
-      }),
+    accion:   'comprobante-tardanza',
+    pedidoId: String(state.pedidoActivo.id).trim(),
+    imagen:   base64,
+    append:   true
+}),
       signal: AbortSignal.timeout(20000)
     });
     var d = await r.json();
@@ -5728,7 +5729,7 @@ console.log('[PARCHE Historial RT v1.0] ✅ Stats en tiempo real con domicilio c
 (function (W) {
   'use strict';
 
-  var GAS_URL    = 'https://script.google.com/macros/s/AKfycbyYpNT9yizFaHrxjKPq2TZkzroMUqXpCmdC_ztC-Y7WL3jov6E7IluzKX_dZRB80yHFpQ/exec';
+  var GAS_URL    = 'https://script.google.com/macros/s/AKfycbyWgOMcpudJ7pvZvO_3_J7S_PnXTPcEin0C5NMEfZEw8kV7TbyRqzE1eZtk4W7SNMUbuQ/exec';
   var SECTION_ID = 'wil-factura-libre-section';
   var MODAL_ID   = 'wfl-zoom-modal';
 
@@ -5949,6 +5950,9 @@ if (inp) {
 }
   }
 
+
+
+   /* Seccion cargar factura cliente */
 function _buildHTML(domiNum) {
   var tid = 'wfl-toggle-' + Date.now();
   return (
@@ -6157,92 +6161,86 @@ W.wflEnviarFactura = async function () {
   var p = W.state && W.state.pedidoActivo;
   if (!p) { alert('Sin pedido activo'); return; }
 
-  var manInp = document.getElementById('wfl-manual-input');
-  var nota   = (document.getElementById('wfl-nota-cliente') || {}).value || '';
-  var totalV = parseInt(String((manInp || {}).value || '0').replace(/\D/g,''),10) || 0;
-  var domiNum = parseInt((_parseCOP(p.domicilio || '0')),10) || 0;
+  var manInp  = document.getElementById('wfl-manual-input');
+  var nota    = (document.getElementById('wfl-nota-cliente') || {}).value || '';
+  var totalV  = parseInt(String((manInp || {}).value || '0').replace(/\D/g,''), 10) || 0;
+  var domiNum = parseInt((_parseCOP(p.domicilio || '0')), 10) || 0;
 
-  // Obtener la imagen actual (si hay)
   var nuevaFactura = null;
   if (_b64 && _mime) {
     nuevaFactura = 'data:' + _mime + ';base64,' + _b64;
   }
 
-  // Si no hay imagen nueva pero hay facturas previas, usar las previas
   if (!nuevaFactura && _facturasEnviadas.length === 0) {
     alert('Selecciona una factura primero');
     return;
   }
 
-  // Acumular la nueva factura
   if (nuevaFactura) {
     _facturasEnviadas.push({
-      url: nuevaFactura,
+      url:       nuevaFactura,
       timestamp: new Date().toISOString(),
-      total: totalV
+      total:     totalV
     });
   }
 
-  // Construir payload con TODAS las facturas acumuladas
-  const payload = {
-    accion:       'factura-libre-append',  // NUEVA ACCIÓN
+  /* accion: 'factura-libre' — el GAS ya concatena URLs en col F */
+  var payload = {
+    accion:       'factura-libre',
     pedidoId:     String(p.id || '').trim(),
     cliente:      p.cliente || '',
     domi:         (window.domi && window.domi.nombre) || '',
-    fecha:        new Date().toLocaleDateString('es-CO',{timeZone:'America/Bogota'}),
-    hora:         new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',timeZone:'America/Bogota'}),
+    fecha:        new Date().toLocaleDateString('es-CO', {timeZone:'America/Bogota'}),
+    hora:         new Date().toLocaleTimeString('es-CO', {hour:'2-digit',minute:'2-digit',timeZone:'America/Bogota'}),
     totalFactura: totalV,
     domicilio:    domiNum,
     totalCobrar:  totalV + domiNum,
     nota:         nota.trim(),
-    nuevaFactura: nuevaFactura,           // Solo la nueva (para el GAS)
-    facturasPrevias: _facturasEnviadas.slice(0, -1).map(f => f.url), // Las anteriores
-    todasFacturas: _facturasEnviadas.map(f => f.url)  // Todas concatenadas
+    imagen:       nuevaFactura || ''   /* solo la nueva; el GAS concatena */
   };
 
-  console.log('[Factura] Enviando factura #' + _facturasEnviadas.length + ' para pedido ' + p.id);
+  console.log('[Factura] Enviando #' + _facturasEnviadas.length + ' pedido=' + p.id);
 
   try {
-    var r = await fetch(SCRIPT_URL_DOMI, {
-      method: 'POST',
+    var r    = await fetch(SCRIPT_URL_DOMI, {
+      method:  'POST',
       headers: {'Content-Type':'text/plain'},
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(35000)
+      body:    JSON.stringify(payload),
+      signal:  AbortSignal.timeout(35000)
     });
     var json = await r.json();
 
-    if (json.ok) {
-      // ✅ Mostrar resumen de TODAS las facturas enviadas
-      _wflMostrarResumenConHistorial(totalV, domiNum, _facturasEnviadas);
-      
-      // 🟢 IMPORTANTE: NO limpiar _facturasEnviadas
-      // Solo limpiar el input y preview actual
-      _b64 = null;
-      _mime = null;
-      
-      // Limpiar el campo de entrada
-      var fileInput = document.getElementById('wfl-file-input');
-      if (fileInput) fileInput.value = '';
-      
-      // Ocultar preview actual pero mantener historial
-      var previewWrap = document.getElementById('wfl-preview-wrap');
-      var btnWrap = document.getElementById('wfl-btn-wrap');
-      if (previewWrap) previewWrap.style.display = 'none';
-      if (btnWrap) btnWrap.style.display = 'block';
-      
-      // Mostrar mensaje de éxito
-      _toastFactura('✅ Factura #' + _facturasEnviadas.length + ' agregada');
-      
-      // Opcional: resetear el input manual para la siguiente factura
-      if (manInp) manInp.value = '';
-      
-    } else {
-      throw new Error(json.error || 'Error al guardar');
-    }
+    if (!json.ok && json.error) throw new Error(json.error);
+
+    /* ── Éxito ── */
+    _wflMostrarResumenConHistorial(totalV, domiNum, _facturasEnviadas);
+    _toastFactura('✅ Factura #' + _facturasEnviadas.length + ' agregada');
+
+    _b64  = null;
+_mime = null;
+
+// Limpiar drop-zone
+var fileInput   = document.getElementById('wfl-file-input');
+var previewWrap = document.getElementById('wfl-preview-wrap');
+var btnWrap     = document.getElementById('wfl-btn-wrap');
+if (fileInput)   fileInput.value           = '';
+if (previewWrap) previewWrap.style.display  = 'none';
+if (btnWrap)     btnWrap.style.display      = 'block';
+if (manInp)      manInp.value               = '';
+
+// Habilitar botón principal para enviar otra factura
+var btnPrincipalFact = document.getElementById('wfl-enviar-btn');
+if (btnPrincipalFact) {
+  btnPrincipalFact.disabled     = false;
+  btnPrincipalFact.style.opacity = '1';
+  btnPrincipalFact.innerHTML    = '<span class="material-symbols-outlined" style="font-size:15px;font-variation-settings:\'FILL\' 1">send</span> Enviar otra factura';
+}
+
+    /* Botón queda activo para enviar otra */
+
   } catch(err) {
     console.error('[wflEnviar] ERROR →', err.message);
     alert('Error: ' + err.message);
-    // En caso de error, NO agregar la factura al array
     _facturasEnviadas.pop();
   }
 };
@@ -7457,7 +7455,7 @@ let yaEnviado = false;
 let panelVisible = false;
 
   function togglePanel() {
-    if (yaEnviado) return; // si ya envió, el botón principal no hace nada
+   
     panelVisible = !panelVisible;
     document.getElementById('panel').classList.toggle('open', panelVisible);
   }
@@ -7500,16 +7498,16 @@ let panelVisible = false;
     reader.readAsDataURL(file);
   });
 }
-// ══ REEMPLAZA enviar() ══
 async function enviar() {
   if (!state || !state.pedidoActivo) {
     alert('No hay pedido activo. Recarga la página.');
     return;
   }
 
-  const btn       = document.getElementById('btnEnviar');
-  const fileInput = document.getElementById('fileInput');
-  const file      = fileInput && fileInput.files[0];
+  const btnPrincipal = document.getElementById('btnPrincipal');
+  const btn          = document.getElementById('btnEnviar');
+  const fileInput    = document.getElementById('fileInput');
+  const file         = fileInput && fileInput.files[0];
   if (!file) return;
 
   btn.disabled    = true;
@@ -7517,32 +7515,44 @@ async function enviar() {
 
   try {
     const base64 = await fileToBase64(file);
-
     btn.textContent = '📡 Enviando…';
 
-    const res = await fetch(SCRIPT_URL_DOMI, {   // ← directo, no window.
+    const res = await fetch(SCRIPT_URL_DOMI, {
       method:  'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({
         accion:   'comprobante-tardanza',
         pedidoId: String(state.pedidoActivo.id).trim(),
-        imagen:   base64
+        imagen:   base64,
+        append:   true
       }),
-      signal: AbortSignal.timeout(35000)          // ← 35s para Drive
+      signal: AbortSignal.timeout(35000)
     });
 
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || 'Error servidor');
 
-    yaEnviado = true;
-    document.getElementById('btnPrincipal').style.display = 'none';
-    document.getElementById('chipEnviado').style.display  = 'flex';
+    // Mostrar chip de enviado
+    document.getElementById('chipEnviado').style.display = 'flex';
+
+    // Cerrar panel
     panelVisible = false;
     document.getElementById('panel').classList.remove('open');
     document.getElementById('chipArrow').classList.remove('open');
-    document.getElementById('dropzone').classList.add('bloqueado');
-    document.getElementById('btnQuitar').style.display = 'none';
-    btn.textContent = '✓ Enviado';
+
+    // Limpiar drop-zone para la próxima foto
+    fileInput.value = '';
+    document.getElementById('previewImg').src = '';
+    document.getElementById('dzEmpty').style.display  = 'flex';
+    document.getElementById('dzPreview').style.display = 'none';
+
+    // Resetear btnEnviar (dentro del panel) para la próxima foto
+    btn.disabled    = true;
+    btn.textContent = '✉️ Enviar comprobante';
+
+    // Habilitar btnPrincipal para abrir el panel de nuevo
+    btnPrincipal.disabled   = false;
+    btnPrincipal.textContent = '📋 Adjuntar otro comprobante';
 
   } catch (err) {
     console.error('[enviar comprobante]', err);
@@ -7551,7 +7561,6 @@ async function enviar() {
     alert('Error: ' + (err.message || 'Sin conexión. Intenta de nuevo.'));
   }
 }
-
 
 
 
@@ -8178,10 +8187,1142 @@ return (
 
 })();
 
-
-
  
 </script>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   WIL — PATCH FACTURA + COMPROBANTE v3.0 (DEFINITIVO)
+   
+   PROBLEMAS QUE RESUELVE:
+   1. "Subir factura/comprobante" no abre el selector de archivos
+   2. El toggle de factura no despliega el formulario
+   3. No envía nada al sheet
+   4. UI fea / rota
+   
+   CÓMO FUNCIONA:
+   - Espera a que el DOM esté listo
+   - Destruye los bloques rotos
+   - Crea bloques nuevos desde cero con JS puro
+   - Escucha eventos correctamente
+   - Envía directo al Apps Script con base64
+═══════════════════════════════════════════════════════════════ */
+
+(function () {
+  'use strict';
+
+  /* ─────────────────────────────────────
+     CONFIG — ajusta si cambia la URL
+  ───────────────────────────────────── */
+  var GAS_URL = window.SCRIPT_URL_DOMI
+    || 'https://script.google.com/macros/s/AKfycbyWgOMcpudJ7pvZvO_3_J7S_PnXTPcEin0C5NMEfZEw8kV7TbyRqzE1eZtk4W7SNMUbuQ/exec';
+
+  var TZ = 'America/Bogota';
+
+  /* ─────────────────────────────────────
+     UTILIDADES
+  ───────────────────────────────────── */
+  function horaAhora() {
+    return new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
+  }
+  function fechaHoy() {
+    return new Date().toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: TZ });
+  }
+  function fmtCOP(n) {
+    var num = Math.round(n || 0);
+    return '$' + num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+  function parseCOP(v) {
+    var s = String(v || '').replace(/[^0-9.,]/g, '');
+    if (!s) return 0;
+    var dots = (s.match(/\./g) || []).length;
+    if (dots > 1) return parseFloat(s.replace(/\./g, ''));
+    if (dots === 1) {
+      var pts = s.split('.');
+      return (pts[1] && pts[1].length === 3) ? parseFloat(s.replace('.', '')) : parseFloat(s);
+    }
+    return parseFloat(s) || 0;
+  }
+  function fileToBase64(file) {
+    return new Promise(function (resolve, reject) {
+      var r = new FileReader();
+      r.onload = function (e) { resolve(e.target.result); };
+      r.onerror = function () { reject(new Error('Error leyendo archivo')); };
+      r.readAsDataURL(file);
+    });
+  }
+  function toast(msg, color) {
+    color = color || '#2a9d5c';
+    var el = document.createElement('div');
+    el.textContent = msg;
+    el.style.cssText = 'position:fixed;bottom:110px;left:50%;transform:translateX(-50%);'
+      + 'z-index:99999;background:' + color + ';color:#fff;border-radius:22px;'
+      + 'padding:10px 22px;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;'
+      + 'font-size:12px;white-space:nowrap;box-shadow:0 4px 18px rgba(0,0,0,.25);'
+      + 'pointer-events:none;animation:_tf .25s ease both';
+    if (!document.getElementById('_tfKF')) {
+      var s = document.createElement('style');
+      s.id = '_tfKF';
+      s.textContent = '@keyframes _tf{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}';
+      document.head.appendChild(s);
+    }
+    document.body.appendChild(el);
+    setTimeout(function () { if (el.parentNode) el.remove(); }, 2800);
+  }
+  function validarImagen(file) {
+    if (!file) return 'Selecciona un archivo';
+    if (!file.type.startsWith('image/')) return 'Solo imágenes JPG o PNG';
+    if (file.size > 5 * 1024 * 1024) return 'La imagen supera 5 MB. Usa una más pequeña';
+    return null;
+  }
+  function spinnerBtn(btn, txt) {
+    btn.disabled = true;
+    btn.innerHTML = '<span style="display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:rot .7s linear infinite;vertical-align:middle;margin-right:6px"></span>' + txt;
+  }
+
+  /* ─────────────────────────────────────
+     CSS GLOBAL (una sola vez)
+  ───────────────────────────────────── */
+  function inyectarCSS() {
+    if (document.getElementById('_wilPatchCSS')) return;
+    var s = document.createElement('style');
+    s.id = '_wilPatchCSS';
+    s.textContent = `
+      /* ── Acordeón base ── */
+      .wil-acordeon {
+        background: #fff;
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1.5px solid rgba(0,0,0,.09);
+        box-shadow: 0 2px 10px rgba(0,0,0,.06);
+        margin-bottom: 8px;
+      }
+      .wil-acordeon-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 13px;
+        cursor: pointer;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .wil-acordeon-ico {
+        width: 36px; height: 36px;
+        border-radius: 11px;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+      }
+      .wil-acordeon-texts { flex: 1; min-width: 0; }
+      .wil-acordeon-title {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-weight: 800; font-size: 12.5px; color: #191c1d; margin: 0;
+      }
+      .wil-acordeon-sub {
+        font-size: 10px; color: #9eaaac; font-weight: 600; margin: 2px 0 0;
+      }
+      .wil-acordeon-chev {
+        transition: transform .3s cubic-bezier(.22,1,.36,1);
+        color: #9eaaac; flex-shrink: 0;
+      }
+      .wil-acordeon.abierto .wil-acordeon-chev { transform: rotate(180deg); }
+      .wil-acordeon-body {
+        max-height: 0; overflow: hidden; opacity: 0;
+        transition: max-height .4s cubic-bezier(.22,1,.36,1), opacity .3s ease;
+      }
+      .wil-acordeon.abierto .wil-acordeon-body {
+        max-height: 800px; opacity: 1;
+      }
+      .wil-acordeon-inner {
+        padding: 0 13px 14px;
+        border-top: 1px solid rgba(0,0,0,.07);
+      }
+      /* ── Drop-zone ── */
+      .wil-dz {
+        border: 2px dashed rgba(0,0,0,.18);
+        border-radius: 13px;
+        padding: 18px 14px;
+        text-align: center;
+        cursor: pointer;
+        background: rgba(0,0,0,.02);
+        transition: border-color .2s, background .2s;
+        position: relative;
+        margin: 10px 0 8px;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .wil-dz:active { background: rgba(0,0,0,.05); }
+      .wil-dz input[type="file"] {
+        position: absolute; inset: 0;
+        opacity: 0; cursor: pointer;
+        width: 100%; height: 100%; z-index: 3;
+      }
+      .wil-dz-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+      .wil-dz-ico-wrap {
+        width: 46px; height: 46px; border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        margin-bottom: 2px;
+      }
+      .wil-dz-lbl {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-weight: 800; font-size: 12px;
+      }
+      .wil-dz-hint { font-size: 10px; color: #9eaaac; }
+      .wil-dz-prev { display: none; }
+      .wil-dz-prev img {
+        width: 100%; max-height: 200px; object-fit: contain;
+        border-radius: 10px; display: block;
+      }
+      .wil-dz-prev-bar {
+        display: flex; align-items: center;
+        justify-content: space-between; margin-top: 6px; padding: 0 2px;
+      }
+      .wil-dz-fname {
+        font-size: 10px; color: #6c7a7b; font-weight: 600;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 68%;
+      }
+      .wil-dz-rm {
+        font-size: 10px; color: #ba1a1a; background: none;
+        border: none; cursor: pointer; font-weight: 800;
+        font-family: 'Plus Jakarta Sans', sans-serif; padding: 2px 6px; flex-shrink: 0;
+      }
+      /* ── Aviso info ── */
+      .wil-aviso {
+        border-radius: 11px; padding: 9px 11px; margin: 10px 0 0;
+        display: flex; align-items: flex-start; gap: 8px;
+      }
+      .wil-aviso-ico { font-size: 16px; flex-shrink: 0; }
+      .wil-aviso-title {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-weight: 800; font-size: 11px; margin-bottom: 1px;
+      }
+      .wil-aviso-sub { font-size: 10px; color: #6c7a7b; line-height: 1.4; }
+      /* ── Botones ── */
+      .wil-btn-enviar {
+        width: 100%; padding: 12px; border: none; border-radius: 13px;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-weight: 800; font-size: 13px; cursor: pointer;
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        transition: opacity .15s; margin-top: 8px;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .wil-btn-enviar:disabled { opacity: .45; cursor: not-allowed; }
+      /* ── Chip éxito ── */
+      .wil-chip-ok {
+        display: none; align-items: center; gap: 9px;
+        background: #f0fdf4; border: 1.5px solid #86efac;
+        border-radius: 12px; padding: 11px 13px; margin-top: 8px;
+        cursor: pointer;
+      }
+      .wil-chip-ok.visible { display: flex; }
+      .wil-chip-ok-lbl {
+        flex: 1; font-family: 'Plus Jakarta Sans', sans-serif;
+        font-weight: 800; font-size: 12px; color: #166534;
+      }
+      /* ── Input manual ── */
+      .wil-input-num {
+        width: 100%; border: 1.5px solid rgba(0,0,0,.15);
+        border-radius: 11px; padding: 11px 13px;
+        font-size: 16px; font-family: 'Plus Jakarta Sans', sans-serif;
+        font-weight: 800; color: #191c1d; outline: none; box-sizing: border-box;
+        margin-top: 10px;
+      }
+      .wil-input-num:focus { border-color: #006970; }
+      .wil-nota-ta {
+        width: 100%; border: 1.5px solid rgba(0,0,0,.15);
+        border-radius: 11px; padding: 11px 13px;
+        font-size: 12px; font-family: 'Inter', sans-serif;
+        color: #191c1d; outline: none; box-sizing: border-box;
+        resize: none; margin-top: 8px;
+      }
+      .wil-nota-ta:focus { border-color: #006970; }
+      /* ── Resumen totales ── */
+      .wil-totales {
+        display: flex; gap: 6px; margin-top: 10px;
+      }
+      .wil-total-chip {
+        flex: 1; background: #f3f4f5; border-radius: 11px;
+        padding: 8px 6px; text-align: center;
+      }
+      .wil-total-chip-lbl {
+        font-size: 9px; font-weight: 700; color: #9eaaac;
+        text-transform: uppercase; letter-spacing: .04em; display: block;
+      }
+      .wil-total-chip-val {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-weight: 900; font-size: 13px; color: #006970;
+        display: block; margin-top: 2px;
+      }
+    `;
+    document.head.appendChild(s);
+  }
+
+  /* ─────────────────────────────────────
+     BUILDER: Crear acordeón genérico
+  ───────────────────────────────────── */
+  function crearAcordeon(opts) {
+    /* opts: { icoBg, icoNombre, titulo, subtitulo, borderColor, abierto } */
+    var div = document.createElement('div');
+    div.className = 'wil-acordeon';
+    div.style.borderColor = opts.borderColor || 'rgba(0,0,0,.09)';
+
+    var header = document.createElement('div');
+    header.className = 'wil-acordeon-header';
+    header.innerHTML =
+      '<div class="wil-acordeon-ico" style="background:' + opts.icoBg + '">'
+        + '<span class="material-symbols-outlined" style="font-size:18px;color:#fff;font-variation-settings:\'FILL\' 1">' + opts.icoNombre + '</span>'
+      + '</div>'
+      + '<div class="wil-acordeon-texts">'
+        + '<p class="wil-acordeon-title">' + opts.titulo + '</p>'
+        + '<p class="wil-acordeon-sub">' + opts.subtitulo + '</p>'
+      + '</div>'
+      + '<span class="material-symbols-outlined wil-acordeon-chev" style="font-size:22px">expand_more</span>';
+
+    header.addEventListener('click', function () {
+      div.classList.toggle('abierto');
+    });
+
+    var body = document.createElement('div');
+    body.className = 'wil-acordeon-body';
+    var inner = document.createElement('div');
+    inner.className = 'wil-acordeon-inner';
+    body.appendChild(inner);
+
+    div.appendChild(header);
+    div.appendChild(body);
+
+    if (opts.abierto) div.classList.add('abierto');
+
+    return { div: div, inner: inner };
+  }
+
+  /* ─────────────────────────────────────
+     BUILDER: Drop-zone de imagen
+  ───────────────────────────────────── */
+  function crearDropzone(accentColor, cb) {
+    var wrap = document.createElement('div');
+    wrap.className = 'wil-dz';
+    wrap.style.borderColor = accentColor + '55';
+
+    var inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = 'image/*';
+    inp.capture = 'environment'; // en móvil sugiere cámara
+
+    var emptyEl = document.createElement('div');
+    emptyEl.className = 'wil-dz-empty';
+    emptyEl.innerHTML =
+      '<div class="wil-dz-ico-wrap" style="background:' + accentColor + '18">'
+        + '<span class="material-symbols-outlined" style="font-size:24px;color:' + accentColor + ';font-variation-settings:\'FILL\' 1">add_a_photo</span>'
+      + '</div>'
+      + '<div class="wil-dz-lbl" style="color:' + accentColor + '">Toca para adjuntar o tomar foto</div>'
+      + '<div class="wil-dz-hint">JPG · PNG · máx 5 MB</div>';
+
+    var prevEl = document.createElement('div');
+    prevEl.className = 'wil-dz-prev';
+
+    var prevImg = document.createElement('img');
+    prevImg.alt = 'preview';
+
+    var prevBar = document.createElement('div');
+    prevBar.className = 'wil-dz-prev-bar';
+
+    var fname = document.createElement('span');
+    fname.className = 'wil-dz-fname';
+
+    var rmBtn = document.createElement('button');
+    rmBtn.className = 'wil-dz-rm';
+    rmBtn.type = 'button';
+    rmBtn.textContent = '✕ Quitar';
+
+    prevBar.appendChild(fname);
+    prevBar.appendChild(rmBtn);
+    prevEl.appendChild(prevImg);
+    prevEl.appendChild(prevBar);
+
+    wrap.appendChild(inp);
+    wrap.appendChild(emptyEl);
+    wrap.appendChild(prevEl);
+
+    var _dataURL = null;
+
+    inp.addEventListener('change', function (e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      var err = validarImagen(file);
+      if (err) { toast(err, '#ba1a1a'); inp.value = ''; return; }
+
+      fileToBase64(file).then(function (dataURL) {
+        _dataURL = dataURL;
+        prevImg.src = dataURL;
+        fname.textContent = file.name;
+        emptyEl.style.display = 'none';
+        prevEl.style.display = 'block';
+        if (cb) cb(dataURL, file);
+      }).catch(function () {
+        toast('No se pudo leer la imagen', '#ba1a1a');
+      });
+    });
+
+    rmBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      e.preventDefault();
+      _dataURL = null;
+      inp.value = '';
+      prevImg.src = '';
+      prevEl.style.display = 'none';
+      emptyEl.style.display = '';
+      if (cb) cb(null, null);
+    });
+
+    return {
+      el: wrap,
+      getDataURL: function () { return _dataURL; },
+      reset: function () { rmBtn.click(); }
+    };
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     BLOQUE 1: COMPROBANTE DE TARDANZA
+  ═══════════════════════════════════════════════════════════ */
+  function construirBloqueComprobante(contenedor) {
+    /* Limpiar bloque anterior si existe */
+    var viejo = document.getElementById('_blocComprobante');
+    if (viejo) viejo.remove();
+
+    var ac = crearAcordeon({
+      icoBg: 'linear-gradient(135deg,#7c3aed,#8b5cf6)',
+      icoNombre: 'timer',
+      titulo: 'Comprobante de tardanza',
+      subtitulo: 'Adjunta si hay fila larga en el comercio',
+      borderColor: 'rgba(124,58,237,.2)'
+    });
+    ac.div.id = '_blocComprobante';
+
+    /* Aviso */
+    var aviso = document.createElement('div');
+    aviso.className = 'wil-aviso';
+    aviso.style.background = 'rgba(124,58,237,.05)';
+    aviso.style.border = '1px solid rgba(124,58,237,.18)';
+    aviso.innerHTML =
+      '<span class="wil-aviso-ico">ℹ️</span>'
+      + '<div>'
+        + '<div class="wil-aviso-title" style="color:#7c3aed">¿Hay mucha fila?</div>'
+        + '<div class="wil-aviso-sub">Foto de pantalla o ticket — esto valida tu tardanza.</div>'
+      + '</div>';
+    ac.inner.appendChild(aviso);
+
+    /* Drop-zone */
+    var _img = null;
+    var dz = crearDropzone('#7c3aed', function (dataURL) { _img = dataURL; });
+    ac.inner.appendChild(dz.el);
+
+    /* Botón enviar */
+    var btnEnv = document.createElement('button');
+    btnEnv.className = 'wil-btn-enviar';
+    btnEnv.style.background = 'linear-gradient(135deg,#7c3aed,#8b5cf6)';
+    btnEnv.style.color = '#fff';
+    btnEnv.style.boxShadow = '0 3px 14px rgba(124,58,237,.28)';
+    btnEnv.innerHTML = '<span class="material-symbols-outlined" style="font-size:17px;font-variation-settings:\'FILL\' 1">send</span> Enviar comprobante';
+    btnEnv.disabled = true;
+    ac.inner.appendChild(btnEnv);
+
+    /* Habilitar btn cuando hay imagen */
+    dz.el.querySelector('input').addEventListener('change', function () {
+      setTimeout(function () { btnEnv.disabled = !dz.getDataURL(); }, 200);
+    });
+
+    /* Chip éxito */
+    var chip = document.createElement('div');
+    chip.className = 'wil-chip-ok';
+    chip.innerHTML = '<span style="font-size:18px">✅</span><span class="wil-chip-ok-lbl">Comprobante enviado</span>';
+    ac.inner.appendChild(chip);
+
+    /* ENVIAR */
+    btnEnv.addEventListener('click', function () {
+      var dataURL = dz.getDataURL();
+      if (!dataURL) { toast('Selecciona una imagen primero', '#ba1a1a'); return; }
+
+      var p = window.state && window.state.pedidoActivo;
+      if (!p) { toast('Sin pedido activo', '#ba1a1a'); return; }
+
+      var originalHTML = btnEnv.innerHTML;
+      spinnerBtn(btnEnv, 'Subiendo imagen…');
+
+      var payload = {
+        accion:   'comprobante-tardanza',
+        pedidoId: String(p.id || '').trim(),
+        cliente:  p.cliente || '',
+        domi:     (window.domi && window.domi.nombre) || '',
+        fecha:    fechaHoy(),
+        hora:     horaAhora(),
+        imagen:   dataURL
+      };
+
+      fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload)
+      })
+      .then(function (r) { return r.json(); })
+      .then(function (json) {
+        if (json.ok === false && json.error) throw new Error(json.error);
+        /* Éxito */
+        btnEnv.style.display = 'none';
+        chip.classList.add('visible');
+        dz.el.style.pointerEvents = 'none';
+        dz.el.querySelector('input').disabled = true;
+        toast('✅ Comprobante enviado');
+      })
+      .catch(function (err) {
+        console.error('[Comprobante]', err.message);
+        btnEnv.disabled = false;
+        btnEnv.innerHTML = originalHTML;
+        toast('Error al enviar. Reintenta.', '#ba1a1a');
+      });
+    });
+
+    contenedor.appendChild(ac.div);
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     BLOQUE 2: FACTURA DEL COMERCIO
+  ═══════════════════════════════════════════════════════════ */
+  function construirBloqueFactura(contenedor) {
+    var viejo = document.getElementById('_blocFactura');
+    if (viejo) viejo.remove();
+
+    /* Destruir el bloque original roto */
+    var secVieja = document.getElementById('wil-factura-libre-section');
+    if (secVieja) secVieja.remove();
+
+    var ac = crearAcordeon({
+      icoBg: 'linear-gradient(135deg,#006970,#00bcc9)',
+      icoNombre: 'receipt_long',
+      titulo: '¿Necesitas cargar factura?',
+      subtitulo: 'Solo si el comercio emite recibo o comprobante',
+      borderColor: 'rgba(0,105,112,.2)'
+    });
+    ac.div.id = '_blocFactura';
+
+    /* Aviso */
+    var aviso = document.createElement('div');
+    aviso.className = 'wil-aviso';
+    aviso.style.background = 'rgba(0,105,112,.05)';
+    aviso.style.border = '1px solid rgba(0,105,112,.18)';
+    aviso.innerHTML =
+      '<span class="wil-aviso-ico">📋</span>'
+      + '<div>'
+        + '<div class="wil-aviso-title" style="color:#006970">Adjunta la factura</div>'
+        + '<div class="wil-aviso-sub">Foto del recibo o ticket del comercio.</div>'
+      + '</div>';
+    ac.inner.appendChild(aviso);
+
+    /* Drop-zone */
+    var dz = crearDropzone('#006970', null);
+    ac.inner.appendChild(dz.el);
+
+    /* Total manual */
+    var lbl = document.createElement('p');
+    lbl.style.cssText = 'font-size:9px;font-weight:800;color:#9eaaac;text-transform:uppercase;letter-spacing:.05em;margin:12px 0 0';
+    lbl.textContent = 'Total de la factura (opcional)';
+    ac.inner.appendChild(lbl);
+
+    var inputTotal = document.createElement('input');
+    inputTotal.type = 'number';
+    inputTotal.className = 'wil-input-num';
+    inputTotal.placeholder = 'Ej: 45000';
+    inputTotal.min = '0';
+    ac.inner.appendChild(inputTotal);
+
+    /* Nota opcional */
+    var lblNota = document.createElement('p');
+    lblNota.style.cssText = 'font-size:9px;font-weight:800;color:#9eaaac;text-transform:uppercase;letter-spacing:.05em;margin:10px 0 0';
+    lblNota.textContent = 'Nota para el cliente (opcional)';
+    ac.inner.appendChild(lblNota);
+
+    var nota = document.createElement('textarea');
+    nota.className = 'wil-nota-ta';
+    nota.rows = 2;
+    nota.placeholder = 'Ej: Pedido listo, bajo en 5 min…';
+    ac.inner.appendChild(nota);
+
+    /* Resumen de totales (aparece al escribir total) */
+    var totalesWrap = document.createElement('div');
+    totalesWrap.className = 'wil-totales';
+    totalesWrap.style.display = 'none';
+    ac.inner.appendChild(totalesWrap);
+
+    function actualizarTotales() {
+      var p = window.state && window.state.pedidoActivo;
+      var domiNum = p ? parseCOP(p.domicilio || '0') : 0;
+      var totalFact = parseInt(inputTotal.value || '0', 10) || 0;
+      if (totalFact <= 0 && domiNum <= 0) { totalesWrap.style.display = 'none'; return; }
+      totalesWrap.style.display = 'flex';
+      totalesWrap.innerHTML =
+        '<div class="wil-total-chip"><span class="wil-total-chip-lbl">Factura</span><span class="wil-total-chip-val">' + (totalFact > 0 ? fmtCOP(totalFact) : '—') + '</span></div>'
+        + '<div class="wil-total-chip"><span class="wil-total-chip-lbl">🚚 Domi</span><span class="wil-total-chip-val" style="color:#2a9d5c">' + (domiNum > 0 ? fmtCOP(domiNum) : '$0') + '</span></div>'
+        + '<div class="wil-total-chip" style="background:rgba(0,105,112,.07);"><span class="wil-total-chip-lbl">Cobrar</span><span class="wil-total-chip-val">' + fmtCOP(totalFact + domiNum) + '</span></div>';
+    }
+    inputTotal.addEventListener('input', actualizarTotales);
+
+    /* Botón enviar */
+    var btnEnv = document.createElement('button');
+    btnEnv.className = 'wil-btn-enviar';
+    btnEnv.style.background = 'linear-gradient(135deg,#006970,#00bcc9)';
+    btnEnv.style.color = '#fff';
+    btnEnv.style.boxShadow = '0 3px 14px rgba(0,105,112,.28)';
+    btnEnv.innerHTML = '<span class="material-symbols-outlined" style="font-size:17px;font-variation-settings:\'FILL\' 1">send</span> Enviar factura al registro';
+    ac.inner.appendChild(btnEnv);
+
+    /* Contenedor de facturas enviadas */
+    var historialWrap = document.createElement('div');
+    historialWrap.id = '_factHistorial';
+    ac.inner.appendChild(historialWrap);
+
+    /* ENVIAR FACTURA */
+    var numEnviadas = 0;
+
+    btnEnv.addEventListener('click', function () {
+      var p = window.state && window.state.pedidoActivo;
+      if (!p) { toast('Sin pedido activo', '#ba1a1a'); return; }
+
+      var dataURL = dz.getDataURL();
+      var totalFact = parseInt(inputTotal.value || '0', 10) || 0;
+      var domiNum   = parseCOP(p.domicilio || '0');
+      var notaText  = nota.value.trim();
+
+      var originalHTML = btnEnv.innerHTML;
+      spinnerBtn(btnEnv, 'Enviando…');
+
+      var payload = {
+        accion:       'factura-libre',
+        pedidoId:     String(p.id || '').trim(),
+        cliente:      p.cliente || '',
+        domi:         (window.domi && window.domi.nombre) || '',
+        fecha:        fechaHoy(),
+        hora:         horaAhora(),
+        totalFactura: totalFact,
+        domicilio:    domiNum,
+        totalCobrar:  totalFact + domiNum,
+        nota:         notaText,
+        imagen:       dataURL || ''
+      };
+
+      fetch(GAS_URL, {
+        method:  'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload)
+      })
+      .then(function (r) { return r.json(); })
+      .then(function (json) {
+        if (json.ok === false && json.error) throw new Error(json.error);
+
+        numEnviadas++;
+
+        /* Agregar tarjeta al historial */
+        var card = document.createElement('div');
+        card.style.cssText = 'background:#f0fdf4;border:1.5px solid #86efac;border-radius:13px;padding:10px 12px;margin-top:8px;display:flex;align-items:center;gap:10px';
+        card.innerHTML =
+          '<span style="font-size:18px;flex-shrink:0">✅</span>'
+          + '<div style="flex:1;min-width:0">'
+            + '<div style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:12px;color:#166534">Factura #' + numEnviadas + ' registrada</div>'
+            + (totalFact > 0 ? '<div style="font-size:10px;color:#6c7a7b;margin-top:1px">' + fmtCOP(totalFact) + ' factura · ' + fmtCOP(domiNum) + ' domi · Total: ' + fmtCOP(totalFact + domiNum) + '</div>' : '')
+          + '</div>'
+          + (dataURL ? '<img src="' + dataURL + '" style="width:44px;height:44px;object-fit:cover;border-radius:8px;cursor:zoom-in;flex-shrink:0" onclick="window.wilDocZoomAbrir && window.wilDocZoomAbrir(this.src,\'Factura #' + numEnviadas + '\')" />' : '');
+        historialWrap.appendChild(card);
+
+        /* Limpiar form */
+        dz.reset();
+        inputTotal.value = '';
+        nota.value = '';
+        totalesWrap.style.display = 'none';
+
+        btnEnv.disabled = false;
+        btnEnv.innerHTML = originalHTML;
+        toast('✅ Factura #' + numEnviadas + ' enviada');
+      })
+      .catch(function (err) {
+        console.error('[Factura]', err.message);
+        btnEnv.disabled = false;
+        btnEnv.innerHTML = originalHTML;
+        toast('Error al enviar: ' + err.message, '#ba1a1a');
+      });
+    });
+
+    contenedor.appendChild(ac.div);
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     PUNTO DE ENTRADA: Inyectar ambos bloques
+  ═══════════════════════════════════════════════════════════ */
+  function inyectarBloques() {
+    inyectarCSS();
+
+    var inlineDiv = document.getElementById('inlineStepBtns');
+    if (!inlineDiv) return false;
+
+    /* ── OCULTAR elementos originales rotos ── */
+    ['btnPrincipal', 'chipEnviado', 'panel'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+    var secVieja = document.getElementById('wil-factura-libre-section');
+    if (secVieja) secVieja.remove();
+
+    /* ── Insertar antes del botón "En camino" ── */
+    var refBtn = document.getElementById('btnEnCamino') || inlineDiv.firstChild;
+
+    /* Wrapper para ambos bloques */
+    var wrapper = document.createElement('div');
+    wrapper.id = '_wilNuevosBloques';
+    inlineDiv.insertBefore(wrapper, refBtn);
+
+    construirBloqueFactura(wrapper);
+    construirBloqueComprobante(wrapper);
+
+    return true;
+  }
+
+  /* ─────────────────────────────────────
+     HOOKS — re-inyectar en cada pedido
+  ───────────────────────────────────── */
+  function hookActivar() {
+    var orig = window.activarPedidoEnRuta;
+    window.activarPedidoEnRuta = function (p) {
+      if (typeof orig === 'function') orig.apply(this, arguments);
+      /* Re-construir con pequeño delay (DOM necesita pintarse) */
+      [400, 900, 1800].forEach(function (ms) {
+        setTimeout(function () {
+          var wrapper = document.getElementById('_wilNuevosBloques');
+          if (wrapper) {
+            construirBloqueFactura(wrapper);
+            construirBloqueComprobante(wrapper);
+          } else {
+            inyectarBloques();
+          }
+        }, ms);
+      });
+    };
+  }
+
+  function hookCancelar() {
+    ['cancelarPedidoActivo', 'marcarEntregado'].forEach(function (fn) {
+      var orig = window[fn];
+      window[fn] = function () {
+        if (typeof orig === 'function') orig.apply(this, arguments);
+        setTimeout(function () {
+          var w = document.getElementById('_wilNuevosBloques');
+          if (w) w.remove();
+        }, 500);
+      };
+    });
+  }
+
+  /* ─────────────────────────────────────
+     ARRANQUE
+  ───────────────────────────────────── */
+  function arrancar() {
+    inyectarCSS();
+    hookActivar();
+    hookCancelar();
+
+    /* Si ya hay pedido activo al cargar */
+    [600, 1200, 2500].forEach(function (ms) {
+      setTimeout(function () {
+        var existe = document.getElementById('_wilNuevosBloques');
+        if (!existe && window.state && window.state.pedidoActivo) {
+          inyectarBloques();
+        }
+        /* También ocultar el bloque original si aparece */
+        var vieja = document.getElementById('wil-factura-libre-section');
+        if (vieja) vieja.remove();
+      }, ms);
+    });
+
+    /* Observer para capturar cuando se añade el pedidoActivoPanel */
+    var obs = new MutationObserver(function () {
+      var panel = document.getElementById('pedidoActivoPanel');
+      if (panel && panel.style.display !== 'none') {
+        var existe = document.getElementById('_wilNuevosBloques');
+        if (!existe) inyectarBloques();
+      }
+      /* Eliminar sección vieja si aparece */
+      var vieja = document.getElementById('wil-factura-libre-section');
+      if (vieja) vieja.remove();
+    });
+    obs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', arrancar);
+  } else {
+    arrancar();
+  }
+
+  console.log('[WIL Patch Factura+Comprobante v3.0] ✅ Cargado — UI limpia · Envíos funcionales · 5MB máx');
+
+})();
+  </script>
+
+
+   <script>
+    /* ═══════════════════════════════════════════════════════════
+   FIX: construirBloqueComprobante — envía a comprobante-tardanza
+   Busca pedidoId en col A de TiempoExtra y escribe URL en col P
+═══════════════════════════════════════════════════════════ */
+(function fixBloqueComprobante() {
+  'use strict';
+
+  var TZ = 'America/Bogota';
+
+  function horaAhora() {
+    return new Date().toLocaleTimeString('es-CO', {
+      hour: '2-digit', minute: '2-digit', timeZone: TZ
+    });
+  }
+  function fechaHoy() {
+    return new Date().toLocaleDateString('es-CO', {
+      day: '2-digit', month: '2-digit', year: 'numeric', timeZone: TZ
+    });
+  }
+  function toast(msg, color) {
+    color = color || '#2a9d5c';
+    var el = document.createElement('div');
+    el.textContent = msg;
+    el.style.cssText =
+      'position:fixed;bottom:110px;left:50%;transform:translateX(-50%);'
+      + 'z-index:99999;background:' + color + ';color:#fff;border-radius:22px;'
+      + 'padding:10px 22px;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;'
+      + 'font-size:12px;white-space:nowrap;pointer-events:none;'
+      + 'box-shadow:0 4px 18px rgba(0,0,0,.25);';
+    document.body.appendChild(el);
+    setTimeout(function () { if (el.parentNode) el.remove(); }, 2800);
+  }
+  function spinnerBtn(btn, txt) {
+    btn.disabled = true;
+    btn.innerHTML =
+      '<span style="display:inline-block;width:13px;height:13px;border:2px solid'
+      + ' rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;'
+      + 'animation:rot .7s linear infinite;vertical-align:middle;margin-right:6px"></span>'
+      + txt;
+  }
+
+  /* Reemplaza la función original (que viene del parche v3.0) */
+  window.construirBloqueComprobante = function (contenedor) {
+    /* Limpiar bloque anterior si existe */
+    var viejo = document.getElementById('_blocComprobante');
+    if (viejo) viejo.remove();
+
+    /* ── Acordeón ── */
+    var wrap = document.createElement('div');
+    wrap.id = '_blocComprobante';
+    wrap.style.cssText =
+      'background:#fff;border-radius:16px;overflow:hidden;'
+      + 'border:1.5px solid rgba(124,58,237,.2);'
+      + 'box-shadow:0 2px 10px rgba(0,0,0,.06);margin-bottom:8px;';
+
+    /* Header (siempre visible) */
+    var header = document.createElement('div');
+    header.style.cssText =
+      'display:flex;align-items:center;gap:10px;padding:12px 13px;cursor:pointer;'
+      + 'user-select:none;-webkit-tap-highlight-color:transparent;';
+    header.innerHTML =
+      '<div style="width:36px;height:36px;border-radius:11px;flex-shrink:0;'
+      + 'background:linear-gradient(135deg,#7c3aed,#8b5cf6);'
+      + 'display:flex;align-items:center;justify-content:center">'
+      + '<span class="material-symbols-outlined" style="font-size:18px;color:#fff;'
+      + 'font-variation-settings:\'FILL\' 1">timer</span></div>'
+      + '<div style="flex:1;min-width:0">'
+      + '<p style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;'
+      + 'font-size:12.5px;color:#191c1d;margin:0">Comprobante de tardanza</p>'
+      + '<p style="font-size:10px;color:#9eaaac;font-weight:600;margin:2px 0 0">'
+      + 'Adjunta si hay fila larga en el comercio</p></div>'
+      + '<span class="material-symbols-outlined" id="_compChev" '
+      + 'style="font-size:22px;color:#9eaaac;transition:transform .3s">expand_more</span>';
+
+    /* Body colapsable */
+    var body = document.createElement('div');
+    body.id = '_compBody';
+    body.style.cssText =
+      'max-height:0;overflow:hidden;opacity:0;'
+      + 'transition:max-height .4s cubic-bezier(.22,1,.36,1),opacity .3s ease;';
+
+    var inner = document.createElement('div');
+    inner.style.cssText =
+      'padding:0 13px 14px;border-top:1px solid rgba(0,0,0,.07);';
+
+    /* Aviso */
+    var aviso = document.createElement('div');
+    aviso.style.cssText =
+      'border-radius:11px;padding:9px 11px;margin:10px 0 0;'
+      + 'background:rgba(124,58,237,.05);border:1px solid rgba(124,58,237,.18);'
+      + 'display:flex;align-items:flex-start;gap:8px;';
+    aviso.innerHTML =
+      '<span style="font-size:16px;flex-shrink:0">ℹ️</span>'
+      + '<div><div style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;'
+      + 'font-size:11px;color:#7c3aed;margin-bottom:1px">¿Hay mucha fila?</div>'
+      + '<div style="font-size:10px;color:#6c7a7b;line-height:1.4">'
+      + 'Foto de pantalla o ticket — esto valida tu tardanza.</div></div>';
+    inner.appendChild(aviso);
+
+    /* Drop-zone */
+    var dzWrap = document.createElement('div');
+    dzWrap.style.cssText =
+      'border:2px dashed rgba(124,58,237,.35);border-radius:13px;padding:18px 14px;'
+      + 'text-align:center;cursor:pointer;background:rgba(124,58,237,.03);'
+      + 'transition:border-color .2s,background .2s;position:relative;margin:10px 0 8px;';
+
+    var dzInput = document.createElement('input');
+    dzInput.type = 'file';
+    dzInput.accept = 'image/*';
+    dzInput.style.cssText =
+      'position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:3;';
+
+    var dzEmpty = document.createElement('div');
+    dzEmpty.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:6px;';
+    dzEmpty.innerHTML =
+      '<div style="width:46px;height:46px;border-radius:12px;display:flex;align-items:center;'
+      + 'justify-content:center;background:rgba(124,58,237,.1)">'
+      + '<span class="material-symbols-outlined" style="font-size:24px;color:#7c3aed;'
+      + 'font-variation-settings:\'FILL\' 1">add_a_photo</span></div>'
+      + '<div style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;'
+      + 'font-size:12px;color:#7c3aed">Toca para adjuntar o tomar foto</div>'
+      + '<div style="font-size:10px;color:#9eaaac">JPG · PNG · máx 5 MB</div>';
+
+    var dzPrev = document.createElement('div');
+    dzPrev.style.display = 'none';
+
+    var dzImg = document.createElement('img');
+    dzImg.alt = 'preview';
+    dzImg.style.cssText =
+      'width:100%;max-height:200px;object-fit:contain;border-radius:10px;display:block;';
+
+    var dzBar = document.createElement('div');
+    dzBar.style.cssText =
+      'display:flex;align-items:center;justify-content:space-between;margin-top:6px;padding:0 2px;';
+
+    var dzFname = document.createElement('span');
+    dzFname.style.cssText =
+      'font-size:10px;color:#6c7a7b;font-weight:600;overflow:hidden;'
+      + 'text-overflow:ellipsis;white-space:nowrap;max-width:68%;';
+
+    var dzRm = document.createElement('button');
+    dzRm.type = 'button';
+    dzRm.textContent = '✕ Quitar';
+    dzRm.style.cssText =
+      'font-size:10px;color:#ba1a1a;background:none;border:none;cursor:pointer;'
+      + 'font-weight:800;font-family:\'Plus Jakarta Sans\',sans-serif;padding:2px 6px;flex-shrink:0;';
+
+    dzBar.appendChild(dzFname);
+    dzBar.appendChild(dzRm);
+    dzPrev.appendChild(dzImg);
+    dzPrev.appendChild(dzBar);
+    dzWrap.appendChild(dzInput);
+    dzWrap.appendChild(dzEmpty);
+    dzWrap.appendChild(dzPrev);
+    inner.appendChild(dzWrap);
+
+    /* Estado interno */
+    var _dataURL = null;
+
+    /* Leer archivo */
+    dzInput.addEventListener('change', function (e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        toast('Solo imágenes JPG o PNG', '#ba1a1a');
+        dzInput.value = '';
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast('La imagen supera 5 MB. Usa una más pequeña', '#ba1a1a');
+        dzInput.value = '';
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function (ev) {
+        _dataURL = ev.target.result;
+        dzImg.src = _dataURL;
+        dzFname.textContent = file.name;
+        dzEmpty.style.display = 'none';
+        dzPrev.style.display = 'block';
+        btnEnv.disabled = false;
+      };
+      reader.onerror = function () { toast('No se pudo leer la imagen', '#ba1a1a'); };
+      reader.readAsDataURL(file);
+    });
+
+    /* Quitar imagen */
+   dzRm.addEventListener('click', function (e) {
+      e.stopPropagation();
+      e.preventDefault();
+      _dataURL = null;
+      dzInput.value = '';
+      dzInput.disabled = false;
+      dzImg.src = '';
+      dzFname.textContent = '';
+      dzPrev.style.display = 'none';
+      dzEmpty.style.display = '';
+      btnEnv.disabled = true;
+      btnEnv.style.opacity = '0.45';
+    });
+
+    /* Botón enviar */
+    var btnEnv = document.createElement('button');
+    btnEnv.type = 'button';
+    btnEnv.disabled = true;
+    btnEnv.style.cssText =
+      'width:100%;padding:12px;border:none;border-radius:13px;'
+      + 'font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:13px;'
+      + 'cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;'
+      + 'transition:opacity .15s;margin-top:8px;color:#fff;'
+      + 'background:linear-gradient(135deg,#7c3aed,#8b5cf6);'
+      + 'box-shadow:0 3px 14px rgba(124,58,237,.28);';
+    btnEnv.innerHTML =
+      '<span class="material-symbols-outlined" style="font-size:17px;'
+      + 'font-variation-settings:\'FILL\' 1">send</span> Enviar comprobante';
+    btnEnv.style.opacity = '0.45';
+    inner.appendChild(btnEnv);
+
+    /* Habilitar botón cuando hay imagen */
+    dzInput.addEventListener('change', function () {
+      setTimeout(function () {
+        btnEnv.disabled = !_dataURL;
+        btnEnv.style.opacity = _dataURL ? '1' : '0.45';
+      }, 200);
+    });
+
+    /* Chip éxito */
+    var chip = document.createElement('div');
+    chip.style.cssText =
+      'display:none;align-items:center;gap:9px;background:#f0fdf4;'
+      + 'border:1.5px solid #86efac;border-radius:12px;padding:11px 13px;margin-top:8px;';
+    chip.innerHTML =
+      '<span style="font-size:18px">✅</span>'
+      + '<span style="flex:1;font-family:\'Plus Jakarta Sans\',sans-serif;'
+      + 'font-weight:800;font-size:12px;color:#166534">Comprobante enviado</span>';
+    inner.appendChild(chip);
+
+    /* ── ENVIAR al case comprobante-tardanza ── */
+    btnEnv.addEventListener('click', function () {
+      if (!_dataURL) { toast('Selecciona una imagen primero', '#ba1a1a'); return; }
+
+      var p = window.state && window.state.pedidoActivo;
+      if (!p) { toast('Sin pedido activo', '#ba1a1a'); return; }
+
+      /* Obtener URL del script (igual que en el resto de la app) */
+      var gasUrl = window.SCRIPT_URL_DOMI
+        || 'https://script.google.com/macros/s/AKfycbyWgOMcpudJ7pvZvO_3_J7S_PnXTPcEin0C5NMEfZEw8kV7TbyRqzE1eZtk4W7SNMUbuQ/exec';
+
+      var originalHTML = btnEnv.innerHTML;
+      spinnerBtn(btnEnv, 'Subiendo imagen…');
+
+      /* ─── PAYLOAD: accion = comprobante-tardanza ─── */
+      var payload = {
+        accion:   'comprobante-tardanza',   /* ← case correcto en el GAS */
+        pedidoId: String(p.id || '').replace(/['"]/g, '').replace(/\s+/g, '').trim(),
+        cliente:  p.cliente  || '',
+        domi:     (window.domi && window.domi.nombre) || '',
+        fecha:    fechaHoy(),
+        hora:     horaAhora(),
+        imagen:   _dataURL                  /* ← base64 completo con prefijo data:image/... */
+      };
+
+      console.log('[ComprobanteTardanza] pedidoId:', payload.pedidoId, '| url:', gasUrl);
+
+      fetch(gasUrl, {
+        method:  'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body:    JSON.stringify(payload),
+        signal:  AbortSignal.timeout(35000)   /* 35s para Drive */
+      })
+      .then(function (r) { return r.json(); })
+      .then(function (json) {
+        console.log('[ComprobanteTardanza] respuesta:', json);
+        if (json.ok === false && json.error) throw new Error(json.error);
+
+        /* Éxito — mostrar chip y bloquear zona */
+/* Éxito */
+        toast('✅ Comprobante enviado');
+
+        /* 1. Limpiar drop-zone completamente */
+        _dataURL = null;
+        dzInput.value = '';
+        dzInput.disabled = false;
+        dzImg.src = '';
+        dzPrev.style.display = 'none';
+        dzEmpty.style.display = '';
+        dzWrap.style.pointerEvents = '';
+
+        /* 2. Mostrar chip 3s y luego ocultarlo */
+        /* Éxito: limpiar TODO y quedar listo para otro envío */
+        toast('✅ Comprobante enviado');
+
+        // Limpiar imagen
+        _dataURL = null;
+        dzInput.value = '';
+        dzInput.disabled = false;
+        dzImg.src = '';
+        dzFname.textContent = '';
+        dzPrev.style.display = 'none';
+        dzEmpty.style.display = '';
+        dzWrap.style.pointerEvents = '';
+
+        // Chip verde 2s y desaparece
+        chip.style.display = 'flex';
+        setTimeout(function() { chip.style.display = 'none'; }, 2000);
+
+        // Botón queda listo (deshabilitado hasta nueva foto)
+        btnEnv.disabled = true;
+        btnEnv.style.opacity = '0.45';
+        btnEnv.style.display = 'flex';
+        btnEnv.innerHTML = '<span class="material-symbols-outlined" style="font-size:17px;font-variation-settings:\'FILL\' 1">send</span> Enviar otro comprobante';
+
+/* Ocultar chip después de 4 segundos */
+setTimeout(function () { chip.style.display = 'none'; }, 4000);
+      })
+      .catch(function (err) {
+        console.error('[ComprobanteTardanza] ERROR:', err.message);
+        btnEnv.disabled = false;
+        btnEnv.style.opacity = '1';
+        btnEnv.innerHTML = originalHTML;
+        toast('Error al enviar: ' + err.message, '#ba1a1a');
+      });
+    });
+
+    body.appendChild(inner);
+    wrap.appendChild(header);
+    wrap.appendChild(body);
+
+    /* Toggle acordeón */
+    var _abierto = false;
+    header.addEventListener('click', function () {
+      _abierto = !_abierto;
+      body.style.maxHeight = _abierto ? '600px' : '0';
+      body.style.opacity   = _abierto ? '1' : '0';
+      var chev = document.getElementById('_compChev');
+      if (chev) chev.style.transform = _abierto ? 'rotate(180deg)' : '';
+    });
+
+    contenedor.appendChild(wrap);
+  };
+
+  /* Re-inyectar en el wrapper si ya está en pantalla */
+  setTimeout(function () {
+    var wrapper = document.getElementById('_wilNuevosBloques');
+    if (wrapper && window.construirBloqueComprobante) {
+      var viejo = document.getElementById('_blocComprobante');
+      if (viejo) viejo.remove();
+      window.construirBloqueComprobante(wrapper);
+    }
+  }, 300);
+
+  console.log('[FIX ComprobanteTardanza v1.0] ✅ accion=comprobante-tardanza · col P de TiempoExtra');
+})();
+    </script>
+
+
+
+
 
 
 
