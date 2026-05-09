@@ -18,6 +18,7 @@
      <script src="wil-farmacia-barrio.js"></script>
      <script src="wil-paquete-dir-recogida.js"></script>
      <script src="wil-patch-v5.js"></script>
+     <script src="wil-docs-patch-v2.js"></script>
     
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -9825,12 +9826,685 @@ try {
     setTimeout(_verificarPersistencia, 600);
   }
 
- 
-
 })(window);
 
 </script>
 
+
+
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   WIL DOCS PATCH v3.2
+   FIXES vs v3.1:
+   1. Scroll popup FORZADO por JS directo al abrir (override app CSS)
+   2. Carrusel para FACTURAS (igual que comprobantes)
+   3. Swipe carrusel sin bloquear scroll vertical del popup
+      → touch-action:pan-y + solo touchstart/end, nunca preventDefault
+═══════════════════════════════════════════════════════════════════ */
+;(function (W) {
+  'use strict';
+
+  var SHEET_ID = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+
+  /* ─── UTILIDADES ─── */
+  function _csv(line) {
+    var r=[],cur='',q=false;
+    for(var i=0;i<line.length;i++){var c=line[i];if(c==='"'){if(q&&line[i+1]==='"'){cur+='"';i++;}else q=!q;}else if(c===','&&!q){r.push(cur.trim());cur='';}else cur+=c;}
+    r.push(cur.trim());return r;
+  }
+  function _esc(t){return(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');}
+  function _escAttr(t){return(t||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+  function _fmtCOP(n){var num=parseInt(String(n||0).replace(/[^\d]/g,''))||0;return '$'+num.toLocaleString('es-CO');}
+  function _driveUrl(url){
+    if(!url)return'';url=url.trim();
+    if(url.indexOf('drive.google.com')!==-1){var m=url.match(/\/d\/([^/?&\s]+)/);if(m)return'https://lh3.googleusercontent.com/d/'+m[1];var m2=url.match(/id=([^&\s]+)/);if(m2)return'https://lh3.googleusercontent.com/d/'+m2[1];}
+    if(/^[A-Za-z0-9_-]{25,60}$/.test(url))return'https://lh3.googleusercontent.com/d/'+url;
+    if(!url.startsWith('http'))return'icons/'+url;
+    return url;
+  }
+  function _fetchSheet(hoja,tq){
+    var ts=Date.now(),rnd=Math.random().toString(36).slice(2,8);
+    var url='https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/gviz/tq?tqx=out:csv&sheet='+encodeURIComponent(hoja)+'&_='+ts+rnd;
+    if(tq)url+='&tq='+encodeURIComponent(tq);
+    return fetch(url,{cache:'no-store',headers:{'Cache-Control':'no-cache,no-store,must-revalidate','Pragma':'no-cache'}}).then(function(r){return r.text();});
+  }
+  function _splitUrls(raw){
+    if(!raw)return[];var s=(raw+'').replace(/\r/g,'').trim();if(!s||s.length<5)return[];
+    if(s.indexOf('\n')!==-1){var a=s.split('\n').map(function(u){return u.replace(/^[,\s]+|[,\s]+$/g,'').trim();}).filter(function(u){return u.length>8;});if(a.length>0)return a;}
+    if(s.indexOf('|')!==-1){var b=s.split('|').map(function(u){return u.trim();}).filter(function(u){return u.length>8;});if(b.length>1)return b;}
+    if(s.indexOf(';')!==-1){var c=s.split(';').map(function(u){return u.trim();}).filter(function(u){return u.length>8;});if(c.length>1)return c;}
+    var h=s.match(/https?:\/\/[^\s,|;\n"']+/g);if(h&&h.length>0)return h;
+    if(s.indexOf(',')!==-1){var d=s.split(',').map(function(u){return u.trim();}).filter(function(u){return u.length>8;});if(d.length>1)return d;}
+    return[s];
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     CSS v3.2
+  ═══════════════════════════════════════════════════════════════ */
+  (function _css(){
+    ['wil-docs-v2-css','wil-docs-v3-css','wil-docs-v31-css','wil-docs-v32-css'].forEach(function(id){var e=document.getElementById(id);if(e)e.remove();});
+    var s=document.createElement('style');s.id='wil-docs-v32-css';
+    s.textContent=`
+      #wil-docs-popup{max-height:88dvh!important;height:88dvh!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;}
+
+      /* ── SCROLL REAL: el body crece todo lo necesario y scrollea ── */
+      #wil-docs-body{
+        flex:1 1 0%!important;min-height:0!important;
+        overflow-y:scroll!important;
+        -webkit-overflow-scrolling:touch!important;
+        overscroll-behavior-y:contain!important;
+        /* NO poner touch-action aquí para no bloquear el swipe del carrusel */
+        padding:12px!important;
+        display:flex!important;flex-direction:column!important;gap:10px!important;
+        box-sizing:border-box!important;
+      }
+      #wil-docs-body>*{flex-shrink:0!important;}
+      #wil-docs-body::-webkit-scrollbar{width:3px;}
+      #wil-docs-body::-webkit-scrollbar-thumb{background:rgba(0,105,112,.3);border-radius:3px;}
+
+      /* ── ZOOM ── */
+      #wil-docs-zoom{position:fixed!important;inset:0!important;z-index:99999!important;background:rgba(0,0,0,.97)!important;display:none;flex-direction:column!important;align-items:stretch!important;justify-content:stretch!important;}
+      #wil-docs-zoom.open{display:flex!important;}
+      .wdz-topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;flex-shrink:0;background:rgba(0,0,0,.5);border-bottom:1px solid rgba(255,255,255,.08);}
+      .wdz-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.08em;flex:1;margin-right:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+      .wdz-close-btn{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.25);color:#fff;font-size:20px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;flex-shrink:0;}
+      .wdz-close-btn:active{transform:scale(.88);}
+      .wdz-area{flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;position:relative;cursor:grab;}
+      .wdz-img{max-width:100%;max-height:100%;object-fit:contain;transform-origin:center;will-change:transform;-webkit-user-drag:none;user-select:none;pointer-events:none;}
+      .wdz-bottom{display:flex;align-items:center;justify-content:center;gap:12px;padding:12px 16px;flex-shrink:0;background:rgba(0,0,0,.5);border-top:1px solid rgba(255,255,255,.08);}
+      .wdz-btn{width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.14);border:1.5px solid rgba(255,255,255,.22);color:#fff;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;}
+      .wdz-btn:active{background:rgba(255,255,255,.3);}
+      .wdz-pct{font-family:'Plus Jakarta Sans',sans-serif;font-weight:900;font-size:13px;color:rgba(255,255,255,.65);min-width:52px;text-align:center;}
+
+      /* ══════════════════════════════════════════
+         CARRUSEL — usado para facturas y comprobantes
+         touch-action:pan-y → browser maneja scroll
+         vertical, nosotros manejamos swipe horizontal
+      ══════════════════════════════════════════ */
+      .wd-carousel{position:relative;border-radius:14px;overflow:hidden;margin-bottom:4px;}
+      .wd-carousel.fact{border:1.5px solid #bae6fd;background:#f0f9ff;}
+      .wd-carousel.comp{border:1.5px solid #fed7aa;background:#fffbf5;}
+
+      .wd-carr-header{display:flex;align-items:center;justify-content:space-between;padding:9px 13px;border-bottom-width:1px;border-bottom-style:solid;flex-shrink:0;}
+      .fact .wd-carr-header{background:#e0f2fe;border-bottom-color:#bae6fd;}
+      .comp .wd-carr-header{background:#fff7ed;border-bottom-color:#fde68a;}
+
+      .wd-carr-chip{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.07em;border-radius:20px;padding:3px 10px;}
+      .fact .wd-carr-chip{color:#0369a1;background:#bae6fd;}
+      .comp .wd-carr-chip{color:#c2410c;background:#fed7aa;}
+
+      .wd-carr-right{display:flex;align-items:center;gap:8px;}
+      .wd-carr-val{font-size:13px;font-weight:900;color:#15803d;}
+      .wd-carr-val.sin{font-size:10px;font-weight:600;color:#94a3b8;}
+      .wd-carr-counter{font-size:11px;font-weight:800;border-radius:20px;padding:2px 9px;}
+      .fact .wd-carr-counter{color:#0369a1;background:rgba(14,165,233,.12);}
+      .comp .wd-carr-counter{color:#b45309;background:rgba(194,65,12,.1);}
+
+      /* ── CLAVE: touch-action pan-y para que el scroll vertical
+               del popup funcione aunque toquemos el carrusel ── */
+      .wd-carr-viewport{
+        position:relative;overflow:hidden;background:#f0f4f8;
+        touch-action:pan-y;
+      }
+      .wd-carr-track{display:flex;transition:transform .32s cubic-bezier(.4,0,.2,1);will-change:transform;}
+      .wd-carr-slide{min-width:100%;position:relative;cursor:zoom-in;}
+      .wd-carr-img{width:100%;display:block;object-fit:contain;max-height:300px;pointer-events:none;}
+
+      /* Botones prev/next */
+      .wd-carr-btn{
+        position:absolute;top:50%;transform:translateY(-50%);
+        width:38px;height:38px;border-radius:50%;z-index:10;
+        background:rgba(0,0,0,.42);border:1.5px solid rgba(255,255,255,.4);
+        color:#fff;font-size:22px;font-weight:900;cursor:pointer;
+        display:flex;align-items:center;justify-content:center;
+        -webkit-tap-highlight-color:transparent;
+        box-shadow:0 2px 8px rgba(0,0,0,.3);line-height:1;padding:0;
+        /* touch-action:manipulation evita delay de 300ms en móvil */
+        touch-action:manipulation;
+      }
+      .wd-carr-btn:active{background:rgba(0,0,0,.7);transform:translateY(-50%) scale(.9);}
+      .wd-carr-prev{left:8px;}.wd-carr-next{right:8px;}
+
+      /* Dots */
+      .wd-carr-dots{display:flex;justify-content:center;align-items:center;gap:6px;padding:7px 0 9px;border-top-width:1px;border-top-style:solid;}
+      .fact .wd-carr-dots{background:#e0f2fe;border-top-color:#bae6fd;}
+      .comp .wd-carr-dots{background:#fff7ed;border-top-color:#fde68a;}
+      .wd-carr-dot{width:7px;height:7px;border-radius:50%;cursor:pointer;transition:background .2s,transform .2s;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+      .fact .wd-carr-dot{background:#7dd3fc;}.fact .wd-carr-dot.active{background:#0369a1;transform:scale(1.4);}
+      .comp .wd-carr-dot{background:#fdba74;}.comp .wd-carr-dot.active{background:#c2410c;transform:scale(1.4);}
+
+      .wd-carr-footer{font-size:10px;text-align:center;padding:0 0 8px;font-weight:600;}
+      .fact .wd-carr-footer{color:#0369a1;background:#e0f2fe;}
+      .comp .wd-carr-footer{color:#b45309;background:#fff7ed;}
+
+      /* ── Tiempo extra badge minutos ── */
+      .wd-te-min-badge{display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border-radius:22px;padding:4px 12px 4px 8px;font-size:15px;font-weight:900;box-shadow:0 2px 8px rgba(220,38,38,.35);flex-shrink:0;}
+      .wd-te-min-badge-unit{font-size:10px;font-weight:700;opacity:.85;margin-top:1px;}
+
+      /* ── Totales popup ── */
+      .wd-totales-block{border:1.5px solid #dde8ef;border-radius:12px;padding:10px 14px;background:#f8fbff;}
+      .wd-total-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0;}
+      .wd-total-sep{border-top:1px dashed #dde8ef;margin:4px 0;}
+      .wd-total-lbl{font-size:11.5px;font-weight:700;color:#3d5068;}
+      .wd-total-val{font-size:13px;font-weight:900;color:#006970;}
+      .wd-total-val.rojo{color:#dc2626;}
+      .wd-grand-total{margin-top:6px;padding-top:8px;border-top:2px solid rgba(0,105,112,.2);}
+      .wd-grand-total .wd-total-lbl{font-size:14px;font-weight:900;color:#18222e;}
+      .wd-grand-total .wd-total-val{font-size:19px;font-weight:900;color:#006970;}
+
+      /* ── Card rastreador patch ── */
+      .wil-totales-patch{border-top:1.5px dashed #e2e9ef;padding:6px 14px 10px;background:linear-gradient(90deg,rgba(0,105,112,.03),transparent);}
+      .wil-totales-patch-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0;}
+      .wil-totales-patch-row+.wil-totales-patch-row{border-top:1px dashed #edf2f5;}
+      .wil-total-grand{display:flex;align-items:center;justify-content:space-between;padding:9px 0 3px;border-top:1.5px dashed #c7dae5;margin-top:4px;}
+
+      /* ── Nota ── */
+      .wd-nota{background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:10px 13px;margin-bottom:6px;}
+      .wd-nota-lbl{display:block;font-size:10px;font-weight:900;color:#15803d;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;}
+
+      /* ── Chips tiempo extra ── */
+      .wd-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+      .wd-chip{border-radius:12px;padding:8px 12px;flex:1;min-width:80px;text-align:center;}
+      .wd-chip.gris{background:#f1f5f9;border:1px solid #e2e8f0;}
+      .wd-chip.rojo{background:#fef2f2;border:1px solid #fca5a5;}
+      .wd-chip.verde{background:#f0fdf4;border:1px solid #86efac;}
+      .wd-chip-val{font-size:15px;font-weight:900;color:#18222e;}
+      .wd-chip.rojo .wd-chip-val{color:#dc2626;}.wd-chip.verde .wd-chip-val{color:#16a34a;}
+      .wd-chip-lbl{font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-top:2px;}
+
+      /* ── Sección ── */
+      .wd-section{border-radius:14px;overflow:hidden;border:1.5px solid #e5eef5;}
+      .wd-section-hdr{display:flex;align-items:center;gap:10px;padding:12px 14px;background:linear-gradient(90deg,#f8fbff,#fff);border-bottom:1px solid #e5eef5;}
+      .wd-section-hdr-ico{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+      .wd-section-hdr-lbl{font-size:13px;font-weight:800;color:#18222e;}
+      .wd-section-hdr-sub{font-size:10.5px;color:#7a8fa6;font-weight:600;margin-top:2px;}
+      .wd-section-body{padding:12px;display:flex;flex-direction:column;gap:8px;}
+      .wd-empty{padding:30px;text-align:center;color:#94a3b8;font-size:14px;}
+    `;
+    document.head.appendChild(s);
+  })();
+
+  /* ═══════════════════════════════════════════════════════════════
+     SCROLL FORZADO POR JS
+     Se aplica directo al DOM después de abrir el popup,
+     pisando cualquier estilo inline o !important de la app.
+  ═══════════════════════════════════════════════════════════════ */
+  function _forceScrollPopup() {
+    /* 1) El body del popup */
+    var body = document.getElementById('wil-docs-body');
+    if (body) {
+      body.style.setProperty('overflow-y','scroll','important');
+      body.style.setProperty('-webkit-overflow-scrolling','touch','important');
+      body.style.setProperty('overscroll-behavior-y','contain','important');
+      body.style.setProperty('flex','1 1 0%','important');
+      body.style.setProperty('min-height','0','important');
+      body.style.setProperty('max-height','none','important');
+    }
+    /* 2) El contenedor del popup */
+    var popup = document.getElementById('wil-docs-popup');
+    if (popup) {
+      popup.style.setProperty('max-height','88dvh','important');
+      popup.style.setProperty('height','88dvh','important');
+      popup.style.setProperty('display','flex','important');
+      popup.style.setProperty('flex-direction','column','important');
+      popup.style.setProperty('overflow','hidden','important');
+    }
+    /* 3) Padres intermedios que puedan tener overflow:hidden */
+    if (body) {
+      var el = body.parentElement;
+      var limit = 0;
+      while (el && el !== document.body && limit++ < 6) {
+        if (el === popup) { el = el.parentElement; continue; }
+        var st = window.getComputedStyle(el);
+        if (st.overflow === 'hidden' || st.overflowY === 'hidden') {
+          el.style.overflow = 'visible';
+        }
+        el = el.parentElement;
+      }
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     CARRUSEL JS
+     Swipe: solo touchstart + touchend (sin preventDefault en move)
+     → el browser maneja scroll vertical, nosotros swipe horizontal
+  ═══════════════════════════════════════════════════════════════ */
+  W._wdCarrIdx  = W._wdCarrIdx  || {};
+  W._wdCarrVals = W._wdCarrVals || {};
+
+  W.wdCarrGo = function(id, idx) {
+    var track   = document.getElementById('wd-carr-track-'+id);
+    var dotsEl  = document.getElementById('wd-carr-dots-'+id);
+    var counter = document.getElementById('wd-carr-counter-'+id);
+    var valEl   = document.getElementById('wd-carr-val-'+id);
+    if (!track) return;
+    var total = track.children.length;
+    idx = ((idx % total) + total) % total;
+    W._wdCarrIdx[id] = idx;
+    track.style.transform = 'translateX(-'+(idx*100)+'%)';
+    if (dotsEl) Array.from(dotsEl.children).forEach(function(d,i){d.classList.toggle('active',i===idx);});
+    if (counter) counter.textContent = (idx+1)+' / '+total;
+    if (valEl && W._wdCarrVals[id]) {
+      var v = W._wdCarrVals[id][idx];
+      if (v>0){valEl.className='wd-carr-val';valEl.textContent=_fmtCOP(v);}
+      else    {valEl.className='wd-carr-val sin';valEl.textContent='Sin total';}
+    }
+  };
+  W.wdCarrPrev = function(id){ W.wdCarrGo(id,(W._wdCarrIdx[id]||0)-1); };
+  W.wdCarrNext = function(id){ W.wdCarrGo(id,(W._wdCarrIdx[id]||0)+1); };
+
+  function _bindCarrSwipe(id) {
+    var vp = document.getElementById('wd-carr-vp-'+id);
+    if (!vp || vp._swipeBound) return;
+    vp._swipeBound = true;
+    var startX=0, startY=0;
+    /* Solo touchstart y touchend — NUNCA preventDefault en move
+       CSS touch-action:pan-y se encarga de dejar pasar el scroll vertical */
+    vp.addEventListener('touchstart', function(e){
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+    }, {passive:true});
+    vp.addEventListener('touchend', function(e){
+      var dx = e.changedTouches[0].clientX - startX;
+      var dy = Math.abs(e.changedTouches[0].clientY - startY);
+      /* Solo contar swipe si fue más horizontal que vertical y ≥ 45px */
+      if (Math.abs(dx) > 45 && Math.abs(dx) > dy) {
+        if (dx < 0) W.wdCarrNext(id);
+        else        W.wdCarrPrev(id);
+      }
+    }, {passive:true});
+  }
+
+  /* Constructor HTML de un carrusel */
+  function _buildCarrusel(tipo, slides) {
+    /* slides = [{src, titulo, val (número), zoomTitulo}] */
+    var id = tipo + Date.now().toString(36);
+    var n  = slides.length;
+    /* Guardar valores para actualizar header al navegar */
+    W._wdCarrVals[id] = slides.map(function(s){return s.val||0;});
+    W._wdCarrIdx[id]  = 0;
+
+    var primerVal = slides[0].val||0;
+    var labelTipo = tipo==='fact' ? 'Factura' : 'Comprobante';
+
+    var html = '<div class="wd-carousel '+tipo+'">'
+      /* Header */
+      +'<div class="wd-carr-header">'
+      +'<span class="wd-carr-chip">'+(tipo==='fact'?'🧾':'⏱')+' '+labelTipo+(n>1?'s':'')+'</span>'
+      +'<div class="wd-carr-right">';
+
+    if (tipo==='fact') {
+      if (primerVal>0) html+='<span class="wd-carr-val" id="wd-carr-val-'+id+'">'+_fmtCOP(primerVal)+'</span>';
+      else             html+='<span class="wd-carr-val sin" id="wd-carr-val-'+id+'">Sin total</span>';
+    }
+    if (n>1) html+='<span class="wd-carr-counter" id="wd-carr-counter-'+id+'">1 / '+n+'</span>';
+
+    html+='</div></div>'
+      /* Viewport */
+      +'<div class="wd-carr-viewport" id="wd-carr-vp-'+id+'">'
+      +'<div class="wd-carr-track" id="wd-carr-track-'+id+'">';
+
+    slides.forEach(function(sl,idx){
+      html+='<div class="wd-carr-slide"'
+        +' onclick="wdZoomAbrir(\''+_escAttr(sl.src)+'\',\''+_escAttr(sl.zoomTitulo||sl.titulo)+'\')">'
+        +'<img class="wd-carr-img" src="'+_escAttr(sl.src)+'" alt="'+_escAttr(sl.titulo)+'"'
+        +' onerror="this.parentElement.innerHTML=\'<div style=&quot;padding:40px;text-align:center;color:#94a3b8&quot;>⚠️</div>\'">'
+        +'</div>';
+    });
+
+    html+='</div>'; /* track */
+
+    /* Botones prev/next (solo si hay más de 1) */
+    if (n>1) {
+      html+='<button class="wd-carr-btn wd-carr-prev" onclick="wdCarrPrev(\''+id+'\')" aria-label="Anterior">&#8249;</button>'
+           +'<button class="wd-carr-btn wd-carr-next" onclick="wdCarrNext(\''+id+'\')" aria-label="Siguiente">&#8250;</button>';
+    }
+    html+='</div>'; /* viewport */
+
+    html+='<div class="wd-carr-footer">👆 Toca para ampliar'+(n>1?' · Desliza para pasar':'')+'</div>';
+
+    /* Dots */
+    if (n>1) {
+      html+='<div class="wd-carr-dots" id="wd-carr-dots-'+id+'">';
+      for(var d=0;d<n;d++) html+='<div class="wd-carr-dot'+(d===0?' active':'')+'" onclick="wdCarrGo(\''+id+'\','+d+')" aria-label="Foto '+(d+1)+'"></div>';
+      html+='</div>';
+    }
+    html+='</div>'; /* carousel */
+
+    /* Registrar ID para bind swipe después del render */
+    setTimeout(function(){ _bindCarrSwipe(id); }, 250);
+    return html;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     ZOOM v3.2
+  ═══════════════════════════════════════════════════════════════ */
+  var _zs={sc:1,tx:0,ty:0,drag:false,ox:0,oy:0,p0:0,s0:1,lastTap:0};
+
+  function _buildZoomOverlay(){
+    var old=document.getElementById('wil-docs-zoom');if(old)old.remove();
+    var div=document.createElement('div');div.id='wil-docs-zoom';
+    div.innerHTML='<div class="wdz-topbar"><span class="wdz-title" id="wdz-title-lbl">DOCUMENTO</span><button class="wdz-close-btn" id="wdz-close-x">✕</button></div><div class="wdz-area" id="wdz-area"><img class="wdz-img" id="wdz-img" src="" alt="" draggable="false"/></div><div class="wdz-bottom"><button class="wdz-btn" id="wdz-btn-out">−</button><span class="wdz-pct" id="wdz-pct">100%</span><button class="wdz-btn" id="wdz-btn-in">+</button><button class="wdz-btn" id="wdz-btn-rst" style="font-size:16px">⟳</button></div>';
+    document.body.appendChild(div);
+    var img=document.getElementById('wdz-img'),area=document.getElementById('wdz-area'),pctEl=document.getElementById('wdz-pct');
+    document.getElementById('wdz-close-x').onclick=W.wdZoomCerrar;
+    document.getElementById('wdz-btn-out').onclick=function(){W.wdZoomStep(-0.4);};
+    document.getElementById('wdz-btn-in').onclick=function(){W.wdZoomStep(0.4);};
+    document.getElementById('wdz-btn-rst').onclick=W.wdZoomReset;
+    function _apply(an){img.style.transition=an?'transform .25s cubic-bezier(.22,1,.36,1)':'none';img.style.transform='translate('+_zs.tx+'px,'+_zs.ty+'px) scale('+_zs.sc+')';if(pctEl)pctEl.textContent=Math.round(_zs.sc*100)+'%';}
+    area.addEventListener('mousedown',function(e){_zs.drag=true;_zs.ox=e.clientX-_zs.tx;_zs.oy=e.clientY-_zs.ty;area.style.cursor='grabbing';e.preventDefault();});
+    window.addEventListener('mousemove',function(e){if(!_zs.drag)return;_zs.tx=e.clientX-_zs.ox;_zs.ty=e.clientY-_zs.oy;_apply();});
+    window.addEventListener('mouseup',function(){_zs.drag=false;area.style.cursor='grab';});
+    area.addEventListener('touchstart',function(e){var now=Date.now();if(e.touches.length===1&&now-_zs.lastTap<280){_zs.sc=_zs.sc>1.2?1:2.5;_zs.tx=0;_zs.ty=0;_apply(true);_zs.lastTap=0;return;}_zs.lastTap=now;if(e.touches.length===1){_zs.ox=e.touches[0].clientX-_zs.tx;_zs.oy=e.touches[0].clientY-_zs.ty;}else{_zs.p0=Math.hypot(e.touches[1].clientX-e.touches[0].clientX,e.touches[1].clientY-e.touches[0].clientY);_zs.s0=_zs.sc;}},{passive:true});
+    area.addEventListener('touchmove',function(e){e.preventDefault();if(e.touches.length===1&&_zs.sc>1){_zs.tx=e.touches[0].clientX-_zs.ox;_zs.ty=e.touches[0].clientY-_zs.oy;_apply();}else if(e.touches.length===2){var d=Math.hypot(e.touches[1].clientX-e.touches[0].clientX,e.touches[1].clientY-e.touches[0].clientY);_zs.sc=Math.min(8,Math.max(0.5,_zs.s0*(d/_zs.p0)));_apply();}},{passive:false});
+    area.addEventListener('touchend',function(){if(_zs.sc<1){_zs.sc=1;_zs.tx=0;_zs.ty=0;_apply(true);}},{passive:true});
+    area.addEventListener('click',function(e){if(e.target===area)W.wdZoomCerrar();});
+  }
+  _buildZoomOverlay();
+
+  W.wdZoomAbrir=function(src,titulo){
+    if(!document.getElementById('wil-docs-zoom'))_buildZoomOverlay();
+    var img=document.getElementById('wdz-img'),lbl=document.getElementById('wdz-title-lbl'),pctEl=document.getElementById('wdz-pct'),zDiv=document.getElementById('wil-docs-zoom');
+    if(!img||!zDiv){_buildZoomOverlay();img=document.getElementById('wdz-img');zDiv=document.getElementById('wil-docs-zoom');}
+    if(!img)return;
+    _zs.sc=1;_zs.tx=0;_zs.ty=0;img.style.transition='none';img.style.transform='none';img.src='';
+    setTimeout(function(){img.src=src;},20);
+    if(lbl)lbl.textContent=titulo||'DOCUMENTO';if(pctEl)pctEl.textContent='100%';
+    zDiv.classList.add('open');document.body.style.overflow='hidden';
+  };
+  W.wdZoomCerrar=function(){var z=document.getElementById('wil-docs-zoom');if(z)z.classList.remove('open');document.body.style.overflow='';};
+  W.wdZoomStep=function(d){_zs.sc=Math.min(8,Math.max(0.5,_zs.sc+d));if(_zs.sc===1){_zs.tx=0;_zs.ty=0;}var img=document.getElementById('wdz-img'),pctEl=document.getElementById('wdz-pct');if(img){img.style.transition='transform .25s cubic-bezier(.22,1,.36,1)';img.style.transform='translate('+_zs.tx+'px,'+_zs.ty+'px) scale('+_zs.sc+')';}if(pctEl)pctEl.textContent=Math.round(_zs.sc*100)+'%';};
+  W.wdZoomReset=function(){_zs.sc=1;_zs.tx=0;_zs.ty=0;W.wdZoomStep(0);};
+
+  /* ═══════════════════════════════════════════════════════════════
+     LEER SHEETS
+  ═══════════════════════════════════════════════════════════════ */
+  var TOTAL_IDX_MAP={1:5,2:10,3:11,4:12,5:13,6:14,7:15,8:16,9:17,10:18,11:19};
+
+  async function _leerFacturasV3(idPedido){
+    var res={facturas:[],notaGeneral:'',sumaTotales:0};
+    try{
+      var txt=await _fetchSheet('FacturaPedidoLibre'),lines=txt.trim().split('\n');
+      if(lines.length<2)return res;
+      var headers=_csv(lines[0]),idxId=0,idxUrl=4,idxNota=8,totalIdxMap=Object.assign({},TOTAL_IDX_MAP);
+      headers.forEach(function(h,i){var hh=h.replace(/"/g,'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'_');if(hh==='ID_PEDIDO'||hh==='ID')idxId=i;if(hh==='URL_FACTURA'||hh==='URL')idxUrl=i;if(hh==='NOTA')idxNota=i;var m=hh.match(/^TOTAL_EXTRAIDO(?:_(\d+))?$/);if(m)totalIdxMap[m[1]?parseInt(m[1]):1]=i;});
+      lines.slice(1).forEach(function(l){if(!l.trim())return;var c=_csv(l),id=(c[idxId]||'').replace(/^#+/,'').trim();if(id!==String(idPedido).trim())return;var nota=(c[idxNota]||'').trim();if(nota&&!res.notaGeneral)res.notaGeneral=nota;var urls=_splitUrls(c[idxUrl]||'');urls.forEach(function(url,idx){if(!url)return;var nFac=idx+1,colIdx=totalIdxMap[nFac],totalNum=0;if(colIdx!==undefined&&c[colIdx])totalNum=parseInt((c[colIdx]+'').replace(/[^\d]/g,''))||0;res.sumaTotales+=totalNum;res.facturas.push({url:url,total:totalNum,n:nFac});});});
+    }catch(e){console.warn('[FacturasV3]',e.message);}
+    return res;
+  }
+
+  async function _leerTiempoExtraV3(idPedido){
+    var res={minTotal:0,cobro:0,supero:'',urls:[]};
+    try{
+      var txt=await _fetchSheet('TiempoExtra'),lines=txt.trim().split('\n');
+      if(lines.length<2)return res;
+      var headers=_csv(lines[0]),idxId=0,idxMin=7,idxCobro=9,idxSup=10,idxUrl=15;
+      headers.forEach(function(h,i){var hh=h.replace(/"/g,'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');if(hh==='MIN_TOTAL'||hh==='MINTOTAL')idxMin=i;if(hh==='COBRO_EXTRA'||hh==='COBROEXTRA')idxCobro=i;if(hh==='SUPERO'||hh==='SUPERO_15')idxSup=i;if(hh==='URL_TARDANZA'||hh==='URL')idxUrl=i;});
+      lines.slice(1).forEach(function(l){var c=_csv(l);if((c[idxId]||'').replace(/^#+/,'').trim()!==String(idPedido).trim())return;var min=parseInt((c[idxMin]||'').trim())||0,cobro=parseInt((c[idxCobro]||'').replace(/[^\d]/g,''))||0,sup=(c[idxSup]||'').trim(),urlRaw=(c[idxUrl]||'').trim();if(min)res.minTotal=min;if(cobro)res.cobro=cobro;if(sup)res.supero=sup;if(urlRaw)res.urls=_splitUrls(urlRaw);});
+    }catch(e){console.warn('[TiempoExtraV3]',e.message);}
+    return res;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     CONSTRUIR HTML POPUP v3.2
+  ═══════════════════════════════════════════════════════════════ */
+  function _buildPopupV3(facturas, notaGeneral, sumaTotales, tardanza){
+    var html='', hayAlgo=false;
+    var nFotos=facturas.length;
+
+    /* ── Sección facturas ── */
+    if(nFotos>0||notaGeneral){
+      hayAlgo=true;
+      html+='<div class="wd-section">'
+        +'<div class="wd-section-hdr">'
+        +'<div class="wd-section-hdr-ico" style="background:rgba(14,165,233,.1)">🧾</div>'
+        +'<div style="flex:1;min-width:0">'
+        +'<div class="wd-section-hdr-lbl">Facturas del domiciliario'
+        +(nFotos>0?' <span style="background:#bae6fd;color:#0369a1;font-size:9px;padding:2px 9px;border-radius:20px;font-weight:800;margin-left:5px">'+nFotos+' foto'+(nFotos!==1?'s':'')+'</span>':'')
+        +'</div>'
+        +'<div class="wd-section-hdr-sub">Toca imagen para ampliar · Desliza para pasar</div>'
+        +'</div></div>'
+        +'<div class="wd-section-body">';
+
+      if(notaGeneral){
+        html+='<div class="wd-nota"><b class="wd-nota-lbl">💬 Nota del domiciliario</b>'+_esc(notaGeneral)+'</div>';
+      }
+
+      /* CARRUSEL de facturas */
+      if(nFotos>0){
+        var factSlides = facturas.map(function(f,idx){
+          return { src:_driveUrl(f.url), titulo:'Factura '+(idx+1), zoomTitulo:'FACTURA '+(idx+1)+' DE '+nFotos, val:f.total };
+        });
+        html += _buildCarrusel('fact', factSlides);
+      }
+
+      /* Bloque de totales */
+      var cobroExtra=(tardanza&&tardanza.cobro)?tardanza.cobro:0;
+      if(sumaTotales>0||cobroExtra>0){
+        html+='<div class="wd-totales-block">';
+        if(nFotos>1){
+          facturas.forEach(function(f,idx){if(f.total>0)html+='<div class="wd-total-row"><span class="wd-total-lbl">🧾 Factura '+(idx+1)+'</span><span class="wd-total-val" style="font-size:12px">'+_fmtCOP(f.total)+'</span></div>';});
+          html+='<div class="wd-total-sep"></div><div class="wd-total-row"><span class="wd-total-lbl">🧾 Subtotal ('+nFotos+' facturas)</span><span class="wd-total-val">'+_fmtCOP(sumaTotales)+'</span></div>';
+        }else if(sumaTotales>0){
+          html+='<div class="wd-total-row"><span class="wd-total-lbl">🧾 Total del pedido</span><span class="wd-total-val">'+_fmtCOP(sumaTotales)+'</span></div>';
+        }
+        if(cobroExtra>0)html+='<div class="wd-total-row"><span class="wd-total-lbl">⏱ Tiempo de espera</span><span class="wd-total-val rojo">+'+_fmtCOP(cobroExtra)+'</span></div>';
+        html+='<div class="wd-total-row wd-grand-total"><span class="wd-total-lbl">💳 Total a pagar</span><span class="wd-total-val">'+_fmtCOP(sumaTotales+cobroExtra)+'</span></div></div>';
+      }
+      html+='</div></div>';
+    }
+
+    /* ── Sección tiempo de espera ── */
+    if(tardanza&&(tardanza.minTotal||tardanza.cobro||tardanza.urls.length)){
+      hayAlgo=true;
+      var min=tardanza.minTotal||0,cobro=tardanza.cobro||0;
+      var supero=(tardanza.supero||'').toLowerCase();
+      var superoSi=supero==='si'||supero==='sí'||supero==='yes';
+      var superoLbl=superoSi?'Sí superó':(supero==='no'?'No superó':'—');
+      var chipCol=superoSi?'rojo':'verde';
+      var nComp=tardanza.urls.length;
+
+      html+='<div class="wd-section">'
+        +'<div class="wd-section-hdr" style="background:linear-gradient(90deg,#fff7ed,#fff);border-bottom-color:#fde68a">'
+        +'<div class="wd-section-hdr-ico" style="background:rgba(245,158,11,.12)">⏱</div>'
+        +'<div style="flex:1;min-width:0">'
+        +'<div class="wd-section-hdr-lbl" style="color:#92400e">Cobro por tiempo de espera'
+        +(nComp>1?' <span style="background:#ffedd5;color:#c2410c;font-size:9px;padding:2px 9px;border-radius:20px;font-weight:800;margin-left:5px">'+nComp+' fotos</span>':'')
+        +'</div>'
+        +'<div class="wd-section-hdr-sub">Tiempo que el domi esperó en el comercio</div>'
+        +'</div>'
+        +(min>0?'<div class="wd-te-min-badge"><span>⏱</span><span>'+min+'</span><span class="wd-te-min-badge-unit">min</span></div>':'')
+        +'</div>'
+        +'<div class="wd-section-body">';
+
+      html+='<div class="wd-chips">';
+      if(cobro>0)html+='<div class="wd-chip rojo"><div class="wd-chip-val">'+_fmtCOP(cobro)+'</div><div class="wd-chip-lbl">Cobro extra</div></div>';
+      html+='<div class="wd-chip '+chipCol+'"><div class="wd-chip-val" style="font-size:12px">'+_esc(superoLbl)+'</div><div class="wd-chip-lbl">Límite 15 min</div></div></div>';
+
+      if(cobro>0)html+='<div class="wd-nota" style="background:#fff7ed;border-color:#fdba74;color:#92400e"><b class="wd-nota-lbl" style="color:#b45309">ℹ️ Detalle del cobro</b>Esperó <strong>'+min+' minutos</strong> en el comercio. Se cobran <strong>$2.000 por cada 15 min adicionales</strong>.</div>';
+
+      /* CARRUSEL de comprobantes */
+      if(nComp>0){
+        var compSlides = tardanza.urls.map(function(url,idx){
+          return { src:_driveUrl(url), titulo:'Comprobante '+(idx+1), zoomTitulo:'COMPROBANTE DE ESPERA'+(nComp>1?' '+(idx+1)+'/'+nComp:''), val:0 };
+        });
+        html += _buildCarrusel('comp', compSlides);
+      }
+
+      html+='</div></div>';
+    }
+
+    return hayAlgo
+      ? html
+      : '<div class="wd-empty">🔍 Sin documentos disponibles aún para este pedido.</div>';
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     CARD RASTREADOR — totales patch
+  ═══════════════════════════════════════════════════════════════ */
+  function _actualizarTotalesCard(facturas,sumaTotales,cobro,domicilioVal){
+    document.querySelectorAll('.wil-totales-patch').forEach(function(e){e.remove();});
+    var sec=document.getElementById('rtProductosSection');
+    if(!sec||sumaTotales<=0)return;
+    var nFotos=facturas.length,grand=sumaTotales+(cobro||0)+(domicilioVal||0);
+    var div=document.createElement('div');div.className='wil-totales-patch';
+    var inner='';
+    if(nFotos>1){facturas.forEach(function(f,idx){if(f.total>0)inner+='<div class="wil-totales-patch-row"><span style="font-size:11px;font-weight:700;color:#3d5068">🧾 Factura '+(idx+1)+'</span><span style="font-size:12px;font-weight:900;color:#006970">'+_fmtCOP(f.total)+'</span></div>';});inner+='<div class="wil-totales-patch-row" style="border-top:1px dashed #dde8ef;padding-top:7px;margin-top:2px"><span style="font-size:11.5px;font-weight:700;color:#3d5068">🧾 Subtotal facturas</span><span style="font-size:13px;font-weight:900;color:#006970">'+_fmtCOP(sumaTotales)+'</span></div>';}
+    else{inner+='<div class="wil-totales-patch-row"><span style="font-size:11.5px;font-weight:700;color:#3d5068">🧾 Total facturas</span><span style="font-size:13px;font-weight:900;color:#006970">'+_fmtCOP(sumaTotales)+'</span></div>';}
+    var teNativo=_hallarTiempoExtraNativo(sec);
+    if((!teNativo||teNativo.offsetHeight===0)&&cobro>0)inner+='<div class="wil-totales-patch-row"><span style="font-size:11.5px;font-weight:700;color:#c2410c">⏱ Tiempo extra</span><span style="font-size:13px;font-weight:900;color:#dc2626">+'+_fmtCOP(cobro)+'</span></div>';
+    if(domicilioVal>0)inner+='<div class="wil-totales-patch-row"><span style="font-size:11.5px;font-weight:700;color:#3d5068">🛵 Domicilio</span><span style="font-size:13px;font-weight:900;color:#006970">'+_fmtCOP(domicilioVal)+'</span></div>';
+    inner+='<div class="wil-total-grand"><span style="font-size:13px;font-weight:900;color:#18222e">💳 Total a pagar</span><span style="font-size:18px;font-weight:900;color:#006970">'+_fmtCOP(grand)+'</span></div>';
+    div.innerHTML=inner;sec.appendChild(div);
+  }
+
+  function _hallarTiempoExtraNativo(contexto){
+    var nodo=contexto||document,walker=document.createTreeWalker(nodo,NodeFilter.SHOW_TEXT,null,false),txtNode;
+    while((txtNode=walker.nextNode())){var t=(txtNode.textContent||'').trim().toLowerCase();if(t.includes('tiempo extra')||t.includes('tiempo de espera')){var el=txtNode.parentElement;for(var i=0;i<5&&el&&el!==nodo;i++){if(el.offsetHeight>20&&el.offsetWidth>80)return el;el=el.parentElement;}return txtNode.parentElement;}}
+    return null;
+  }
+  function _leerDomicilioDelDOM(){
+    var walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null,false),txtNode;
+    while((txtNode=walker.nextNode())){var t=(txtNode.textContent||'').trim();if(/^[Dd]omicilio$/i.test(t)){var contenedor=txtNode.parentElement;for(var i=0;i<4;i++){if(!contenedor)break;var raw=contenedor.textContent||'',m=raw.match(/\$\s*([\d.,]+)/);if(m){var n=parseInt(m[1].replace(/[.,]/g,''))||0;if(n>0&&n<100000)return n;}contenedor=contenedor.parentElement;}}}
+    return 0;
+  }
+  function _fixCardLayout(sec){
+    sec=sec||document.getElementById('rtProductosSection');if(!sec)return;
+    var teNativo=_hallarTiempoExtraNativo(sec);
+    if(teNativo){var fila=teNativo;for(var i=0;i<6;i++){if(!fila||fila===sec)break;var h=fila.offsetHeight;if(h>15&&h<80&&fila.textContent.includes('$')){fila.style.display='none';break;}fila=fila.parentElement;}}
+    var walkerDom=document.createTreeWalker(sec,NodeFilter.SHOW_TEXT,null,false),domNode;
+    while((domNode=walkerDom.nextNode())){if(/^[Dd]omicilio$/i.test((domNode.textContent||'').trim())){var filaDom=domNode.parentElement;for(var j=0;j<6;j++){if(!filaDom||filaDom===sec)break;var hd=filaDom.offsetHeight;if(hd>15&&hd<120&&/\$\s*[\d.,]+/.test(filaDom.textContent)){filaDom.style.display='none';break;}filaDom=filaDom.parentElement;}break;}}
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     FAB + POPUP ORQUESTADOR
+  ═══════════════════════════════════════════════════════════════ */
+  var _datosCache={},_pollDocsTimer=null,_prevNDocs=0;
+
+  async function _cargarYMostrar(idPedido){
+    delete _datosCache[idPedido];
+    var res=await Promise.all([_leerFacturasV3(idPedido),_leerTiempoExtraV3(idPedido)]);
+    var factResult=res[0],tardanza=res[1],domVal=_leerDomicilioDelDOM();
+    var datos={facturas:factResult.facturas,notaGeneral:factResult.notaGeneral,sumaTotales:factResult.sumaTotales,tardanza:tardanza,domicilioVal:domVal};
+    _datosCache[idPedido]=datos;
+    var hayDocs=datos.facturas.length||datos.notaGeneral||datos.tardanza.minTotal||datos.tardanza.cobro||datos.tardanza.urls.length;
+    if(hayDocs){_mostrarFAB(datos);_actualizarTotalesCard(datos.facturas,datos.sumaTotales,datos.tardanza.cobro,datos.domicilioVal);setTimeout(function(){_fixCardLayout();},400);}
+    return datos;
+  }
+
+  function _mostrarFAB(datos){
+    W._wdDatosV3=datos;
+    var fab=document.getElementById('wil-docs-fab'),badge=document.getElementById('wil-docs-fab-badge');
+    if(!fab)return;
+    var count=datos.facturas.length+datos.tardanza.urls.length+(datos.notaGeneral?1:0);
+    if(!count)count=(datos.tardanza.minTotal||datos.tardanza.cobro)?1:0;
+    fab.style.cssText='display:flex;opacity:0;transform:translateY(12px)';
+    if(badge){badge.textContent=count||'!';badge.style.display='flex';}
+    requestAnimationFrame(function(){fab.style.transition='opacity .3s ease,transform .3s ease';fab.style.opacity='1';fab.style.transform='translateY(0)';});
+  }
+
+  var _origAbrirPopup=W.wdAbrirPopup;
+  W.wdAbrirPopup=function(){
+    var datos=W._wdDatosV3;
+    if(!datos){if(typeof _origAbrirPopup==='function')_origAbrirPopup.apply(this,arguments);return;}
+    var ov=document.getElementById('wil-docs-overlay'),body=document.getElementById('wil-docs-body'),sub=document.getElementById('wil-docs-sub');
+    var p=W.state&&W.state.pedidoRastreado;
+    if(sub)sub.textContent='Pedido #'+(p?p.id:'—');
+    if(body)body.innerHTML=_buildPopupV3(datos.facturas,datos.notaGeneral,datos.sumaTotales,datos.tardanza);
+    if(ov)ov.classList.add('wdopen');
+    document.body.style.overflow='hidden';
+    /* ── FORZAR SCROLL inmediatamente y de nuevo tras pintar ── */
+    _forceScrollPopup();
+    requestAnimationFrame(function(){ _forceScrollPopup(); });
+    setTimeout(function(){ _forceScrollPopup(); }, 120);
+    var badge=document.getElementById('wil-docs-fab-badge');if(badge)badge.style.display='none';
+  };
+  W.wdCerrarPopup=function(){var ov=document.getElementById('wil-docs-overlay');if(ov)ov.classList.remove('wdopen');document.body.style.overflow='';};
+
+  /* ═══════════════════════════════════════════════════════════════
+     HOOKS
+  ═══════════════════════════════════════════════════════════════ */
+  (function _hookDocs(){
+    var orig=W.rastrearPedido;if(typeof orig!=='function')return;
+    W.rastrearPedido=async function(){
+      W._wdDatosV3=null;clearInterval(_pollDocsTimer);_prevNDocs=0;
+      await orig.apply(this,arguments);
+      var p=W.state&&W.state.pedidoRastreado;if(!p||!p.id)return;
+      setTimeout(async function(){
+        var d=await _cargarYMostrar(p.id);
+        _prevNDocs=d.facturas.length+d.tardanza.urls.length;
+        _pollDocsTimer=setInterval(async function(){
+          var nuevo=await _cargarYMostrar(p.id);
+          var nuevoN=nuevo.facturas.length+nuevo.tardanza.urls.length;
+          if(nuevoN>_prevNDocs){_prevNDocs=nuevoN;if(typeof W.mostrarToast==='function')W.mostrarToast('📄 Nuevos documentos disponibles','receipt_long');if(navigator.vibrate)navigator.vibrate([100,50,100]);}
+        },15000);
+      },1200);
+    };
+  })();
+
+  (function _hookLabels(){
+    var orig=W.rastrearPedido;if(typeof orig!=='function')return;
+    W.rastrearPedido=async function(){
+      await orig.apply(this,arguments);
+      setTimeout(function(){
+        var bento=document.getElementById('rtItemsGrid');if(!bento)return;
+        Array.from(bento.children).forEach(function(row){row.querySelectorAll('div').forEach(function(el){if(el.querySelectorAll('div').length>0)return;var txt=(el.textContent||'').trim();if(txt==='Dirección')el.textContent='Dirección entrega';if(txt==='Comercio')el.textContent='Dirección recogida';});});
+      },600);
+    };
+  })();
+
+  (function(){
+    var orig=W.rtActualizarStepper;if(typeof orig!=='function')return;
+    W.rtActualizarStepper=function(estado){
+      orig.apply(this,arguments);
+      setTimeout(function(){var bento=document.getElementById('rtItemsGrid');if(!bento)return;Array.from(bento.children).forEach(function(row){row.querySelectorAll('div').forEach(function(el){if(el.querySelectorAll('div').length>0)return;var txt=(el.textContent||'').trim();if(txt==='Dirección')el.textContent='Dirección entrega';if(txt==='Comercio')el.textContent='Dirección recogida';});});},200);
+      setTimeout(function(){_fixCardLayout();},350);
+    };
+  })();
+
+  /* ═══════════════════════════════════════════════════════════════
+     GPS 10s
+  ═══════════════════════════════════════════════════════════════ */
+  var _gpsTimer=null,_ultimaPos=null;
+  async function _pollGPS(){
+    var p=W.state&&W.state.pedidoRastreado;if(!p||!p.id||!p.domiciliario)return;
+    var nd=p.domiciliario.replace(/\s*\([^)]+\)/g,'').trim().toLowerCase();if(!nd)return;
+    try{
+      var primer=nd.split(' ')[0].replace(/'/g,"\\'");
+      var txt=await _fetchSheet('Domiciliarios',"select * where lower(B) contains '"+primer+"' limit 5");
+      var lines=txt.trim().split('\n');
+      for(var i=1;i<lines.length;i++){
+        var c=_csv(lines[i]),dn=(c[1]||'').trim().toLowerCase();
+        if(!dn||(dn!==nd&&nd.indexOf(dn)===-1&&dn.indexOf(nd)===-1))continue;
+        var actividad=(c[6]||'').trim();if(!actividad)break;
+        var gm=actividad.match(/(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);if(!gm)break;
+        var lat=parseFloat(gm[1]),lng=parseFloat(gm[2]);if(isNaN(lat)||isNaN(lng))break;
+        if(_ultimaPos&&Math.abs(lat-_ultimaPos.lat)<0.00005&&Math.abs(lng-_ultimaPos.lng)<0.00005)break;
+        _ultimaPos={lat:lat,lng:lng};
+        if(W.mapResult&&W.domiMarkerResult){W.domiMarkerResult.setLatLng([lat,lng]);var dirRaw=p.direccion||'',cm=dirRaw.match(/\[(-?\d+\.\d+),\s*(-?\d+\.\d+)\]/);if(cm&&typeof W.trazarRutaResult==='function'){W.trazarRutaResult(lat,lng,parseFloat(cm[1]),parseFloat(cm[2]),p);try{if(typeof L!=='undefined')W.mapResult.fitBounds(L.latLngBounds([[lat,lng],[parseFloat(cm[1]),parseFloat(cm[2])]]),{paddingTopLeft:[20,60],paddingBottomRight:[20,20],maxZoom:16});}catch(e){}}else W.mapResult.panTo([lat,lng]);}
+        else if(W.mapResult&&!W.domiMarkerResult&&typeof L!=='undefined'&&typeof W.iconDomi==='function'){try{W.domiMarkerResult=L.marker([lat,lng],{icon:W.iconDomi(p.domiciliario,true),zIndexOffset:1000}).addTo(W.mapResult);}catch(e){}}
+        break;
+      }
+    }catch(e){console.warn('[WIL GPS]',e.message);}
+  }
+  function _startGPS(nd){clearInterval(_gpsTimer);_ultimaPos=null;_pollGPS();_gpsTimer=setInterval(_pollGPS,10000);}
+  function _stopGPS(){clearInterval(_gpsTimer);_gpsTimer=null;_ultimaPos=null;}
+
+  (function _hookGPS(){var orig=W.rastrearPedido;if(typeof orig!=='function')return;W.rastrearPedido=async function(){_stopGPS();await orig.apply(this,arguments);var p=W.state&&W.state.pedidoRastreado;if(p&&p.id&&p.domiciliario)setTimeout(function(){_startGPS(p.domiciliario);},1500);};})();
+
+  (function(){var orig=W.rtActualizarStepper;if(typeof orig==='function'){W.rtActualizarStepper=function(estado){orig.apply(this,arguments);var p=W.state&&W.state.pedidoRastreado;if(!_gpsTimer&&p&&p.domiciliario)setTimeout(function(){_startGPS(p.domiciliario);},500);};}})();
+
+  (function _hookStop(){
+    var origMin=W.minimizarResult;if(typeof origMin==='function'){W.minimizarResult=function(){_stopGPS();clearInterval(_pollDocsTimer);origMin.apply(this,arguments);};}
+    var origNav=W.navTo;if(typeof origNav==='function'){W.navTo=function(tab){if(tab!=='rastrear'){_stopGPS();clearInterval(_pollDocsTimer);}origNav.apply(this,arguments);};}
+    document.addEventListener('visibilitychange',function(){if(document.visibilityState!=='visible')return;var p=W.state&&W.state.pedidoRastreado;if(p&&p.domiciliario&&!_gpsTimer)_startGPS(p.domiciliario);});
+  })();
+
+  console.log('[WIL Docs v3.2] ✅ Scroll forzado JS · Carrusel facturas · Swipe sin bloquear scroll vertical · GPS 10s');
+
+})(window);
+</script>
 
 </body>
 </html>
