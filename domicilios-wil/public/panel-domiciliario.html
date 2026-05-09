@@ -2956,16 +2956,17 @@ async function aceptarPedido(id) {
 
   try {
     var r = await fetch(SCRIPT_URL_DOMI, {
-      method:  'POST',
-      headers: { 'Content-Type':'text/plain' },
-      body: JSON.stringify({
-    accion:   'comprobante-tardanza',
-    pedidoId: String(state.pedidoActivo.id).trim(),
-    imagen:   base64,
-    append:   true
-}),
-      signal: AbortSignal.timeout(20000)
-    });
+  method:  'POST',
+  headers: { 'Content-Type':'text/plain' },
+  body: JSON.stringify({
+    accion:    'asignar-domi',
+    pedidoId:  String(id).trim(),
+    domi:      domi.nombre,
+    estado:    'En proceso',
+    horaAsign: hora
+  }),
+  signal: AbortSignal.timeout(20000)
+});
     var d = await r.json();
     console.log('[aceptarPedido]', id, d);
 
@@ -4407,12 +4408,12 @@ async function aceptarPedidoAsignado(id) {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({
-        accion:    'asignar-domi',
-        pedidoId:  String(id).trim(),
-        domi:      domi.nombre,
-        estado:    'En proceso',
-        horaAsign: new Date().toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit' })
-      })
+    accion:    'asignar-domi',
+    pedidoId:  String(id).trim(),
+    domi:      domi.nombre,
+    estado:    'En proceso',
+    horaAsign: hora
+}),
     });
     var json = await res.json();
 
