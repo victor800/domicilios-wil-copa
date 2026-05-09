@@ -300,6 +300,37 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 @media(max-width:1200px){.kpi-grid{grid-template-columns:repeat(3,1fr);}}
 @media(max-width:900px){.kpi-grid{grid-template-columns:1fr 1fr;}.grid-3{grid-template-columns:1fr;}.grid-2{grid-template-columns:1fr;}.grid-2b{grid-template-columns:1fr;}}
 @media(max-width:600px){.kpi-grid{grid-template-columns:1fr 1fr;}.page-wrap{padding:14px 14px 80px;}.periodo-bar{padding:10px 12px;}.caja-stats{grid-template-columns:1fr 1fr;}.cierre-kpis{grid-template-columns:1fr 1fr;}.tf-kpi-grid{grid-template-columns:1fr 1fr 1fr;}}
+  
+  
+  
+  /* ═══ KPIs TIEMPO REAL ═══ */
+.rt-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
+.rt-card{background:var(--white);border:1.5px solid var(--border);border-radius:14px;padding:16px;position:relative;overflow:hidden;transition:transform .18s;}
+.rt-card:hover{transform:translateY(-2px);}
+.rt-acc{position:absolute;top:0;left:0;right:0;height:3px;border-radius:14px 14px 0 0;}
+.rt-ico{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;margin-bottom:10px;}
+.rt-lbl{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px;}
+.rt-val{font-size:26px;font-weight:800;line-height:1;margin-bottom:3px;}
+.rt-sub{font-size:10px;color:var(--text3);}
+.rt-pulse{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;display:inline-block;margin-right:5px;vertical-align:middle;}
+/* Lista pedidos activos */
+.ped-rt-item{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
+.ped-rt-item:last-child{border-bottom:none;}
+.ped-rt-ico{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+.ped-rt-name{font-size:12px;font-weight:800;color:var(--text);}
+.ped-rt-meta{font-size:10px;color:var(--text2);margin-top:2px;}
+.ped-rt-right{margin-left:auto;text-align:right;flex-shrink:0;}
+.ped-rt-hora{font-size:10px;font-weight:800;}
+.ped-rt-id{font-size:9px;color:var(--text3);margin-top:2px;font-family:'DM Mono',monospace;}
+/* Stag mini */
+.stag-rt{font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:99px;display:inline-flex;align-items:center;gap:2px;white-space:nowrap;margin-left:5px;}
+.stag-rt.pendiente{background:var(--orange-l);color:var(--orange);}
+.stag-rt.asignado{background:var(--purple-l);color:var(--purple);}
+.stag-rt.proceso{background:var(--blue-l);color:var(--blue);}
+.stag-rt.encamino{background:var(--purple-l);color:var(--purple);}
+@media(max-width:900px){.rt-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:480px){.rt-grid{grid-template-columns:1fr 1fr;gap:8px;}}
+  
 </style>
 </head>
 <body>
@@ -307,7 +338,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 <!-- LOADING -->
 <div class="loading-overlay" id="loading">
   <div class="loading-spinner"></div>
-  <div class="loading-text" id="loading-txt">Conectando con el sheet…</div>
+  <div class="loading-text" id="loading-txt">Conectando…</div>
 </div>
 
 <!-- TOPBAR -->
@@ -340,7 +371,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
   <div class="page-hdr">
     <div class="page-hdr-left">
       <h1>Control Financiero</h1>
-      <p id="hdr-sub">Cargando datos del sheet…</p>
+      <p id="hdr-sub">Cargando datos…</p>
     </div>
     <div class="hdr-actions">
       <button class="btn btn-primary" onclick="abrirCierreCaja()">
@@ -361,6 +392,40 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
     </div>
     <div class="periodo-lbl" id="periodo-lbl">–</div>
   </div>
+  
+  
+  <!-- PEDIDOS EN TIEMPO REAL -->
+<div class="panel" style="margin-bottom:22px;">
+  <div class="panel-hdr">
+    <div class="panel-hdr-ico" style="background:var(--red-l);color:var(--red);">
+      <span class="material-symbols-rounded" style="font-size:17px;">pending_actions</span>
+    </div>
+    <h3>
+      <span class="rt-pulse"></span>Pedidos en tiempo real
+    </h3>
+    <span class="panel-hdr ph-sub" id="rt-timestamp" style="margin-left:4px;">–</span>
+    <button class="btn btn-ghost btn-sm" onclick="doRefresh()" style="margin-left:auto;">
+      <span class="material-symbols-rounded">refresh</span>Actualizar
+    </button>
+  </div>
+  <div class="panel-body">
+    <!-- 4 KPIs -->
+    <div class="rt-grid" id="rt-kpi-grid"></div>
+    <!-- Lista pedidos activos -->
+    <div style="margin-top:4px;">
+      <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;
+                  letter-spacing:.11em;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+        <span class="material-symbols-rounded" style="font-size:13px;color:var(--teal);">list_alt</span>
+        Pedidos activos (no entregados)
+        <span style="font-size:9px;font-weight:800;background:var(--teal-m);color:var(--teal-d);
+                     padding:2px 8px;border-radius:99px;margin-left:2px;" id="rt-activos-count">–</span>
+      </div>
+      <div id="rt-pending-list">
+        <div class="empty-state"><div class="es-ico">📦</div><p>Cargando pedidos…</p></div>
+      </div>
+    </div>
+  </div>
+</div>
 
   <!-- KPI GRID -->
   <div class="kpi-grid" id="kpi-grid"></div>
@@ -984,6 +1049,7 @@ function enPeriodo(p) {
 
 /* ════════ RENDER PRINCIPAL ════════ */
 function renderAll() {
+  renderPendientesRT();
   const peds=allPedidos.filter(p=>(p.estado==='entregado'||p.estado==='proceso'||p.estado==='encamino')&&enPeriodo(p));
   const pedsEnt=peds.filter(p=>p.estado==='entregado');
   const totalFacturado=pedsEnt.reduce((s,p)=>s+parsePrecio(p.total),0);
@@ -1618,6 +1684,116 @@ function showToast(type,title,msg) {
   t.classList.add('show');
   clearTimeout(t._to);
   t._to=setTimeout(()=>t.classList.remove('show'),4500);
+}
+  
+  /* ════════ PEDIDOS EN TIEMPO REAL (mismo lógica que dashboard) ════════ */
+function renderPendientesRT() {
+  const tot   = allPedidos.length;
+  const ent   = allPedidos.filter(p => p.estado === 'entregado').length;
+  const pend  = allPedidos.filter(p => p.estado === 'pendiente').length;
+  const proc  = allPedidos.filter(p => ['proceso','encamino','asignado'].includes(p.estado)).length;
+  const actD  = allDrivers.filter(d => d.activo).length;
+
+  /* Timestamp */
+  const hora  = new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+  const tsEl  = document.getElementById('rt-timestamp');
+  if (tsEl) tsEl.textContent = 'Actualizado: ' + hora;
+
+  /* KPIs */
+  const kpis = [
+    {
+      acc:'var(--teal)', ico:'package_2', bg:'var(--teal-m)', c:'var(--teal-d)',
+      lbl:'Total pedidos', val: tot || '0',
+      sub: tot ? 'pedidos en total' : 'Sin pedidos aún'
+    },
+    {
+      acc:'var(--green)', ico:'check_circle', bg:'var(--green-l)', c:'var(--green)',
+      lbl:'Entregados', val: ent || '0',
+      sub: tot ? Math.round(ent / tot * 100) + '% tasa de éxito' : '—'
+    },
+    {
+      acc:'var(--blue)', ico:'delivery_dining', bg:'var(--blue-l)', c:'var(--blue)',
+      lbl:'Domis activos', val: actD || '0',
+      sub: actD + ' de ' + allDrivers.length + ' domiciliarios'
+    },
+    {
+      acc: pend > 0 ? 'var(--red)' : 'var(--orange)',
+      ico:'pending_actions',
+      bg: pend > 0 ? 'var(--red-l)' : 'var(--orange-l)',
+      c:  pend > 0 ? 'var(--red)'   : 'var(--orange)',
+      lbl:'Pendientes / En proceso', val: (pend + proc) || '0',
+      sub: pend + ' pendientes · ' + proc + ' en ruta'
+    },
+  ];
+
+  const grid = document.getElementById('rt-kpi-grid');
+  if (grid) grid.innerHTML = kpis.map(k => `
+    <div class="rt-card">
+      <div class="rt-acc" style="background:${k.acc};"></div>
+      <div class="rt-ico" style="background:${k.bg};color:${k.c};">
+        <span class="material-symbols-rounded" style="font-size:17px;">${k.ico}</span>
+      </div>
+      <div class="rt-lbl">${k.lbl}</div>
+      <div class="rt-val" style="color:${k.c};">${k.val}</div>
+      <div class="rt-sub">${k.sub}</div>
+    </div>`).join('');
+
+  /* Lista pedidos activos */
+  const ST = {
+    pendiente: { dot:'#d97706', bg:'#fef3c7', ico:'schedule',          cls:'pendiente', lbl:'Pendiente'    },
+    asignado:  { dot:'#7c3aed', bg:'#ede9fe', ico:'person_pin_circle', cls:'asignado',  lbl:'Asignado ✦'  },
+    proceso:   { dot:'#2563eb', bg:'#dbeafe', ico:'local_shipping',    cls:'proceso',   lbl:'En proceso'   },
+    encamino:  { dot:'#7c3aed', bg:'#ede9fe', ico:'directions_bike',   cls:'encamino',  lbl:'🛵 En camino' },
+  };
+
+  const activos = allPedidos
+    .filter(p => p.estado !== 'entregado' && p.estado !== 'cancelado')
+    .slice(0, 8);
+
+  const cntEl = document.getElementById('rt-activos-count');
+  if (cntEl) {
+    const totalActivos = allPedidos.filter(p => p.estado !== 'entregado' && p.estado !== 'cancelado').length;
+    cntEl.textContent = totalActivos;
+  }
+
+  const listEl = document.getElementById('rt-pending-list');
+  if (!listEl) return;
+
+  if (!activos.length) {
+    listEl.innerHTML = `<div class="empty-state">
+      <div class="es-ico">${tot > 0 ? '✅' : '📦'}</div>
+      <p>${tot > 0 ? 'Sin pedidos activos — todos entregados' : 'Sin pedidos en el sheet todavía'}</p>
+    </div>`;
+    return;
+  }
+
+  const sinDomi = p => !p.domi || !p.domi.trim();
+  listEl.innerHTML = activos.map(p => {
+    const st  = ST[p.estado] || ST.pendiente;
+    const tot$ = parsePrecio(p.total);
+    return `<div class="ped-rt-item">
+      <div class="ped-rt-ico" style="background:${st.bg};">
+        <span class="material-symbols-rounded" style="font-size:15px;color:${st.dot};">${st.ico}</span>
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px;">
+          <span class="ped-rt-name">${p.cliente || 'Sin nombre'}</span>
+          <span class="stag-rt ${p.estado}">${st.lbl}</span>
+          ${sinDomi(p)
+            ? '<span style="font-size:8px;font-weight:800;color:var(--red);background:var(--red-l);padding:1px 6px;border-radius:99px;border:1px solid rgba(220,38,38,.2);">⚠ Sin asignar</span>'
+            : ''}
+        </div>
+        <div class="ped-rt-meta">
+          ${p.domi ? '🛵 ' + p.domi + (p.direccion ? ' &nbsp;·&nbsp; ' : '') : ''}
+          ${p.direccion ? '📍 ' + p.direccion.substring(0,32) + (p.direccion.length > 32 ? '…' : '') : ''}
+        </div>
+      </div>
+      <div class="ped-rt-right">
+        <div class="ped-rt-hora" style="color:${st.dot};">${p.hora || '–'}</div>
+        <div class="ped-rt-id">${tot$ > 0 ? '$\u2009' + tot$.toLocaleString('es-CO') : '#' + p.id}</div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 /* ════════ REFRESH ════════ */
