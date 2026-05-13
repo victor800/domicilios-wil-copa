@@ -19,6 +19,8 @@
      <script src="wil-paquete-dir-recogida.js"></script>
      <script src="wil-patch-v5.js"></script>
      <script src="wil-docs-patch-v2.js"></script>
+     <script src="wil-gps-eta-patch.js"></script>
+     <script src="wil-fix-entregado.js"></script>
     
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -874,7 +876,7 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
       <div class="wil-libre-body"><span class="wl-emo">🛍️</span>
         <div class="wl-txt">
           <div class="wl-badge"><span class="sym f" style="font-size:11px">bolt</span>Sin restricciones</div>
-          <div class="wl-tit">Pedido Libre WIL</div>
+          <div class="wl-tit">Solicita tu servicio aqui</div>
           <div class="wl-sub">Mercado, tienda, restaurante… tú dices dónde y qué necesitas.</div>
           <span class="wl-cta"><span class="sym" style="font-size:15px">arrow_forward</span>Hacer pedido</span>
         </div>
@@ -2875,18 +2877,29 @@ async function rastrearPedido(){
       .map(function(r){ return (r[6]||'').trim(); })
       .filter(function(s){ return s.length > 1; });
 
-    // Agregar cantidades/precios si existen
-    var productosStr = filasPedido.map(function(r){
-      var nombre = (r[6]||'').trim();
-      if(!nombre) return '';
-      var cant = (r[8]||'').trim();
-      var vu   = (r[9]||'').trim();
-      var vt   = (r[10]||'').trim();
-      var out  = nombre;
-      if(cant && cant !== '1') out += ' x' + cant;
-      if(vt)   out += ' =' + vt + ' COP';
-      return out;
-    }).filter(function(s){ return s.length > 1; }).join(' | ');
+   /* Deduplicar: ignorar filas cuyo texto de producto ya apareció,
+   y filtrar filas de metadatos (Recogida, Comercio, Envía, etc.) */
+var _productosVistos = {};
+var productosStr = filasPedido.map(function(r){
+  var nombre = (r[6]||'').trim();
+  if(!nombre) return '';
+  /* Filtrar filas de metadatos / resumen */
+  var nl = nombre.toLowerCase();
+  if(nl.startsWith('recogida:') || nl.startsWith('comercio:') ||
+     nl.startsWith('env') || nl.startsWith('dir. recogida') ||
+     nl.startsWith('tarifa') || nl.startsWith('destino')) return '';
+  /* Deduplicar por nombre normalizado */
+  var clave = nl.replace(/\s+/g,' ').trim();
+  if(_productosVistos[clave]) return '';
+  _productosVistos[clave] = true;
+  /* Formatear */
+  var cant = (r[8]||'').trim();
+  var vt   = (r[10]||'').trim();
+  var out  = nombre;
+  if(cant && cant !== '1') out += ' x' + cant;
+  if(vt)   out += ' =' + vt + ' COP';
+  return out;
+}).filter(function(s){ return s.length > 1; }).join(' | ');
 
     var p = {
       id:           id,
@@ -6457,36 +6470,46 @@ function _copiarFallback(txt){
 
   /* ── Inyecta fila "Valor domicilio" bajo los productos ── */
   function _inyectarDomi() {
-    if (document.getElementById('rt-domi-val-row')) return;
-    var p = W.state && W.state.pedidoRastreado;
-    if (!p) return;
+  var viejo = document.getElementById('rt-domi-val-row');
+  if (viejo) viejo.remove();
 
-    var val = parseInt((p.valorDomicilio || '').toString().replace(/[^\d]/g, '')) || 0;
-    if (val <= 0) return;
+  var p = W.state && W.state.pedidoRastreado;
+  if (!p || !p.id) return;
 
-    var sec = document.getElementById('rtProductosSection');
-    if (!sec) return;
+  var sec = document.getElementById('rtProductosSection');
+  if (!sec || sec.style.display === 'none') return;
 
-    var div = document.createElement('div');
-    div.id = 'rt-domi-val-row';
-    div.style.cssText = [
-      'display:flex', 'align-items:center', 'justify-content:space-between',
-      'padding:9px 14px', 'margin:4px 0 2px',
-      'border-top:1.5px dashed #e2e9ef',
-      'background:linear-gradient(90deg,rgba(0,105,112,.05),transparent)'
-    ].join(';');
-    div.innerHTML =
-      '<div style="display:flex;align-items:center;gap:7px;font-size:11.5px;'
-      + 'font-weight:700;color:#3d5068">'
-      + '<div style="width:26px;height:26px;border-radius:7px;'
-      + 'background:rgba(0,105,112,.09);display:flex;align-items:center;'
-      + 'justify-content:center;font-size:13px;flex-shrink:0">🛵</div>'
-      + 'Valor domicilio</div>'
-      + '<div style="font-size:15px;font-weight:900;color:#15803d">$'
-      + val.toLocaleString('es-CO') + '</div>';
+  var total    = parseInt((p.total           || '').replace(/[^\d]/g, '')) || 0;
+  var domiVal  = parseInt((p.valorDomicilio  || '').replace(/[^\d]/g, '')) || 0;
 
-    sec.appendChild(div);
+  if (total <= 0 && domiVal <= 0) return;
+
+  var div = document.createElement('div');
+  div.id = 'rt-domi-val-row';
+  div.style.cssText = 'border-top:1.5px dashed #e2e9ef;margin-top:4px;padding:0 14px 10px';
+
+  var html = '';
+
+  if (domiVal > 0) {
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0">'
+      + '<div style="display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:700;color:#3d5068">'
+      + '<div style="width:26px;height:26px;border-radius:7px;background:rgba(0,105,112,.09);display:flex;align-items:center;justify-content:center;font-size:13px">🛵</div>'
+      + 'Domicilio</div>'
+      + '<div style="font-size:13px;font-weight:900;color:#006970">$' + domiVal.toLocaleString('es-CO') + '</div>'
+      + '</div>';
   }
+
+  if (total > 0) {
+    html += '<div style="border-top:1.5px dashed #e2e9ef;margin:2px 0 6px"></div>'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0">'
+      + '<div style="font-size:13px;font-weight:900;color:#18222e">💳 Total a pagar</div>'
+      + '<div style="font-size:18px;font-weight:900;color:#006970">$' + total.toLocaleString('es-CO') + '</div>'
+      + '</div>';
+  }
+
+  div.innerHTML = html;
+  sec.appendChild(div);
+}
 
   /* ── Filtro de productos: quitar "Recogida:…" y similares ── */
   var _origRender = W.rtRenderProductos;
@@ -6511,9 +6534,8 @@ function _copiarFallback(txt){
 
   /* ── Punto de entrada: se llama tras cada rastrearPedido ── */
   function patchUI() {
-    _limpiarBento();
-    _inyectarDomi();
-  }
+  _limpiarBento();
+}
 
   /* Hook en rastrearPedido */
   var _origRastrear = W.rastrearPedido;
@@ -6524,7 +6546,8 @@ function _copiarFallback(txt){
       if (old) old.remove();
 
       await _origRastrear.apply(this, arguments);
-      setTimeout(patchUI, 420);
+      setTimeout(patchUI, 600);
+
     };
   }
 
@@ -6537,9 +6560,9 @@ function _copiarFallback(txt){
   var _origActualizar = W.rtActualizarStepper;
   if (typeof _origActualizar === 'function') {
     W.rtActualizarStepper = function () {
-      _origActualizar.apply(this, arguments);
-      setTimeout(patchUI, 200);
-    };
+  _origActualizar.apply(this, arguments);
+  setTimeout(patchUI, 800);
+};
   }
 
   console.log('[WIL] ✅ Rastrear patch v2 cargado');
@@ -10502,6 +10525,961 @@ try {
   })();
 
   console.log('[WIL Docs v3.2] ✅ Scroll forzado JS · Carrusel facturas · Swipe sin bloquear scroll vertical · GPS 10s');
+
+})(window);
+</script>
+
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   WIL GPS + ETA TIEMPO REAL — parche autónomo
+   ─────────────────────────────────────────────────────────────
+   1. Lee col G (ACTIVIDAD) de hoja Domiciliarios cada 10 s
+   2. Mueve el marcador del domi en el mapa en tiempo real
+   3. Calcula ETA real con Valhalla (fallback: Haversine)
+   4. Al estado "Entregado": elimina polilínea, muestra solo destino
+   ─────────────────────────────────────────────────────────────
+  
+═══════════════════════════════════════════════════════════════ */
+;(function (W) {
+  'use strict';
+
+  var SHEET_ID  = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+  var GPS_INTERVALO  = 10000;   /* ms entre lecturas de GPS */
+  var ETA_INTERVALO  = 30000;   /* ms entre recálculos de ruta */
+  var VALHALLA_URL   = 'https://valhalla1.openstreetmap.de/route';
+  var RADIO_MIN_MOVE = 0.00004; /* grados (~4 m) — ignorar micro-ruido */
+
+  /* ── Estado del módulo ── */
+  var _gps = {
+    timer:     null,
+    etaTimer:  null,
+    lat:       null,
+    lng:       null,
+    destLat:   null,
+    destLng:   null,
+    etaMinutos: null,
+    rutaActiva: false,
+    entregado:  false
+  };
+
+  /* ─────────────────────────────────────────────
+     UTILIDADES
+  ───────────────────────────────────────────── */
+
+  /* CSV parser mínimo */
+  function _csv(line) {
+    var r = [], cur = '', q = false;
+    for (var i = 0; i < line.length; i++) {
+      var c = line[i];
+      if (c === '"') { if (q && line[i+1] === '"') { cur += '"'; i++; } else q = !q; }
+      else if (c === ',' && !q) { r.push(cur.trim()); cur = ''; }
+      else cur += c;
+    }
+    r.push(cur.trim());
+    return r;
+  }
+
+  /* Haversine — km entre dos puntos */
+  function _km(la1, lo1, la2, lo2) {
+    var R = 6371,
+        dL = (la2 - la1) * Math.PI / 180,
+        dO = (lo2 - lo1) * Math.PI / 180,
+        a  = Math.sin(dL/2)*Math.sin(dL/2)
+           + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)
+           * Math.sin(dO/2)*Math.sin(dO/2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  /* Fetch anti-caché a una hoja */
+  function _fetchSheet(hoja, tq) {
+    var ts  = Date.now();
+    var rnd = Math.random().toString(36).slice(2, 8);
+    var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
+            + '/gviz/tq?tqx=out:csv'
+            + '&sheet=' + encodeURIComponent(hoja)
+            + '&_=' + ts + rnd;
+    if (tq) url += '&tq=' + encodeURIComponent(tq);
+    return fetch(url, {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache, no-store', 'Pragma': 'no-cache' }
+    }).then(function (r) { return r.text(); });
+  }
+
+  /* Decodificar polyline precision-6 de Valhalla */
+  function _decodePolyline6(encoded) {
+    var pts = [], idx = 0, lat = 0, lng = 0;
+    while (idx < encoded.length) {
+      var b, shift = 0, res = 0;
+      do { b = encoded.charCodeAt(idx++) - 63; res |= (b & 0x1f) << shift; shift += 5; } while (b >= 32);
+      lat += (res & 1) ? ~(res >> 1) : (res >> 1);
+      shift = 0; res = 0;
+      do { b = encoded.charCodeAt(idx++) - 63; res |= (b & 0x1f) << shift; shift += 5; } while (b >= 32);
+      lng += (res & 1) ? ~(res >> 1) : (res >> 1);
+      pts.push([lat / 1e6, lng / 1e6]);
+    }
+    return pts;
+  }
+
+  /* ─────────────────────────────────────────────
+     EXTRAER DESTINO de state.pedidoRastreado
+  ───────────────────────────────────────────── */
+  function _leerDestino() {
+    var p = W.state && W.state.pedidoRastreado;
+    if (!p) return null;
+    var dirRaw = p.direccion || '';
+    var m = dirRaw.match(/\[(-?\d+\.\d+),\s*(-?\d+\.\d+)\]/);
+    if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+    return null;
+  }
+
+  /* ─────────────────────────────────────────────
+     LEER GPS del DOMI desde col G de Domiciliarios
+  ───────────────────────────────────────────── */
+  async function _leerGPSDomi() {
+    var p = W.state && W.state.pedidoRastreado;
+    if (!p || !p.domiciliario) return null;
+
+    var nd = p.domiciliario.replace(/\s*\([^)]+\)/g, '').trim().toLowerCase();
+    if (!nd) return null;
+
+    var primer = nd.split(' ')[0].replace(/'/g, "\\'");
+    try {
+      var txt   = await _fetchSheet('Domiciliarios',
+        "select * where lower(B) contains '" + primer + "' limit 5");
+      var lines = txt.trim().split('\n');
+      for (var i = 1; i < lines.length; i++) {
+        var c   = _csv(lines[i]);
+        var dn  = (c[1] || '').trim().toLowerCase();
+        if (!dn || (dn !== nd && nd.indexOf(dn) === -1 && dn.indexOf(nd) === -1)) continue;
+
+        /* col G = índice 6 = ACTIVIDAD */
+        var actividad = (c[6] || '').trim();
+        if (!actividad) return null;
+
+        var gm = actividad.match(/(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
+        if (!gm) return null;
+
+        return { lat: parseFloat(gm[1]), lng: parseFloat(gm[2]) };
+      }
+    } catch (e) {
+      console.warn('[WIL GPS] Error leyendo Domiciliarios:', e.message);
+    }
+    return null;
+  }
+
+  /* ─────────────────────────────────────────────
+     ACTUALIZAR MARCADOR en el mapa
+  ───────────────────────────────────────────── */
+  function _actualizarMarcadorDomi(lat, lng) {
+    if (!W.mapResult || typeof L === 'undefined') return;
+
+    if (W.domiMarkerResult) {
+      W.domiMarkerResult.setLatLng([lat, lng]);
+    } else {
+      var p = W.state && W.state.pedidoRastreado;
+      var nombre = p ? (p.domiciliario || 'Domi WIL') : 'Domi WIL';
+      if (typeof W.iconDomi === 'function') {
+        W.domiMarkerResult = L.marker([lat, lng], {
+          icon: W.iconDomi(nombre, true),
+          zIndexOffset: 1000
+        }).addTo(W.mapResult);
+      } else {
+        W.domiMarkerResult = L.marker([lat, lng]).addTo(W.mapResult);
+      }
+    }
+  }
+
+  /* ─────────────────────────────────────────────
+     LIMPIAR RUTA (para estado Entregado u otro)
+  ───────────────────────────────────────────── */
+  function _limpiarRuta() {
+    if (!W.mapResult) return;
+    if (W.routeLayerResult) {
+      try { W.mapResult.removeLayer(W.routeLayerResult); } catch (e) {}
+      W.routeLayerResult = null;
+    }
+    if (W.routeLayerResultTop) {
+      try { W.mapResult.removeLayer(W.routeLayerResultTop); } catch (e) {}
+      W.routeLayerResultTop = null;
+    }
+  }
+
+  /* ─────────────────────────────────────────────
+     CALCULAR ETA REAL (Valhalla, fallback Haversine)
+  ───────────────────────────────────────────── */
+  async function _calcularETA(latO, lngO, latD, lngD) {
+    /* Intento 1: routing real con Valhalla */
+    try {
+      var body = JSON.stringify({
+        locations: [{ lon: lngO, lat: latO }, { lon: lngD, lat: latD }],
+        costing: 'auto'
+      });
+      var ctrl    = new AbortController();
+      var timeout = setTimeout(function () { ctrl.abort(); }, 8000);
+      var res = await fetch(VALHALLA_URL + '?json=' + encodeURIComponent(body), {
+        cache: 'no-store',
+        signal: ctrl.signal
+      });
+      clearTimeout(timeout);
+      var data = await res.json();
+
+      if (data.trip && data.trip.legs && data.trip.legs[0]) {
+        var durSeg = data.trip.summary.time;
+        var latLngs = _decodePolyline6(data.trip.legs[0].shape);
+        return { minutos: Math.max(1, Math.round(durSeg / 60)), latLngs: latLngs };
+      }
+    } catch (e) {
+      /* Valhalla falló o timeout — continuar con fallback */
+    }
+
+    /* Intento 2: Haversine con velocidad promedio de moto (30 km/h en ciudad) */
+    var distKm  = _km(latO, lngO, latD, lngD);
+    var velKmH  = 30;
+    var minutos = Math.max(1, Math.round((distKm / velKmH) * 60));
+    return { minutos: minutos, latLngs: null };
+  }
+
+  /* ─────────────────────────────────────────────
+     DIBUJAR / ACTUALIZAR RUTA en el mapa
+  ───────────────────────────────────────────── */
+  function _dibujarRuta(latLngs, latO, lngO, latD, lngD) {
+    if (!W.mapResult) return;
+    _limpiarRuta();
+
+    if (latLngs && latLngs.length > 1) {
+      W.routeLayerResult = L.polyline(latLngs, {
+        color: '#000',    weight: 14, opacity: 0.15,
+        lineCap: 'round', lineJoin: 'round'
+      }).addTo(W.mapResult);
+
+      W.routeLayerResultTop = L.polyline(latLngs, {
+        color: '#1a1a1a', weight: 7,  opacity: 1,
+        lineCap: 'round', lineJoin: 'round'
+      }).addTo(W.mapResult);
+
+      var bounds = L.latLngBounds([[latO, lngO], [latD, lngD]]);
+      W.mapResult.fitBounds(bounds, { paddingTopLeft: [20, 80], paddingBottomRight: [20, 20], maxZoom: 16 });
+    }
+  }
+
+  /* ─────────────────────────────────────────────
+     ACTUALIZAR ETA en el overlay del mapa
+  ───────────────────────────────────────────── */
+  function _mostrarETA(minutos) {
+    var etaOverlay = document.getElementById('rtMapEtaOverlay');
+    var etaMinsEl  = document.getElementById('rtMapEtaMins');
+    if (!etaOverlay || !etaMinsEl) return;
+
+    etaOverlay.style.display = 'flex';
+    etaMinsEl.textContent    = minutos <= 0 ? '¡Ya!' : String(minutos);
+    _gps.etaMinutos = minutos;
+
+    /* Detener el timer de simulación anterior si existe */
+    if (W._etaTimer) { clearInterval(W._etaTimer); W._etaTimer = null; }
+  }
+
+  /* ─────────────────────────────────────────────
+     ESTADO ENTREGADO — limpiar todo y mostrar pin
+  ───────────────────────────────────────────── */
+  function _modoEntregado() {
+    _gps.entregado = true;
+    _limpiarRuta();
+
+    /* Ocultar overlay de ETA */
+    var etaOverlay = document.getElementById('rtMapEtaOverlay');
+    if (etaOverlay) etaOverlay.style.display = 'none';
+
+    /* Centrar en el destino */
+    var dest = _leerDestino();
+    if (dest && W.mapResult) {
+      W.mapResult.setView([dest.lat, dest.lng], 16, { animate: true });
+    }
+
+    /* Si hay marcador del domi, mostrarlo en destino como confirmación */
+    if (W.domiMarkerResult && dest) {
+      W.domiMarkerResult.setLatLng([dest.lat, dest.lng]);
+    }
+  }
+
+  /* ─────────────────────────────────────────────
+     CICLO PRINCIPAL DE GPS (cada 10 s)
+  ───────────────────────────────────────────── */
+  async function _cicloGPS() {
+    var p = W.state && W.state.pedidoRastreado;
+    if (!p || !p.id) return;
+
+    /* Si ya está entregado, no hay nada más que hacer */
+    if (_gps.entregado || p.estado === 'Entregado' || p.estado === 'Cancelado') {
+      if (!_gps.entregado) _modoEntregado();
+      _pararGPS();
+      return;
+    }
+
+    var pos = await _leerGPSDomi();
+    if (!pos) return;
+
+    var lat = pos.lat, lng = pos.lng;
+
+    /* Ignorar micro-movimientos (ruido GPS) */
+    if (_gps.lat !== null) {
+      var dLat = Math.abs(lat - _gps.lat);
+      var dLng = Math.abs(lng - _gps.lng);
+      if (dLat < RADIO_MIN_MOVE && dLng < RADIO_MIN_MOVE) return;
+    }
+
+    _gps.lat = lat;
+    _gps.lng = lng;
+
+    /* Mover marcador */
+    _actualizarMarcadorDomi(lat, lng);
+
+    /* Obtener destino */
+    var dest = _leerDestino();
+    if (!dest) return;
+
+    _gps.destLat = dest.lat;
+    _gps.destLng = dest.lng;
+
+    /* Calcular ETA y ruta cada GPS_INTERVALO pero ruta solo cada ETA_INTERVALO */
+    var ahora = Date.now();
+    if (!_gps._ultimaRuta || (ahora - _gps._ultimaRuta) >= ETA_INTERVALO) {
+      _gps._ultimaRuta = ahora;
+
+      var resultado = await _calcularETA(lat, lng, dest.lat, dest.lng);
+      _mostrarETA(resultado.minutos);
+
+      if (resultado.latLngs) {
+        _dibujarRuta(resultado.latLngs, lat, lng, dest.lat, dest.lng);
+      } else {
+        /* Sin ruta de Valhalla: solo mover cámara */
+        if (W.mapResult) {
+          var bounds = L.latLngBounds([[lat, lng], [dest.lat, dest.lng]]);
+          W.mapResult.fitBounds(bounds, { paddingTopLeft: [20, 80], paddingBottomRight: [20, 20], maxZoom: 16 });
+        }
+      }
+    } else {
+      /* Entre recálculos de ruta: solo mover cámara suavemente si la ruta ya existe */
+      if (W.mapResult && W.routeLayerResultTop) {
+        W.mapResult.panTo([lat, lng], { animate: true, duration: 0.6 });
+      }
+    }
+  }
+
+  /* ─────────────────────────────────────────────
+     ARRANCAR / PARAR GPS
+  ───────────────────────────────────────────── */
+  function _arrancarGPS() {
+    _pararGPS();
+    _gps.entregado = false;
+    _gps.lat       = null;
+    _gps.lng       = null;
+    _gps._ultimaRuta = null;
+
+    /* Primera lectura inmediata */
+    _cicloGPS();
+    _gps.timer = setInterval(_cicloGPS, GPS_INTERVALO);
+    console.log('[WIL GPS Real] ✅ Iniciado — cada ' + (GPS_INTERVALO/1000) + 's');
+  }
+
+  function _pararGPS() {
+    clearInterval(_gps.timer);
+    _gps.timer = null;
+    if (W._etaTimer) { clearInterval(W._etaTimer); W._etaTimer = null; }
+  }
+
+  /* ─────────────────────────────────────────────
+     HOOK en rastrearPedido
+  ───────────────────────────────────────────── */
+  (function _hookRastrear() {
+    var orig = W.rastrearPedido;
+    if (typeof orig !== 'function') {
+      /* rastrearPedido aún no existe — esperar */
+      var espera = setInterval(function () {
+        if (typeof W.rastrearPedido === 'function') {
+          clearInterval(espera);
+          _hookRastrear();
+        }
+      }, 200);
+      return;
+    }
+
+    W.rastrearPedido = async function () {
+      _pararGPS();
+      _gps.entregado = false;
+      await orig.apply(this, arguments);
+
+      var p = W.state && W.state.pedidoRastreado;
+      if (!p || !p.id) return;
+
+      if (p.estado === 'Entregado' || p.estado === 'Cancelado') {
+        _modoEntregado();
+        return;
+      }
+
+      /* Arrancar GPS real solo si hay domi asignado */
+      if (p.domiciliario && p.domiciliario.trim()) {
+        setTimeout(_arrancarGPS, 1200);
+      }
+    };
+  })();
+
+  /* ─────────────────────────────────────────────
+     HOOK en rtActualizarStepper — detectar Entregado
+     desde el polling de estado (sin necesidad de re-rastrear)
+  ───────────────────────────────────────────── */
+  (function _hookStepper() {
+    var orig = W.rtActualizarStepper;
+    if (typeof orig !== 'function') return;
+
+    W.rtActualizarStepper = function (estado) {
+      orig.apply(this, arguments);
+
+      if ((estado === 'Entregado' || estado === 'Cancelado') && !_gps.entregado) {
+        _modoEntregado();
+        _pararGPS();
+      } else if (
+        (estado === 'En camino' || estado === 'Confirmado') &&
+        !_gps.entregado && !_gps.timer
+      ) {
+        /* Si el domi acaba de ser asignado y el GPS no está corriendo */
+        var p = W.state && W.state.pedidoRastreado;
+        if (p && p.domiciliario && p.domiciliario.trim()) {
+          _arrancarGPS();
+        }
+      }
+    };
+  })();
+
+  /* ─────────────────────────────────────────────
+     PARAR cuando el usuario minimiza o cambia tab
+  ───────────────────────────────────────────── */
+  (function _hookNav() {
+    var origMin = W.minimizarResult;
+    if (typeof origMin === 'function') {
+      W.minimizarResult = function () {
+        _pararGPS();
+        origMin.apply(this, arguments);
+      };
+    }
+
+    var origNav = W.navTo;
+    if (typeof origNav === 'function') {
+      W.navTo = function (tab) {
+        if (tab !== 'rastrear') _pararGPS();
+        else {
+          /* Reactivar GPS si había un pedido en curso */
+          var p = W.state && W.state.pedidoRastreado;
+          if (p && p.domiciliario && !_gps.entregado && !_gps.timer &&
+              p.estado !== 'Entregado' && p.estado !== 'Cancelado') {
+            setTimeout(_arrancarGPS, 500);
+          }
+        }
+        origNav.apply(this, arguments);
+      };
+    }
+  })();
+
+  /* Reactivar al volver a la pestaña */
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState !== 'visible') return;
+    var p = W.state && W.state.pedidoRastreado;
+    if (!p || !p.id) return;
+    if (_gps.entregado) return;
+    if (p.estado === 'Entregado' || p.estado === 'Cancelado') { _modoEntregado(); return; }
+    if (p.domiciliario && !_gps.timer) {
+      console.log('[WIL GPS Real] Reactivando tras visibilidad…');
+      _arrancarGPS();
+    } else if (_gps.timer) {
+      /* Lectura inmediata al volver */
+      _cicloGPS();
+    }
+  });
+
+  /* Exponer control para debug */
+  W._wilGps = { arrancar: _arrancarGPS, parar: _pararGPS, estado: _gps };
+
+  console.log('[WIL GPS Real] ✅ Parche cargado — GPS cada 10s, ETA real, limpieza al Entregado');
+
+})(window);
+</script>
+
+
+
+
+
+
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   WIL GPS + ETA TIEMPO REAL — parche autónomo
+   ─────────────────────────────────────────────────────────────
+   1. Lee col G (ACTIVIDAD) de hoja Domiciliarios cada 10 s
+   2. Mueve el marcador del domi en el mapa en tiempo real
+   3. Calcula ETA real con Valhalla (fallback: Haversine)
+   4. Al estado "Entregado": elimina polilínea, muestra solo destino
+   ─────────────────────────────────────────────────────────────
+  
+═══════════════════════════════════════════════════════════════ */
+;(function (W) {
+  'use strict';
+
+  var SHEET_ID  = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
+  var GPS_INTERVALO  = 10000;   /* ms entre lecturas de GPS */
+  var ETA_INTERVALO  = 30000;   /* ms entre recálculos de ruta */
+  var VALHALLA_URL   = 'https://valhalla1.openstreetmap.de/route';
+  var RADIO_MIN_MOVE = 0.00004; /* grados (~4 m) — ignorar micro-ruido */
+
+  /* ── Estado del módulo ── */
+  var _gps = {
+    timer:     null,
+    etaTimer:  null,
+    lat:       null,
+    lng:       null,
+    destLat:   null,
+    destLng:   null,
+    etaMinutos: null,
+    rutaActiva: false,
+    entregado:  false
+  };
+
+  /* ─────────────────────────────────────────────
+     UTILIDADES
+  ───────────────────────────────────────────── */
+
+  /* CSV parser mínimo */
+  function _csv(line) {
+    var r = [], cur = '', q = false;
+    for (var i = 0; i < line.length; i++) {
+      var c = line[i];
+      if (c === '"') { if (q && line[i+1] === '"') { cur += '"'; i++; } else q = !q; }
+      else if (c === ',' && !q) { r.push(cur.trim()); cur = ''; }
+      else cur += c;
+    }
+    r.push(cur.trim());
+    return r;
+  }
+
+  /* Haversine — km entre dos puntos */
+  function _km(la1, lo1, la2, lo2) {
+    var R = 6371,
+        dL = (la2 - la1) * Math.PI / 180,
+        dO = (lo2 - lo1) * Math.PI / 180,
+        a  = Math.sin(dL/2)*Math.sin(dL/2)
+           + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)
+           * Math.sin(dO/2)*Math.sin(dO/2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  /* Fetch anti-caché a una hoja */
+  function _fetchSheet(hoja, tq) {
+    var ts  = Date.now();
+    var rnd = Math.random().toString(36).slice(2, 8);
+    var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
+            + '/gviz/tq?tqx=out:csv'
+            + '&sheet=' + encodeURIComponent(hoja)
+            + '&_=' + ts + rnd;
+    if (tq) url += '&tq=' + encodeURIComponent(tq);
+    return fetch(url, {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache, no-store', 'Pragma': 'no-cache' }
+    }).then(function (r) { return r.text(); });
+  }
+
+  /* Decodificar polyline precision-6 de Valhalla */
+  function _decodePolyline6(encoded) {
+    var pts = [], idx = 0, lat = 0, lng = 0;
+    while (idx < encoded.length) {
+      var b, shift = 0, res = 0;
+      do { b = encoded.charCodeAt(idx++) - 63; res |= (b & 0x1f) << shift; shift += 5; } while (b >= 32);
+      lat += (res & 1) ? ~(res >> 1) : (res >> 1);
+      shift = 0; res = 0;
+      do { b = encoded.charCodeAt(idx++) - 63; res |= (b & 0x1f) << shift; shift += 5; } while (b >= 32);
+      lng += (res & 1) ? ~(res >> 1) : (res >> 1);
+      pts.push([lat / 1e6, lng / 1e6]);
+    }
+    return pts;
+  }
+
+  /* ─────────────────────────────────────────────
+     EXTRAER DESTINO de state.pedidoRastreado
+  ───────────────────────────────────────────── */
+  function _leerDestino() {
+    var p = W.state && W.state.pedidoRastreado;
+    if (!p) return null;
+    var dirRaw = p.direccion || '';
+    var m = dirRaw.match(/\[(-?\d+\.\d+),\s*(-?\d+\.\d+)\]/);
+    if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+    return null;
+  }
+
+  /* ─────────────────────────────────────────────
+     LEER GPS del DOMI desde col G de Domiciliarios
+  ───────────────────────────────────────────── */
+  async function _leerGPSDomi() {
+    var p = W.state && W.state.pedidoRastreado;
+    if (!p || !p.domiciliario) return null;
+
+    var nd = p.domiciliario.replace(/\s*\([^)]+\)/g, '').trim().toLowerCase();
+    if (!nd) return null;
+
+    var primer = nd.split(' ')[0].replace(/'/g, "\\'");
+    try {
+      var txt   = await _fetchSheet('Domiciliarios',
+        "select * where lower(B) contains '" + primer + "' limit 5");
+      var lines = txt.trim().split('\n');
+      for (var i = 1; i < lines.length; i++) {
+        var c   = _csv(lines[i]);
+        var dn  = (c[1] || '').trim().toLowerCase();
+        if (!dn || (dn !== nd && nd.indexOf(dn) === -1 && dn.indexOf(nd) === -1)) continue;
+
+        /* col G = índice 6 = ACTIVIDAD */
+        var actividad = (c[6] || '').trim();
+        if (!actividad) return null;
+
+        var gm = actividad.match(/(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
+        if (!gm) return null;
+
+        return { lat: parseFloat(gm[1]), lng: parseFloat(gm[2]) };
+      }
+    } catch (e) {
+      console.warn('[WIL GPS] Error leyendo Domiciliarios:', e.message);
+    }
+    return null;
+  }
+
+  /* ─────────────────────────────────────────────
+     ACTUALIZAR MARCADOR en el mapa
+  ───────────────────────────────────────────── */
+  function _actualizarMarcadorDomi(lat, lng) {
+    if (!W.mapResult || typeof L === 'undefined') return;
+
+    if (W.domiMarkerResult) {
+      W.domiMarkerResult.setLatLng([lat, lng]);
+    } else {
+      var p = W.state && W.state.pedidoRastreado;
+      var nombre = p ? (p.domiciliario || 'Domi WIL') : 'Domi WIL';
+      if (typeof W.iconDomi === 'function') {
+        W.domiMarkerResult = L.marker([lat, lng], {
+          icon: W.iconDomi(nombre, true),
+          zIndexOffset: 1000
+        }).addTo(W.mapResult);
+      } else {
+        W.domiMarkerResult = L.marker([lat, lng]).addTo(W.mapResult);
+      }
+    }
+  }
+
+  /* ─────────────────────────────────────────────
+     LIMPIAR RUTA (para estado Entregado u otro)
+  ───────────────────────────────────────────── */
+  function _limpiarRuta() {
+    if (!W.mapResult) return;
+    if (W.routeLayerResult) {
+      try { W.mapResult.removeLayer(W.routeLayerResult); } catch (e) {}
+      W.routeLayerResult = null;
+    }
+    if (W.routeLayerResultTop) {
+      try { W.mapResult.removeLayer(W.routeLayerResultTop); } catch (e) {}
+      W.routeLayerResultTop = null;
+    }
+  }
+
+  /* ─────────────────────────────────────────────
+     CALCULAR ETA REAL (Valhalla, fallback Haversine)
+  ───────────────────────────────────────────── */
+  async function _calcularETA(latO, lngO, latD, lngD) {
+    /* Intento 1: routing real con Valhalla */
+    try {
+      var body = JSON.stringify({
+        locations: [{ lon: lngO, lat: latO }, { lon: lngD, lat: latD }],
+        costing: 'auto'
+      });
+      var ctrl    = new AbortController();
+      var timeout = setTimeout(function () { ctrl.abort(); }, 8000);
+      var res = await fetch(VALHALLA_URL + '?json=' + encodeURIComponent(body), {
+        cache: 'no-store',
+        signal: ctrl.signal
+      });
+      clearTimeout(timeout);
+      var data = await res.json();
+
+      if (data.trip && data.trip.legs && data.trip.legs[0]) {
+        var durSeg = data.trip.summary.time;
+        var latLngs = _decodePolyline6(data.trip.legs[0].shape);
+        return { minutos: Math.max(1, Math.round(durSeg / 60)), latLngs: latLngs };
+      }
+    } catch (e) {
+      /* Valhalla falló o timeout — continuar con fallback */
+    }
+
+    /* Intento 2: Haversine con velocidad promedio de moto (30 km/h en ciudad) */
+    var distKm  = _km(latO, lngO, latD, lngD);
+    var velKmH  = 30;
+    var minutos = Math.max(1, Math.round((distKm / velKmH) * 60));
+    return { minutos: minutos, latLngs: null };
+  }
+
+  /* ─────────────────────────────────────────────
+     DIBUJAR / ACTUALIZAR RUTA en el mapa
+  ───────────────────────────────────────────── */
+  function _dibujarRuta(latLngs, latO, lngO, latD, lngD) {
+    if (!W.mapResult) return;
+    _limpiarRuta();
+
+    if (latLngs && latLngs.length > 1) {
+      W.routeLayerResult = L.polyline(latLngs, {
+        color: '#000',    weight: 14, opacity: 0.15,
+        lineCap: 'round', lineJoin: 'round'
+      }).addTo(W.mapResult);
+
+      W.routeLayerResultTop = L.polyline(latLngs, {
+        color: '#1a1a1a', weight: 7,  opacity: 1,
+        lineCap: 'round', lineJoin: 'round'
+      }).addTo(W.mapResult);
+
+      var bounds = L.latLngBounds([[latO, lngO], [latD, lngD]]);
+      W.mapResult.fitBounds(bounds, { paddingTopLeft: [20, 80], paddingBottomRight: [20, 20], maxZoom: 16 });
+    }
+  }
+
+  /* ─────────────────────────────────────────────
+     ACTUALIZAR ETA en el overlay del mapa
+  ───────────────────────────────────────────── */
+  function _mostrarETA(minutos) {
+    var etaOverlay = document.getElementById('rtMapEtaOverlay');
+    var etaMinsEl  = document.getElementById('rtMapEtaMins');
+    if (!etaOverlay || !etaMinsEl) return;
+
+    etaOverlay.style.display = 'flex';
+    etaMinsEl.textContent    = minutos <= 0 ? '¡Ya!' : String(minutos);
+    _gps.etaMinutos = minutos;
+
+    /* Detener el timer de simulación anterior si existe */
+    if (W._etaTimer) { clearInterval(W._etaTimer); W._etaTimer = null; }
+  }
+
+  /* ─────────────────────────────────────────────
+     ESTADO ENTREGADO — limpiar todo y mostrar pin
+  ───────────────────────────────────────────── */
+  function _modoEntregado() {
+    _gps.entregado = true;
+    _limpiarRuta();
+
+    /* Ocultar overlay de ETA */
+    var etaOverlay = document.getElementById('rtMapEtaOverlay');
+    if (etaOverlay) etaOverlay.style.display = 'none';
+
+    /* Centrar en el destino */
+    var dest = _leerDestino();
+    if (dest && W.mapResult) {
+      W.mapResult.setView([dest.lat, dest.lng], 16, { animate: true });
+    }
+
+    /* Si hay marcador del domi, mostrarlo en destino como confirmación */
+    if (W.domiMarkerResult && dest) {
+      W.domiMarkerResult.setLatLng([dest.lat, dest.lng]);
+    }
+  }
+
+  /* ─────────────────────────────────────────────
+     CICLO PRINCIPAL DE GPS (cada 10 s)
+  ───────────────────────────────────────────── */
+  async function _cicloGPS() {
+    var p = W.state && W.state.pedidoRastreado;
+    if (!p || !p.id) return;
+
+    /* Si ya está entregado, no hay nada más que hacer */
+    if (_gps.entregado || p.estado === 'Entregado' || p.estado === 'Cancelado') {
+      if (!_gps.entregado) _modoEntregado();
+      _pararGPS();
+      return;
+    }
+
+    var pos = await _leerGPSDomi();
+    if (!pos) return;
+
+    var lat = pos.lat, lng = pos.lng;
+
+    /* Ignorar micro-movimientos (ruido GPS) */
+    if (_gps.lat !== null) {
+      var dLat = Math.abs(lat - _gps.lat);
+      var dLng = Math.abs(lng - _gps.lng);
+      if (dLat < RADIO_MIN_MOVE && dLng < RADIO_MIN_MOVE) return;
+    }
+
+    _gps.lat = lat;
+    _gps.lng = lng;
+
+    /* Mover marcador */
+    _actualizarMarcadorDomi(lat, lng);
+
+    /* Obtener destino */
+    var dest = _leerDestino();
+    if (!dest) return;
+
+    _gps.destLat = dest.lat;
+    _gps.destLng = dest.lng;
+
+    /* Calcular ETA y ruta cada GPS_INTERVALO pero ruta solo cada ETA_INTERVALO */
+    var ahora = Date.now();
+    if (!_gps._ultimaRuta || (ahora - _gps._ultimaRuta) >= ETA_INTERVALO) {
+      _gps._ultimaRuta = ahora;
+
+      var resultado = await _calcularETA(lat, lng, dest.lat, dest.lng);
+      _mostrarETA(resultado.minutos);
+
+      if (resultado.latLngs) {
+        _dibujarRuta(resultado.latLngs, lat, lng, dest.lat, dest.lng);
+      } else {
+        /* Sin ruta de Valhalla: solo mover cámara */
+        if (W.mapResult) {
+          var bounds = L.latLngBounds([[lat, lng], [dest.lat, dest.lng]]);
+          W.mapResult.fitBounds(bounds, { paddingTopLeft: [20, 80], paddingBottomRight: [20, 20], maxZoom: 16 });
+        }
+      }
+    } else {
+      /* Entre recálculos de ruta: solo mover cámara suavemente si la ruta ya existe */
+      if (W.mapResult && W.routeLayerResultTop) {
+        W.mapResult.panTo([lat, lng], { animate: true, duration: 0.6 });
+      }
+    }
+  }
+
+  /* ─────────────────────────────────────────────
+     ARRANCAR / PARAR GPS
+  ───────────────────────────────────────────── */
+  function _arrancarGPS() {
+    _pararGPS();
+    _gps.entregado = false;
+    _gps.lat       = null;
+    _gps.lng       = null;
+    _gps._ultimaRuta = null;
+
+    /* Primera lectura inmediata */
+    _cicloGPS();
+    _gps.timer = setInterval(_cicloGPS, GPS_INTERVALO);
+    console.log('[WIL GPS Real] ✅ Iniciado — cada ' + (GPS_INTERVALO/1000) + 's');
+  }
+
+  function _pararGPS() {
+    clearInterval(_gps.timer);
+    _gps.timer = null;
+    if (W._etaTimer) { clearInterval(W._etaTimer); W._etaTimer = null; }
+  }
+
+  /* ─────────────────────────────────────────────
+     HOOK en rastrearPedido
+  ───────────────────────────────────────────── */
+  (function _hookRastrear() {
+    var orig = W.rastrearPedido;
+    if (typeof orig !== 'function') {
+      /* rastrearPedido aún no existe — esperar */
+      var espera = setInterval(function () {
+        if (typeof W.rastrearPedido === 'function') {
+          clearInterval(espera);
+          _hookRastrear();
+        }
+      }, 200);
+      return;
+    }
+
+    W.rastrearPedido = async function () {
+      _pararGPS();
+      _gps.entregado = false;
+      await orig.apply(this, arguments);
+
+      var p = W.state && W.state.pedidoRastreado;
+      if (!p || !p.id) return;
+
+      if (p.estado === 'Entregado' || p.estado === 'Cancelado') {
+        _modoEntregado();
+        return;
+      }
+
+      /* Arrancar GPS real solo si hay domi asignado */
+      if (p.domiciliario && p.domiciliario.trim()) {
+        setTimeout(_arrancarGPS, 1200);
+      }
+    };
+  })();
+
+  /* ─────────────────────────────────────────────
+     HOOK en rtActualizarStepper — detectar Entregado
+     desde el polling de estado (sin necesidad de re-rastrear)
+  ───────────────────────────────────────────── */
+  (function _hookStepper() {
+    var orig = W.rtActualizarStepper;
+    if (typeof orig !== 'function') return;
+
+    W.rtActualizarStepper = function (estado) {
+      orig.apply(this, arguments);
+
+      if ((estado === 'Entregado' || estado === 'Cancelado') && !_gps.entregado) {
+        _modoEntregado();
+        _pararGPS();
+      } else if (
+        (estado === 'En camino' || estado === 'Confirmado') &&
+        !_gps.entregado && !_gps.timer
+      ) {
+        /* Si el domi acaba de ser asignado y el GPS no está corriendo */
+        var p = W.state && W.state.pedidoRastreado;
+        if (p && p.domiciliario && p.domiciliario.trim()) {
+          _arrancarGPS();
+        }
+      }
+    };
+  })();
+
+  /* ─────────────────────────────────────────────
+     PARAR cuando el usuario minimiza o cambia tab
+  ───────────────────────────────────────────── */
+  (function _hookNav() {
+    var origMin = W.minimizarResult;
+    if (typeof origMin === 'function') {
+      W.minimizarResult = function () {
+        _pararGPS();
+        origMin.apply(this, arguments);
+      };
+    }
+
+    var origNav = W.navTo;
+    if (typeof origNav === 'function') {
+      W.navTo = function (tab) {
+        if (tab !== 'rastrear') _pararGPS();
+        else {
+          /* Reactivar GPS si había un pedido en curso */
+          var p = W.state && W.state.pedidoRastreado;
+          if (p && p.domiciliario && !_gps.entregado && !_gps.timer &&
+              p.estado !== 'Entregado' && p.estado !== 'Cancelado') {
+            setTimeout(_arrancarGPS, 500);
+          }
+        }
+        origNav.apply(this, arguments);
+      };
+    }
+  })();
+
+  /* Reactivar al volver a la pestaña */
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState !== 'visible') return;
+    var p = W.state && W.state.pedidoRastreado;
+    if (!p || !p.id) return;
+    if (_gps.entregado) return;
+    if (p.estado === 'Entregado' || p.estado === 'Cancelado') { _modoEntregado(); return; }
+    if (p.domiciliario && !_gps.timer) {
+      console.log('[WIL GPS Real] Reactivando tras visibilidad…');
+      _arrancarGPS();
+    } else if (_gps.timer) {
+      /* Lectura inmediata al volver */
+      _cicloGPS();
+    }
+  });
+
+  /* Exponer control para debug */
+  W._wilGps = { arrancar: _arrancarGPS, parar: _pararGPS, estado: _gps };
+
+  console.log('[WIL GPS Real] ✅ Parche cargado — GPS cada 10s, ETA real, limpieza al Entregado');
 
 })(window);
 </script>
