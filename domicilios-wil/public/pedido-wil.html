@@ -21,6 +21,7 @@
      <script src="wil-docs-patch-v2.js"></script>
      <script src="wil-gps-eta-patch.js"></script>
      <script src="wil-fix-entregado.js"></script>
+     <script src="wil-patch-sin-para-quien.js"></script>
     
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -921,7 +922,7 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
         <span class="sym f" style="font-size:22px">check_circle</span>Recoger y Entregar
       </button>
       <button class="yn-btn" id="yn-no" onclick="wilSelComercio(false)">
-        <span class="sym f" style="font-size:22px">help</span>Realizr compra
+        <span class="sym f" style="font-size:22px">help</span>Realizar compra
       </button>
     </div>
     <div id="wil-comercio-field" class="field hidden">
@@ -11483,6 +11484,239 @@ try {
 
 })(window);
 </script>
+
+
+
+
+
+
+
+
+<script>
+  /* ═══════════════════════════════════════════════════════════════
+   WIL PATCH — Eliminar sección "¿Para quién?" del Pedido Libre P1
+   ─────────────────────────────────────────────────────────────
+   CAMBIOS:
+   1. Oculta los radio buttons "Para mí / Envío a alguien más"
+   2. Muestra directamente los barrios + tarifa al seleccionar servicio
+   3. Muestra un único formulario de datos (sin duplicar campos)
+   4. wilGoLibre2() adaptado: no requiere destino seleccionado,
+      lee los campos unificados
+   5. La tarifa y barrios se muestran igual que antes en factura
+═══════════════════════════════════════════════════════════════ */
+;(function (W) {
+  'use strict';
+
+  /* ── 1. CSS: ocultar la sección de para-quién y mostrar datos directo ── */
+  var st = document.createElement('style');
+  st.id = 'wil-sin-para-quien-css';
+  st.textContent = `
+    /* Ocultar radio buttons para-quién */
+    #wil-opt-mi,
+    #wil-opt-otro,
+    #wil-card-para-quien > div:first-of-type { display: none !important; }
+
+    /* Ocultar el título de la card para-quién y reemplazarlo */
+    #wil-card-para-quien .card-tit { display: none !important; }
+
+    /* Mostrar sección de barrios directamente sin necesidad de seleccionar destino */
+    #wil-sec-barrios { display: block !important; }
+    #wil-sec-barrios.hidden { display: block !important; }
+
+    /* Mostrar solo la sección "Para mí" como formulario único */
+    #wil-sec-dir-mi { display: block !important; }
+    #wil-sec-dir-mi.hidden { display: block !important; }
+
+    /* Ocultar la sección "Para otro" — ya no se usa */
+    #wil-sec-dir-otro { display: none !important; }
+
+    /* Ajustar card para-quién: quitar espacio del título oculto */
+    #wil-card-para-quien {
+      padding-top: 12px !important;
+    }
+  `;
+  document.head.appendChild(st);
+
+  /* ── 2. Mostrar la card de datos directamente al seleccionar servicio ── */
+  var _origWilSelComercio = W.wilSelComercio;
+  W.wilSelComercio = function (si) {
+    /* Llamar original para manejar el campo comercio */
+    if (typeof _origWilSelComercio === 'function') {
+      _origWilSelComercio.apply(this, arguments);
+    }
+
+    /* Mostrar card de datos inmediatamente */
+    var cardParaQuien = document.getElementById('wil-card-para-quien');
+    if (cardParaQuien) cardParaQuien.style.display = 'block';
+
+    /* Pre-seleccionar destino 'mi' internamente para que la lógica funcione */
+    W.WIL_LIBRE = W.WIL_LIBRE || {};
+    W.WIL_LIBRE.destino = 'mi';
+
+    /* Asegurar que los campos de barrios estén visibles */
+    var secBarrios = document.getElementById('wil-sec-barrios');
+    if (secBarrios) {
+      secBarrios.classList.remove('hidden');
+      secBarrios.style.display = 'block';
+    }
+
+    /* Asegurar que el formulario de datos esté visible */
+    var secDirMi = document.getElementById('wil-sec-dir-mi');
+    if (secDirMi) {
+      secDirMi.classList.remove('hidden');
+      secDirMi.style.display = 'block';
+    }
+  };
+
+  /* ── 3. Sobrescribir wilSelDestino para que no oculte nada ── */
+  W.wilSelDestino = function (d) {
+    /* Fijar siempre como 'mi' internamente */
+    W.WIL_LIBRE = W.WIL_LIBRE || {};
+    W.WIL_LIBRE.destino = 'mi';
+
+    /* Siempre mostrar sección barrios */
+    var secBarrios = document.getElementById('wil-sec-barrios');
+    if (secBarrios) {
+      secBarrios.classList.remove('hidden');
+      secBarrios.style.display = 'block';
+    }
+
+    /* Siempre mostrar campos de datos */
+    var secDirMi = document.getElementById('wil-sec-dir-mi');
+    if (secDirMi) {
+      secDirMi.classList.remove('hidden');
+      secDirMi.style.display = 'block';
+    }
+
+    /* Nunca mostrar la sección de "otro" */
+    var secDirOtro = document.getElementById('wil-sec-dir-otro');
+    if (secDirOtro) {
+      secDirOtro.style.display = 'none';
+      secDirOtro.classList.add('hidden');
+    }
+
+    /* Recalcular tarifa por si ya hay barrios seleccionados */
+    if (typeof W.wilCalcTarifa === 'function') W.wilCalcTarifa();
+  };
+
+  /* ── 4. Sobrescribir wilGoLibre2 para no requerir destino seleccionado ── */
+  W.wilGoLibre2 = function () {
+    var L = W.WIL_LIBRE = W.WIL_LIBRE || {};
+
+    /* Forzar destino 'mi' */
+    L.destino = 'mi';
+
+    /* Validar comercio */
+    if (L.comercio === null || L.comercio === undefined) {
+      if (typeof W.mostrarToast === 'function')
+        W.mostrarToast('Indica qué servicio deseas solicitar.', 'help');
+      return;
+    }
+
+    if (L.comercio) {
+      L.comercioNombre = (document.getElementById('comercio-nombre') || {}).value
+        ? document.getElementById('comercio-nombre').value.trim()
+        : '';
+      if (!L.comercioNombre) {
+        if (typeof W.mostrarToast === 'function')
+          W.mostrarToast('Escribe el nombre del comercio o dirección.', 'storefront');
+        return;
+      }
+    }
+
+    /* Validar barrios */
+    var hidR = document.getElementById('wil-barrio-recogida');
+    var hidE = document.getElementById('wil-barrio-entrega');
+    if (!hidR || !hidR.value) {
+      if (typeof W.mostrarToast === 'function')
+        W.mostrarToast('Selecciona el barrio de recogida.', 'location_on');
+      return;
+    }
+    if (!hidE || !hidE.value) {
+      if (typeof W.mostrarToast === 'function')
+        W.mostrarToast('Selecciona el barrio de entrega.', 'location_on');
+      return;
+    }
+
+    var pR = parseInt((hidR.dataset && hidR.dataset.precio) || 0);
+    var pE = parseInt((hidE.dataset && hidE.dataset.precio) || 0);
+    L.barrioRecogida = hidR.value;
+    L.barrioEntrega  = hidE.value;
+    L.tarifaDomi     = Math.max(pR, pE);
+
+    /* Leer campos del formulario unificado */
+    var nom = (document.getElementById('wil-nombre-mi') || {}).value
+      ? document.getElementById('wil-nombre-mi').value.trim() : '';
+    var dir = (document.getElementById('wil-dir-mi') || {}).value
+      ? document.getElementById('wil-dir-mi').value.trim() : '';
+    var tel = (document.getElementById('wil-tel-mi') || {}).value
+      ? document.getElementById('wil-tel-mi').value.trim() : '';
+    var ref = (document.getElementById('wil-ref-mi') || {}).value
+      ? document.getElementById('wil-ref-mi').value.trim() : '';
+
+    if (!nom) {
+      if (typeof W.mostrarToast === 'function')
+        W.mostrarToast('Escribe tu nombre.', 'person');
+      return;
+    }
+    if (!dir) {
+      if (typeof W.mostrarToast === 'function')
+        W.mostrarToast('Escribe la dirección de entrega.', 'location_on');
+      return;
+    }
+    if (!tel) {
+      if (typeof W.mostrarToast === 'function')
+        W.mostrarToast('Escribe tu teléfono.', 'phone');
+      return;
+    }
+
+    L.direccion    = dir;
+    L.referencia   = ref;
+    L.recibeTel    = tel;
+    L.nombre       = nom;
+    L.recibeNombre = nom;
+    L.enviaNombre  = nom;
+    L.enviaTel     = tel;
+
+    /* Sincronizar con state global */
+    if (W.state) {
+      W.state.nombre    = nom;
+      W.state.telefono  = tel;
+      W.state.direccion = dir;
+      W.state.referencia = ref;
+      W.state.barrio    = L.barrioEntrega;
+    }
+
+    /* Ir al paso 2 */
+    if (typeof W.showView === 'function') W.showView('view-libre-2');
+  };
+
+  /* ── 5. Al cargar, si la card para-quién ya tiene display:none (por style inline),
+          forzar que aparezca una vez seleccionado el servicio ── */
+  function _init() {
+    /* La card empieza oculta por style="display:none" en el HTML.
+       Solo la mostramos cuando el usuario selecciona servicio (wilSelComercio).
+       El CSS ya maneja ocultar los radio buttons internamente. */
+
+    /* Si el formulario ya tiene datos (reload / persistencia), mostrar card */
+    var L = W.WIL_LIBRE || {};
+    if (L.comercio !== null && L.comercio !== undefined) {
+      var cardParaQuien = document.getElementById('wil-card-para-quien');
+      if (cardParaQuien) cardParaQuien.style.display = 'block';
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _init);
+  } else {
+    setTimeout(_init, 0);
+  }
+
+  console.log('[WIL] ✅ Patch sin-para-quien cargado — flujo P1 simplificado');
+
+})(window);
+</script>
+
 
 </body>
 </html>
