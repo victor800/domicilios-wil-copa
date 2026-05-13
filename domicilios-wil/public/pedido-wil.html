@@ -4701,8 +4701,8 @@ function wilPoblarResumenP3(){
            </div>`;
   html += `<div style="margin-top:10px;padding:10px 12px;background:#fef2f2;border:1px solid rgba(220,38,38,.2);border-radius:var(--r-md);font-size:11.5px;color:#dc2626;font-weight:600;line-height:1.5;display:flex;align-items:flex-start;gap:6px">
              <span style="font-size:15px;flex-shrink:0">🧾</span>
-            <span>✅ El domiciliario confirmará disponibilidad y te enviará la <strong>foto de la factura real</strong> antes del cobro. 
-⚠️ <strong>Importante:</strong> Por alta demanda y posibles filas en algunos comercios, se aplicará un cargo de <strong>$2.000 pesos por cada 15 minutos de espera adicionales</strong> (EL TIEMPO INICIA CUANDO EL DOMICILIARIO TE ENVIA LA EVIDENCIA). 
+            <span><strong></strong> 
+⚠️ <strong>Importante:</strong> En caso de posibles demoras en el lugar de recogida o de entrega, se aplicará un cargo de <strong>$2.000 pesos por cada 15 minutos de espera adicionales</strong>. 
 🔒 <strong>Tú apruebas el pedido antes de pagar.</strong></span>
            </div>`;
   div.innerHTML = html;
@@ -11493,133 +11493,152 @@ try {
 
 
 <script>
-  /* ═══════════════════════════════════════════════════════════════
-   WIL PATCH — Eliminar sección "¿Para quién?" del Pedido Libre P1
-   ─────────────────────────────────────────────────────────────
-   CAMBIOS:
-   1. Oculta los radio buttons "Para mí / Envío a alguien más"
-   2. Muestra directamente los barrios + tarifa al seleccionar servicio
-   3. Muestra un único formulario de datos (sin duplicar campos)
-   4. wilGoLibre2() adaptado: no requiere destino seleccionado,
-      lee los campos unificados
-   5. La tarifa y barrios se muestran igual que antes en factura
+ /* ═══════════════════════════════════════════════════════════════
+   WIL PATCH — Flujo Libre P1 simplificado
+   v2 — Agrega teléfono de recogida + resumen completo en P3
 ═══════════════════════════════════════════════════════════════ */
 ;(function (W) {
   'use strict';
 
-  /* ── 1. CSS: ocultar la sección de para-quién y mostrar datos directo ── */
+  /* ── 1. CSS ── */
   var st = document.createElement('style');
   st.id = 'wil-sin-para-quien-css';
   st.textContent = `
-    /* Ocultar radio buttons para-quién */
+    /* Ocultar radio buttons para-quién y su título */
     #wil-opt-mi,
     #wil-opt-otro,
     #wil-card-para-quien > div:first-of-type { display: none !important; }
-
-    /* Ocultar el título de la card para-quién y reemplazarlo */
     #wil-card-para-quien .card-tit { display: none !important; }
+    #wil-card-para-quien { padding-top: 12px !important; }
 
-    /* Mostrar sección de barrios directamente sin necesidad de seleccionar destino */
-    #wil-sec-barrios { display: block !important; }
+    /* Mostrar sección barrios y datos directamente */
+    #wil-sec-barrios,
     #wil-sec-barrios.hidden { display: block !important; }
 
-    /* Mostrar solo la sección "Para mí" como formulario único */
-    #wil-sec-dir-mi { display: block !important; }
+    #wil-sec-dir-mi,
     #wil-sec-dir-mi.hidden { display: block !important; }
 
-    /* Ocultar la sección "Para otro" — ya no se usa */
+    /* Ocultar sección "para otro" — no se usa */
     #wil-sec-dir-otro { display: none !important; }
 
-    /* Ajustar card para-quién: quitar espacio del título oculto */
-    #wil-card-para-quien {
-      padding-top: 12px !important;
+    /* Campo teléfono recogida — inyectado por JS */
+    #wil-tel-recogida-wrap {
+      margin-bottom: 12px;
+    }
+    #wil-tel-recogida-wrap label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--on3);
+      margin-bottom: 5px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    #wil-tel-recogida-wrap input {
+      width: 100%;
+      border: 1.5px solid #dce3ea;
+      border-radius: var(--r-lg, 13px);
+      padding: 11px 13px;
+      font-size: 14px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      color: var(--on);
+      background: #fff;
+      outline: none;
+      transition: border-color .15s;
+      box-sizing: border-box;
+    }
+    #wil-tel-recogida-wrap input:focus {
+      border-color: var(--p, #006970);
+      box-shadow: 0 0 0 3px rgba(0,105,112,.08);
+    }
+    #wil-tel-recogida-wrap input::placeholder { color: var(--on3); }
+    #wil-tel-recogida-wrap .field-note {
+      font-size: 10.5px;
+      color: var(--on3);
+      margin-top: 4px;
+      font-weight: 500;
     }
   `;
   document.head.appendChild(st);
 
-  /* ── 2. Mostrar la card de datos directamente al seleccionar servicio ── */
+  /* ── 2. Inyectar campo "Teléfono de recogida" después del divisor en wil-sec-dir-mi ── */
+  function _inyectarTelRecogida() {
+    if (document.getElementById('wil-tel-recogida-wrap')) return;
+
+    var secMi = document.getElementById('wil-sec-dir-mi');
+    if (!secMi) return;
+
+    var wrap = document.createElement('div');
+    wrap.id = 'wil-tel-recogida-wrap';
+    wrap.innerHTML =
+      '<label>Teléfono de recogida *</label>' +
+      '<input type="tel" id="wil-tel-recogida" placeholder="Teléfono de quien entrega o del comercio"/>' +
+      '<div class="field-note">Número de contacto en el punto de recogida</div>';
+
+    /* Insertar al final de la sección, antes del campo de nombre */
+    var primeraField = secMi.querySelector('.field');
+    if (primeraField) {
+      secMi.insertBefore(wrap, primeraField);
+    } else {
+      var divider = secMi.querySelector('div[style*="border-top"]');
+      var ancla = divider ? divider.nextSibling : secMi.firstChild;
+      secMi.insertBefore(wrap, ancla);
+    }
+  }
+
+  /* ── 3. Mostrar card al seleccionar servicio ── */
   var _origWilSelComercio = W.wilSelComercio;
   W.wilSelComercio = function (si) {
-    /* Llamar original para manejar el campo comercio */
-    if (typeof _origWilSelComercio === 'function') {
-      _origWilSelComercio.apply(this, arguments);
-    }
+    if (typeof _origWilSelComercio === 'function') _origWilSelComercio.apply(this, arguments);
 
-    /* Mostrar card de datos inmediatamente */
     var cardParaQuien = document.getElementById('wil-card-para-quien');
     if (cardParaQuien) cardParaQuien.style.display = 'block';
 
-    /* Pre-seleccionar destino 'mi' internamente para que la lógica funcione */
     W.WIL_LIBRE = W.WIL_LIBRE || {};
     W.WIL_LIBRE.destino = 'mi';
 
-    /* Asegurar que los campos de barrios estén visibles */
     var secBarrios = document.getElementById('wil-sec-barrios');
-    if (secBarrios) {
-      secBarrios.classList.remove('hidden');
-      secBarrios.style.display = 'block';
-    }
+    if (secBarrios) { secBarrios.classList.remove('hidden'); secBarrios.style.display = 'block'; }
 
-    /* Asegurar que el formulario de datos esté visible */
     var secDirMi = document.getElementById('wil-sec-dir-mi');
-    if (secDirMi) {
-      secDirMi.classList.remove('hidden');
-      secDirMi.style.display = 'block';
-    }
+    if (secDirMi) { secDirMi.classList.remove('hidden'); secDirMi.style.display = 'block'; }
+
+    setTimeout(_inyectarTelRecogida, 80);
   };
 
-  /* ── 3. Sobrescribir wilSelDestino para que no oculte nada ── */
-  W.wilSelDestino = function (d) {
-    /* Fijar siempre como 'mi' internamente */
+  /* ── 4. wilSelDestino — siempre 'mi', nunca oculta nada ── */
+  W.wilSelDestino = function () {
     W.WIL_LIBRE = W.WIL_LIBRE || {};
     W.WIL_LIBRE.destino = 'mi';
 
-    /* Siempre mostrar sección barrios */
     var secBarrios = document.getElementById('wil-sec-barrios');
-    if (secBarrios) {
-      secBarrios.classList.remove('hidden');
-      secBarrios.style.display = 'block';
-    }
+    if (secBarrios) { secBarrios.classList.remove('hidden'); secBarrios.style.display = 'block'; }
 
-    /* Siempre mostrar campos de datos */
     var secDirMi = document.getElementById('wil-sec-dir-mi');
-    if (secDirMi) {
-      secDirMi.classList.remove('hidden');
-      secDirMi.style.display = 'block';
-    }
+    if (secDirMi) { secDirMi.classList.remove('hidden'); secDirMi.style.display = 'block'; }
 
-    /* Nunca mostrar la sección de "otro" */
     var secDirOtro = document.getElementById('wil-sec-dir-otro');
-    if (secDirOtro) {
-      secDirOtro.style.display = 'none';
-      secDirOtro.classList.add('hidden');
-    }
+    if (secDirOtro) secDirOtro.style.display = 'none';
 
-    /* Recalcular tarifa por si ya hay barrios seleccionados */
     if (typeof W.wilCalcTarifa === 'function') W.wilCalcTarifa();
   };
 
-  /* ── 4. Sobrescribir wilGoLibre2 para no requerir destino seleccionado ── */
+  /* ── 5. wilGoLibre2 — valida y captura todos los campos ── */
   W.wilGoLibre2 = function () {
     var L = W.WIL_LIBRE = W.WIL_LIBRE || {};
-
-    /* Forzar destino 'mi' */
     L.destino = 'mi';
 
-    /* Validar comercio */
+    var g = function (id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; };
+
+    /* Validar servicio */
     if (L.comercio === null || L.comercio === undefined) {
-      if (typeof W.mostrarToast === 'function')
-        W.mostrarToast('Indica qué servicio deseas solicitar.', 'help');
+      W.mostrarToast && W.mostrarToast('Indica qué servicio deseas solicitar.', 'help');
       return;
     }
-
     if (L.comercio) {
-      L.comercioNombre = (document.getElementById('comercio-nombre') || {}).value
-        ? document.getElementById('comercio-nombre').value.trim()
-        : '';
+      L.comercioNombre = g('comercio-nombre');
       if (!L.comercioNombre) {
-        if (typeof W.mostrarToast === 'function')
-          W.mostrarToast('Escribe el nombre del comercio o dirección.', 'storefront');
+        W.mostrarToast && W.mostrarToast('Escribe el nombre del comercio o dirección.', 'storefront');
         return;
       }
     }
@@ -11627,82 +11646,145 @@ try {
     /* Validar barrios */
     var hidR = document.getElementById('wil-barrio-recogida');
     var hidE = document.getElementById('wil-barrio-entrega');
-    if (!hidR || !hidR.value) {
-      if (typeof W.mostrarToast === 'function')
-        W.mostrarToast('Selecciona el barrio de recogida.', 'location_on');
-      return;
-    }
-    if (!hidE || !hidE.value) {
-      if (typeof W.mostrarToast === 'function')
-        W.mostrarToast('Selecciona el barrio de entrega.', 'location_on');
-      return;
-    }
+    if (!hidR || !hidR.value) { W.mostrarToast && W.mostrarToast('Selecciona el barrio de recogida.', 'location_on'); return; }
+    if (!hidE || !hidE.value) { W.mostrarToast && W.mostrarToast('Selecciona el barrio de entrega.', 'location_on'); return; }
 
-    var pR = parseInt((hidR.dataset && hidR.dataset.precio) || 0);
-    var pE = parseInt((hidE.dataset && hidE.dataset.precio) || 0);
     L.barrioRecogida = hidR.value;
     L.barrioEntrega  = hidE.value;
-    L.tarifaDomi     = Math.max(pR, pE);
+    L.tarifaDomi     = Math.max(
+      parseInt((hidR.dataset && hidR.dataset.precio) || 0),
+      parseInt((hidE.dataset && hidE.dataset.precio) || 0)
+    );
 
-    /* Leer campos del formulario unificado */
-    var nom = (document.getElementById('wil-nombre-mi') || {}).value
-      ? document.getElementById('wil-nombre-mi').value.trim() : '';
-    var dir = (document.getElementById('wil-dir-mi') || {}).value
-      ? document.getElementById('wil-dir-mi').value.trim() : '';
-    var tel = (document.getElementById('wil-tel-mi') || {}).value
-      ? document.getElementById('wil-tel-mi').value.trim() : '';
-    var ref = (document.getElementById('wil-ref-mi') || {}).value
-      ? document.getElementById('wil-ref-mi').value.trim() : '';
+    /* Leer campos de datos */
+    var nom    = g('wil-nombre-mi');
+    var dir    = g('wil-dir-mi');
+    var tel    = g('wil-tel-mi');
+    var telRec = g('wil-tel-recogida');
+    var ref    = g('wil-ref-mi');
 
-    if (!nom) {
-      if (typeof W.mostrarToast === 'function')
-        W.mostrarToast('Escribe tu nombre.', 'person');
-      return;
-    }
-    if (!dir) {
-      if (typeof W.mostrarToast === 'function')
-        W.mostrarToast('Escribe la dirección de entrega.', 'location_on');
-      return;
-    }
-    if (!tel) {
-      if (typeof W.mostrarToast === 'function')
-        W.mostrarToast('Escribe tu teléfono.', 'phone');
-      return;
-    }
+    if (!nom)    { W.mostrarToast && W.mostrarToast('Escribe tu nombre.', 'person'); return; }
+    if (!dir)    { W.mostrarToast && W.mostrarToast('Escribe la dirección de entrega.', 'location_on'); return; }
+    if (!tel)    { W.mostrarToast && W.mostrarToast('Escribe el teléfono de entrega.', 'phone'); return; }
+    if (!telRec) { W.mostrarToast && W.mostrarToast('Escribe el teléfono de recogida.', 'phone'); return; }
 
     L.direccion    = dir;
     L.referencia   = ref;
     L.recibeTel    = tel;
+    L.telRecogida  = telRec;
     L.nombre       = nom;
     L.recibeNombre = nom;
     L.enviaNombre  = nom;
     L.enviaTel     = tel;
 
-    /* Sincronizar con state global */
     if (W.state) {
-      W.state.nombre    = nom;
-      W.state.telefono  = tel;
-      W.state.direccion = dir;
+      W.state.nombre     = nom;
+      W.state.telefono   = tel;
+      W.state.direccion  = dir;
       W.state.referencia = ref;
-      W.state.barrio    = L.barrioEntrega;
+      W.state.barrio     = L.barrioEntrega;
     }
 
-    /* Ir al paso 2 */
     if (typeof W.showView === 'function') W.showView('view-libre-2');
   };
 
-  /* ── 5. Al cargar, si la card para-quién ya tiene display:none (por style inline),
-          forzar que aparezca una vez seleccionado el servicio ── */
-  function _init() {
-    /* La card empieza oculta por style="display:none" en el HTML.
-       Solo la mostramos cuando el usuario selecciona servicio (wilSelComercio).
-       El CSS ya maneja ocultar los radio buttons internamente. */
+  /* ── 6. Parchear wilPoblarResumenP3 para incluir tel. recogida ── */
+  var _origPoblar = W.wilPoblarResumenP3;
+  W.wilPoblarResumenP3 = function () {
+    if (typeof _origPoblar === 'function') _origPoblar.apply(this, arguments);
 
-    /* Si el formulario ya tiene datos (reload / persistencia), mostrar card */
+    var L   = W.WIL_LIBRE || {};
+    var div = document.getElementById('wil-p3-resumen-body');
+    if (!div || !L.telRecogida) return;
+    if (document.getElementById('wil-p3-tel-rec-row')) return;
+
+    var row = document.createElement('div');
+    row.id = 'wil-p3-tel-rec-row';
+    row.style.cssText = 'display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f5f7';
+    row.innerHTML =
+      '<span style="color:var(--on3)">📞 Tel. recogida</span>' +
+      '<span style="font-weight:700">' + _esc(L.telRecogida) + '</span>';
+
+    /* Insertar después de la fila de Recogida */
+    var todas = div.querySelectorAll('div');
+    var recRow = null;
+    todas.forEach(function (r) { if (r.textContent.indexOf('Recogida') !== -1 && !recRow) recRow = r; });
+
+    if (recRow && recRow.nextSibling) div.insertBefore(row, recRow.nextSibling);
+    else div.appendChild(row);
+  };
+
+  /* ── 7. Parchear generarFacturaLibre para mostrar tel. recogida en ticket ── */
+  var _origGenFactura = W.generarFacturaLibre;
+  W.generarFacturaLibre = function () {
+    if (typeof _origGenFactura === 'function') _origGenFactura.apply(this, arguments);
+
+    var L = W.WIL_LIBRE || {};
+    if (!L.telRecogida) return;
+
+    var container = document.getElementById('wil-ticket-entrega-container');
+    if (!container || document.getElementById('wil-ticket-tel-rec-row')) return;
+
+    var row = document.createElement('div');
+    row.id = 'wil-ticket-tel-rec-row';
+    row.className = 'wil-ticket-row';
+    row.innerHTML =
+      '<div class="wil-ticket-lbl">📞 Tel. recogida</div>' +
+      '<div class="wil-ticket-val">' + _esc(L.telRecogida) + '</div>';
+
+    container.insertBefore(row, container.firstChild);
+  };
+
+  /* ── 8. Añadir tel. recogida a las rows que van a Google Sheets ── */
+  var GAS_MARCA = 'AKfycbyYpNT9yizFaHrxjKPq2TZkzroMUqXpCmdC_ztC-Y7WL3jov6E7IluzKX_dZRB80yHFpQ';
+  var _origFetch = window.fetch;
+  window.fetch = async function (url, opts) {
+    if (typeof url === 'string' &&
+        url.indexOf(GAS_MARCA) !== -1 &&
+        opts && opts.method === 'POST' &&
+        opts.mode === 'no-cors') {
+      try {
+        var body   = JSON.parse(opts.body || '{}');
+        var telRec = (W.WIL_LIBRE && W.WIL_LIBRE.telRecogida) || '';
+        if (body.rows && body.rows.length && telRec) {
+          var agregado = false;
+          for (var i = 0; i < body.rows.length; i++) {
+            var celG = (body.rows[i][6] || '').toString();
+            if (celG.indexOf('Recogida:') !== -1) {
+              body.rows[i][6] = celG + ' — Tel: ' + telRec;
+              agregado = true;
+              break;
+            }
+          }
+          if (!agregado) {
+            body.rows.push([
+              '', '', '', '', '', '',
+              'Tel. recogida: ' + telRec,
+              '', 1, '', '',
+              '', '', '', '', '', '', '', '', '', '', '', ''
+            ]);
+          }
+          opts = Object.assign({}, opts, { body: JSON.stringify(body) });
+        }
+      } catch (ex) {
+        console.warn('[WIL tel-recogida fetch patch]', ex.message);
+      }
+    }
+    return _origFetch.apply(this, arguments);
+  };
+
+  /* ── Utilidad escape HTML ── */
+  function _esc(t) {
+    return (t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /* ── 9. Init ── */
+  function _init() {
     var L = W.WIL_LIBRE || {};
     if (L.comercio !== null && L.comercio !== undefined) {
-      var cardParaQuien = document.getElementById('wil-card-para-quien');
-      if (cardParaQuien) cardParaQuien.style.display = 'block';
+      var card = document.getElementById('wil-card-para-quien');
+      if (card) card.style.display = 'block';
+      setTimeout(_inyectarTelRecogida, 100);
     }
   }
 
@@ -11712,7 +11794,7 @@ try {
     setTimeout(_init, 0);
   }
 
-  console.log('[WIL] ✅ Patch sin-para-quien cargado — flujo P1 simplificado');
+  console.log('[WIL] ✅ Patch v2 — sin para-quién · tel. recogida · resumen P3 · ticket · Sheets');
 
 })(window);
 </script>
