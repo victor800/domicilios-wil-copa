@@ -11492,9 +11492,9 @@ try {
 
 
 <script>
- /* ═══════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════
    WIL PATCH — Flujo Libre P1 simplificado
-   v2 — Agrega teléfono de recogida + resumen completo en P3
+   v3 — Tel. recogida debajo del barrio de recogida (opcional)
 ═══════════════════════════════════════════════════════════════ */
 ;(function (W) {
   'use strict';
@@ -11503,26 +11503,24 @@ try {
   var st = document.createElement('style');
   st.id = 'wil-sin-para-quien-css';
   st.textContent = `
-    /* Ocultar radio buttons para-quién y su título */
     #wil-opt-mi,
     #wil-opt-otro,
     #wil-card-para-quien > div:first-of-type { display: none !important; }
     #wil-card-para-quien .card-tit { display: none !important; }
     #wil-card-para-quien { padding-top: 12px !important; }
 
-    /* Mostrar sección barrios y datos directamente */
     #wil-sec-barrios,
     #wil-sec-barrios.hidden { display: block !important; }
 
     #wil-sec-dir-mi,
     #wil-sec-dir-mi.hidden { display: block !important; }
 
-    /* Ocultar sección "para otro" — no se usa */
     #wil-sec-dir-otro { display: none !important; }
 
-    /* Campo teléfono recogida — inyectado por JS */
+    /* Tel. recogida — debajo del barrio de recogida */
     #wil-tel-recogida-wrap {
-      margin-bottom: 12px;
+      margin-top: 8px;
+      margin-bottom: 4px;
     }
     #wil-tel-recogida-wrap label {
       display: block;
@@ -11560,29 +11558,27 @@ try {
   `;
   document.head.appendChild(st);
 
-  /* ── 2. Inyectar campo "Teléfono de recogida" después del divisor en wil-sec-dir-mi ── */
+  /* ── 2. Inyectar campo tel. recogida DEBAJO del .field de barrio recogida ── */
   function _inyectarTelRecogida() {
     if (document.getElementById('wil-tel-recogida-wrap')) return;
 
-    var secMi = document.getElementById('wil-sec-dir-mi');
-    if (!secMi) return;
+    /* El field del barrio de recogida está dentro de #wil-sec-barrios */
+    var secBarrios = document.getElementById('wil-sec-barrios');
+    if (!secBarrios) return;
+
+    /* Primer .field dentro de wil-sec-barrios = barrio de recogida */
+    var fieldRecogida = secBarrios.querySelector('.field');
+    if (!fieldRecogida) return;
 
     var wrap = document.createElement('div');
     wrap.id = 'wil-tel-recogida-wrap';
     wrap.innerHTML =
-      '<label>Teléfono de recogida *</label>' +
-      '<input type="tel" id="wil-tel-recogida" placeholder="Teléfono de quien entrega o del comercio"/>' +
+      '<label>Teléfono de recogida <span style="font-weight:500;color:var(--on3)">(opcional)</span></label>' +
+      '<input type="tel" id="wil-tel-recogida" placeholder="Ej: 310 123 4567"/>' +
       '<div class="field-note">Número de contacto en el punto de recogida</div>';
 
-    /* Insertar al final de la sección, antes del campo de nombre */
-    var primeraField = secMi.querySelector('.field');
-    if (primeraField) {
-      secMi.insertBefore(wrap, primeraField);
-    } else {
-      var divider = secMi.querySelector('div[style*="border-top"]');
-      var ancla = divider ? divider.nextSibling : secMi.firstChild;
-      secMi.insertBefore(wrap, ancla);
-    }
+    /* Insertar inmediatamente después del field de barrio recogida */
+    fieldRecogida.insertAdjacentElement('afterend', wrap);
   }
 
   /* ── 3. Mostrar card al seleccionar servicio ── */
@@ -11590,8 +11586,8 @@ try {
   W.wilSelComercio = function (si) {
     if (typeof _origWilSelComercio === 'function') _origWilSelComercio.apply(this, arguments);
 
-    var cardParaQuien = document.getElementById('wil-card-para-quien');
-    if (cardParaQuien) cardParaQuien.style.display = 'block';
+    var card = document.getElementById('wil-card-para-quien');
+    if (card) card.style.display = 'block';
 
     W.WIL_LIBRE = W.WIL_LIBRE || {};
     W.WIL_LIBRE.destino = 'mi';
@@ -11605,7 +11601,7 @@ try {
     setTimeout(_inyectarTelRecogida, 80);
   };
 
-  /* ── 4. wilSelDestino — siempre 'mi', nunca oculta nada ── */
+  /* ── 4. wilSelDestino — siempre 'mi' ── */
   W.wilSelDestino = function () {
     W.WIL_LIBRE = W.WIL_LIBRE || {};
     W.WIL_LIBRE.destino = 'mi';
@@ -11622,7 +11618,7 @@ try {
     if (typeof W.wilCalcTarifa === 'function') W.wilCalcTarifa();
   };
 
-  /* ── 5. wilGoLibre2 — valida y captura todos los campos ── */
+  /* ── 5. wilGoLibre2 — tel. recogida OPCIONAL ── */
   W.wilGoLibre2 = function () {
     var L = W.WIL_LIBRE = W.WIL_LIBRE || {};
     L.destino = 'mi';
@@ -11655,22 +11651,21 @@ try {
       parseInt((hidE.dataset && hidE.dataset.precio) || 0)
     );
 
-    /* Leer campos de datos */
+    /* Campos — tel recogida opcional */
     var nom    = g('wil-nombre-mi');
     var dir    = g('wil-dir-mi');
     var tel    = g('wil-tel-mi');
-    var telRec = g('wil-tel-recogida');
+    var telRec = g('wil-tel-recogida'); /* opcional */
     var ref    = g('wil-ref-mi');
 
-    if (!nom)    { W.mostrarToast && W.mostrarToast('Escribe tu nombre.', 'person'); return; }
-    if (!dir)    { W.mostrarToast && W.mostrarToast('Escribe la dirección de entrega.', 'location_on'); return; }
-    if (!tel)    { W.mostrarToast && W.mostrarToast('Escribe el teléfono de entrega.', 'phone'); return; }
-    if (!telRec) { W.mostrarToast && W.mostrarToast('Escribe el teléfono de recogida.', 'phone'); return; }
+    if (!nom) { W.mostrarToast && W.mostrarToast('Escribe tu nombre.', 'person'); return; }
+    if (!dir) { W.mostrarToast && W.mostrarToast('Escribe la dirección de entrega.', 'location_on'); return; }
+    if (!tel) { W.mostrarToast && W.mostrarToast('Escribe tu teléfono.', 'phone'); return; }
 
     L.direccion    = dir;
     L.referencia   = ref;
     L.recibeTel    = tel;
-    L.telRecogida  = telRec;
+    L.telRecogida  = telRec; /* puede ser vacío */
     L.nombre       = nom;
     L.recibeNombre = nom;
     L.enviaNombre  = nom;
@@ -11687,7 +11682,7 @@ try {
     if (typeof W.showView === 'function') W.showView('view-libre-2');
   };
 
-  /* ── 6. Parchear wilPoblarResumenP3 para incluir tel. recogida ── */
+  /* ── 6. Resumen P3 — incluir tel. recogida si existe ── */
   var _origPoblar = W.wilPoblarResumenP3;
   W.wilPoblarResumenP3 = function () {
     if (typeof _origPoblar === 'function') _origPoblar.apply(this, arguments);
@@ -11704,16 +11699,15 @@ try {
       '<span style="color:var(--on3)">📞 Tel. recogida</span>' +
       '<span style="font-weight:700">' + _esc(L.telRecogida) + '</span>';
 
-    /* Insertar después de la fila de Recogida */
-    var todas = div.querySelectorAll('div');
+    /* Insertar después de la fila "Recogida" */
+    var todas  = div.querySelectorAll('div');
     var recRow = null;
-    todas.forEach(function (r) { if (r.textContent.indexOf('Recogida') !== -1 && !recRow) recRow = r; });
-
+    todas.forEach(function (r) { if (!recRow && r.textContent.indexOf('Recogida') !== -1) recRow = r; });
     if (recRow && recRow.nextSibling) div.insertBefore(row, recRow.nextSibling);
     else div.appendChild(row);
   };
 
-  /* ── 7. Parchear generarFacturaLibre para mostrar tel. recogida en ticket ── */
+  /* ── 7. Ticket factura — tel. recogida si existe ── */
   var _origGenFactura = W.generarFacturaLibre;
   W.generarFacturaLibre = function () {
     if (typeof _origGenFactura === 'function') _origGenFactura.apply(this, arguments);
@@ -11734,7 +11728,7 @@ try {
     container.insertBefore(row, container.firstChild);
   };
 
-  /* ── 8. Añadir tel. recogida a las rows que van a Google Sheets ── */
+  /* ── 8. Google Sheets — añadir tel. recogida a la fila si existe ── */
   var GAS_MARCA = 'AKfycbyYpNT9yizFaHrxjKPq2TZkzroMUqXpCmdC_ztC-Y7WL3jov6E7IluzKX_dZRB80yHFpQ';
   var _origFetch = window.fetch;
   window.fetch = async function (url, opts) {
@@ -11759,20 +11753,18 @@ try {
             body.rows.push([
               '', '', '', '', '', '',
               'Tel. recogida: ' + telRec,
-              '', 1, '', '',
-              '', '', '', '', '', '', '', '', '', '', '', ''
+              '', 1, '', '', '', '', '', '', '', '', '', '', '', '', '', ''
             ]);
           }
           opts = Object.assign({}, opts, { body: JSON.stringify(body) });
         }
       } catch (ex) {
-        console.warn('[WIL tel-recogida fetch patch]', ex.message);
+        console.warn('[WIL tel-recogida]', ex.message);
       }
     }
     return _origFetch.apply(this, arguments);
   };
 
-  /* ── Utilidad escape HTML ── */
   function _esc(t) {
     return (t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
@@ -11793,7 +11785,7 @@ try {
     setTimeout(_init, 0);
   }
 
-  console.log('[WIL] ✅ Patch v2 — sin para-quién · tel. recogida · resumen P3 · ticket · Sheets');
+  console.log('[WIL] ✅ Patch v3 — tel. recogida debajo barrio recogida, opcional');
 
 })(window);
 </script>
