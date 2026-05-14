@@ -1319,6 +1319,8 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
               placeholder="Ej: Casa roja al lado del puente, finca El Porvenir…"/>
             <div class="wv-field-note">Instrucciones para llegar (opcional pero útil)</div>
           </div>
+
+          
  
         </div>
       </div>
@@ -12261,24 +12263,26 @@ try {
 
 ;(function (W) {
   'use strict';
- 
+
   /* ── Punto de referencia WIL ── */
   var WIL_ANCLA = {
-    lat:   6.2970,      /* coordenadas del enlace https://maps.app.goo.gl/aJgMvFWRezjr32pf6 */
+    lat:   6.2970,
     lng:  -75.5714,
     wa:    '573023452213',
     mapa:  'https://maps.app.goo.gl/aJgMvFWRezjr32pf6'
   };
- 
+
   /* Estado GPS del modal */
   var _vr = {
-    lat:      null,
-    lng:      null,
+    lat:       null,
+    lng:       null,
     direccion: '',
-    distKm:   null
+    distKm:    null,   /* distancia en línea recta (Haversine) — respaldo */
+    distRealKm: null,  /* distancia real por carretera (OSRM)              */
+    distLabel: ''      /* texto listo para mostrar / enviar                */
   };
- 
-  /* ── Haversine ── */
+
+  /* ── Haversine (respaldo offline) ── */
   function _km(la1, lo1, la2, lo2) {
     var R = 6371,
         dL = (la2 - la1) * Math.PI / 180,
@@ -12287,7 +12291,14 @@ try {
            + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dO/2)*Math.sin(dO/2);
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   }
- 
+
+  /* ── Formatear kilómetros ── */
+  function _fmtKm(km) {
+    return km < 1
+      ? Math.round(km * 1000) + ' m'
+      : km.toFixed(1) + ' km';
+  }
+
   /* ── Abrir / cerrar modal ── */
   W.wvAbrir = function () {
     document.getElementById('wil-veredal-overlay').classList.add('open');
@@ -12300,41 +12311,90 @@ try {
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') W.wvCerrar();
   });
- 
-  /* ── Capturar GPS ── */
+
+  /* ── Capturar GPS + distancia real por OSRM ── */
   W.wvCapturarGPS = function () {
     var btn    = document.getElementById('wvGpsBtn');
     var result = document.getElementById('wvGpsResult');
     var T      = typeof W.mostrarToast === 'function' ? W.mostrarToast : function(){};
- 
+
     if (!navigator.geolocation) {
       T('GPS no disponible en tu dispositivo.', 'location_off');
       return;
     }
- 
+
     btn.disabled = true;
     btn.innerHTML = '<span class="spin dk"></span>&nbsp;Capturando GPS…';
- 
+
     navigator.geolocation.getCurrentPosition(
       function (pos) {
         var lat = pos.coords.latitude;
         var lng = pos.coords.longitude;
         _vr.lat = lat;
         _vr.lng = lng;
- 
-        /* Distancia a WIL */
-        var dist = _km(lat, lng, WIL_ANCLA.lat, WIL_ANCLA.lng);
-        _vr.distKm = dist;
- 
-        var distTxt = dist < 1
-          ? Math.round(dist * 1000) + ' m de Domicilios WIL'
-          : dist.toFixed(1) + ' km de Domicilios WIL';
- 
-        document.getElementById('wvGpsDistTxt').textContent = distTxt;
+
+        /* Distancia Haversine (línea recta) — se muestra mientras llega OSRM */
+        var distLinea = _km(lat, lng, WIL_ANCLA.lat, WIL_ANCLA.lng);
+        _vr.distKm = distLinea;
+        _vr.distLabel = '~' + _fmtKm(distLinea) + ' en línea recta';
+
+        document.getElementById('wvGpsDistTxt').textContent =
+          _fmtKm(distLinea) + ' de Domicilios WIL (calculando ruta…)';
         document.getElementById('wvGpsCoordTxt').textContent =
           lat.toFixed(5) + ', ' + lng.toFixed(5);
- 
-        /* Geocodificación inversa con Nominatim */
+
+        /* Mostrar tarjeta de resultado ya */
+        result.style.display = 'block';
+        btn.disabled = false;
+        btn.innerHTML = '<span class="sym f" style="font-size:19px">check_circle</span>&nbsp;Ubicación capturada ✓';
+        btn.style.background = 'linear-gradient(135deg,#14532d,#15803d)';
+
+        /* ══ 1. Distancia real por carretera — OSRM (gratuito, sin key) ══
+           Endpoint: https://router.project-osrm.org/route/v1/driving/
+           Formato:  lng_origen,lat_origen;lng_destino,lat_destino             */
+        var osrmUrl =
+          'https://router.project-osrm.org/route/v1/driving/' +
+          lng.toFixed(6) + ',' + lat.toFixed(6) + ';' +
+          WIL_ANCLA.lng  + ',' + WIL_ANCLA.lat  +
+          '?overview=false&alternatives=false';
+
+        fetch(osrmUrl)
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (d.code === 'Ok' && d.routes && d.routes[0]) {
+              var metros   = d.routes[0].distance;          /* metros        */
+              var segundos = d.routes[0].duration;          /* segundos      */
+              var kmReal   = metros / 1000;
+              _vr.distRealKm = kmReal;
+
+              /* Tiempo estimado */
+              var mins = Math.round(segundos / 60);
+              var tiempoTxt = mins < 60
+                ? mins + ' min'
+                : Math.floor(mins/60) + 'h ' + (mins % 60) + 'min';
+
+              _vr.distLabel =
+                _fmtKm(kmReal) + ' por carretera (~' + tiempoTxt + ')';
+
+              document.getElementById('wvGpsDistTxt').textContent =
+                _fmtKm(kmReal) + ' por carretera (~' + tiempoTxt + ') desde Domicilios WIL';
+
+              T('📍 ' + _fmtKm(kmReal) + ' por carretera · ' + tiempoTxt, 'check_circle');
+            } else {
+              /* OSRM no encontró ruta: dejar Haversine */
+              document.getElementById('wvGpsDistTxt').textContent =
+                _fmtKm(distLinea) + ' en línea recta desde Domicilios WIL';
+              T('📍 Ubicación capturada · ' + _fmtKm(distLinea) + ' (línea recta)', 'check_circle');
+            }
+          })
+          .catch(function () {
+            /* Sin red para OSRM: usar Haversine */
+            document.getElementById('wvGpsDistTxt').textContent =
+              _fmtKm(distLinea) + ' en línea recta desde Domicilios WIL';
+            T('📍 Ubicación capturada · ' + _fmtKm(distLinea) + ' (línea recta)', 'check_circle');
+          });
+
+        /* ══ 2. Geocodificación inversa — Nominatim ══ */
         document.getElementById('wvGpsDirTxt').textContent = 'Identificando zona…';
         fetch(
           'https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng +
@@ -12357,13 +12417,6 @@ try {
             _vr.direccion = lat.toFixed(5) + ', ' + lng.toFixed(5);
             document.getElementById('wvGpsDirTxt').textContent = _vr.direccion;
           });
- 
-        /* Mostrar resultado */
-        result.style.display = 'block';
-        btn.disabled = false;
-        btn.innerHTML = '<span class="sym f" style="font-size:19px">check_circle</span>&nbsp;Ubicación capturada ✓';
-        btn.style.background = 'linear-gradient(135deg,#14532d,#15803d)';
-        T('📍 Ubicación capturada · ' + distTxt, 'check_circle');
       },
       function () {
         btn.disabled = false;
@@ -12373,65 +12426,75 @@ try {
       { enableHighAccuracy: true, timeout: 15000 }
     );
   };
- 
+
   /* ── Generar y abrir WhatsApp ── */
   W.wvEnviarWA = function () {
     var T = typeof W.mostrarToast === 'function' ? W.mostrarToast : function(){};
- 
+
+    /* ── Leer campos ── */
     var nombre     = (document.getElementById('wvNombre')      || {}).value.trim();
     var telefono   = (document.getElementById('wvTelefono')    || {}).value.trim();
+    var comercio   = (document.getElementById('wvComercio')    || {}).value.trim(); /* NUEVO */
     var vereda     = (document.getElementById('wvVereda')      || {}).value.trim();
     var descripcion= (document.getElementById('wvDescripcion') || {}).value.trim();
     var referencia = (document.getElementById('wvReferencia')  || {}).value.trim();
- 
-    if (!nombre)      { T('Escribe tu nombre.', 'person');          return false; }
-    if (!telefono)    { T('Escribe tu teléfono.', 'phone');         return false; }
-    if (!vereda)      { T('Escribe la vereda o sector.', 'forest'); return false; }
-    if (!descripcion) { T('Cuéntanos qué necesitas.', 'edit_note'); return false; }
- 
-    /* Enlace de ubicación */
+
+    /* ── Validaciones ── */
+    if (!nombre)      { T('Escribe tu nombre.',              'person');    return false; }
+    if (!telefono)    { T('Escribe tu teléfono.',            'phone');     return false; }
+    if (!vereda)      { T('Escribe la vereda o sector.',     'forest');    return false; }
+    if (!descripcion) { T('Cuéntanos qué necesitas.',        'edit_note'); return false; }
+
+    /* ── Enlace de ubicación ── */
     var enlaceUbic = _vr.lat
       ? 'https://www.google.com/maps?q=' + _vr.lat.toFixed(6) + ',' + _vr.lng.toFixed(6)
       : 'No capturada';
- 
-    var distInfo = _vr.distKm
-      ? (_vr.distKm < 1
-          ? '~' + Math.round(_vr.distKm * 1000) + ' m desde Domicilios WIL'
-          : '~' + _vr.distKm.toFixed(1) + ' km desde Domicilios WIL')
-      : 'Sin datos GPS';
- 
-    /* Mensaje WhatsApp */
-    var msg = [
+
+    /* ── Texto de distancia (real si ya llegó, Haversine si no) ── */
+    var distInfo;
+    if (_vr.distRealKm !== null) {
+      distInfo = _vr.distLabel + ' ✅ (distancia real por carretera — OSRM)';
+    } else if (_vr.distKm !== null) {
+      distInfo = '~' + _fmtKm(_vr.distKm) + ' en línea recta (GPS sin ruta)';
+    } else {
+      distInfo = 'Sin datos GPS';
+    }
+
+    /* ── Mensaje WhatsApp ── */
+    var lineas = [
       '🌿 *SOLICITUD DE SERVICIO VEREDAL — Domicilios WIL*',
       '',
-      '👤 *Nombre:* ' + nombre,
-      '📱 *Teléfono:* ' + telefono,
-      '🌄 *Vereda / Sector:* ' + vereda,
+      '👤 *Nombre:* '           + nombre,
+      '📱 *Teléfono:* '         + telefono,
+      comercio
+        ? '🏪 *Comercio / Lugar de recogida:* ' + comercio
+        : null,
+      '🌄 *Vereda / Sector:* '  + vereda,
       '',
       '📦 *Qué necesita:*',
       descripcion,
       '',
-      referencia ? '🏡 *Referencia de acceso:*\n' + referencia : null,
+      referencia
+        ? '🏡 *Referencia de acceso:*\n' + referencia
+        : null,
       '',
       '📍 *Ubicación GPS del cliente:*',
       _vr.direccion ? _vr.direccion : '(No capturada)',
       '🗺️ ' + enlaceUbic,
       '',
       '📏 *Distancia a Domicilios WIL:* ' + distInfo,
-      '🏠 *Punto de referencia WIL:* ' + WIL_ANCLA.mapa,
+      '🏠 *Punto de referencia WIL:* '    + WIL_ANCLA.mapa,
       '',
       '⏳ _Esperando cotización del administrador…_'
     ].filter(function (l) { return l !== null; }).join('\n');
- 
-    var url = 'https://wa.me/' + WIL_ANCLA.wa + '?text=' + encodeURIComponent(msg);
+
+    var url = 'https://wa.me/' + WIL_ANCLA.wa + '?text=' + encodeURIComponent(lineas);
     document.getElementById('wvWaBtn').href = url;
     return true; /* dejar que el <a> abra el enlace */
   };
- 
+
 })(window);
 
-</script>
-<script>
 /* ═══ PARCHE ÚNICO VEREDAL — scroll + GPS visible ═══ */
 (function(){
   var s = document.createElement('style');
@@ -12485,13 +12548,11 @@ try {
       gap: 12px !important;
     }
 
-    /* CLAVE: todos los hijos directos no se colapsan */
     .wv-sheet-body > * {
       flex-shrink: 0 !important;
       flex-grow: 0 !important;
     }
 
-    /* GPS card body y botón siempre visibles */
     .wv-gps-card { overflow: visible !important; }
     .wv-gps-card-body {
       display: block !important;
@@ -12503,7 +12564,6 @@ try {
       opacity: 1 !important;
     }
 
-    /* WA button estático, no fijo */
     .wv-wa-btn {
       position: static !important;
       flex-shrink: 0 !important;
