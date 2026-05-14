@@ -12515,6 +12515,48 @@ try {
 })();
 </script>
 
+<script>
+/* PARCHE SCROLL — Sheet veredal */
+(function(){
+  var s = document.createElement('style');
+  s.textContent = `
+    /* El overlay ocupa toda la pantalla pero centrado */
+    #wil-veredal-overlay {
+      position: fixed !important;
+      inset: 0 !important;
+      z-index: 1200 !important;
+      overflow: hidden !important;
+    }
+
+    /* El sheet: altura máxima + flex column SIN overflow hidden global */
+    #wil-veredal-sheet {
+      overflow: hidden !important;
+      max-height: 90dvh !important;
+      max-height: 90vh !important;
+      display: flex !important;
+      flex-direction: column !important;
+    }
+
+    /* El handle y el header NO crecen */
+    .wv-handle,
+    .wv-sheet-hdr {
+      flex-shrink: 0 !important;
+    }
+
+    /* El body SÍ scrollea — ocupa el espacio restante */
+    .wv-sheet-body {
+      flex: 1 1 0% !important;
+      min-height: 0 !important;
+      overflow-y: scroll !important;
+      -webkit-overflow-scrolling: touch !important;
+      overscroll-behavior: contain !important;
+      padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px) !important;
+    }
+  `;
+  document.head.appendChild(s);
+})();
+</script>
+
 
 </body>
 </html>
