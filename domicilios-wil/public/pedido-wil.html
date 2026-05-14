@@ -714,27 +714,7 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 }
 .wv-cta .sym { font-size: 14px; }
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    background: #f0f4f8;
-    min-height: 100dvh;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-  }
- 
-  /* Demo page trigger */
-  .demo-page {
-    width: 100%;
-    max-width: 480px;
-    min-height: 100dvh;
-    background: #f0f4f8;
-    padding: 20px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
+
  
   /* ── BOTÓN VEREDAL ── */
   .wil-veredal {
@@ -1399,7 +1379,7 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
         <span class="wv-cotiza-nota-ico">💡</span>
         <p>El <strong>administrador de Domicilios WIL</strong> recibirá tu solicitud y te
            enviará una <strong>cotización personalizada</strong> según la distancia y el
-           servicio.</p>
+           servicio. </p>
       </div>
  
       <!-- Botón WhatsApp -->
@@ -12503,7 +12483,37 @@ try {
 
 </script>
 
+<script>
+/* PARCHE URGENTE — Fix body/margin/scroll veredal */
+(function(){
+  var s = document.createElement('style');
+  s.textContent = `
+    /* Anular el body flex que rompe el layout */
+    body {
+      display: block !important;
+      align-items: unset !important;
+      justify-content: unset !important;
+    }
 
+    /* Márgenes correctas del botón veredal */
+    .wil-veredal {
+      margin: 0 16px 20px !important;
+    }
+
+    /* Asegurar scroll en el main */
+    .main {
+      overflow-y: auto !important;
+      overflow-x: hidden !important;
+    }
+
+    /* El view-inicio debe poder crecer */
+    #view-inicio {
+      padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important;
+    }
+  `;
+  document.head.appendChild(s);
+})();
+</script>
 
 
 </body>
