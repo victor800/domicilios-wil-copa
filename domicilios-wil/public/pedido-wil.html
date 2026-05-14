@@ -12260,145 +12260,394 @@ try {
 
 })(window);
 
-
 ;(function (W) {
   'use strict';
 
-  /* ── Punto de referencia WIL ── */
+  /* ══════════════════════════════════════════════════════
+     PUNTO DE REFERENCIA WIL — Cl. 51 #57-60, Copacabana
+  ══════════════════════════════════════════════════════ */
   var WIL_ANCLA = {
-    lat:   6.2970,
-    lng:  -75.5714,
-    wa:    '573023452213',
-    mapa:  'https://maps.app.goo.gl/aJgMvFWRezjr32pf6'
+    lat:  6.3459291,
+    lng: -75.512814,
+    wa:   '573023452213',
+    mapa: 'https://maps.app.goo.gl/aJgMvFWRezjr32pf6'
   };
 
-  /* Estado GPS del modal */
+  /* ── Estado GPS ── */
   var _vr = {
-    lat:       null,
-    lng:       null,
-    direccion: '',
-    distKm:    null,   /* distancia en línea recta (Haversine) — respaldo */
-    distRealKm: null,  /* distancia real por carretera (OSRM)              */
-    distLabel: ''      /* texto listo para mostrar / enviar                */
+    lat:        null,
+    lng:        null,
+    direccion:  '',
+    distKm:     null,
+    distRealKm: null,
+    distLabel:  ''
   };
 
-  /* ── Haversine (respaldo offline) ── */
+  /* ── Estado Leaflet ── */
+  var _mapa         = null;
+  var _mkCliente    = null;
+  var _mkAncla      = null;
+  var _rutaLinea    = null;
+  var _leafletListo = false;
+  var _mapaInicializado = false;
+
+  /* ═══════════════════════════════════════
+     UTILIDADES
+  ═══════════════════════════════════════ */
   function _km(la1, lo1, la2, lo2) {
-    var R = 6371,
+    var R  = 6371,
         dL = (la2 - la1) * Math.PI / 180,
         dO = (lo2 - lo1) * Math.PI / 180,
         a  = Math.sin(dL/2)*Math.sin(dL/2)
-           + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dO/2)*Math.sin(dO/2);
+           + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)
+           * Math.sin(dO/2)*Math.sin(dO/2);
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   }
-
-  /* ── Formatear kilómetros ── */
   function _fmtKm(km) {
-    return km < 1
-      ? Math.round(km * 1000) + ' m'
-      : km.toFixed(1) + ' km';
+    if (km < 0.1) return Math.round(km * 1000) + ' m';
+    if (km < 1)   return (km * 1000).toFixed(0) + ' m';
+    return km.toFixed(2) + ' km';
+  }
+  function _fmtTiempo(seg) {
+    var m = Math.round(seg / 60);
+    return m < 60 ? m + ' min' : Math.floor(m/60) + ' h ' + (m%60) + ' min';
   }
 
-  /* ── Abrir / cerrar modal ── */
+  /* ═══════════════════════════════════════════════════════
+     OSRM — distancia real + geometría GeoJSON
+     overview=full&geometries=geojson → coordenadas de la ruta
+  ═══════════════════════════════════════════════════════ */
+  function _osrmRoute(lat, lng, onOk, onFail) {
+    var url =
+      'https://router.project-osrm.org/route/v1/driving/' +
+      lng.toFixed(6) + ',' + lat.toFixed(6) + ';' +
+      WIL_ANCLA.lng.toFixed(6) + ',' + WIL_ANCLA.lat.toFixed(6) +
+      '?overview=full&geometries=geojson&alternatives=false';
+
+    var ctrl = new AbortController();
+    var t    = setTimeout(function () { ctrl.abort(); }, 12000);
+
+    fetch(url, { signal: ctrl.signal })
+      .then(function (r) { clearTimeout(t); return r.json(); })
+      .then(function (d) {
+        if (d.code === 'Ok' && d.routes && d.routes[0]) {
+          var ruta   = d.routes[0];
+          /* GeoJSON devuelve [lng, lat] → invertir para Leaflet */
+          var coords = ruta.geometry.coordinates.map(function (c) {
+            return [c[1], c[0]];
+          });
+          onOk(ruta.distance / 1000, ruta.duration, coords);
+        } else { onFail(); }
+      })
+      .catch(function () { clearTimeout(t); onFail(); });
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     LEAFLET — carga dinámica desde CDN (una sola vez)
+  ═══════════════════════════════════════════════════════ */
+  function _cargarLeaflet(cb) {
+    if (_leafletListo && window.L) { cb(); return; }
+
+    /* CSS */
+    if (!document.getElementById('wv-leaflet-css')) {
+      var link  = document.createElement('link');
+      link.id   = 'wv-leaflet-css';
+      link.rel  = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+
+    /* JS */
+    if (!document.getElementById('wv-leaflet-js')) {
+      var script      = document.createElement('script');
+      script.id       = 'wv-leaflet-js';
+      script.src      = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.onload   = function () { _leafletListo = true; cb(); };
+      script.onerror  = function () { console.warn('WIL: Leaflet no cargó.'); };
+      document.head.appendChild(script);
+    } else if (_leafletListo) {
+      cb();
+    }
+  }
+
+  /* ── Íconos personalizados ── */
+  function _iconoAncla() {
+    return window.L.divIcon({
+      className: '',
+      html:
+        '<div style="width:36px;height:36px;border-radius:50% 50% 50% 0;' +
+        'background:linear-gradient(135deg,#16a34a,#14532d);' +
+        'transform:rotate(-45deg);box-shadow:0 3px 10px rgba(0,0,0,.4);' +
+        'display:flex;align-items:center;justify-content:center">' +
+        '<span style="transform:rotate(45deg);font-size:18px;color:#fff;' +
+        'font-family:\'Material Symbols Rounded\',sans-serif">store</span></div>',
+      iconSize: [36,36], iconAnchor: [18,36], popupAnchor: [0,-38]
+    });
+  }
+  function _iconoCliente() {
+    return window.L.divIcon({
+      className: '',
+      html:
+        '<div style="width:36px;height:36px;border-radius:50% 50% 50% 0;' +
+        'background:linear-gradient(135deg,#2563eb,#1e40af);' +
+        'transform:rotate(-45deg);box-shadow:0 3px 10px rgba(0,0,0,.4);' +
+        'display:flex;align-items:center;justify-content:center">' +
+        '<span style="transform:rotate(45deg);font-size:18px;color:#fff;' +
+        'font-family:\'Material Symbols Rounded\',sans-serif">person_pin</span></div>',
+      iconSize: [36,36], iconAnchor: [18,36], popupAnchor: [0,-38]
+    });
+  }
+
+  /* ── Crear el bloque del mapa en el DOM (una sola vez) ── */
+  function _asegurarDivMapa() {
+    if (document.getElementById('wv-map-wrap')) return;
+
+    var wrap = document.createElement('div');
+    wrap.id  = 'wv-map-wrap';
+    wrap.innerHTML =
+      '<div id="wv-map-hdr">' +
+        '<span class="sym f" style="font-size:17px;color:#15803d;vertical-align:-3px">map</span>' +
+        '&nbsp;<strong>Domicilios WIL — Copacabana</strong>' +
+        '<span id="wv-map-badge"></span>' +
+      '</div>' +
+      '<div id="wv-map">' +
+        '<div id="wv-map-ph">' +
+          '<span class="sym f" style="font-size:38px;color:#d1d5db">map</span>' +
+          '<p style="margin:6px 0 0;font-size:12px;color:#9ca3af">Cargando mapa…</p>' +
+        '</div>' +
+      '</div>';
+
+    /* Insertar al tope del sheet-body, antes de cualquier otro elemento */
+    var body = document.querySelector('.wv-sheet-body');
+    if (body) body.insertBefore(wrap, body.firstChild);
+  }
+
+  /* ── Inicializar mapa (muestra solo el ancla WIL de entrada) ── */
+  function _initMapa() {
+    if (_mapaInicializado) {
+      /* Solo refrescar tamaño si ya existe */
+      if (_mapa) _mapa.invalidateSize();
+      return;
+    }
+    _asegurarDivMapa();
+
+    var L  = window.L;
+    var ph = document.getElementById('wv-map-ph');
+    if (ph) ph.remove();
+
+    _mapa = L.map('wv-map', {
+      center: [WIL_ANCLA.lat, WIL_ANCLA.lng],
+      zoom:   14,
+      zoomControl: true,
+      attributionControl: false
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19
+    }).addTo(_mapa);
+
+    L.control.attribution({ prefix: false })
+      .addAttribution('© <a href="https://osm.org/copyright" target="_blank">OSM</a>')
+      .addTo(_mapa);
+
+    _mkAncla = L.marker([WIL_ANCLA.lat, WIL_ANCLA.lng], { icon: _iconoAncla() })
+      .addTo(_mapa)
+      .bindPopup('<strong>🏪 Domicilios WIL</strong><br>Cl. 51 #57-60, Copacabana', { maxWidth: 190 })
+      .openPopup();
+
+    _mapaInicializado = true;
+    setTimeout(function () { _mapa.invalidateSize(); }, 300);
+  }
+
+  /* ── Agregar cliente + ruta al mapa ── */
+  function _actualizarMapa(lat, lng, rutaCoords) {
+    if (!_mapa) return;
+    var L = window.L;
+
+    /* Cerrar popup del ancla para no tapar la vista */
+    _mkAncla.closePopup();
+
+    if (_mkCliente) {
+      _mkCliente.setLatLng([lat, lng]);
+    } else {
+      _mkCliente = L.marker([lat, lng], { icon: _iconoCliente() })
+        .addTo(_mapa)
+        .bindPopup('<strong>📍 Tu ubicación</strong>', { maxWidth: 170 });
+    }
+
+    if (_rutaLinea) { _mapa.removeLayer(_rutaLinea); _rutaLinea = null; }
+
+    var tieneRuta = rutaCoords && rutaCoords.length > 1;
+    var coords    = tieneRuta
+      ? rutaCoords
+      : [[lat, lng], [WIL_ANCLA.lat, WIL_ANCLA.lng]];
+
+    _rutaLinea = L.polyline(coords, {
+      color:     '#16a34a',
+      weight:    4.5,
+      opacity:   0.88,
+      lineJoin:  'round',
+      dashArray: tieneRuta ? null : '9 7'
+    }).addTo(_mapa);
+
+    _mapa.fitBounds(_rutaLinea.getBounds(), { padding: [32, 32] });
+    setTimeout(function () { _mapa.invalidateSize(); }, 150);
+
+    var badge = document.getElementById('wv-map-badge');
+    if (badge && _vr.distLabel) badge.textContent = _vr.distLabel;
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     POPUP DE PERMISO DE UBICACIÓN
+  ═══════════════════════════════════════════════════════ */
+  function _crearPopupUbic() {
+    if (document.getElementById('wv-perm-overlay')) return;
+    var el = document.createElement('div');
+    el.id  = 'wv-perm-overlay';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el.innerHTML =
+      '<div id="wv-perm-card">' +
+        '<div id="wv-perm-icon"><span class="sym f">my_location</span></div>' +
+        '<p id="wv-perm-title">¿Usar tu ubicación?</p>' +
+        '<p id="wv-perm-body">Calculamos la distancia real por carretera y la trazamos en el mapa para cotizarte el domicilio.</p>' +
+        '<div id="wv-perm-btns">' +
+          '<button id="wv-perm-no" onclick="wvPermisoNo()">Ahora no</button>' +
+          '<button id="wv-perm-ok" onclick="wvPermisoSi()">' +
+            '<span class="sym f" style="font-size:17px;vertical-align:-3px">location_on</span>' +
+            '&nbsp;Permitir' +
+          '</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(el);
+  }
+  function _abrirPopupUbic() {
+    _crearPopupUbic();
+    document.getElementById('wv-perm-overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    setTimeout(function () {
+      var b = document.getElementById('wv-perm-ok');
+      if (b) b.focus();
+    }, 80);
+  }
+  function _cerrarPopupUbic() {
+    var ov = document.getElementById('wv-perm-overlay');
+    if (ov) ov.classList.remove('open');
+  }
+
+  W.wvPermisoNo = function () { _cerrarPopupUbic(); W.wvAbrir(); };
+  W.wvPermisoSi = function () {
+    _cerrarPopupUbic();
+    W.wvAbrir();
+    setTimeout(function () { W.wvCapturarGPS(); }, 300);
+  };
+  W.wvAbrirConPermiso = function () {
+    if (_vr.lat !== null) { W.wvAbrir(); return; }
+    _abrirPopupUbic();
+  };
+
+  /* ═══════════════════════════════════════════════════════
+     ABRIR / CERRAR SHEET
+     Al abrir: carga Leaflet y muestra el mapa con el ancla
+  ═══════════════════════════════════════════════════════ */
   W.wvAbrir = function () {
     document.getElementById('wil-veredal-overlay').classList.add('open');
     document.body.style.overflow = 'hidden';
+
+    /* Cargar Leaflet e inicializar mapa de inmediato */
+    _cargarLeaflet(function () {
+      /* Esperar un frame para que el sheet sea visible y tenga tamaño */
+      setTimeout(_initMapa, 120);
+    });
   };
+
   W.wvCerrar = function () {
     document.getElementById('wil-veredal-overlay').classList.remove('open');
     document.body.style.overflow = '';
   };
+
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') W.wvCerrar();
+    if (e.key === 'Escape') { _cerrarPopupUbic(); W.wvCerrar(); }
   });
 
-  /* ── Capturar GPS + distancia real por OSRM ── */
+  /* ═══════════════════════════════════════════════════════
+     CAPTURAR GPS → Leaflet + OSRM + Nominatim
+  ═══════════════════════════════════════════════════════ */
   W.wvCapturarGPS = function () {
     var btn    = document.getElementById('wvGpsBtn');
     var result = document.getElementById('wvGpsResult');
-    var T      = typeof W.mostrarToast === 'function' ? W.mostrarToast : function(){};
+    var T      = typeof W.mostrarToast === 'function' ? W.mostrarToast : function () {};
 
     if (!navigator.geolocation) {
-      T('GPS no disponible en tu dispositivo.', 'location_off');
-      return;
+      T('GPS no disponible en tu dispositivo.', 'location_off'); return;
     }
 
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spin dk"></span>&nbsp;Capturando GPS…';
+    _vr.lat = _vr.lng = null;
+    _vr.distKm = _vr.distRealKm = null;
+    _vr.distLabel = _vr.direccion = '';
+
+    if (btn) {
+      btn.disabled  = true;
+      btn.innerHTML = '<span class="spin dk"></span>&nbsp;Capturando GPS…';
+    }
 
     navigator.geolocation.getCurrentPosition(
+
       function (pos) {
         var lat = pos.coords.latitude;
         var lng = pos.coords.longitude;
-        _vr.lat = lat;
-        _vr.lng = lng;
+        _vr.lat = lat; _vr.lng = lng;
 
-        /* Distancia Haversine (línea recta) — se muestra mientras llega OSRM */
-        var distLinea = _km(lat, lng, WIL_ANCLA.lat, WIL_ANCLA.lng);
-        _vr.distKm = distLinea;
-        _vr.distLabel = '~' + _fmtKm(distLinea) + ' en línea recta';
+        /* Haversine inmediato */
+        var dLinea    = _km(lat, lng, WIL_ANCLA.lat, WIL_ANCLA.lng);
+        _vr.distKm    = dLinea;
+        _vr.distLabel = '~' + _fmtKm(dLinea) + ' línea recta';
 
-        document.getElementById('wvGpsDistTxt').textContent =
-          _fmtKm(distLinea) + ' de Domicilios WIL (calculando ruta…)';
-        document.getElementById('wvGpsCoordTxt').textContent =
-          lat.toFixed(5) + ', ' + lng.toFixed(5);
+        var elDist  = document.getElementById('wvGpsDistTxt');
+        var elCoord = document.getElementById('wvGpsCoordTxt');
+        var elDir   = document.getElementById('wvGpsDirTxt');
 
-        /* Mostrar tarjeta de resultado ya */
-        result.style.display = 'block';
-        btn.disabled = false;
-        btn.innerHTML = '<span class="sym f" style="font-size:19px">check_circle</span>&nbsp;Ubicación capturada ✓';
-        btn.style.background = 'linear-gradient(135deg,#14532d,#15803d)';
+        if (elDist)  elDist.textContent  = _fmtKm(dLinea) + ' de WIL (calculando ruta…)';
+        if (elCoord) elCoord.textContent = lat.toFixed(5) + ', ' + lng.toFixed(5);
+        if (result)  result.style.display = 'block';
 
-        /* ══ 1. Distancia real por carretera — OSRM (gratuito, sin key) ══
-           Endpoint: https://router.project-osrm.org/route/v1/driving/
-           Formato:  lng_origen,lat_origen;lng_destino,lat_destino             */
-        var osrmUrl =
-          'https://router.project-osrm.org/route/v1/driving/' +
-          lng.toFixed(6) + ',' + lat.toFixed(6) + ';' +
-          WIL_ANCLA.lng  + ',' + WIL_ANCLA.lat  +
-          '?overview=false&alternatives=false';
+        if (btn) {
+          btn.disabled  = false;
+          btn.innerHTML =
+            '<span class="sym f" style="font-size:19px">check_circle</span>' +
+            '&nbsp;Ubicación capturada ✓';
+          btn.style.background = 'linear-gradient(135deg,#14532d,#15803d)';
+        }
 
-        fetch(osrmUrl)
-          .then(function (r) { return r.json(); })
-          .then(function (d) {
-            if (d.code === 'Ok' && d.routes && d.routes[0]) {
-              var metros   = d.routes[0].distance;          /* metros        */
-              var segundos = d.routes[0].duration;          /* segundos      */
-              var kmReal   = metros / 1000;
-              _vr.distRealKm = kmReal;
+        /* Mostrar cliente en mapa con línea recta provisional */
+        _actualizarMapa(lat, lng, null);
 
-              /* Tiempo estimado */
-              var mins = Math.round(segundos / 60);
-              var tiempoTxt = mins < 60
-                ? mins + ' min'
-                : Math.floor(mins/60) + 'h ' + (mins % 60) + 'min';
+        /* OSRM: ruta real */
+        _osrmRoute(lat, lng,
+          function (kmReal, segundos, coords) {
+            _vr.distRealKm = kmReal;
+            var tiempo     = _fmtTiempo(segundos);
+            _vr.distLabel  = _fmtKm(kmReal) + ' por carretera (~' + tiempo + ')';
+            if (elDist)
+              elDist.textContent = _fmtKm(kmReal) + ' por carretera (~' + tiempo + ') desde WIL';
+            var badge = document.getElementById('wv-map-badge');
+            if (badge) badge.textContent = _vr.distLabel;
+            _actualizarMapa(lat, lng, coords);
+            T('📍 ' + _fmtKm(kmReal) + ' por carretera · ' + tiempo, 'check_circle');
+          },
+          function () {
+            _vr.distLabel = '~' + _fmtKm(dLinea) + ' en línea recta';
+            if (elDist)
+              elDist.textContent = _fmtKm(dLinea) + ' en línea recta desde WIL';
+            T('📍 ' + _fmtKm(dLinea) + ' (sin red de rutas)', 'check_circle');
+          }
+        );
 
-              _vr.distLabel =
-                _fmtKm(kmReal) + ' por carretera (~' + tiempoTxt + ')';
-
-              document.getElementById('wvGpsDistTxt').textContent =
-                _fmtKm(kmReal) + ' por carretera (~' + tiempoTxt + ') desde Domicilios WIL';
-
-              T('📍 ' + _fmtKm(kmReal) + ' por carretera · ' + tiempoTxt, 'check_circle');
-            } else {
-              /* OSRM no encontró ruta: dejar Haversine */
-              document.getElementById('wvGpsDistTxt').textContent =
-                _fmtKm(distLinea) + ' en línea recta desde Domicilios WIL';
-              T('📍 Ubicación capturada · ' + _fmtKm(distLinea) + ' (línea recta)', 'check_circle');
-            }
-          })
-          .catch(function () {
-            /* Sin red para OSRM: usar Haversine */
-            document.getElementById('wvGpsDistTxt').textContent =
-              _fmtKm(distLinea) + ' en línea recta desde Domicilios WIL';
-            T('📍 Ubicación capturada · ' + _fmtKm(distLinea) + ' (línea recta)', 'check_circle');
-          });
-
-        /* ══ 2. Geocodificación inversa — Nominatim ══ */
-        document.getElementById('wvGpsDirTxt').textContent = 'Identificando zona…';
+        /* Nominatim: dirección legible */
+        if (elDir) elDir.textContent = 'Identificando zona…';
         fetch(
-          'https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng +
-          '&format=json&accept-language=es',
+          'https://nominatim.openstreetmap.org/reverse?lat=' + lat +
+          '&lon=' + lng + '&format=json&accept-language=es',
           { headers: { 'User-Agent': 'DomiciliosWIL/1.0' } }
         )
           .then(function (r) { return r.json(); })
@@ -12410,95 +12659,102 @@ try {
               (a.municipality || a.city || a.town || '').trim(),
               (a.county || '').trim()
             ].filter(Boolean).join(', ');
-            _vr.direccion = dir || (lat.toFixed(4) + ', ' + lng.toFixed(4));
-            document.getElementById('wvGpsDirTxt').textContent = _vr.direccion;
+            _vr.direccion = dir || (lat.toFixed(5) + ', ' + lng.toFixed(5));
+            if (elDir) elDir.textContent = _vr.direccion;
+            if (_mkCliente)
+              _mkCliente.getPopup().setContent(
+                '<strong>📍 Tu ubicación</strong><br>' + _vr.direccion
+              );
           })
           .catch(function () {
             _vr.direccion = lat.toFixed(5) + ', ' + lng.toFixed(5);
-            document.getElementById('wvGpsDirTxt').textContent = _vr.direccion;
+            if (elDir) elDir.textContent = _vr.direccion;
           });
       },
-      function () {
-        btn.disabled = false;
-        btn.innerHTML = '<span class="sym f" style="font-size:19px">my_location</span>&nbsp;Reintentar GPS';
-        T('No se pudo capturar el GPS. Activa el permiso de ubicación.', 'location_off');
+
+      function (err) {
+        if (btn) {
+          btn.disabled  = false;
+          btn.innerHTML =
+            '<span class="sym f" style="font-size:19px">my_location</span>' +
+            '&nbsp;Reintentar GPS';
+        }
+        var msg = err.code === 1
+          ? 'Permiso denegado. Actívalo en tu navegador.'
+          : err.code === 3
+            ? 'Tiempo agotado. Verifica tu señal GPS.'
+            : 'No se pudo capturar el GPS.';
+        T(msg, 'location_off');
       },
-      { enableHighAccuracy: true, timeout: 15000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   };
 
-  /* ── Generar y abrir WhatsApp ── */
+  /* ═══════════════════════════════════════════════════════
+     WHATSAPP
+     HTML:  <a id="wvWaBtn" href="#" onclick="return wvEnviarWA()">…</a>
+  ═══════════════════════════════════════════════════════ */
   W.wvEnviarWA = function () {
-    var T = typeof W.mostrarToast === 'function' ? W.mostrarToast : function(){};
+    var T = typeof W.mostrarToast === 'function' ? W.mostrarToast : function () {};
+    function _val(id) { var e = document.getElementById(id); return e ? e.value.trim() : ''; }
 
-    /* ── Leer campos ── */
-    var nombre     = (document.getElementById('wvNombre')      || {}).value.trim();
-    var telefono   = (document.getElementById('wvTelefono')    || {}).value.trim();
-    var comercio   = (document.getElementById('wvComercio')    || {}).value.trim(); /* NUEVO */
-    var vereda     = (document.getElementById('wvVereda')      || {}).value.trim();
-    var descripcion= (document.getElementById('wvDescripcion') || {}).value.trim();
-    var referencia = (document.getElementById('wvReferencia')  || {}).value.trim();
+    var nombre      = _val('wvNombre');
+    var telefono    = _val('wvTelefono');
+    var comercio    = _val('wvComercio');
+    var vereda      = _val('wvVereda');
+    var descripcion = _val('wvDescripcion');
+    var referencia  = _val('wvReferencia');
 
-    /* ── Validaciones ── */
-    if (!nombre)      { T('Escribe tu nombre.',              'person');    return false; }
-    if (!telefono)    { T('Escribe tu teléfono.',            'phone');     return false; }
-    if (!vereda)      { T('Escribe la vereda o sector.',     'forest');    return false; }
-    if (!descripcion) { T('Cuéntanos qué necesitas.',        'edit_note'); return false; }
+    if (!nombre)      { T('Escribe tu nombre.',          'person');    return false; }
+    if (!telefono)    { T('Escribe tu teléfono.',        'phone');     return false; }
+    if (!vereda)      { T('Escribe la vereda o sector.', 'forest');    return false; }
+    if (!descripcion) { T('Cuéntanos qué necesitas.',    'edit_note'); return false; }
 
-    /* ── Enlace de ubicación ── */
     var enlaceUbic = _vr.lat
       ? 'https://www.google.com/maps?q=' + _vr.lat.toFixed(6) + ',' + _vr.lng.toFixed(6)
       : 'No capturada';
+    var distInfo = _vr.distRealKm !== null
+      ? _vr.distLabel + ' ✅'
+      : _vr.distKm !== null
+        ? _vr.distLabel + ' (sin ruta)'
+        : 'Sin datos GPS';
 
-    /* ── Texto de distancia (real si ya llegó, Haversine si no) ── */
-    var distInfo;
-    if (_vr.distRealKm !== null) {
-      distInfo = _vr.distLabel + ' ✅ (distancia real por carretera — OSRM)';
-    } else if (_vr.distKm !== null) {
-      distInfo = '~' + _fmtKm(_vr.distKm) + ' en línea recta (GPS sin ruta)';
-    } else {
-      distInfo = 'Sin datos GPS';
-    }
-
-    /* ── Mensaje WhatsApp ── */
-    var lineas = [
-      '🌿 *SOLICITUD DE SERVICIO VEREDAL — Domicilios WIL*',
-      '',
-      '👤 *Nombre:* '           + nombre,
-      '📱 *Teléfono:* '         + telefono,
-      comercio
-        ? '🏪 *Comercio / Lugar de recogida:* ' + comercio
-        : null,
-      '🌄 *Vereda / Sector:* '  + vereda,
-      '',
-      '📦 *Qué necesita:*',
-      descripcion,
-      '',
-      referencia
-        ? '🏡 *Referencia de acceso:*\n' + referencia
-        : null,
-      '',
+    var msg = [
+      '🌿 *SOLICITUD DE SERVICIO VEREDAL — Domicilios WIL*', '',
+      '👤 *Nombre:* '          + nombre,
+      '📱 *Teléfono:* '        + telefono,
+      comercio ? '🏪 *Comercio / Recogida:* ' + comercio : null,
+      '🌄 *Vereda / Sector:* ' + vereda, '',
+      '📦 *Qué necesita:*', descripcion, '',
+      referencia ? '🏡 *Referencia de acceso:*\n' + referencia : null, '',
       '📍 *Ubicación GPS del cliente:*',
-      _vr.direccion ? _vr.direccion : '(No capturada)',
-      '🗺️ ' + enlaceUbic,
-      '',
+      _vr.direccion || '(No capturada)',
+      '🗺️ ' + enlaceUbic, '',
       '📏 *Distancia a Domicilios WIL:* ' + distInfo,
-      '🏠 *Punto de referencia WIL:* '    + WIL_ANCLA.mapa,
-      '',
+      '🏠 *Punto WIL (Copacabana):* '     + WIL_ANCLA.mapa, '',
       '⏳ _Esperando cotización del administrador…_'
     ].filter(function (l) { return l !== null; }).join('\n');
 
-    var url = 'https://wa.me/' + WIL_ANCLA.wa + '?text=' + encodeURIComponent(lineas);
-    document.getElementById('wvWaBtn').href = url;
-    return true; /* dejar que el <a> abra el enlace */
+    var url = 'https://wa.me/' + WIL_ANCLA.wa + '?text=' + encodeURIComponent(msg);
+    var btn = document.getElementById('wvWaBtn');
+    if (btn) { btn.href = url; btn.target = '_blank'; btn.rel = 'noopener noreferrer'; }
+    else     { window.open(url, '_blank', 'noopener,noreferrer'); }
+    return true;
   };
 
 })(window);
 
-/* ═══ PARCHE ÚNICO VEREDAL — scroll + GPS visible ═══ */
-(function(){
+
+/* ══════════════════════════════════════════════════════
+   PARCHE CSS
+   Reglas muy quirúrgicas — solo tocan lo estrictamente
+   necesario sin romper el espaciado existente del sheet.
+══════════════════════════════════════════════════════ */
+(function () {
   var s = document.createElement('style');
   s.textContent = `
+
+    /* ── Scroll del body y de la vista inicio ── */
     body {
       display: block !important;
       align-items: unset !important;
@@ -12510,63 +12766,183 @@ try {
     }
     .wil-veredal { margin: 0 16px 20px !important; }
 
+    /* ── Overlay del sheet ── */
     #wil-veredal-overlay {
-      position: fixed !important;
-      inset: 0 !important;
-      z-index: 9999 !important;
-      display: none !important;
-      align-items: flex-end !important;
+      position:        fixed !important;
+      inset:           0 !important;
+      z-index:         9999 !important;
+      display:         none !important;
+      align-items:     flex-end !important;
       justify-content: center !important;
-      padding-bottom: env(safe-area-inset-bottom, 0px) !important;
     }
     #wil-veredal-overlay.open { display: flex !important; }
 
+    /* ── Sheet en sí ── */
     #wil-veredal-sheet {
-      max-height: 88vh !important;
-      max-height: 88dvh !important;
-      display: flex !important;
+      max-height: 92vh !important;
+      max-height: 92dvh !important;
+      display:        flex !important;
       flex-direction: column !important;
-      overflow: hidden !important;
+      overflow:       hidden !important;
     }
 
-    .wv-handle,
-    .wv-sheet-hdr {
+    /* ── Handle y header no crecen ── */
+    .wv-handle, .wv-sheet-hdr {
       flex-shrink: 0 !important;
-      flex-grow: 0 !important;
     }
 
+    /* ── Cuerpo del sheet: scroll interno ── */
     .wv-sheet-body {
-      flex: 1 1 auto !important;
+      flex:      1 1 auto !important;
       min-height: 0 !important;
       overflow-y: scroll !important;
       -webkit-overflow-scrolling: touch !important;
       overscroll-behavior: contain !important;
-      display: flex !important;
-      flex-direction: column !important;
-      padding: 16px 14px !important;
-      padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 32px) !important;
-      gap: 12px !important;
+      /* *** Conservamos padding y gap originales *** */
     }
 
-    .wv-sheet-body > * {
-      flex-shrink: 0 !important;
-      flex-grow: 0 !important;
-    }
-
+    /* ── GPS card siempre visible ── */
     .wv-gps-card { overflow: visible !important; }
-    .wv-gps-card-body {
-      display: block !important;
-      padding: 13px 15px !important;
-    }
+    .wv-gps-card-body { display: block !important; }
     .wv-gps-btn {
-      display: flex !important;
+      display:    flex !important;
       visibility: visible !important;
-      opacity: 1 !important;
+      opacity:    1 !important;
     }
 
-    .wv-wa-btn {
-      position: static !important;
-      flex-shrink: 0 !important;
+    /* ── Botón WhatsApp estático (no flotante) ── */
+    .wv-wa-btn { position: static !important; }
+
+    /* ══════════════════════════════════════
+       BLOQUE DEL MAPA
+       Edge-to-edge: sale de los márgenes del
+       sheet usando márgenes negativos.
+    ══════════════════════════════════════ */
+    #wv-map-wrap {
+      /* Rompe el padding lateral del sheet-body */
+      margin-left:  -14px !important;
+      margin-right: -14px !important;
+      /* Separación vertical del resto de tarjetas */
+      margin-bottom: 12px !important;
+    }
+
+    #wv-map-hdr {
+      display:     flex !important;
+      align-items: center !important;
+      gap:         6px !important;
+      padding:     10px 14px 8px !important;
+      font-size:   13px !important;
+      color:       #111827 !important;
+      background:  #f9fafb !important;
+      border-top:    1px solid #e5e7eb !important;
+    }
+
+    #wv-map-badge {
+      margin-left:   auto !important;
+      font-size:     11px !important;
+      font-weight:   700 !important;
+      color:         #15803d !important;
+      background:    #dcfce7 !important;
+      border-radius: 20px !important;
+      padding:       2px 9px !important;
+      white-space:   nowrap !important;
+      max-width:     54% !important;
+      overflow:      hidden !important;
+      text-overflow: ellipsis !important;
+    }
+
+    /* *** El mapa ocupa la mitad de la pantalla *** */
+    #wv-map {
+      width:      100% !important;
+      height:     44vh !important;
+      height:     44dvh !important;
+      min-height: 200px !important;
+      max-height: 320px !important;
+      position:   relative !important;
+      z-index:    0 !important;
+      border-bottom: 1px solid #e5e7eb !important;
+    }
+
+    /* Placeholder centrado mientras carga el mapa */
+    #wv-map-ph {
+      position:        absolute !important;
+      inset:           0 !important;
+      display:         flex !important;
+      flex-direction:  column !important;
+      align-items:     center !important;
+      justify-content: center !important;
+      background:      #f3f4f6 !important;
+      z-index:         1 !important;
+    }
+
+    /* Controles Leaflet por encima del contenido */
+    .leaflet-top, .leaflet-bottom { z-index: 2 !important; }
+    .leaflet-popup-content { font-size: 13px !important; line-height: 1.45 !important; }
+
+    /* ══════════════════════════════════════
+       POPUP PERMISO DE UBICACIÓN
+    ══════════════════════════════════════ */
+    #wv-perm-overlay {
+      position:        fixed !important;
+      inset:           0 !important;
+      z-index:         10000 !important;
+      display:         none !important;
+      align-items:     center !important;
+      justify-content: center !important;
+      padding:         20px !important;
+      background:      rgba(0,0,0,.55) !important;
+      backdrop-filter:         blur(4px) !important;
+      -webkit-backdrop-filter: blur(4px) !important;
+    }
+    #wv-perm-overlay.open { display: flex !important; }
+
+    #wv-perm-card {
+      background:    #fff !important;
+      border-radius: 20px !important;
+      padding:       28px 24px 22px !important;
+      max-width:     320px !important;
+      width:         100% !important;
+      box-shadow:    0 24px 60px rgba(0,0,0,.25) !important;
+      text-align:    center !important;
+    }
+    #wv-perm-icon {
+      width:           60px !important;
+      height:          60px !important;
+      border-radius:   50% !important;
+      background:      linear-gradient(135deg,#dcfce7,#bbf7d0) !important;
+      display:         flex !important;
+      align-items:     center !important;
+      justify-content: center !important;
+      margin:          0 auto 14px !important;
+    }
+    #wv-perm-icon .sym { font-size: 30px !important; color: #15803d !important; }
+    #wv-perm-title {
+      font-size: 17px !important; font-weight: 700 !important;
+      color: #14532d !important; margin: 0 0 10px !important;
+    }
+    #wv-perm-body {
+      font-size: 13px !important; color: #4b5563 !important;
+      line-height: 1.55 !important; margin: 0 0 20px !important;
+    }
+    #wv-perm-btns { display: flex !important; gap: 10px !important; }
+    #wv-perm-no {
+      flex: 1 !important; padding: 12px 0 !important;
+      border-radius: 12px !important; border: 1.5px solid #d1d5db !important;
+      background: #f9fafb !important; color: #374151 !important;
+      font-size: 14px !important; font-weight: 600 !important; cursor: pointer !important;
+    }
+    #wv-perm-ok {
+      flex: 2 !important; padding: 12px 0 !important;
+      border-radius: 12px !important; border: none !important;
+      background: linear-gradient(135deg,#16a34a,#15803d) !important;
+      color: #fff !important; font-size: 14px !important;
+      font-weight: 700 !important; cursor: pointer !important;
+      display: flex !important; align-items: center !important;
+      justify-content: center !important; gap: 4px !important;
+      box-shadow: 0 4px 14px rgba(21,128,61,.35) !important;
+    }
+    #wv-perm-ok:focus {
+      outline: 3px solid #86efac !important; outline-offset: 2px !important;
     }
   `;
   document.head.appendChild(s);
