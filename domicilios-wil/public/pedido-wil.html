@@ -22,6 +22,7 @@
      <script src="wil-gps-eta-patch.js"></script>
      <script src="wil-fix-entregado.js"></script>
      <script src="wil-patch-sin-para-quien.js"></script>
+      <script src="wil-veredal-visual-patch.js"></script>
     
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -663,6 +664,406 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 .wil-sug-empty{padding:12px 14px;font-size:12px;color:var(--on3);text-align:center}
 
 
+/* ── Botón Veredal ── */
+.wil-veredal {
+  margin: 0 16px 20px;
+  border-radius: var(--r-2xl);
+  overflow: hidden;
+  background: linear-gradient(135deg, #1a2e1a 0%, #2d4a2d 50%, #3a5e3a 100%);
+  cursor: pointer;
+  position: relative;
+  box-shadow: var(--sh2);
+  transition: transform .15s;
+}
+.wil-veredal:active { transform: scale(.985); }
+.wil-veredal-shine {
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,.06) 0%, transparent 55%);
+  pointer-events: none;
+}
+.wil-veredal-body {
+  padding: 20px 20px;
+  position: relative; z-index: 1;
+  display: flex; align-items: center; gap: 14px;
+}
+.wv-emo {
+  font-size: 48px; line-height: 1; flex-shrink: 0;
+  filter: drop-shadow(0 4px 14px rgba(0,0,0,.3));
+}
+.wv-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2);
+  border-radius: 99px; padding: 3px 10px;
+  font-size: 10px; font-weight: 700; color: rgba(255,255,255,.88);
+  margin-bottom: 7px;
+}
+.wv-badge .sym { font-size: 11px; }
+.wv-tit {
+  font-size: 16px; font-weight: 900; color: #fff;
+  line-height: 1.2; letter-spacing: -.015em; margin-bottom: 4px;
+}
+.wv-sub {
+  font-size: 11px; color: rgba(255,255,255,.6);
+  line-height: 1.5; font-weight: 500; margin-bottom: 12px;
+}
+.wv-cta {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.22);
+  border-radius: 99px; padding: 6px 13px;
+  font-size: 11.5px; font-weight: 800; color: #fff;
+}
+.wv-cta .sym { font-size: 14px; }
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: #f0f4f8;
+    min-height: 100dvh;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+ 
+  /* Demo page trigger */
+  .demo-page {
+    width: 100%;
+    max-width: 480px;
+    min-height: 100dvh;
+    background: #f0f4f8;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+ 
+  /* ── BOTÓN VEREDAL ── */
+  .wil-veredal {
+    border-radius: 20px;
+    overflow: hidden;
+    background: linear-gradient(135deg, #1a2e1a 0%, #2d4a2d 50%, #3a5e3a 100%);
+    cursor: pointer;
+    position: relative;
+    box-shadow: 0 8px 32px rgba(22,163,74,.28), 0 2px 8px rgba(0,0,0,.15);
+    transition: transform .15s, box-shadow .15s;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wil-veredal:active { transform: scale(.985); box-shadow: 0 4px 16px rgba(22,163,74,.2); }
+  .wil-veredal-shine {
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,.09) 0%, transparent 55%);
+    pointer-events: none;
+  }
+  /* Decorative dots */
+  .wil-veredal::after {
+    content: '';
+    position: absolute; right: -20px; top: -20px;
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.04);
+    pointer-events: none;
+  }
+  .wil-veredal-body {
+    padding: 20px;
+    position: relative; z-index: 1;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .wv-emo {
+    font-size: 48px; line-height: 1; flex-shrink: 0;
+    filter: drop-shadow(0 4px 14px rgba(0,0,0,.35));
+  }
+  .wv-txt { flex: 1; min-width: 0; }
+  .wv-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.22);
+    border-radius: 99px; padding: 3px 10px;
+    font-size: 10px; font-weight: 700; color: rgba(255,255,255,.88);
+    margin-bottom: 7px; letter-spacing: .02em;
+  }
+  .wv-tit {
+    font-size: 16px; font-weight: 900; color: #fff;
+    line-height: 1.2; letter-spacing: -.02em; margin-bottom: 4px;
+  }
+  .wv-sub {
+    font-size: 11.5px; color: rgba(255,255,255,.6);
+    line-height: 1.5; font-weight: 500; margin-bottom: 12px;
+  }
+  .wv-cta {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.25);
+    border-radius: 99px; padding: 6px 13px;
+    font-size: 11.5px; font-weight: 800; color: #fff;
+    letter-spacing: .01em;
+  }
+ 
+  /* ── OVERLAY ── */
+  #wil-veredal-overlay {
+    position: fixed; inset: 0; z-index: 1200;
+    background: rgba(0,0,0,.6);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: none; align-items: flex-end; justify-content: center;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  #wil-veredal-overlay.open { display: flex; }
+ 
+  /* ── SHEET ── */
+  #wil-veredal-sheet {
+    width: 100%; max-width: 480px;
+    background: #f4f7fa;
+    border-radius: 28px 28px 0 0;
+    /* SCROLL FIX: altura máxima + flex column */
+    max-height: 93dvh;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 -12px 60px rgba(0,0,0,.3);
+    animation: wvSlideUp .34s cubic-bezier(.22,1,.36,1) both;
+    overflow: hidden; /* clip the rounded corners */
+  }
+  @keyframes wvSlideUp {
+    from { transform: translateY(80px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+ 
+  /* Handle */
+  .wv-handle {
+    width: 40px; height: 4px; background: rgba(0,0,0,.15);
+    border-radius: 4px; margin: 14px auto 0; flex-shrink: 0;
+  }
+ 
+  /* Header */
+  .wv-sheet-hdr {
+    background: linear-gradient(135deg, #1a2e1a 0%, #2d4a2d 60%, #3a5e3a 100%);
+    padding: 14px 18px 18px;
+    display: flex; align-items: center; gap: 12px;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .wv-sheet-hdr::before {
+    content: '';
+    position: absolute; right: -30px; top: -30px;
+    width: 130px; height: 130px; border-radius: 50%;
+    background: rgba(255,255,255,.05);
+    pointer-events: none;
+  }
+  .wv-sheet-hdr-ico {
+    width: 46px; height: 46px; border-radius: 15px;
+    background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0; position: relative; z-index: 1;
+  }
+  .wv-sheet-hdr-tit { font-size: 16px; font-weight: 900; color: #fff; line-height: 1.25; }
+  .wv-sheet-hdr-sub { font-size: 11px; color: rgba(255,255,255,.65); margin-top: 3px; font-weight: 500; }
+  .wv-sheet-close {
+    margin-left: auto; width: 36px; height: 36px;
+    border-radius: 50%; background: rgba(255,255,255,.15);
+    border: 1.5px solid rgba(255,255,255,.22);
+    color: #fff; font-size: 17px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; position: relative; z-index: 1;
+    transition: background .15s, transform .12s;
+    line-height: 1;
+  }
+  .wv-sheet-close:active { transform: scale(.88); background: rgba(255,255,255,.25); }
+ 
+  /* ── BODY SCROLL ── */
+  .wv-sheet-body {
+    /* CLAVE: overflow-y auto + flex: 1 para que ocupe el espacio disponible */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    flex: 1;
+    min-height: 0; /* necesario para que flex child haga scroll */
+    padding: 16px 14px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  /* Scrollbar estilizado */
+  .wv-sheet-body::-webkit-scrollbar { width: 4px; }
+  .wv-sheet-body::-webkit-scrollbar-track { background: transparent; }
+  .wv-sheet-body::-webkit-scrollbar-thumb { background: rgba(0,0,0,.15); border-radius: 4px; }
+ 
+  /* ── SECCIÓN: pasos label ── */
+  .wv-step-label {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 2px;
+  }
+  .wv-step-num {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: #3a5e3a; color: #fff;
+    font-size: 11px; font-weight: 900;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .wv-step-txt { font-size: 13px; font-weight: 800; color: #1a2e1a; }
+ 
+  /* ── GPS CARD ── */
+  .wv-gps-card {
+    background: #fff;
+    border: 1.5px solid #bbf7d0;
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(22,163,74,.08);
+  }
+  .wv-gps-card-hdr {
+    padding: 13px 15px;
+    background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+    border-bottom: 1px solid #bbf7d0;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .wv-gps-card-hdr-ico {
+    width: 36px; height: 36px; border-radius: 11px;
+    background: rgba(22,163,74,.15);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .wv-gps-card-hdr-lbl { font-size: 13px; font-weight: 800; color: #14532d; }
+  .wv-gps-card-hdr-sub { font-size: 10.5px; color: #166534; font-weight: 500; margin-top: 1px; line-height: 1.4; }
+  .wv-gps-card-body { padding: 13px 15px; }
+ 
+  .wv-gps-btn {
+    width: 100%; padding: 13px 16px;
+    border-radius: 13px; border: none;
+    background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+    color: #fff;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 14px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    cursor: pointer; transition: all .18s;
+    box-shadow: 0 4px 18px rgba(22,163,74,.38);
+    letter-spacing: .01em;
+  }
+  .wv-gps-btn:active { transform: scale(.97); box-shadow: 0 2px 8px rgba(22,163,74,.25); }
+  .wv-gps-btn:disabled { opacity: .65; cursor: default; }
+  .wv-gps-btn .sym-r { font-family: 'Material Symbols Rounded'; font-size: 19px; font-weight: 400; font-style: normal; }
+ 
+  .wv-gps-result {
+    display: none; margin-top: 11px;
+    border: 1.5px solid #86efac; border-radius: 13px;
+    background: #f0fdf4; padding: 12px 14px;
+  }
+  .wv-gps-result.show { display: block; animation: fadeIn .25s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .wv-gps-result-row {
+    display: flex; align-items: flex-start; gap: 8px;
+    font-size: 12px; font-weight: 600; color: #14532d;
+    margin-bottom: 6px; line-height: 1.55;
+  }
+  .wv-gps-result-row:last-of-type { margin-bottom: 0; }
+  .wv-gps-result-ico { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+  .wv-gps-dist-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: linear-gradient(135deg, #16a34a, #15803d);
+    color: #fff; border-radius: 20px; padding: 4px 12px;
+    font-size: 12px; font-weight: 900; margin-top: 8px;
+    box-shadow: 0 2px 10px rgba(22,163,74,.3);
+  }
+ 
+  /* ── FORM CARD ── */
+  .wv-form-card {
+    background: #fff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,.05);
+  }
+  .wv-form-card-hdr {
+    padding: 12px 15px; border-bottom: 1px solid #f1f5f9;
+    display: flex; align-items: center; gap: 9px;
+    background: linear-gradient(90deg, #f8fafc, #fff);
+  }
+  .wv-form-card-hdr-ico {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: rgba(58,94,58,.1);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; flex-shrink: 0;
+  }
+  .wv-form-card-hdr-lbl { font-size: 13px; font-weight: 800; color: #1e293b; }
+  .wv-form-card-body {
+    padding: 15px; display: flex; flex-direction: column; gap: 12px;
+  }
+ 
+  /* Fields */
+  .wv-field {}
+  .wv-field label {
+    display: block; font-size: 10.5px; font-weight: 700;
+    color: #64748b; margin-bottom: 6px;
+    letter-spacing: .055em; text-transform: uppercase;
+  }
+  .wv-field input,
+  .wv-field textarea {
+    width: 100%; border: 1.5px solid #e2e8f0; border-radius: 12px;
+    padding: 11px 14px; font-size: 14px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    color: #1e293b; background: #f8fafc; outline: none;
+    transition: border-color .18s, background .18s, box-shadow .18s;
+    box-sizing: border-box; resize: none;
+    -webkit-appearance: none;
+  }
+  .wv-field input:focus,
+  .wv-field textarea:focus {
+    border-color: #3a5e3a; background: #fff;
+    box-shadow: 0 0 0 3.5px rgba(58,94,58,.1);
+  }
+  .wv-field input::placeholder,
+  .wv-field textarea::placeholder { color: #94a3b8; }
+  .wv-field-note {
+    font-size: 10.5px; color: #94a3b8; font-weight: 500; margin-top: 5px;
+    line-height: 1.45; padding-left: 2px;
+  }
+ 
+  /* ── NOTA COTIZACIÓN ── */
+  .wv-cotiza-nota {
+    background: linear-gradient(135deg, #fffbeb, #fef9c3);
+    border: 1.5px solid rgba(217,119,6,.22);
+    border-radius: 15px; padding: 13px 15px;
+    display: flex; align-items: flex-start; gap: 10px;
+    box-shadow: 0 2px 10px rgba(217,119,6,.07);
+  }
+  .wv-cotiza-nota-ico { font-size: 20px; flex-shrink: 0; margin-top: 0; }
+  .wv-cotiza-nota p { font-size: 12px; font-weight: 600; color: #92400e; line-height: 1.65; }
+  .wv-cotiza-nota strong { font-weight: 900; color: #78350f; }
+ 
+  /* ── BOTÓN WHATSAPP ── */
+  .wv-wa-btn {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    width: 100%; padding: 16px 20px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #16a34a 0%, #22c55e 50%, #25D366 100%);
+    color: #fff; text-decoration: none;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 15px; font-weight: 900; letter-spacing: .01em;
+    cursor: pointer; transition: all .18s;
+    box-shadow: 0 6px 28px rgba(37,211,102,.42);
+    position: relative; overflow: hidden;
+  }
+  .wv-wa-btn::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,.12) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .wv-wa-btn:active { transform: scale(.97); box-shadow: 0 3px 14px rgba(37,211,102,.3); }
+  .wv-wa-btn-note {
+    text-align: center; font-size: 10.5px; color: #94a3b8;
+    font-weight: 600; margin-top: -4px; padding-bottom: 2px;
+  }
+ 
+  /* ── SPINNER ── */
+  .wv-spinner {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 2.5px solid rgba(255,255,255,.35);
+    border-top-color: #fff;
+    animation: spin .7s linear infinite;
+    display: none;
+  }
+  .wv-gps-btn.loading .wv-spinner { display: block; }
+  .wv-gps-btn.loading .sym-r,
+  .wv-gps-btn.loading .btn-txt { display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
 </style>
 </head>
@@ -897,10 +1298,148 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
       </div>
     </div>
 
-    <div class="spacer"></div>
+    
+
+    <!-- MODAL VEREDAL -->
+<div id="wil-veredal-overlay" onclick="if(event.target===this)wvCerrar()">
+  <div id="wil-veredal-sheet">
+    <div class="wv-handle"></div>
+ 
+    <!-- Header -->
+    <div class="wv-sheet-hdr">
+      <div class="wv-sheet-hdr-ico">🌿</div>
+      <div>
+        <div class="wv-sheet-hdr-tit">Servicio Veredal</div>
+        <div class="wv-sheet-hdr-sub">Cotización personalizada por el administrador</div>
+      </div>
+      <button class="wv-sheet-close" onclick="wvCerrar()">✕</button>
+    </div>
+ 
+    <!-- Body -->
+    <div class="wv-sheet-body">
+ 
+      <!-- GPS -->
+      <div class="wv-gps-card">
+        <div class="wv-gps-card-hdr">
+          <div class="wv-gps-card-hdr-ico">📍</div>
+          <div>
+            <div class="wv-gps-card-hdr-lbl">1. Captura tu ubicación</div>
+            <div class="wv-gps-card-hdr-sub">Necesitamos saber dónde estás para cotizar</div>
+          </div>
+        </div>
+        <div class="wv-gps-card-body">
+          <button class="wv-gps-btn" id="wvGpsBtn" onclick="wvCapturarGPS()">
+            <span class="sym f" style="font-size:19px">my_location</span>
+            Capturar mi ubicación GPS
+          </button>
+ 
+          <!-- Resultado GPS -->
+          <div class="wv-gps-result" id="wvGpsResult">
+            <div class="wv-gps-result-row">
+              <span class="wv-gps-result-ico">📍</span>
+              <span id="wvGpsDirTxt">—</span>
+            </div>
+            <div class="wv-gps-result-row">
+              <span class="wv-gps-result-ico">🗺️</span>
+              <span id="wvGpsCoordTxt" style="font-size:10.5px;opacity:.7">—</span>
+            </div>
+            <div>
+              <span class="wv-gps-dist-badge" id="wvGpsDistBadge">
+                <span class="sym f" style="font-size:14px">delivery_dining</span>
+                <span id="wvGpsDistTxt">Calculando…</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+ 
+      <!-- Formulario datos -->
+      <div class="wv-form-card">
+        <div class="wv-form-card-hdr">
+          <div class="wv-form-card-hdr-ico">📋</div>
+          <div class="wv-form-card-hdr-lbl">2. Cuéntanos qué necesitas</div>
+        </div>
+        <div class="wv-form-card-body">
+ 
+          <div class="wv-field">
+            <label>Tu nombre *</label>
+            <input type="text" id="wvNombre" placeholder="Nombre completo"/>
+          </div>
+ 
+          <div class="wv-field">
+            <label>Tu teléfono *</label>
+            <input type="tel" id="wvTelefono" placeholder="310 000 0000"/>
+          </div>
+ 
+          <div class="wv-field">
+            <label>Vereda / Sector *</label>
+            <input type="text" id="wvVereda"
+              placeholder="Ej: Vereda La Palma, El Ancón, Cabuyal…"/>
+            <div class="wv-field-note">Nombre del lugar donde necesitas el servicio</div>
+          </div>
+ 
+          <div class="wv-field">
+            <label>¿Qué necesitas? *</label>
+            <textarea id="wvDescripcion" rows="3"
+              placeholder="Ej: Llevar mercado, recoger un paquete, comprar medicamentos en el pueblo…"></textarea>
+          </div>
+ 
+          <div class="wv-field">
+            <label>Referencia de acceso</label>
+            <input type="text" id="wvReferencia"
+              placeholder="Ej: Casa roja al lado del puente, finca El Porvenir…"/>
+            <div class="wv-field-note">Instrucciones para llegar (opcional pero útil)</div>
+          </div>
+ 
+        </div>
+      </div>
+ 
+      <!-- Nota cotización -->
+      <div class="wv-cotiza-nota">
+        <span class="wv-cotiza-nota-ico">💡</span>
+        <p>El <strong>administrador de Domicilios WIL</strong> recibirá tu solicitud y te
+           enviará una <strong>cotización personalizada</strong> según la distancia y el
+           servicio.</p>
+      </div>
+ 
+      <!-- Botón WhatsApp -->
+      <a class="wv-wa-btn" id="wvWaBtn" href="#" target="_blank" onclick="return wvEnviarWA()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff">
+          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+        </svg>
+        Solicitar cotización por WhatsApp
+      </a>
+      <p class="wv-wa-btn-note"></p>
+ 
+    </div><!-- /wv-sheet-body -->
+  </div><!-- /wil-veredal-sheet -->
+</div><!-- /wil-veredal-overlay -->
+
+
+   
+ 
+<!-- BOTÓN en el inicio -->
+<div class="wil-veredal" onclick="wvAbrir()" style="margin-top:-4px">
+  <div class="wil-veredal-shine"></div>
+  <div class="wil-veredal-body">
+    <span class="wv-emo">🌿</span>
+    <div class="wv-txt">
+      <div class="wv-badge">
+        <span class="sym" style="font-size:11px">help</span>
+        Servicio especial · Solo veredas
+      </div>
+      <div class="wv-tit">¿Tu servicio es veredal?</div>
+      <div class="wv-sub">Cotización personalizada según distancia y acceso.</div>
+      <span class="wv-cta">
+        <span class="sym" style="font-size:14px">arrow_forward</span>Solicitar cotización
+      </span>
+    </div>
   </div>
 </div>
 
+ <div class="spacer"></div>
+  </div>
+</div>
 
 <!-- ════ LIBRE P1 ════ -->
 <div class="view" id="view-libre-1">
@@ -11789,7 +12328,182 @@ try {
   console.log('[WIL] ✅ Patch v3 — tel. recogida debajo barrio recogida, opcional');
 
 })(window);
+
+
+;(function (W) {
+  'use strict';
+ 
+  /* ── Punto de referencia WIL ── */
+  var WIL_ANCLA = {
+    lat:   6.2970,      /* coordenadas del enlace https://maps.app.goo.gl/aJgMvFWRezjr32pf6 */
+    lng:  -75.5714,
+    wa:    '573023452213',
+    mapa:  'https://maps.app.goo.gl/aJgMvFWRezjr32pf6'
+  };
+ 
+  /* Estado GPS del modal */
+  var _vr = {
+    lat:      null,
+    lng:      null,
+    direccion: '',
+    distKm:   null
+  };
+ 
+  /* ── Haversine ── */
+  function _km(la1, lo1, la2, lo2) {
+    var R = 6371,
+        dL = (la2 - la1) * Math.PI / 180,
+        dO = (lo2 - lo1) * Math.PI / 180,
+        a  = Math.sin(dL/2)*Math.sin(dL/2)
+           + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dO/2)*Math.sin(dO/2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+ 
+  /* ── Abrir / cerrar modal ── */
+  W.wvAbrir = function () {
+    document.getElementById('wil-veredal-overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  };
+  W.wvCerrar = function () {
+    document.getElementById('wil-veredal-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+  };
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') W.wvCerrar();
+  });
+ 
+  /* ── Capturar GPS ── */
+  W.wvCapturarGPS = function () {
+    var btn    = document.getElementById('wvGpsBtn');
+    var result = document.getElementById('wvGpsResult');
+    var T      = typeof W.mostrarToast === 'function' ? W.mostrarToast : function(){};
+ 
+    if (!navigator.geolocation) {
+      T('GPS no disponible en tu dispositivo.', 'location_off');
+      return;
+    }
+ 
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spin dk"></span>&nbsp;Capturando GPS…';
+ 
+    navigator.geolocation.getCurrentPosition(
+      function (pos) {
+        var lat = pos.coords.latitude;
+        var lng = pos.coords.longitude;
+        _vr.lat = lat;
+        _vr.lng = lng;
+ 
+        /* Distancia a WIL */
+        var dist = _km(lat, lng, WIL_ANCLA.lat, WIL_ANCLA.lng);
+        _vr.distKm = dist;
+ 
+        var distTxt = dist < 1
+          ? Math.round(dist * 1000) + ' m de Domicilios WIL'
+          : dist.toFixed(1) + ' km de Domicilios WIL';
+ 
+        document.getElementById('wvGpsDistTxt').textContent = distTxt;
+        document.getElementById('wvGpsCoordTxt').textContent =
+          lat.toFixed(5) + ', ' + lng.toFixed(5);
+ 
+        /* Geocodificación inversa con Nominatim */
+        document.getElementById('wvGpsDirTxt').textContent = 'Identificando zona…';
+        fetch(
+          'https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng +
+          '&format=json&accept-language=es',
+          { headers: { 'User-Agent': 'DomiciliosWIL/1.0' } }
+        )
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            var a   = d.address || {};
+            var dir = [
+              (a.road || a.street || '').trim(),
+              (a.hamlet || a.village || a.neighbourhood || a.suburb || '').trim(),
+              (a.municipality || a.city || a.town || '').trim(),
+              (a.county || '').trim()
+            ].filter(Boolean).join(', ');
+            _vr.direccion = dir || (lat.toFixed(4) + ', ' + lng.toFixed(4));
+            document.getElementById('wvGpsDirTxt').textContent = _vr.direccion;
+          })
+          .catch(function () {
+            _vr.direccion = lat.toFixed(5) + ', ' + lng.toFixed(5);
+            document.getElementById('wvGpsDirTxt').textContent = _vr.direccion;
+          });
+ 
+        /* Mostrar resultado */
+        result.style.display = 'block';
+        btn.disabled = false;
+        btn.innerHTML = '<span class="sym f" style="font-size:19px">check_circle</span>&nbsp;Ubicación capturada ✓';
+        btn.style.background = 'linear-gradient(135deg,#14532d,#15803d)';
+        T('📍 Ubicación capturada · ' + distTxt, 'check_circle');
+      },
+      function () {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="sym f" style="font-size:19px">my_location</span>&nbsp;Reintentar GPS';
+        T('No se pudo capturar el GPS. Activa el permiso de ubicación.', 'location_off');
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
+    );
+  };
+ 
+  /* ── Generar y abrir WhatsApp ── */
+  W.wvEnviarWA = function () {
+    var T = typeof W.mostrarToast === 'function' ? W.mostrarToast : function(){};
+ 
+    var nombre     = (document.getElementById('wvNombre')      || {}).value.trim();
+    var telefono   = (document.getElementById('wvTelefono')    || {}).value.trim();
+    var vereda     = (document.getElementById('wvVereda')      || {}).value.trim();
+    var descripcion= (document.getElementById('wvDescripcion') || {}).value.trim();
+    var referencia = (document.getElementById('wvReferencia')  || {}).value.trim();
+ 
+    if (!nombre)      { T('Escribe tu nombre.', 'person');          return false; }
+    if (!telefono)    { T('Escribe tu teléfono.', 'phone');         return false; }
+    if (!vereda)      { T('Escribe la vereda o sector.', 'forest'); return false; }
+    if (!descripcion) { T('Cuéntanos qué necesitas.', 'edit_note'); return false; }
+ 
+    /* Enlace de ubicación */
+    var enlaceUbic = _vr.lat
+      ? 'https://www.google.com/maps?q=' + _vr.lat.toFixed(6) + ',' + _vr.lng.toFixed(6)
+      : 'No capturada';
+ 
+    var distInfo = _vr.distKm
+      ? (_vr.distKm < 1
+          ? '~' + Math.round(_vr.distKm * 1000) + ' m desde Domicilios WIL'
+          : '~' + _vr.distKm.toFixed(1) + ' km desde Domicilios WIL')
+      : 'Sin datos GPS';
+ 
+    /* Mensaje WhatsApp */
+    var msg = [
+      '🌿 *SOLICITUD DE SERVICIO VEREDAL — Domicilios WIL*',
+      '',
+      '👤 *Nombre:* ' + nombre,
+      '📱 *Teléfono:* ' + telefono,
+      '🌄 *Vereda / Sector:* ' + vereda,
+      '',
+      '📦 *Qué necesita:*',
+      descripcion,
+      '',
+      referencia ? '🏡 *Referencia de acceso:*\n' + referencia : null,
+      '',
+      '📍 *Ubicación GPS del cliente:*',
+      _vr.direccion ? _vr.direccion : '(No capturada)',
+      '🗺️ ' + enlaceUbic,
+      '',
+      '📏 *Distancia a Domicilios WIL:* ' + distInfo,
+      '🏠 *Punto de referencia WIL:* ' + WIL_ANCLA.mapa,
+      '',
+      '⏳ _Esperando cotización del administrador…_'
+    ].filter(function (l) { return l !== null; }).join('\n');
+ 
+    var url = 'https://wa.me/' + WIL_ANCLA.wa + '?text=' + encodeURIComponent(msg);
+    document.getElementById('wvWaBtn').href = url;
+    return true; /* dejar que el <a> abra el enlace */
+  };
+ 
+})(window);
+
 </script>
+
+
 
 
 </body>
