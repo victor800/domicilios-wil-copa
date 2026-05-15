@@ -1290,35 +1290,68 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
         </div>
         <div class="wv-form-card-body">
  
-          <div class="wv-field">
-            <label>Tu nombre *</label>
-            <input type="text" id="wvNombre" placeholder="Nombre completo"/>
-          </div>
- 
-          <div class="wv-field">
-            <label>Tu teléfono *</label>
-            <input type="tel" id="wvTelefono" placeholder="310 000 0000"/>
-          </div>
- 
-          <div class="wv-field">
-            <label>Vereda / Sector *</label>
-            <input type="text" id="wvVereda"
-              placeholder="Ej: Vereda La Palma, El Ancón, Cabuyal…"/>
-            <div class="wv-field-note">Nombre del lugar donde necesitas el servicio</div>
-          </div>
- 
-          <div class="wv-field">
-            <label>¿Qué necesitas? *</label>
-            <textarea id="wvDescripcion" rows="3"
-              placeholder="Ej: Llevar mercado, recoger un paquete, comprar medicamentos en el pueblo…"></textarea>
-          </div>
- 
-          <div class="wv-field">
-            <label>Referencia de acceso</label>
-            <input type="text" id="wvReferencia"
-              placeholder="Ej: Casa roja al lado del puente, finca El Porvenir…"/>
-            <div class="wv-field-note">Instrucciones para llegar (opcional pero útil)</div>
-          </div>
+<!-- 1. Tu Nombre -->
+<div class="wv-field">
+  <label class="wv-label" for="wvNombre">
+    <span class="sym f">person</span> Tu nombre
+  </label>
+  <input class="wv-input" id="wvNombre" type="text"
+         placeholder="¿Cómo te llamamos?" autocomplete="name" />
+</div>
+
+<!-- 2. Teléfono de entrega -->
+<div class="wv-field">
+  <label class="wv-label" for="wvTelefono">
+    <span class="sym f">phone</span> Teléfono donde se entrega
+  </label>
+  <input class="wv-input" id="wvTelefono" type="tel"
+         placeholder="Número de quien recibe" autocomplete="tel" />
+</div>
+
+<!-- 3. Vereda o Sector -->
+<div class="wv-field">
+  <label class="wv-label" for="wvVereda">
+    <span class="sym f">forest</span> Nombre de vereda o sector
+  </label>
+  <input class="wv-input" id="wvVereda" type="text"
+         placeholder="Ej: Vereda El Chuscal, Sector La Loma…" />
+</div>
+
+<!-- 4. Punto de referencia -->
+<div class="wv-field">
+  <label class="wv-label" for="wvReferencia">
+    <span class="sym f">signpost</span> Punto de referencia del lugar de entrega
+  </label>
+  <textarea class="wv-input wv-textarea" id="wvReferencia" rows="2"
+            placeholder="Ej: Después del puente, casa azul con portón negro…"></textarea>
+</div>
+
+<!-- 5. Qué vamos a transportar -->
+<div class="wv-field">
+  <label class="wv-label" for="wvDescripcion">
+    <span class="sym f">inventory_2</span> ¿Qué vamos a transportar?
+  </label>
+  <textarea class="wv-input wv-textarea" id="wvDescripcion" rows="3"
+            placeholder="Describe el pedido, paquete o encargo…"></textarea>
+</div>
+
+<!-- 6. Lugar de recogida -->
+<div class="wv-field">
+  <label class="wv-label" for="wvComercio">
+    <span class="sym f">store</span> Lugar de recogida
+  </label>
+  <input class="wv-input" id="wvComercio" type="text"
+         placeholder="Nombre del comercio, dirección o barrio de origen" />
+</div>
+
+<!-- 7. Teléfono de recogida -->
+<div class="wv-field">
+  <label class="wv-label" for="wvTelefonoRecogida">
+    <span class="sym f">call</span> Número de teléfono donde se recoge
+  </label>
+  <input class="wv-input" id="wvTelefonoRecogida" type="tel"
+         placeholder="Número de quien entrega el paquete" autocomplete="tel" />
+</div>
 
           
  
@@ -12638,7 +12671,162 @@ try {
   `;
   document.head.appendChild(s);
 })();
+
+
+
+
+/* ══════════════════════════════════════════════════════
+   WIL VEREDAL — TARIFA POR KM (misma lógica que paquetes)
+   Se activa automáticamente al capturar GPS en el modal
+══════════════════════════════════════════════════════ */
+;(function (W) {
+  'use strict';
+
+  var ANCLA_WIL   = { lat: 6.3459291, lng: -75.512814 }; /* Sede WIL Copacabana */
+  var BASE_TARIFA = 24000;
+  var PRECIO_KM   = 1800;
+  var KM_LIBRE    = 0.5;    /* primeros km sin cobro extra */
+  var TARIFA_FIJA = 50000;  /* municipios lejanos */
+
+  var MUNICIPIOS_FIJOS = [
+    'envigado','itagui','itagüí','sabaneta','la estrella','estrella',
+    'caldas','girardota','barbosa','heliconia','sopetran','sopetrán',
+    'san jeronimo','san jerónimo','ebejico','san antonio de prado'
+  ];
+
+  /* ── Haversine ── */
+  function _km(la1, lo1, la2, lo2) {
+    var R  = 6371,
+        dL = (la2 - la1) * Math.PI / 180,
+        dO = (lo2 - lo1) * Math.PI / 180,
+        a  = Math.sin(dL/2)*Math.sin(dL/2)
+           + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)
+           * Math.sin(dO/2)*Math.sin(dO/2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  /* ── Calcular tarifa ── */
+  function _calcTarifa(lat, lng, textoDir) {
+    var txt = (textoDir || '').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    /* Municipio de tarifa fija */
+    if (MUNICIPIOS_FIJOS.some(function (m) { return txt.indexOf(m) !== -1; }))
+      return { tarifa: TARIFA_FIJA, km: _km(ANCLA_WIL.lat, ANCLA_WIL.lng, lat, lng), fija: true };
+
+    var distKm = _km(ANCLA_WIL.lat, ANCLA_WIL.lng, lat, lng);
+    var extra  = Math.max(0, distKm - KM_LIBRE);
+    var tarifa = Math.round((BASE_TARIFA + extra * PRECIO_KM) / 500) * 500;
+    return { tarifa: tarifa, km: distKm, fija: false };
+  }
+
+  /* ── Inyectar pill de tarifa en el resultado GPS del modal ── */
+  function _mostrarTarifaPill(info) {
+    /* Reutilizar si ya existe, si no crear */
+    var pill = document.getElementById('wv-tarifa-pill');
+    if (!pill) {
+      pill = document.createElement('div');
+      pill.id = 'wv-tarifa-pill';
+      pill.style.cssText =
+        'margin-top:10px;display:flex;align-items:center;gap:10px;'
+        + 'background:linear-gradient(135deg,#1a2e1a,#2d4a2d);'
+        + 'border-radius:14px;padding:12px 15px;'
+        + 'box-shadow:0 4px 16px rgba(22,163,74,.25);';
+      var result = document.getElementById('wvGpsResult');
+      if (result) result.appendChild(pill);
+    }
+
+    var tarifaTxt = '$' + info.tarifa.toLocaleString('es-CO');
+    var kmTxt     = info.km.toFixed(1) + ' km desde WIL';
+    var nota      = info.fija
+      ? '📍 Municipio lejano · tarifa fija'
+      : '📍 Calculado por distancia';
+
+    pill.innerHTML =
+      '<span style="font-size:28px">🛵</span>'
+      + '<div style="flex:1">'
+        + '<div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.6);'
+          + 'text-transform:uppercase;letter-spacing:.07em;margin-bottom:2px">'
+          + 'Tarifa estimada de domicilio</div>'
+        + '<div style="font-size:22px;font-weight:900;color:#fff">' + tarifaTxt + '</div>'
+        + '<div style="font-size:11px;color:rgba(255,255,255,.65);margin-top:1px">'
+          + kmTxt + ' · ' + nota + '</div>'
+      + '</div>'
+      + '<div style="font-size:10px;color:rgba(255,255,255,.5);text-align:right;line-height:1.4">'
+        + 'El admin<br>confirma</div>';
+
+    /* Guardar en state para incluirlo en el WA */
+    W._wvTarifa = info;
+  }
+
+  /* ── Hook en wvCapturarGPS: calcular tarifa después de obtener coords ── */
+  var _origGPS = W.wvCapturarGPS;
+  W.wvCapturarGPS = function () {
+
+    /* Interceptar el getCurrentPosition original */
+    var _origGeo = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
+
+    navigator.geolocation.getCurrentPosition = function (onOk, onErr, opts) {
+      _origGeo(function (pos) {
+        onOk(pos);
+        /* Restaurar inmediatamente para no interferir con otros usos */
+        navigator.geolocation.getCurrentPosition = _origGeo;
+
+        /* Calcular tarifa con la posición recibida */
+        var lat = pos.coords.latitude;
+        var lng = pos.coords.longitude;
+
+        /* Esperar 400 ms para que la dirección (Nominatim) ya esté en el DOM */
+        setTimeout(function () {
+          var dirEl = document.getElementById('wvGpsDirTxt');
+          var dir   = dirEl ? dirEl.textContent : '';
+          var info  = _calcTarifa(lat, lng, dir);
+          _mostrarTarifaPill(info);
+        }, 400);
+
+      }, onErr, opts);
+    };
+
+    /* Llamar la función original (que internamente llama getCurrentPosition) */
+    if (typeof _origGPS === 'function') _origGPS.apply(this, arguments);
+  };
+
+  /* ── Hook en wvEnviarWA: añadir tarifa al mensaje ── */
+  var _origWA = W.wvEnviarWA;
+  W.wvEnviarWA = function () {
+    /* Parchar el msg dentro del fetch de WA añadiendo la tarifa ANTES de llamar original */
+    /* La función original construye el mensaje y lo pone en el href del botón.
+       Lo interceptamos DESPUÉS para modificar el href ya asignado. */
+    var resultado = _origWA ? _origWA.apply(this, arguments) : true;
+
+    if (W._wvTarifa) {
+      var btn = document.getElementById('wvWaBtn');
+      if (btn && btn.href && btn.href.indexOf('wa.me') !== -1) {
+        try {
+          /* Decodificar texto actual del mensaje */
+          var urlObj = new URL(btn.href);
+          var txt    = decodeURIComponent(urlObj.searchParams.get('text') || '');
+          var linea  = '\n💰 *Tarifa estimada domicilio:* $'
+            + W._wvTarifa.tarifa.toLocaleString('es-CO')
+            + ' (' + W._wvTarifa.km.toFixed(1) + ' km desde WIL'
+            + (W._wvTarifa.fija ? ' · tarifa fija' : '') + ')';
+          /* Insertar antes de la línea de espera */
+          txt = txt.replace('⏳ _Esperando cotización', linea + '\n⏳ _Esperando cotización');
+          urlObj.searchParams.set('text', txt);
+          btn.href = urlObj.toString();
+        } catch (e) { /* si falla, el mensaje original igual se envía */ }
+      }
+    }
+    return resultado;
+  };
+
+  console.log('[WIL Veredal] ✅ Tarifa por km activa en modal GPS');
+
+})(window);
+
 </script>
+
+
 
 
 </body>
