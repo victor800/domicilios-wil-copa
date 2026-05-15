@@ -34,38 +34,6 @@ const stats = {
 };
 
 // ─── GOOGLE SHEETS AUTH ──────────────────────────────────────
-async function getSheetsClient() {
-  if (!SHEETS_ENABLED) throw new Error('Sheets no configurado');
-
-  let auth;
-  if (process.env.GOOGLE_CREDENTIALS) {
-    let creds;
-    try {
-      // Limpia saltos de línea literales que Vercel puede introducir,
-      // pero preserva los \n dentro del private_key (ya escapados en JSON)
-      const raw = process.env.GOOGLE_CREDENTIALS
-        .replace(/\r?\n\s*/g, ' ')  // newlines literales → espacio
-        .trim();
-      creds = JSON.parse(raw);
-    } catch {
-      throw new Error('GOOGLE_CREDENTIALS no es un JSON válido — pégalo minificado en Vercel');
-    }
-    auth = new google.auth.GoogleAuth({
-      credentials: creds,
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-    });
-  } else {
-    auth = new google.auth.GoogleAuth({
-      keyFile: './credentials.json',
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-    });
-  }
-
-  const client = await auth.getClient();
-  return google.sheets({ version: 'v4', auth: client });
-}
-
-// ─── GUARDAR EVENTO EN SHEETS ────────────────────────────────
 async function registrarEvento(ip, ruta, tipo, metodo, userAgent, prioridad) {
   if (!SHEETS_ENABLED) return; // Salir silenciosamente si no hay Sheets
   try {
@@ -88,6 +56,50 @@ async function registrarEvento(ip, ruta, tipo, metodo, userAgent, prioridad) {
   } catch (e) {
     console.error('[Monitor] Error guardando en Sheets:', e.message);
   }
+}
+
+// ─── GOOGLE SHEETS AUTH ──────────────────────────────────────
+function parseCredentials(raw) {
+  // 1. Intento directo
+  try { return JSON.parse(raw); } catch {}
+
+  // 2. Reparar \n literales dentro del private_key
+  try {
+    const fixed = raw.replace(
+      /("private_key"\s*:\s*")([\s\S]*?)(?="(?:\s*,|\s*\}))/,
+      (_, prefix, key) => prefix + key.replace(/\n/g, '\\n')
+    );
+    return JSON.parse(fixed);
+  } catch {}
+
+  // 3. Último recurso: colapsar saltos externos
+  try {
+    return JSON.parse(raw.split('\n').map(l => l.trim()).join(''));
+  } catch (e) {
+    throw new Error(`GOOGLE_CREDENTIALS inválido: ${e.message}`);
+  }
+}
+
+async function getSheetsClient() {
+  if (!SHEETS_ENABLED) throw new Error('Sheets no configurado');
+
+  let auth;
+  if (process.env.GOOGLE_CREDENTIALS) {
+    // ↓ reemplaza el try/catch anterior por esto
+    const creds = parseCredentials(process.env.GOOGLE_CREDENTIALS);
+    auth = new google.auth.GoogleAuth({
+      credentials: creds,
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+  } else {
+    auth = new google.auth.GoogleAuth({
+      keyFile: './credentials.json',
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+  }
+
+  const client = await auth.getClient();
+  return google.sheets({ version: 'v4', auth: client });
 }
 
 // ─── TELEGRAM ────────────────────────────────────────────────
@@ -261,7 +273,6 @@ function sendReport() {
     `🔝 *Rutas más visitadas:*\n${topRoutes || "—"}`
   );
 }
-
 // ─── ARRANQUE ─────────────────────────────────────────────────
 function startMonitor() {
   console.log(`[Monitor] ✅ Monitoreo activo | Sheets: ${SHEETS_ENABLED ? 'ON' : 'OFF (sin credenciales)'}`);
@@ -278,4 +289,5 @@ function startMonitor() {
   process.on("SIGTERM", () => sendTelegram(`🔴 *Servidor detenido (SIGTERM)*`, "high"));
 }
 
-module.exports = { monitorMiddleware, startMonitor, sendTelegram, stats };
+// ↓ Solo agrega sendReport al export
+module.exports = { monitorMiddleware, startMonitor, sendTelegram, sendReport, stats };
