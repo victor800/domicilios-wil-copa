@@ -12,7 +12,11 @@ const ALERT_COOLDOWN  = 30 * 1000;
 
 // ─── SHEETS HABILITADO ────────────────────────────────────────
 // Solo intenta usar Sheets si las credenciales están configuradas
-const SHEETS_ENABLED = !!(process.env.GOOGLE_CREDENTIALS || fs.existsSync('./credentials.json'));
+// ✅ Después
+const SHEETS_ENABLED = !!(
+  (process.env.GOOGLE_CREDENTIALS && process.env.GOOGLE_CREDENTIALS !== 'undefined') ||
+  fs.existsSync('./credentials.json')
+);
 
 // ─── RUTAS SENSIBLES ─────────────────────────────────────────
 const SENSITIVE_ROUTES = [
@@ -60,6 +64,8 @@ async function registrarEvento(ip, ruta, tipo, metodo, userAgent, prioridad) {
 
 // ─── GOOGLE SHEETS AUTH ──────────────────────────────────────
 function parseCredentials(raw) {
+    if (!raw || raw === 'undefined') throw new Error('GOOGLE_CREDENTIALS no está configurado');
+
   // 1. Intento directo
   try { return JSON.parse(raw); } catch {}
 
