@@ -12671,38 +12671,33 @@ try {
 
 
 <script>
-  /* ═══════════════════════════════════════════════════════════════
-   WIL PATCH — "Realizar compra" simplificado
+ /* ═══════════════════════════════════════════════════════════════
+   WIL PATCH — "Realizar compra" simplificado v2
    ─────────────────────────────────────────────────────────────
-   Cuando el usuario elige "Realizar compra" (comercio = false):
-   • Se ocultan: Barrio de recogida + Teléfono de recogida
-   • Aparece: Textarea "¿Qué necesitas?" directo en P1
-   • Se mantiene: Barrio de entrega (con lista y precios)
-   • Se mantiene: Nombre, dirección, teléfono, referencia
-
-   Cuando elige "Recoger y Entregar" (comercio = true):
-   • Todo queda igual que antes (sin cambios)
+   FIX: el patch anterior llamaba la cadena wilGoLibre2 que
+   validaba barrio de recogida y bloqueaba el flujo.
+   Este patch maneja el modo "compra" de forma completamente
+   independiente, saltando esa validación.
    ─────────────────────────────────────────────────────────────
    Cargar DESPUÉS de wil-patch-sin-para-quien.js
 ═══════════════════════════════════════════════════════════════ */
 ;(function (W) {
   'use strict';
 
-  /* ── 1. CSS adicional ── */
+  /* ── 1. CSS ── */
   var st = document.createElement('style');
-  st.id = 'wil-compra-patch-css';
+  st.id = 'wil-compra-v2-css';
   st.textContent = `
-    /* Wrapper del textarea en P1 para "Realizar compra" */
     #wil-compra-texto-wrap {
       display: none;
       margin-bottom: 10px;
-      animation: wcpFadeIn .2s ease;
+      animation: wcpIn .2s ease;
     }
-    @keyframes wcpFadeIn {
-      from { opacity: 0; transform: translateY(-5px); }
-      to   { opacity: 1; transform: translateY(0); }
+    @keyframes wcpIn {
+      from { opacity:0; transform:translateY(-5px); }
+      to   { opacity:1; transform:translateY(0); }
     }
-    #wil-compra-texto-wrap label {
+    #wil-compra-texto-wrap > label {
       display: block;
       font-size: 11px;
       font-weight: 700;
@@ -12731,191 +12726,215 @@ try {
       border-color: var(--p, #006970);
       box-shadow: 0 0 0 3px rgba(0,105,112,.08);
     }
-    #wil-compra-texto::placeholder {
-      color: var(--on3);
-      font-size: 13px;
-    }
-    #wil-compra-texto-note {
+    #wil-compra-texto::placeholder { color: var(--on3); font-size: 13px; }
+    #wil-compra-nota {
       font-size: 10.5px;
       color: var(--on3);
-      margin-top: 4px;
+      margin-top: 5px;
       font-weight: 500;
       line-height: 1.5;
     }
-
-    /* Pill de ayuda visual */
-    #wil-compra-hint-pill {
+    #wil-compra-hint {
       display: none;
       align-items: center;
-      gap: 7px;
+      gap: 8px;
       background: rgba(0,105,112,.06);
       border: 1px solid rgba(0,105,112,.18);
       border-radius: 10px;
-      padding: 9px 12px;
+      padding: 10px 13px;
       margin-bottom: 10px;
       font-size: 12px;
       font-weight: 600;
       color: var(--p, #006970);
-      line-height: 1.4;
+      line-height: 1.45;
     }
-    #wil-compra-hint-pill .sym {
-      font-size: 16px;
-      flex-shrink: 0;
-    }
+    #wil-compra-hint .sym { font-size: 16px; flex-shrink: 0; }
+
+    /* En modo compra: ocultar barrio recogida y tel recogida */
+    body.wil-modo-compra #wil-barrio-recogida-field,
+    body.wil-modo-compra #wil-tel-recogida-wrap { display: none !important; }
   `;
   document.head.appendChild(st);
 
-  /* ── 2. Inyectar textarea y pill de ayuda en #wil-sec-barrios
-          ANTES del campo de barrio de entrega ── */
-  function _inyectarElementosCompra() {
-    var secBarrios = document.getElementById('wil-sec-barrios');
-    if (!secBarrios) return;
+  /* ── 2. Inyectar elementos en #wil-sec-barrios ── */
+  function _inyectar() {
+    var sec = document.getElementById('wil-sec-barrios');
+    if (!sec || document.getElementById('wil-compra-texto-wrap')) return;
 
-    /* Evitar duplicados */
-    if (document.getElementById('wil-compra-texto-wrap')) return;
+    /* Marcar el primer .field (barrio recogida) con un id para ocultarlo */
+    var primerField = sec.querySelector('.field');
+    if (primerField && !primerField.id) primerField.id = 'wil-barrio-recogida-field';
 
     /* Pill de ayuda */
-    var pill = document.createElement('div');
-    pill.id = 'wil-compra-hint-pill';
-    pill.innerHTML =
-      '<span class="sym f">lightbulb</span>' +
-      '<span>Escribe en texto libre — nuestro sistema organiza tu lista automáticamente.</span>';
+    var hint = document.createElement('div');
+    hint.id = 'wil-compra-hint';
+    hint.innerHTML = '<span class="sym f">lightbulb</span>'
+      + '<span>Escribe todo lo que necesitas en texto libre — el sistema lo organiza automáticamente con cantidades.</span>';
 
-    /* Wrap del textarea */
+    /* Textarea */
     var wrap = document.createElement('div');
     wrap.id = 'wil-compra-texto-wrap';
     wrap.innerHTML =
-      '<label>¿Qué necesitas? <span style="font-weight:500;color:var(--on3)">(describe tu pedido)</span></label>' +
-      '<textarea id="wil-compra-texto"' +
-      '  placeholder="Ej: 2 hamburguesas con queso, una coca cola 600ml, papas medianas…' +
-      '\nEj: 1 kilo de arroz, 2 leches, 3 huevos, pan tajado…"></textarea>' +
-      '<div id="wil-compra-texto-note">' +
-      '  Escribe todo lo que necesitas. Lo organizamos con cantidades antes de enviarlo. ' +
-      '  Peso máximo: <strong>30 kg</strong>.' +
-      '</div>';
+      '<label>¿Qué necesitas comprar? *</label>'
+      + '<textarea id="wil-compra-texto"'
+      + ' placeholder="Ej: 2 hamburguesas con queso doble, una coca cola 600ml, papas medianas...'
+      + '\nEj: 1 kilo de arroz, 2 leches, 3 huevos, pan tajado..."></textarea>'
+      + '<div id="wil-compra-nota">Describe todo. Peso máximo permitido: <strong>30 kg</strong>.</div>';
 
-    /* Insertar: pill primero, luego wrap, ambos al inicio de secBarrios */
-    secBarrios.insertBefore(wrap, secBarrios.firstChild);
-    secBarrios.insertBefore(pill, secBarrios.firstChild);
+    /* Insertar al inicio de sec */
+    sec.insertBefore(wrap, sec.firstChild);
+    sec.insertBefore(hint, sec.firstChild);
   }
 
-  /* ── 3. Mostrar / ocultar elementos según modo ── */
-  function _aplicarModoCompra(esCompra) {
-    /* Barrio de recogida: primer .field de #wil-sec-barrios */
-    var secBarrios = document.getElementById('wil-sec-barrios');
-    if (!secBarrios) return;
-
-    /* El primer .field dentro de wil-sec-barrios = barrio recogida */
-    var fields = secBarrios.querySelectorAll('.field');
-    var fieldRecogida = fields[0]; /* barrio recogida */
-
-    /* Tel. recogida wrap (inyectado por el patch anterior) */
-    var telWrap = document.getElementById('wil-tel-recogida-wrap');
-
-    /* Nuestros elementos */
-    var pill = document.getElementById('wil-compra-hint-pill');
-    var wrap = document.getElementById('wil-compra-texto-wrap');
-
-    if (esCompra) {
-      /* ── MODO "Realizar compra" ── */
-      if (fieldRecogida) fieldRecogida.style.display = 'none';
-      if (telWrap)       telWrap.style.display       = 'none';
-      if (pill) pill.style.display = 'flex';
-      if (wrap) wrap.style.display = 'block';
+  /* ── 3. Activar / desactivar modo compra ── */
+  function _modoCompra(activo) {
+    if (activo) {
+      document.body.classList.add('wil-modo-compra');
     } else {
-      /* ── MODO "Recoger y Entregar" ── */
-      if (fieldRecogida) fieldRecogida.style.display = '';
-      if (telWrap)       telWrap.style.display       = '';
-      if (pill) pill.style.display = 'none';
-      if (wrap) wrap.style.display = 'none';
+      document.body.classList.remove('wil-modo-compra');
     }
+    _inyectar();
+    var hint = document.getElementById('wil-compra-hint');
+    var wrap = document.getElementById('wil-compra-texto-wrap');
+    if (hint) hint.style.display = activo ? 'flex' : 'none';
+    if (wrap) wrap.style.display = activo ? 'block' : 'none';
   }
 
   /* ── 4. Parchear wilSelComercio ── */
-  var _origSelComercio = W.wilSelComercio;
+  var _origSel = W.wilSelComercio;
   W.wilSelComercio = function (si) {
-    /* Llamar la cadena existente (patch sin-para-quien + original) */
-    if (typeof _origSelComercio === 'function') _origSelComercio.apply(this, arguments);
-
-    /* Inyectar elementos si aún no existen */
-    setTimeout(function () {
-      _inyectarElementosCompra();
-      _aplicarModoCompra(!si); /* si=true → recoger; si=false → compra */
-    }, 100);
+    if (typeof _origSel === 'function') _origSel.apply(this, arguments);
+    setTimeout(function () { _modoCompra(!si); }, 120);
   };
 
-  /* ── 5. Parchear wilGoLibre2 para modo "Realizar compra" ──
-          Toma el texto del P1 y lo copia al textarea del P2
-          antes de navegar, para que goLibre3Async lo procese. ── */
-  var _origGoLibre2 = W.wilGoLibre2;
-  W.wilGoLibre2 = function () {
-    var L = W.WIL_LIBRE || {};
+  /* ── 5. wilGoLibre2: interceptar ANTES de la cadena ──────────────────
+     En modo compra (comercio=false) manejamos validación y navegación
+     completamente aquí, sin pasar por el patch sin-para-quien que exige
+     barrio de recogida.
+  ─────────────────────────────────────────────────────────────────────── */
+  var _cadenaGoLibre2 = W.wilGoLibre2;
 
-    /* Solo intervenir si es modo "Realizar compra" */
-    if (L.comercio === false) {
-      var textoP1 = document.getElementById('wil-compra-texto');
-      if (textoP1 && textoP1.value.trim()) {
-        /* Copiar al textarea del paso 2 */
-        var textoP2 = document.getElementById('libreTextoLibre');
-        if (textoP2 && !textoP2.value.trim()) {
-          textoP2.value = textoP1.value.trim();
-        }
-      }
-    }
-
-    /* Llamar la cadena existente */
-    if (typeof _origGoLibre2 === 'function') _origGoLibre2.apply(this, arguments);
-  };
-
-  /* ── 6. Incluir texto del P1 en la validación de wilGoLibre2
-          (el patch sin-para-quien sobreescribe wilGoLibre2,
-           así que necesitamos un segundo wrapper) ── */
-  var _lastWilGoLibre2 = W.wilGoLibre2;
   W.wilGoLibre2 = function () {
     var L = W.WIL_LIBRE = W.WIL_LIBRE || {};
 
+    /* MODO "Realizar compra" → flujo propio */
     if (L.comercio === false) {
-      /* Validar que haya texto en el textarea del P1 */
-      var textoEl = document.getElementById('wil-compra-texto');
-      var texto   = textoEl ? textoEl.value.trim() : '';
-
-      if (!texto) {
-        if (typeof W.mostrarToast === 'function') {
-          W.mostrarToast('Escribe qué necesitas pedir.', 'edit_note');
-        }
-        if (textoEl) textoEl.focus();
-        return; /* no avanzar */
-      }
-
-      /* Copiar texto al P2 para que goLibre3Async lo procese */
-      var textoP2 = document.getElementById('libreTextoLibre');
-      if (textoP2) textoP2.value = texto;
+      return _goLibre2Compra(L);
     }
 
-    /* Llamar cadena */
-    if (typeof _lastWilGoLibre2 === 'function') _lastWilGoLibre2.apply(this, arguments);
+    /* MODO "Recoger y Entregar" → cadena normal sin cambios */
+    if (typeof _cadenaGoLibre2 === 'function') _cadenaGoLibre2.apply(this, arguments);
   };
 
-  /* ── 7. Reset al volver al inicio ── */
+  /* ── Flujo completo para "Realizar compra" ── */
+  function _goLibre2Compra(L) {
+    var T = typeof W.mostrarToast === 'function' ? W.mostrarToast : function () {};
+    var g = function (id) { var e = document.getElementById(id); return e ? e.value.trim() : ''; };
+
+    /* 1. Validar texto del pedido */
+    var texto = g('wil-compra-texto');
+    if (!texto) {
+      T('Escribe qué necesitas comprar.', 'edit_note');
+      var tx = document.getElementById('wil-compra-texto');
+      if (tx) tx.focus();
+      return;
+    }
+
+    /* 2. Validar barrio de entrega */
+    var hidE = document.getElementById('wil-barrio-entrega');
+    if (!hidE || !hidE.value) { T('Selecciona el barrio de entrega.', 'location_on'); return; }
+
+    /* 3. Validar datos personales */
+    var nom = g('wil-nombre-mi');
+    var dir = g('wil-dir-mi');
+    var tel = g('wil-tel-mi');
+    if (!nom) { T('Escribe tu nombre.', 'person'); return; }
+    if (!dir) { T('Escribe la dirección de entrega.', 'location_on'); return; }
+    if (!tel) { T('Escribe tu teléfono.', 'phone'); return; }
+
+    /* 4. Poblar WIL_LIBRE */
+    L.destino        = 'mi';
+    L.comercioNombre = '';
+    L.barrioRecogida = '';
+    L.barrioEntrega  = hidE.value;
+    L.tarifaDomi     = parseInt((hidE.dataset && hidE.dataset.precio) || 0);
+    L.direccion      = dir;
+    L.referencia     = g('wil-ref-mi');
+    L.recibeTel      = tel;
+    L.nombre         = nom;
+    L.recibeNombre   = nom;
+    L.enviaNombre    = nom;
+    L.enviaTel       = tel;
+    L.telRecogida    = '';
+
+    /* 5. Copiar texto al P2 para que goLibre3Async lo procese con IA */
+    var textoP2 = document.getElementById('libreTextoLibre');
+    if (textoP2) textoP2.value = texto;
+
+    /* 6. Sincronizar state */
+    if (W.state) {
+      W.state.nombre     = nom;
+      W.state.telefono   = tel;
+      W.state.direccion  = dir;
+      W.state.referencia = L.referencia;
+      W.state.barrio     = L.barrioEntrega;
+    }
+
+    /* 7. Ir al paso 2 */
+    if (typeof W.showView === 'function') W.showView('view-libre-2');
+  }
+
+  /* ── 6. Ajustar datos en Sheets para modo compra ──
+          Col V (idx 21) = COMERCIO → "El domi realiza la compra"
+          Col U (idx 20) = TIPO     → "COMPRA"
+  ── */
+  var GAS_MARCA = 'AKfycbyYpNT9yizFaHrxjKPq2TZkzroMUqXpCmdC_ztC-Y7WL3jov6E7IluzKX_dZRB80yHFpQ';
+  var _origFetch = window.fetch;
+  window.fetch = async function (url, opts) {
+    if (
+      typeof url === 'string' &&
+      url.indexOf(GAS_MARCA) !== -1 &&
+      opts && opts.method === 'POST' &&
+      opts.mode === 'no-cors'
+    ) {
+      try {
+        var body = JSON.parse(opts.body || '{}');
+        var L    = W.WIL_LIBRE || {};
+        if (L.comercio === false && body.rows && body.rows.length) {
+          if (!body.rows[0][21] || body.rows[0][21] === 'Domi WIL') {
+            body.rows[0][21] = 'El domi realiza la compra';
+          }
+          if (body.rows[0][20] === 'DOMICILIO') {
+            body.rows[0][20] = 'COMPRA';
+          }
+          opts = Object.assign({}, opts, { body: JSON.stringify(body) });
+        }
+      } catch (ex) {
+        console.warn('[WIL compra-patch fetch]', ex.message);
+      }
+    }
+    return _origFetch.apply(this, arguments);
+  };
+
+  /* ── 7. Reset ── */
   var _origReset = W.resetAll;
   if (typeof _origReset === 'function') {
     W.resetAll = function () {
       _origReset.apply(this, arguments);
+      document.body.classList.remove('wil-modo-compra');
       var t = document.getElementById('wil-compra-texto');
       if (t) t.value = '';
-      var pill = document.getElementById('wil-compra-hint-pill');
+      var hint = document.getElementById('wil-compra-hint');
       var wrap = document.getElementById('wil-compra-texto-wrap');
-      if (pill) pill.style.display = 'none';
+      if (hint) hint.style.display = 'none';
       if (wrap) wrap.style.display = 'none';
     };
   }
 
-  /* ── 8. Reset al cambiar de opción (botones yn-si / yn-no) ── */
-  /* Ya cubierto por wilSelComercio wrapper de arriba */
-
-  console.log('[WIL] ✅ Compra patch — textarea P1, sin barrio recogida ni tel recogida en modo compra');
+  console.log('[WIL] ✅ Compra patch v2 — flujo independiente, datos a Sheets correctos');
 
 })(window);
+
   </script>
 
 
