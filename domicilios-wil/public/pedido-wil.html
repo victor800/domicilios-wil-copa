@@ -24,6 +24,7 @@
      <script src="wil-patch-sin-para-quien.js"></script>
       <script src="wil-veredal-visual-patch.js"></script>
       <script src="wil-compra-patch.js"></script>
+      <script src="wil-fix-totales-card.js"></script>
 
     
 <style>
@@ -12939,6 +12940,350 @@ try {
 
 
 
+ <script>
+  /* ═══════════════════════════════════════════════════════════════
+   WIL — AVISO FÓRMULA MÉDICA EN TARJETAS DE FARMACIA
+   Botón rojo palpitante + colapsable con resumen de política
+   de medicamentos bajo fórmula médica.
+   Se inserta automáticamente en cada .farm-card al cargar.
+═══════════════════════════════════════════════════════════════ */
+;(function () {
+  'use strict';
+
+  /* ── CSS ── */
+  var st = document.createElement('style');
+  st.id = 'wil-formula-css';
+  st.textContent = `
+
+    /* ── Botón palpitante rojo ── */
+    .wil-formula-btn {
+      width: 100%;
+      margin-top: 7px;
+      padding: 9px 12px;
+      border-radius: 10px;
+      border: none;
+      background: linear-gradient(135deg, #dc2626, #b91c1c);
+      color: #fff;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 11px;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      letter-spacing: .01em;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 3px 12px rgba(220,38,38,.45);
+      transition: transform .13s, box-shadow .13s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .wil-formula-btn:active {
+      transform: scale(.96);
+      box-shadow: 0 1px 6px rgba(220,38,38,.3);
+    }
+
+    /* Pulso de fondo */
+    .wil-formula-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 10px;
+      background: rgba(255,255,255,.14);
+      animation: wfPulso 1.6s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes wfPulso {
+      0%, 100% { opacity: 0; transform: scale(1); }
+      50%       { opacity: 1; transform: scale(1.04); }
+    }
+
+    /* Dot rojo palpitante a la izquierda */
+    .wil-formula-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #fff;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .wil-formula-dot::after {
+      content: '';
+      position: absolute;
+      inset: -3px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.35);
+      animation: wfDotPing 1.4s ease-out infinite;
+    }
+    @keyframes wfDotPing {
+      0%   { transform: scale(1); opacity: .8; }
+      70%  { transform: scale(2.2); opacity: 0; }
+      100% { opacity: 0; }
+    }
+
+    /* Icono chevron */
+    .wil-formula-ico {
+      font-family: 'Material Symbols Rounded';
+      font-size: 16px;
+      font-weight: normal;
+      font-style: normal;
+      line-height: 1;
+      margin-left: auto;
+      transition: transform .3s cubic-bezier(.22,1,.36,1);
+      flex-shrink: 0;
+    }
+    .wil-formula-btn.open .wil-formula-ico {
+      transform: rotate(180deg);
+    }
+
+    /* ── Panel colapsable ── */
+    .wil-formula-panel {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height .38s cubic-bezier(.22,1,.36,1), opacity .28s ease;
+      opacity: 0;
+      margin-top: 0;
+    }
+    .wil-formula-panel.open {
+      max-height: 520px;
+      opacity: 1;
+      margin-top: 6px;
+    }
+
+    /* Contenido del panel */
+    .wil-formula-content {
+      background: linear-gradient(135deg, #fff5f5, #fff);
+      border: 1.5px solid rgba(220,38,38,.22);
+      border-radius: 12px;
+      padding: 13px 13px 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    /* Encabezado del aviso */
+    .wil-formula-hdr {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1.5px dashed rgba(220,38,38,.2);
+    }
+    .wil-formula-hdr-ico {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      background: rgba(220,38,38,.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .wil-formula-hdr-tit {
+      font-size: 12.5px;
+      font-weight: 900;
+      color: #991b1b;
+      line-height: 1.25;
+    }
+    .wil-formula-hdr-sub {
+      font-size: 10px;
+      color: #b91c1c;
+      font-weight: 600;
+      margin-top: 1px;
+      opacity: .85;
+    }
+
+    /* Cuerpo del aviso */
+    .wil-formula-body {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #7f1d1d;
+      line-height: 1.65;
+    }
+    .wil-formula-body strong {
+      font-weight: 900;
+      color: #991b1b;
+    }
+
+    /* Chips de ejemplo */
+    .wil-formula-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+    .wil-formula-chip {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 20px;
+      background: rgba(220,38,38,.09);
+      color: #991b1b;
+      border: 1px solid rgba(220,38,38,.2);
+    }
+
+    /* Nota legal al pie */
+    .wil-formula-legal {
+      font-size: 9.5px;
+      color: #b91c1c;
+      opacity: .7;
+      font-weight: 500;
+      text-align: center;
+      border-top: 1px solid rgba(220,38,38,.12);
+      padding-top: 7px;
+      line-height: 1.5;
+    }
+
+    /* Check verde — medicamento sin fórmula */
+    .wil-formula-ok {
+      display: flex;
+      align-items: flex-start;
+      gap: 7px;
+      background: #f0fdf4;
+      border: 1px solid #86efac;
+      border-radius: 9px;
+      padding: 9px 11px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #14532d;
+      line-height: 1.5;
+    }
+    .wil-formula-ok-ico {
+      font-size: 15px;
+      flex-shrink: 0;
+      margin-top: 1px;
+      color: #15803d;
+    }
+  `;
+  document.head.appendChild(st);
+
+  /* ── Datos por farmacia ── */
+  var FARMACIA_INFO = {
+    central: {
+      nombre: 'Droguería Central',
+      ejemplos: ['Antibióticos', 'Benzodiacepinas', 'Opioides', 'Insulinas', 'Antihipertensivos controlados']
+    },
+    expertos: {
+      nombre: 'Farma Expertos',
+      ejemplos: ['Formulados especiales', 'Inyectables controlados', 'Antibióticos', 'Psicotrópicos']
+    }
+  };
+
+  /* ── HTML del panel ── */
+  function _buildPanel(tienda) {
+    var info = FARMACIA_INFO[tienda] || { nombre: 'Esta farmacia', ejemplos: ['Antibióticos', 'Controlados', 'Psicotrópicos'] };
+
+    var chips = info.ejemplos.map(function (e) {
+      return '<span class="wil-formula-chip">💊 ' + e + '</span>';
+    }).join('');
+
+    return `
+      <div class="wil-formula-content">
+
+        <div class="wil-formula-hdr">
+          <div class="wil-formula-hdr-ico">💊</div>
+          <div>
+            <div class="wil-formula-hdr-tit">Medicamentos bajo fórmula médica</div>
+            <div class="wil-formula-hdr-sub">${info.nombre} · Aviso importante</div>
+          </div>
+        </div>
+
+        <div class="wil-formula-body">
+          En <strong>${info.nombre}</strong> velamos por tu salud y la de los tuyos. Para los medicamentos cuya etiqueta diga
+          <strong>"venta bajo fórmula médica"</strong>, es <strong>indispensable presentar la fórmula médica</strong>
+          antes de dispensar el producto.
+        </div>
+
+        <div>
+          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#991b1b;margin-bottom:5px">
+            Ejemplos que requieren fórmula
+          </div>
+          <div class="wil-formula-chips">${chips}</div>
+        </div>
+
+        <div class="wil-formula-ok">
+          <span class="wil-formula-ok-ico">✅</span>
+          <span>Los medicamentos de venta libre <strong>no requieren fórmula</strong>. El domi puede recogerlos sin inconvenientes.</span>
+        </div>
+
+        <div class="wil-formula-body" style="font-size:11px;background:rgba(220,38,38,.05);border-radius:8px;padding:8px 10px">
+          📋 Si tu pedido incluye medicamentos con fórmula, envía la foto de la fórmula al domiciliario por WhatsApp para que la presente en la farmacia.
+        </div>
+
+        <div class="wil-formula-legal">
+          Art. 2.5.3.10.18 · Decreto 780 de 2016 · Cumplir este requisito es cuidar tu salud.
+        </div>
+
+      </div>
+    `;
+  }
+
+  /* ── Inyectar en cada tarjeta ── */
+  function _inyectarEnTarjetas() {
+    var cards = document.querySelectorAll('.farm-card');
+    cards.forEach(function (card) {
+      if (card.dataset.formulaPatch) return; /* ya parchada */
+      card.dataset.formulaPatch = '1';
+
+      /* Detectar qué farmacia es por el onclick */
+      var onclick = card.getAttribute('onclick') || '';
+      var tienda  = 'central';
+      if (onclick.indexOf('expertos') !== -1) tienda = 'expertos';
+      else if (onclick.indexOf('central') !== -1) tienda = 'central';
+
+      var body = card.querySelector('.farm-card-body');
+      if (!body) return;
+
+      /* Crear botón */
+      var uid    = 'wf_' + tienda + '_' + Date.now();
+      var btn    = document.createElement('button');
+      btn.className = 'wil-formula-btn';
+      btn.setAttribute('data-panel', uid);
+      btn.innerHTML =
+        '<span class="wil-formula-dot"></span>'
+        + '⚠️ Fórmula médica — leer antes de pedir'
+        + '<span class="wil-formula-ico">expand_more</span>';
+
+      /* Crear panel */
+      var panel    = document.createElement('div');
+      panel.className = 'wil-formula-panel';
+      panel.id     = uid;
+      panel.innerHTML = _buildPanel(tienda);
+
+      /* Toggle: evitar que propague al onclick de la card */
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var abierto = panel.classList.contains('open');
+        panel.classList.toggle('open', !abierto);
+        btn.classList.toggle('open', !abierto);
+        var ico = btn.querySelector('.wil-formula-ico');
+        if (ico) ico.textContent = abierto ? 'expand_more' : 'expand_less';
+      });
+
+      /* Insertar ANTES del botón "Pedir aquí" */
+      var btnPedir = body.querySelector('.farm-card-btn');
+      if (btnPedir) {
+        body.insertBefore(btn,   btnPedir);
+        body.insertBefore(panel, btnPedir);
+      } else {
+        body.appendChild(btn);
+        body.appendChild(panel);
+      }
+    });
+  }
+
+  /* ── Ejecutar al cargar ── */
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _inyectarEnTarjetas);
+  } else {
+    setTimeout(_inyectarEnTarjetas, 0);
+  }
+
+  console.log('[WIL] ✅ Aviso fórmula médica en tarjetas de farmacia — cargado');
+
+})();
+ </script>
 
 
 
