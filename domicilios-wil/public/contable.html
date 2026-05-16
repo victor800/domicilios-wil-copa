@@ -666,40 +666,88 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
       </div>
     </div>
     <div class="panel">
-      <div style="padding:10px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg);">
-        <div class="ped-tabs-bar" id="ped-cont-tabs">
-          <button class="ped-tab on" data-f="todos" onclick="filterPedCont('todos',this)">Todos</button>
-          <button class="ped-tab" data-f="pendiente" onclick="filterPedCont('pendiente',this)">Pendientes</button>
-          <button class="ped-tab" data-f="asignado" onclick="filterPedCont('asignado',this)">Asignados</button>
-          <button class="ped-tab" data-f="proceso" onclick="filterPedCont('proceso',this)">En proceso</button>
-          <button class="ped-tab" data-f="encamino" onclick="filterPedCont('encamino',this)">En camino</button>
-          <button class="ped-tab" data-f="entregado" onclick="filterPedCont('entregado',this)">Entregados</button>
-          <button class="ped-tab" data-f="cancelado" onclick="filterPedCont('cancelado',this)">Cancelados</button>
-        </div>
-        <select id="ped-cont-domi" onchange="filterPedCont(document.querySelector('#ped-cont-tabs .ped-tab.on')?.dataset?.f||'todos',null)" style="background:var(--white);border:1.5px solid var(--border);border-radius:8px;padding:4px 9px;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;color:var(--text);outline:none;">
-          <option value="">Todos los domis</option>
-        </select>
-        <select id="ped-cont-tipo" onchange="filterPedCont(document.querySelector('#ped-cont-tabs .ped-tab.on')?.dataset?.f||'todos',null)" style="background:var(--white);border:1.5px solid var(--border);border-radius:8px;padding:4px 9px;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;color:var(--text);outline:none;">
-          <option value="">Domicilio y Recogida</option>
-          <option value="domicilio">Solo Domicilio</option>
-          <option value="recogida">Solo Recogida</option>
-        </select>
-        <span style="font-size:9px;font-weight:700;color:var(--text3);" id="ped-cont-count">–</span>
-      </div>
-      <div style="overflow-x:auto;padding:5px 7px 8px;">
-        <table class="ptbl">
-          <thead><tr>
-            <th>Pedido #</th><th>Cliente</th><th>Dirección</th><th>Domi</th>
-            <th>Estado</th><th>Comercio</th><th>Método</th>
-            <th>Subtotal</th><th>Domicilio</th><th>Total</th><th>Hora</th><th>Fecha</th>
-          </tr></thead>
-          <tbody id="ped-cont-tbody">
-            <tr><td colspan="12" style="text-align:center;padding:24px;color:var(--text3);">Cargando…</td></tr>
-          </tbody>
-        </table>
-      </div>
+     <!-- SUB-NAV Pedidos / Rastreo -->
+<div class="caja-nav" style="margin-bottom:0;border-radius:0;border-left:none;border-right:none;border-top:none;">
+  <button class="caja-ntab active" id="pn-pedidos" onclick="setPedTab('pedidos')">
+    <span class="material-symbols-rounded">package_2</span>Pedidos
+    <span class="sb-badge teal" id="pn-badge-pend">–</span>
+  </button>
+  <button class="caja-ntab" id="pn-rastreo" onclick="setPedTab('rastreo')">
+    <span class="material-symbols-rounded">location_on</span>Rastreo en vivo
+    <span class="sb-badge" style="background:var(--green-l);color:var(--green);" id="pn-badge-activos">–</span>
+  </button>
+</div>
+
+<!-- SUB-TAB: LISTA PEDIDOS -->
+<div class="ctab-view active" id="ptab-pedidos">
+  <div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg);">
+    <div class="ped-tabs-bar" id="ped-cont-tabs">
+      <button class="ped-tab on" data-f="todos" onclick="filterPedCont('todos',this)">Todos</button>
+      <button class="ped-tab" data-f="pendiente" onclick="filterPedCont('pendiente',this)">Pendientes</button>
+      <button class="ped-tab" data-f="asignado" onclick="filterPedCont('asignado',this)">Asignados</button>
+      <button class="ped-tab" data-f="proceso" onclick="filterPedCont('proceso',this)">En proceso</button>
+      <button class="ped-tab" data-f="encamino" onclick="filterPedCont('encamino',this)">En camino</button>
+      <button class="ped-tab" data-f="entregado" onclick="filterPedCont('entregado',this)">Entregados</button>
+      <button class="ped-tab" data-f="cancelado" onclick="filterPedCont('cancelado',this)">Cancelados</button>
     </div>
-  </div><!-- /view-pedidos -->
+    <select id="ped-cont-domi" onchange="filterPedCont(document.querySelector('#ped-cont-tabs .ped-tab.on')?.dataset?.f||'todos',null)" style="background:var(--white);border:1.5px solid var(--border);border-radius:8px;padding:4px 9px;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;color:var(--text);outline:none;">
+      <option value="">Todos los domis</option>
+    </select>
+    <select id="ped-cont-tipo" onchange="filterPedCont(document.querySelector('#ped-cont-tabs .ped-tab.on')?.dataset?.f||'todos',null)" style="background:var(--white);border:1.5px solid var(--border);border-radius:8px;padding:4px 9px;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;color:var(--text);outline:none;">
+      <option value="">Domicilio y Recogida</option>
+      <option value="domicilio">Solo Domicilio</option>
+      <option value="recogida">Solo Recogida</option>
+    </select>
+    <span style="font-size:9px;font-weight:700;color:var(--text3);" id="ped-cont-count">–</span>
+  </div>
+  <div style="overflow-x:auto;padding:5px 7px 8px;">
+    <table class="ptbl">
+      <thead><tr>
+        <th>Pedido #</th><th>Cliente</th><th>Dirección</th><th>Domi</th>
+        <th>Estado</th><th>Comercio</th><th>Método</th>
+        <th>Subtotal</th><th>Domicilio</th><th>Total</th><th>Hora</th><th>Fecha</th>
+      </tr></thead>
+      <tbody id="ped-cont-tbody">
+        <tr><td colspan="12" style="text-align:center;padding:24px;color:var(--text3);">Cargando…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- SUB-TAB: RASTREO -->
+<div class="ctab-view" id="ptab-rastreo">
+
+  <!-- Tarjetas estado por domi -->
+  <div style="padding:14px 16px 0;">
+    <div style="font-size:8px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.11em;margin-bottom:10px;display:flex;align-items:center;gap:5px;">
+      <div class="rt-live-dot" style="width:6px;height:6px;border-radius:50%;background:var(--green);animation:bk 1.4s infinite;"></div>
+      Domiciliarios activos · actualización 30s
+    </div>
+    <div id="rastreo-domis-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:14px;"></div>
+  </div>
+
+  <!-- Mapa -->
+  <div style="padding:0 16px 14px;">
+    <div style="background:linear-gradient(135deg,#071e22,#0d3540);border:1.5px solid rgba(40,185,193,.18);border-radius:14px;overflow:hidden;">
+      <div style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:8px;">
+        <span class="material-symbols-rounded" style="color:var(--teal);font-size:16px;">map</span>
+        <span style="font-size:12px;font-weight:800;color:#fff;flex:1;">Mapa de rastreo</span>
+        <span style="font-size:9px;color:rgba(255,255,255,.35);" id="rastreo-mapa-ts">–</span>
+        <button class="btn btn-ghost btn-sm" onclick="initMapaRastreo()" style="background:rgba(255,255,255,.07);color:rgba(255,255,255,.6);border-color:rgba(255,255,255,.12);">
+          <span class="material-symbols-rounded">refresh</span>
+        </button>
+      </div>
+      <div id="mapa-rastreo" style="height:420px;width:100%;"></div>
+    </div>
+  </div>
+
+  <!-- Lista pedidos activos con estado -->
+  <div style="padding:0 16px 20px;">
+    <div style="font-size:8px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.11em;margin-bottom:8px;">Pedidos activos por domi</div>
+    <div id="rastreo-lista-activos"></div>
+  </div>
+
+</div>
 
   <!-- ════ VISTA CAJA ════ -->
   <div class="view" id="view-caja">

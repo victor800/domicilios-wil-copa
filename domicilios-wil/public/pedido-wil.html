@@ -23,6 +23,8 @@
      <script src="wil-fix-entregado.js"></script>
      <script src="wil-patch-sin-para-quien.js"></script>
       <script src="wil-veredal-visual-patch.js"></script>
+      <script src="wil-compra-patch.js"></script>
+
     
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -12293,6 +12295,10 @@ try {
 
 })(window);
 
+
+
+
+
 ;(function (W) {
   'use strict';
 
@@ -12660,6 +12666,261 @@ try {
   document.head.appendChild(s);
 })();
 </script>
+
+
+
+
+<script>
+  /* ═══════════════════════════════════════════════════════════════
+   WIL PATCH — "Realizar compra" simplificado
+   ─────────────────────────────────────────────────────────────
+   Cuando el usuario elige "Realizar compra" (comercio = false):
+   • Se ocultan: Barrio de recogida + Teléfono de recogida
+   • Aparece: Textarea "¿Qué necesitas?" directo en P1
+   • Se mantiene: Barrio de entrega (con lista y precios)
+   • Se mantiene: Nombre, dirección, teléfono, referencia
+
+   Cuando elige "Recoger y Entregar" (comercio = true):
+   • Todo queda igual que antes (sin cambios)
+   ─────────────────────────────────────────────────────────────
+   Cargar DESPUÉS de wil-patch-sin-para-quien.js
+═══════════════════════════════════════════════════════════════ */
+;(function (W) {
+  'use strict';
+
+  /* ── 1. CSS adicional ── */
+  var st = document.createElement('style');
+  st.id = 'wil-compra-patch-css';
+  st.textContent = `
+    /* Wrapper del textarea en P1 para "Realizar compra" */
+    #wil-compra-texto-wrap {
+      display: none;
+      margin-bottom: 10px;
+      animation: wcpFadeIn .2s ease;
+    }
+    @keyframes wcpFadeIn {
+      from { opacity: 0; transform: translateY(-5px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    #wil-compra-texto-wrap label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--on3);
+      margin-bottom: 6px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    #wil-compra-texto {
+      width: 100%;
+      min-height: 110px;
+      border: 1.5px solid #dce3ea;
+      border-radius: var(--r-lg, 13px);
+      padding: 12px 14px;
+      font-size: 14px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      color: var(--on);
+      background: #fff;
+      outline: none;
+      resize: none;
+      line-height: 1.6;
+      transition: border-color .15s;
+      box-sizing: border-box;
+    }
+    #wil-compra-texto:focus {
+      border-color: var(--p, #006970);
+      box-shadow: 0 0 0 3px rgba(0,105,112,.08);
+    }
+    #wil-compra-texto::placeholder {
+      color: var(--on3);
+      font-size: 13px;
+    }
+    #wil-compra-texto-note {
+      font-size: 10.5px;
+      color: var(--on3);
+      margin-top: 4px;
+      font-weight: 500;
+      line-height: 1.5;
+    }
+
+    /* Pill de ayuda visual */
+    #wil-compra-hint-pill {
+      display: none;
+      align-items: center;
+      gap: 7px;
+      background: rgba(0,105,112,.06);
+      border: 1px solid rgba(0,105,112,.18);
+      border-radius: 10px;
+      padding: 9px 12px;
+      margin-bottom: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--p, #006970);
+      line-height: 1.4;
+    }
+    #wil-compra-hint-pill .sym {
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+  `;
+  document.head.appendChild(st);
+
+  /* ── 2. Inyectar textarea y pill de ayuda en #wil-sec-barrios
+          ANTES del campo de barrio de entrega ── */
+  function _inyectarElementosCompra() {
+    var secBarrios = document.getElementById('wil-sec-barrios');
+    if (!secBarrios) return;
+
+    /* Evitar duplicados */
+    if (document.getElementById('wil-compra-texto-wrap')) return;
+
+    /* Pill de ayuda */
+    var pill = document.createElement('div');
+    pill.id = 'wil-compra-hint-pill';
+    pill.innerHTML =
+      '<span class="sym f">lightbulb</span>' +
+      '<span>Escribe en texto libre — nuestro sistema organiza tu lista automáticamente.</span>';
+
+    /* Wrap del textarea */
+    var wrap = document.createElement('div');
+    wrap.id = 'wil-compra-texto-wrap';
+    wrap.innerHTML =
+      '<label>¿Qué necesitas? <span style="font-weight:500;color:var(--on3)">(describe tu pedido)</span></label>' +
+      '<textarea id="wil-compra-texto"' +
+      '  placeholder="Ej: 2 hamburguesas con queso, una coca cola 600ml, papas medianas…' +
+      '\nEj: 1 kilo de arroz, 2 leches, 3 huevos, pan tajado…"></textarea>' +
+      '<div id="wil-compra-texto-note">' +
+      '  Escribe todo lo que necesitas. Lo organizamos con cantidades antes de enviarlo. ' +
+      '  Peso máximo: <strong>30 kg</strong>.' +
+      '</div>';
+
+    /* Insertar: pill primero, luego wrap, ambos al inicio de secBarrios */
+    secBarrios.insertBefore(wrap, secBarrios.firstChild);
+    secBarrios.insertBefore(pill, secBarrios.firstChild);
+  }
+
+  /* ── 3. Mostrar / ocultar elementos según modo ── */
+  function _aplicarModoCompra(esCompra) {
+    /* Barrio de recogida: primer .field de #wil-sec-barrios */
+    var secBarrios = document.getElementById('wil-sec-barrios');
+    if (!secBarrios) return;
+
+    /* El primer .field dentro de wil-sec-barrios = barrio recogida */
+    var fields = secBarrios.querySelectorAll('.field');
+    var fieldRecogida = fields[0]; /* barrio recogida */
+
+    /* Tel. recogida wrap (inyectado por el patch anterior) */
+    var telWrap = document.getElementById('wil-tel-recogida-wrap');
+
+    /* Nuestros elementos */
+    var pill = document.getElementById('wil-compra-hint-pill');
+    var wrap = document.getElementById('wil-compra-texto-wrap');
+
+    if (esCompra) {
+      /* ── MODO "Realizar compra" ── */
+      if (fieldRecogida) fieldRecogida.style.display = 'none';
+      if (telWrap)       telWrap.style.display       = 'none';
+      if (pill) pill.style.display = 'flex';
+      if (wrap) wrap.style.display = 'block';
+    } else {
+      /* ── MODO "Recoger y Entregar" ── */
+      if (fieldRecogida) fieldRecogida.style.display = '';
+      if (telWrap)       telWrap.style.display       = '';
+      if (pill) pill.style.display = 'none';
+      if (wrap) wrap.style.display = 'none';
+    }
+  }
+
+  /* ── 4. Parchear wilSelComercio ── */
+  var _origSelComercio = W.wilSelComercio;
+  W.wilSelComercio = function (si) {
+    /* Llamar la cadena existente (patch sin-para-quien + original) */
+    if (typeof _origSelComercio === 'function') _origSelComercio.apply(this, arguments);
+
+    /* Inyectar elementos si aún no existen */
+    setTimeout(function () {
+      _inyectarElementosCompra();
+      _aplicarModoCompra(!si); /* si=true → recoger; si=false → compra */
+    }, 100);
+  };
+
+  /* ── 5. Parchear wilGoLibre2 para modo "Realizar compra" ──
+          Toma el texto del P1 y lo copia al textarea del P2
+          antes de navegar, para que goLibre3Async lo procese. ── */
+  var _origGoLibre2 = W.wilGoLibre2;
+  W.wilGoLibre2 = function () {
+    var L = W.WIL_LIBRE || {};
+
+    /* Solo intervenir si es modo "Realizar compra" */
+    if (L.comercio === false) {
+      var textoP1 = document.getElementById('wil-compra-texto');
+      if (textoP1 && textoP1.value.trim()) {
+        /* Copiar al textarea del paso 2 */
+        var textoP2 = document.getElementById('libreTextoLibre');
+        if (textoP2 && !textoP2.value.trim()) {
+          textoP2.value = textoP1.value.trim();
+        }
+      }
+    }
+
+    /* Llamar la cadena existente */
+    if (typeof _origGoLibre2 === 'function') _origGoLibre2.apply(this, arguments);
+  };
+
+  /* ── 6. Incluir texto del P1 en la validación de wilGoLibre2
+          (el patch sin-para-quien sobreescribe wilGoLibre2,
+           así que necesitamos un segundo wrapper) ── */
+  var _lastWilGoLibre2 = W.wilGoLibre2;
+  W.wilGoLibre2 = function () {
+    var L = W.WIL_LIBRE = W.WIL_LIBRE || {};
+
+    if (L.comercio === false) {
+      /* Validar que haya texto en el textarea del P1 */
+      var textoEl = document.getElementById('wil-compra-texto');
+      var texto   = textoEl ? textoEl.value.trim() : '';
+
+      if (!texto) {
+        if (typeof W.mostrarToast === 'function') {
+          W.mostrarToast('Escribe qué necesitas pedir.', 'edit_note');
+        }
+        if (textoEl) textoEl.focus();
+        return; /* no avanzar */
+      }
+
+      /* Copiar texto al P2 para que goLibre3Async lo procese */
+      var textoP2 = document.getElementById('libreTextoLibre');
+      if (textoP2) textoP2.value = texto;
+    }
+
+    /* Llamar cadena */
+    if (typeof _lastWilGoLibre2 === 'function') _lastWilGoLibre2.apply(this, arguments);
+  };
+
+  /* ── 7. Reset al volver al inicio ── */
+  var _origReset = W.resetAll;
+  if (typeof _origReset === 'function') {
+    W.resetAll = function () {
+      _origReset.apply(this, arguments);
+      var t = document.getElementById('wil-compra-texto');
+      if (t) t.value = '';
+      var pill = document.getElementById('wil-compra-hint-pill');
+      var wrap = document.getElementById('wil-compra-texto-wrap');
+      if (pill) pill.style.display = 'none';
+      if (wrap) wrap.style.display = 'none';
+    };
+  }
+
+  /* ── 8. Reset al cambiar de opción (botones yn-si / yn-no) ── */
+  /* Ya cubierto por wilSelComercio wrapper de arriba */
+
+  console.log('[WIL] ✅ Compra patch — textarea P1, sin barrio recogida ni tel recogida en modo compra');
+
+})(window);
+  </script>
+
+
+
+
 
 
 
