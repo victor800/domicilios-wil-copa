@@ -1,7 +1,7 @@
-import mongoose from 'mongoose'
+import mongoose  from 'mongoose'
+import bcrypt    from 'bcryptjs'
 import Domiciliario from '../lib/Domiciliario.js'
 
-// ── Conexión directa (sin middleware) ──────────────────────────
 let cached = global._mongoose || null
 
 async function conectar() {
@@ -10,14 +10,12 @@ async function conectar() {
   global._mongoose = cached
 }
 
-// ── Helpers ────────────────────────────────────────────────────
 function getFotoUrl(foto) {
   if (!foto || !foto.trim()) return ''
   if (foto.startsWith('http') || foto.startsWith('data:')) return foto
   return `/icons/${foto.trim()}`
 }
 
-// ── Handler principal ──────────────────────────────────────────
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin',  '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -27,8 +25,7 @@ export default async function handler(req, res) {
   try {
     await conectar()
   } catch (err) {
-    console.error('[DB connect]', err.message)
-    return res.status(500).json({ ok: false, error: 'Error de conexión a DB' })
+    return res.status(500).json({ ok: false, error: 'Error de conexión: ' + err.message })
   }
 
   /* ── GET ── */
@@ -51,7 +48,6 @@ export default async function handler(req, res) {
         }))
       })
     } catch (err) {
-      console.error('[GET /api/domiciliarios]', err.message)
       return res.status(500).json({ ok: false, error: err.message })
     }
   }
@@ -64,20 +60,21 @@ export default async function handler(req, res) {
       if (!idWil || !nombre || !password)
         return res.status(400).json({ ok: false, error: 'Faltan campos obligatorios' })
 
-      const existe = await Domiciliario.findOne({
-        idWil: idWil.toUpperCase().trim()
-      })
+      const existe = await Domiciliario.findOne({ idWil: idWil.toUpperCase().trim() })
       if (existe)
         return res.status(409).json({ ok: false, error: `El ID ${idWil} ya está registrado` })
+
+      // Hash aquí, sin depender del pre-hook
+      const passwordHash = await bcrypt.hash(password, 12)
 
       const nuevo = await Domiciliario.create({
         idWil:    idWil.toUpperCase().trim(),
         nombre:   nombre.trim(),
-        password,
-        tel:      tel   || '',
-        zona:     zona  || '',
-        rol:      rol   || 'domiciliario',
-        foto:     foto  || '',
+        password: passwordHash,
+        tel:      tel  || '',
+        zona:     zona || '',
+        rol:      rol  || 'domiciliario',
+        foto:     foto || '',
         activo:   activo === 'true' || activo === true,
       })
 
