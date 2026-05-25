@@ -152,7 +152,6 @@ body{min-height:max(820px,100dvh)}
 
       <!-- Otros accesos -->
       <div class="flex flex-col gap-3">
-       
         <button
           onclick="window.location.href='pedido-wil.html'"
           class="w-full bg-surface-low text-on-surface-variant py-3.5 rounded-xl font-body font-semibold text-sm hover:bg-surface-high transition-colors flex items-center justify-center gap-2"
@@ -182,7 +181,6 @@ body{min-height:max(820px,100dvh)}
   </div>
 </main>
 
-
 <div class="fixed bottom-5 right-5 hidden md:block">
   <div class="glass-card px-4 py-3 rounded-2xl border border-outline-variant/20 shadow-xl flex items-center gap-3">
     <div class="w-9 h-9 rounded-full bg-wil-gradient flex items-center justify-center shadow-md">
@@ -195,9 +193,12 @@ body{min-height:max(820px,100dvh)}
   </div>
 </div>
 
-
 <script>
-var API_BASE = 'https://script.google.com/macros/s/AKfycbyNLLKk8S6bG-MgRLWx2zUVp4lXjaMl7txlUAAGLxAa-ZmoBrWN5mWWnnDNw-ZIs78NHA/exec';
+// ── Apunta a tu API en Vercel ────────────────────────────────────────────────
+// Si el HTML está en el mismo dominio que la API, usa ruta relativa:
+var API_DOMI_LOGIN = '/api/domi-login';
+// Si el HTML está en otro dominio (ej: GitHub Pages), usa URL absoluta:
+// var API_DOMI_LOGIN = 'https://TU-API.vercel.app/api/domi-login';
 
 function togglePass() {
   var inp = document.getElementById('inputClave');
@@ -236,12 +237,12 @@ function setBtnLoading(loading) {
 }
 
 async function doLogin() {
-  var id = document.getElementById('inputId').value.trim().toUpperCase();
-  var clave = document.getElementById('inputClave').value.trim();
+  var idWil  = document.getElementById('inputId').value.trim().toUpperCase();
+  var clave  = document.getElementById('inputClave').value.trim();
 
   ocultarError();
 
-  if (!id) {
+  if (!idWil) {
     mostrarError('Ingresa tu ID de domiciliario (ej: WIL-042)');
     document.getElementById('inputId').focus();
     return;
@@ -255,12 +256,13 @@ async function doLogin() {
   setBtnLoading(true);
 
   try {
-    var url = API_BASE + '?accion=domi-login&id=' + encodeURIComponent(id) + '&clave=' + encodeURIComponent(clave);
-    console.log('URL completa:', url);
-    var res = await fetch(url);
-    var text = await res.text();
-    console.log('Respuesta raw:', text);
-    var data = JSON.parse(text);
+    var res = await fetch(API_DOMI_LOGIN, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idWil: idWil, password: clave })
+    });
+
+    var data = await res.json();
 
     if (!data.ok) {
       mostrarError(data.error || 'ID o clave incorrectos');
@@ -270,26 +272,24 @@ async function doLogin() {
       return;
     }
 
-    // ── FIX: limpiar sesión anterior ANTES de guardar la nueva ──
+    // ── Limpiar sesión anterior ───────────────────────────────────────────
     localStorage.removeItem('wil_domi');
     sessionStorage.removeItem('wil_domi');
 
-    var _sesionDomi = JSON.stringify({
-      id:        data.domi.id,
-      nombre:    data.domi.nombre,
-      tel:       data.domi.tel,
-      foto:      data.domi.foto,
-      activo:    data.domi.activo,
-      actividad: data.domi.actividad,
-      rol:       'domiciliario',
-      loginAt:   new Date().toISOString()
+    var sesion = JSON.stringify({
+      id:      data.domi.id,
+      nombre:  data.domi.nombre,
+      tel:     data.domi.tel,
+      foto:    data.domi.foto,
+      activo:  data.domi.activo,
+      rol:     data.domi.rol,
+      loginAt: new Date().toISOString()
     });
 
-    // Guardar en ambos para que el panel siempre encuentre al usuario correcto
-    localStorage.setItem('wil_domi', _sesionDomi);
-    sessionStorage.setItem('wil_domi', _sesionDomi);
+    localStorage.setItem('wil_domi', sesion);
+    sessionStorage.setItem('wil_domi', sesion);
 
-    // Éxito visual
+    // ── Éxito visual ─────────────────────────────────────────────────────
     var content = document.getElementById('btnContent');
     content.innerHTML = '<span class="material-symbols-outlined" style="font-variation-settings:\'FILL\' 1;font-size:20px;color:#2a9d5c">check_circle</span><span>¡Bienvenido ' + data.domi.nombre.split(' ')[0] + '!</span>';
     document.getElementById('btnLogin').style.background = 'linear-gradient(135deg, #2a9d5c 0%, #1e7a45 100%)';
@@ -300,14 +300,13 @@ async function doLogin() {
 
   } catch (e) {
     mostrarError('❌ Error de conexión. Verifica internet.');
-    console.error('Login error:', e);
+    console.error('[domi-login] Error:', e);
     setBtnLoading(false);
   }
 }
 
-// Auto-redirigir si ya hay sesión activa válida
+// ── Auto-redirigir si ya hay sesión activa ───────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
-  // ── FIX: leer de ambos storages ──
   var session = localStorage.getItem('wil_domi') || sessionStorage.getItem('wil_domi');
   if (session) {
     try {
