@@ -3,9 +3,7 @@ import Domiciliario   from '../lib/Domiciliario.js'
 
 function getFotoUrl(foto) {
   if (!foto || !foto.trim()) return ''
-  // Si ya es URL completa (http/https) la devuelve tal cual
-  if (foto.startsWith('http')) return foto
-  // Si es solo nombre de archivo → construye ruta local
+  if (foto.startsWith('http') || foto.startsWith('data:')) return foto
   return `/icons/${foto.trim()}`
 }
 
