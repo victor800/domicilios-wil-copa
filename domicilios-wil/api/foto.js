@@ -1,32 +1,46 @@
-import mongoose from 'mongoose'
+// api/foto.js
+import { MongoClient, ObjectId } from 'mongodb'
 
-const FotoSchema = new mongoose.Schema({ data: String, mime: String })
-const Foto = mongoose.models.Foto || mongoose.model('Foto', FotoSchema, 'Fotos')
+const client = new MongoClient(process.env.MONGODB_URI)
 
-let cached = global._mongoose || null
-async function conectar() {
-  if (cached && mongoose.connection.readyState === 1) return
-  cached = await mongoose.connect(process.env.MONGODB_URI)
-  global._mongoose = cached
+async function getDb() {
+  if (!client.topology?.isConnected()) await client.connect()
+  return client.db().collection('fotos')
 }
 
 export default async function handler(req, res) {
-  await conectar()
 
-  // POST → guarda foto, devuelve URL corta
-  if (req.method === 'POST') {
-    const { base64, mime } = req.body
-    const doc = await Foto.create({ data: base64, mime: mime || 'image/jpeg' })
-    return res.json({ ok: true, url: `/api/foto?id=${doc._id}` })
-  }
-
-  // GET → sirve la imagen
+  /* ── GET /api/foto?id=abc  →  sirve la imagen ── */
   if (req.method === 'GET') {
-    const doc = await Foto.findById(req.query.id).lean()
-    if (!doc) return res.status(404).end()
-    const buf = Buffer.from(doc.data, 'base64')
-    res.setHeader('Content-Type', doc.mime)
-    res.setHeader('Cache-Control', 'public,max-age=31536000')
-    return res.send(buf)
+    const { id } = req.query
+    if (!id) return res.status(400).end('Falta id')
+
+    try {
+      const col  = await getDb()
+      const doc  = await col.findOne({ _id: new ObjectId(id) })
+      if (!doc) return res.status(404).end('No encontrada')
+
+      res.setHeader('Content-Type', doc.mime)
+      res.setHeader('Cache-Control', 'public, max-age=31536000')
+      return res.send(Buffer.from(doc.data, 'base64'))
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: e.message })
+    }
   }
+
+  /* ── POST /api/foto  { base64, mime }  →  { ok, url } ── */
+  if (req.method === 'POST') {
+    const { base64, mime } = req.body ?? {}
+    if (!base64 || !mime) return res.status(400).json({ ok: false, error: 'Faltan campos' })
+
+    try {
+      const col    = await getDb()
+      const result = await col.insertOne({ data: base64, mime, ts: new Date() })
+      return res.json({ ok: true, url: `/api/foto?id=${result.insertedId}` })
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: e.message })
+    }
+  }
+
+  res.status(405).end()
 }
