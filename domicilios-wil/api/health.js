@@ -1,10 +1,9 @@
-const { sendTelegram, stats } = require('../services/monitor');
+import { sendTelegram, stats } from '../services/monitor.js'
 
-module.exports = (req, res) => {
-  // Verifica el secreto
-  const secret = req.headers['x-health-key'];
+export default function handler(req, res) {
+  const secret = req.headers['x-health-key']
   if (secret !== process.env.HEALTH_SECRET) {
-    return res.status(401).json({ error: 'No autorizado' });
+    return res.status(401).json({ error: 'No autorizado' })
   }
 
   try {
@@ -16,10 +15,10 @@ module.exports = (req, res) => {
       `⚠️ Errores 4xx: *${stats.errors4xx}*\n` +
       `💀 Errores 5xx: *${stats.errors5xx}*\n` +
       `📥 Descargas APK: *${stats.apkDownloads}*`
-    );
-    res.json({ ok: true });
+    )
+    res.json({ ok: true })
   } catch (e) {
-    console.error('[Cron] Error enviando reporte:', e.message);
-    res.status(500).json({ error: e.message });
+    console.error('[Cron] Error enviando reporte:', e.message)
+    res.status(500).json({ error: e.message })
   }
-};
+}
