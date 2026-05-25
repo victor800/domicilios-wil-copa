@@ -28,7 +28,7 @@ const Admin = mongoose.models.Admin
 
 const admins = [
   { idWil: 'WIL-001',    nombre: 'Wil',    password: 'Wil2026'    },
-  { idWil: 'RHM', nombre: 'Hernán', password: 'RHM2021' },
+  { idWil: 'RHM-001', nombre: 'Hernan', password: 'RHM2021' },
 ]
 
 for (const a of admins) {
