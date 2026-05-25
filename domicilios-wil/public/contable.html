@@ -473,6 +473,14 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
     <span class="sb-badge" id="sb-badge-cierres" style="background:var(--teal-m);color:var(--teal);">–</span>
   </button>
 
+    <div class="sb-divider"></div>
+  <div class="sb-section">Equipo</div>
+ 
+  <button class="sb-item" id="sb-domis" onclick="setView('domis')">
+    <span class="material-symbols-rounded">badge</span>
+    Registrar Domiciliarios
+  </button>
+
   <div class="sb-footer">
     <div class="sb-footer-item">
       <span class="material-symbols-rounded">schedule</span>
@@ -1050,6 +1058,178 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
     </div>
 
   </div><!-- /view-caja -->
+
+
+  <!-- ════ VISTA DOMICILIARIOS ════ -->
+  <div class="view" id="view-domis">
+    <div class="page-hdr">
+      <div class="page-hdr-left">
+        <h1>Domiciliarios</h1>
+        <p>Registrar nuevos domiciliarios en el sistema</p>
+      </div>
+    </div>
+ 
+    <div class="grid-2b">
+ 
+      <!-- ── FORMULARIO ── -->
+      <div class="inline-form" style="border-color:rgba(40,185,193,.25);background:linear-gradient(135deg,rgba(40,185,193,.03),rgba(40,185,193,.01));">
+        <div class="inline-form-title" style="color:var(--teal);">
+          <span class="material-symbols-rounded" style="color:var(--teal);">person_add</span>
+          Nuevo domiciliario
+        </div>
+ 
+        <!-- ID WIL (auto-sugerido) -->
+        <div class="field">
+          <label>
+            <span class="material-symbols-rounded">badge</span>
+            ID WIL <span style="color:var(--red);">*</span>
+          </label>
+          <div style="display:flex;gap:7px;">
+            <input id="nd-id" type="text" placeholder="WIL-028"
+              style="flex:1;"
+              oninput="this.value=this.value.toUpperCase()">
+            <button class="btn btn-ghost btn-sm" onclick="sugerirIdWil()" title="Sugerir siguiente ID">
+              <span class="material-symbols-rounded">auto_fix_high</span>
+            </button>
+          </div>
+          <span style="font-size:9px;color:var(--text3);margin-top:3px;display:block;" id="nd-id-hint">
+            Haz clic en ✨ para sugerir el siguiente ID disponible
+          </span>
+        </div>
+ 
+        <!-- Nombre -->
+        <div class="field">
+          <label><span class="material-symbols-rounded">person</span>Nombre completo <span style="color:var(--red);">*</span></label>
+          <input id="nd-nombre" type="text" placeholder="Ej: Juan Felipe David">
+        </div>
+ 
+        <!-- Teléfono -->
+        <div class="field">
+          <label><span class="material-symbols-rounded">phone</span>Teléfono</label>
+          <input id="nd-tel" type="tel" placeholder="3001234567" inputmode="numeric">
+        </div>
+ 
+        <!-- Clave -->
+        <div class="field">
+          <label><span class="material-symbols-rounded">lock</span>Clave de acceso <span style="color:var(--red);">*</span></label>
+          <div style="position:relative;">
+            <input id="nd-password" type="password" placeholder="Mínimo 6 caracteres"
+              style="padding-right:42px;">
+            <button type="button"
+              onclick="togglePassNd()"
+              style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text3);">
+              <span class="material-symbols-rounded" id="nd-eye" style="font-size:18px;">visibility</span>
+            </button>
+          </div>
+        </div>
+ 
+        <!-- Zona -->
+        <div class="field-row">
+          <div class="field">
+            <label><span class="material-symbols-rounded">map</span>Zona</label>
+            <input id="nd-zona" type="text" placeholder="Ej: Norte, Centro…">
+          </div>
+          <div class="field">
+            <label><span class="material-symbols-rounded">work</span>Rol</label>
+            <select id="nd-rol">
+              <option value="domiciliario">Domiciliario</option>
+              <option value="coordinador">Coordinador</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+        </div>
+ 
+        <!-- Foto -->
+        <div class="field">
+          <label><span class="material-symbols-rounded">photo_camera</span>Foto de perfil</label>
+          <div id="nd-foto-drop"
+            onclick="document.getElementById('nd-foto-input').click()"
+            style="
+              border:2px dashed var(--border2);
+              border-radius:12px;
+              padding:18px;
+              text-align:center;
+              cursor:pointer;
+              transition:border-color .15s, background .15s;
+              background:var(--bg);
+            "
+            ondragover="event.preventDefault();this.style.borderColor='var(--teal)';this.style.background='var(--teal-l)';"
+            ondragleave="this.style.borderColor='var(--border2)';this.style.background='var(--bg)';"
+            ondrop="handleFotoDrop(event)">
+            <div id="nd-foto-preview-wrap" style="display:none;margin-bottom:10px;">
+              <img id="nd-foto-preview" src="" alt="preview"
+                style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid var(--teal);margin:0 auto;display:block;">
+            </div>
+            <span class="material-symbols-rounded" id="nd-foto-ico"
+              style="font-size:28px;color:var(--teal);opacity:.5;display:block;margin-bottom:4px;">
+              add_photo_alternate
+            </span>
+            <span style="font-size:11px;font-weight:700;color:var(--text3);" id="nd-foto-lbl">
+              Arrastra o haz clic para subir foto
+            </span>
+            <span style="font-size:9px;color:var(--text3);display:block;margin-top:2px;">
+              JPG, PNG, JPEG · máx 5MB
+            </span>
+          </div>
+          <input id="nd-foto-input" type="file" accept="image/*" style="display:none;"
+            onchange="previewFoto(this.files[0])">
+        </div>
+ 
+        <!-- Activo -->
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--border);margin-top:4px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;">
+            <div class="nd-toggle-track" id="nd-activo-track" onclick="toggleActivoNd()"
+              style="
+                position:relative;width:38px;height:22px;
+                background:var(--teal);border-radius:99px;
+                transition:background .2s;cursor:pointer;flex-shrink:0;
+              ">
+              <div id="nd-activo-thumb"
+                style="
+                  position:absolute;top:3px;left:19px;
+                  width:16px;height:16px;background:#fff;
+                  border-radius:50%;transition:left .2s;
+                "></div>
+            </div>
+            <span style="font-size:11px;font-weight:700;color:var(--text2);">Cuenta activa al crear</span>
+          </label>
+          <input type="hidden" id="nd-activo" value="true">
+        </div>
+ 
+        <!-- Error -->
+        <div id="nd-error" class="hidden"
+          style="display:none;background:var(--red-l);border:1.5px solid rgba(220,38,38,.2);border-radius:10px;padding:9px 12px;font-size:11px;font-weight:700;color:var(--red);align-items:center;gap:7px;">
+          <span class="material-symbols-rounded" style="font-size:14px;flex-shrink:0;">error</span>
+          <span id="nd-error-txt">Error</span>
+        </div>
+ 
+        <!-- Botón -->
+        <button class="btn btn-primary" id="btn-crear-domi" onclick="crearDomiciliario()"
+          style="width:100%;justify-content:center;margin-top:6px;">
+          <span class="material-symbols-rounded">person_add</span>
+          Registrar domiciliario
+        </button>
+      </div>
+ 
+      <!-- ── LISTA DE DOMICILIARIOS ACTUALES ── -->
+      <div class="panel">
+        <div class="panel-hdr">
+          <div class="panel-hdr-ico" style="background:var(--teal-m);color:var(--teal-d);">
+            <span class="material-symbols-rounded" style="font-size:15px;">group</span>
+          </div>
+          <h3>Domiciliarios registrados</h3>
+          <span class="ph-sub" id="nd-lista-count">–</span>
+          <button class="btn btn-ghost btn-sm" onclick="renderListaDomis()" style="margin-left:auto;">
+            <span class="material-symbols-rounded">refresh</span>
+          </button>
+        </div>
+        <div class="panel-body" id="nd-lista" style="padding:10px;">
+          <div class="empty-state"><div class="es-ico">👥</div><p>Cargando domiciliarios…</p></div>
+        </div>
+      </div>
+ 
+    </div>
+  </div><!-- /view-domis -->
 
 </div>
 </main>
@@ -2061,6 +2241,222 @@ async function doRefresh(){
     document.getElementById('sync-state').style.color='var(--red)';
     showToast('e','Error de conexión',e.message.substring(0,80));
   }
+}
+
+/* ════ REGISTRAR DOMICILIARIOS ════════════════════════════════════════════ */
+ 
+// ── Extender setView para la nueva pestaña ─────────────────────────────────
+const _setViewOrig = setView
+function setView(view) {
+  _setViewOrig(view)
+  if (view === 'domis') {
+    document.querySelectorAll('.sb-item').forEach(b => b.classList.remove('active'))
+    document.getElementById('sb-domis')?.classList.add('active')
+    renderListaDomis()
+    sugerirIdWil()
+  }
+}
+ 
+// ── Toggle visibilidad clave ───────────────────────────────────────────────
+function togglePassNd() {
+  const inp = document.getElementById('nd-password')
+  const ico = document.getElementById('nd-eye')
+  if (inp.type === 'password') { inp.type = 'text';  ico.textContent = 'visibility_off' }
+  else                         { inp.type = 'password'; ico.textContent = 'visibility'  }
+}
+ 
+// ── Toggle activo ──────────────────────────────────────────────────────────
+function toggleActivoNd() {
+  const inp   = document.getElementById('nd-activo')
+  const track = document.getElementById('nd-activo-track')
+  const thumb = document.getElementById('nd-activo-thumb')
+  const isOn  = inp.value === 'true'
+  inp.value        = isOn ? 'false' : 'true'
+  track.style.background = isOn ? 'var(--border)' : 'var(--teal)'
+  thumb.style.left       = isOn ? '3px' : '19px'
+}
+ 
+// ── Preview foto ───────────────────────────────────────────────────────────
+function previewFoto(file) {
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = e => {
+    document.getElementById('nd-foto-preview').src = e.target.result
+    document.getElementById('nd-foto-preview-wrap').style.display = 'block'
+    document.getElementById('nd-foto-ico').style.display  = 'none'
+    document.getElementById('nd-foto-lbl').textContent    = file.name
+  }
+  reader.readAsDataURL(file)
+}
+function handleFotoDrop(e) {
+  e.preventDefault()
+  const drop = document.getElementById('nd-foto-drop')
+  drop.style.borderColor = 'var(--border2)'
+  drop.style.background  = 'var(--bg)'
+  const file = e.dataTransfer.files?.[0]
+  if (file && file.type.startsWith('image/')) {
+    document.getElementById('nd-foto-input').files = e.dataTransfer.files
+    previewFoto(file)
+  }
+}
+ 
+// ── Sugerir ID ────────────────────────────────────────────────────────────
+function sugerirIdWil() {
+  // Recoge todos los ids numéricos WIL-NNN de allDrivers
+  const nums = allDrivers
+    .map(d => { const m = (d.id || '').match(/^WIL-(\d+)$/); return m ? parseInt(m[1]) : 0 })
+    .filter(n => n > 0)
+  const siguiente = nums.length ? Math.max(...nums) + 1 : 28
+  const sugerido  = `WIL-${String(siguiente).padStart(3, '0')}`
+  document.getElementById('nd-id').value     = sugerido
+  document.getElementById('nd-id-hint').textContent = `✨ ID sugerido: ${sugerido}`
+}
+ 
+// ── Mostrar / ocultar error del form ──────────────────────────────────────
+function ndError(msg) {
+  const box = document.getElementById('nd-error')
+  document.getElementById('nd-error-txt').textContent = msg
+  box.style.display = 'flex'
+}
+function ndOcultarError() {
+  document.getElementById('nd-error').style.display = 'none'
+}
+ 
+// ── Crear domiciliario ─────────────────────────────────────────────────────
+async function crearDomiciliario() {
+  ndOcultarError()
+ 
+  const idWil    = document.getElementById('nd-id').value.trim().toUpperCase()
+  const nombre   = document.getElementById('nd-nombre').value.trim()
+  const password = document.getElementById('nd-password').value.trim()
+  const tel      = document.getElementById('nd-tel').value.trim()
+  const zona     = document.getElementById('nd-zona').value.trim()
+  const rol      = document.getElementById('nd-rol').value
+  const activo   = document.getElementById('nd-activo').value
+  const fotoFile = document.getElementById('nd-foto-input').files?.[0]
+ 
+  // Validaciones básicas
+  if (!idWil)    { ndError('El ID WIL es obligatorio'); return }
+  if (!nombre)   { ndError('El nombre es obligatorio'); return }
+  if (!password) { ndError('La clave es obligatoria'); return }
+  if (password.length < 6) { ndError('La clave debe tener al menos 6 caracteres'); return }
+ 
+  const btn = document.getElementById('btn-crear-domi')
+  btn.disabled = true
+  btn.innerHTML = '<span class="material-symbols-rounded spin-ico">progress_activity</span> Registrando…'
+ 
+  try {
+    const fd = new FormData()
+    fd.append('idWil',    idWil)
+    fd.append('nombre',   nombre)
+    fd.append('password', password)
+    fd.append('tel',      tel)
+    fd.append('zona',     zona)
+    fd.append('rol',      rol)
+    fd.append('activo',   activo)
+    if (fotoFile) fd.append('foto', fotoFile)
+ 
+    const res  = await fetch('/api/crear-domiciliario', { method: 'POST', body: fd })
+    const data = await res.json()
+ 
+    if (!data.ok) {
+      ndError(data.error || 'Error al registrar')
+      return
+    }
+ 
+    // Éxito ✅
+    showToast('s', `✓ ${nombre} registrado`, `${idWil} · ${rol}`)
+ 
+    // Agregar a allDrivers en memoria para que el resto del panel lo vea
+    allDrivers.push({ id: idWil, nombre, tel, activo: activo === 'true' })
+ 
+    // Limpiar form
+    ;['nd-id','nd-nombre','nd-password','nd-tel','nd-zona'].forEach(id => {
+      const el = document.getElementById(id)
+      if (el) el.value = ''
+    })
+    document.getElementById('nd-foto-preview-wrap').style.display = 'none'
+    document.getElementById('nd-foto-ico').style.display  = 'block'
+    document.getElementById('nd-foto-lbl').textContent    = 'Arrastra o haz clic para subir foto'
+    document.getElementById('nd-foto-input').value        = ''
+    document.getElementById('nd-password').type           = 'password'
+    document.getElementById('nd-eye').textContent         = 'visibility'
+ 
+    // Refrescar lista y sugerir nuevo ID
+    renderListaDomis()
+    sugerirIdWil()
+ 
+    // Refrescar selects de caja para que aparezca el nuevo domi
+    poblarDomis('b-domi')
+    poblarDomis('m-domi')
+ 
+  } catch (e) {
+    ndError('Error de red: ' + e.message)
+  } finally {
+    btn.disabled = false
+    btn.innerHTML = '<span class="material-symbols-rounded">person_add</span>Registrar domiciliario'
+  }
+}
+ 
+// ── Render lista domiciliarios ─────────────────────────────────────────────
+function renderListaDomis() {
+  const el  = document.getElementById('nd-lista')
+  const cnt = document.getElementById('nd-lista-count')
+  if (!el) return
+ 
+  if (!allDrivers.length) {
+    el.innerHTML = '<div class="empty-state"><div class="es-ico">👥</div><p>Sin domiciliarios cargados</p></div>'
+    if (cnt) cnt.textContent = '0 registrados'
+    return
+  }
+ 
+  if (cnt) cnt.textContent = allDrivers.length + ' registrados'
+ 
+  // FOTOS_MAP igual al del panel de perfil
+  const FOTOS_MAP = {
+    'WIL-001':'Robinson.jpeg','WIL-005':'Andres.jpeg','WIL-008':'Eduardo.jpeg',
+    'WIL-009':'AndrésMeneses.jpeg','WIL-010':'Jhon.jpeg','WIL-014':'Santiago.jpeg',
+    'RHM':'Hernan.jpeg','WIL-020':'Andres.jpeg','WIL-025':'Luis.jpeg',
+    'WIL-026':'Julian.jpeg','WIL-027':'Emmanuel .jpeg',
+  }
+ 
+  el.innerHTML = allDrivers.map(d => {
+    const fotoArchivo = d.foto || FOTOS_MAP[d.id] || ''
+    const fotoUrl     = fotoArchivo ? `icons/${fotoArchivo}` : ''
+    const iniciales   = (d.nombre || '?').split(' ').slice(0, 2).map(p => p[0]).join('').toUpperCase()
+ 
+    const avatarHTML = fotoUrl
+      ? `<img src="${fotoUrl}"
+            alt="${d.nombre}"
+            style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid var(--teal);flex-shrink:0;"
+            onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+         <div style="display:none;width:40px;height:40px;border-radius:50%;background:var(--teal);
+                     align-items:center;justify-content:center;font-size:14px;font-weight:800;
+                     color:#071e22;flex-shrink:0;">${iniciales}</div>`
+      : `<div style="width:40px;height:40px;border-radius:50%;background:var(--teal);
+                     display:flex;align-items:center;justify-content:center;
+                     font-size:14px;font-weight:800;color:#071e22;flex-shrink:0;">${iniciales}</div>`
+ 
+    return `
+      <div class="bm-item" style="align-items:center;">
+        ${avatarHTML}
+        <div style="flex:1;min-width:0;">
+          <div class="bm-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            ${d.nombre}
+          </div>
+          <div class="bm-meta">
+            ${d.id}
+            ${d.tel ? ' · 📞 ' + d.tel : ''}
+          </div>
+        </div>
+        <span style="
+          font-size:8px;font-weight:800;padding:2px 8px;border-radius:99px;
+          background:${d.activo !== false ? 'var(--green-l)' : 'var(--red-l)'};
+          color:${d.activo !== false ? 'var(--green)' : 'var(--red)'};
+          flex-shrink:0;
+        ">${d.activo !== false ? 'Activo' : 'Inactivo'}</span>
+      </div>`
+  }).join('')
 }
 
 /* ═══ BOOT ═══ */
