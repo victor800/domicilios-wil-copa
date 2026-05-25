@@ -1,6 +1,7 @@
 import { dbConnect } from '../lib/db.js'
 import Admin         from '../lib/Admin.js'
 import Domiciliario  from '../lib/Domiciliario.js'
+import mongoose      from 'mongoose'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST')
@@ -17,9 +18,14 @@ export default async function handler(req, res) {
 
     await dbConnect()
 
-    // ── Elegir colección según rol ──────────────────────────────
+    console.log('[auth] BD conectada:', mongoose.connection.db.databaseName)
+    console.log('[auth] idWil recibido:', idWil.toUpperCase().trim())
+    console.log('[auth] rol recibido:', rol)
+
     const Modelo  = rol === 'admin' ? Admin : Domiciliario
     const usuario = await Modelo.findOne({ idWil: idWil.toUpperCase().trim() })
+
+    console.log('[auth] usuario encontrado:', usuario ? usuario.idWil : 'NO ENCONTRADO')
 
     if (!usuario)
       return res.status(401).json({ error: 'ID o clave incorrectos.' })
@@ -28,6 +34,8 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Cuenta inactiva. Contacta al administrador.' })
 
     const ok = await usuario.compararPassword(password)
+    console.log('[auth] password ok:', ok)
+
     if (!ok)
       return res.status(401).json({ error: 'ID o clave incorrectos.' })
 
