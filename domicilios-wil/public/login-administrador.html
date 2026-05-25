@@ -240,8 +240,6 @@ body>*{position:relative;z-index:2;}
 </div>
 
 <script>
-const SHEET_ID = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
-
 /* ── OJO CLAVE ── */
 function togglePass(){
   var inp=document.getElementById('inputPass');
@@ -249,7 +247,7 @@ function togglePass(){
   if(inp.type==='password'){inp.type='text';ico.textContent='visibility_off';}
   else{inp.type='password';ico.textContent='visibility';}
 }
-
+ 
 /* ── MENSAJES ── */
 function showErr(txt){
   document.getElementById('msgErrTxt').textContent=txt||'ID o clave incorrectos.';
@@ -270,7 +268,7 @@ function clearMsgs(){
   document.getElementById('msgErr').classList.remove('show');
   document.getElementById('msgOk').classList.remove('show');
 }
-
+ 
 /* ── ESTADO BOTÓN ── */
 function setLoading(v){
   var btn=document.getElementById('btnLogin');
@@ -282,120 +280,61 @@ function setLoading(v){
   ico.style.display=v?'none':'inline-block';
   document.getElementById('btnTxt').textContent=v?'Validando…':'Ingresar al panel';
 }
-
-/* ── PARSEO CSV ── */
-function parseCSVLine(line){
-  var cols=[],cur='',inQ=false;
-  for(var i=0;i<line.length;i++){
-    var ch=line[i];
-    if(ch==='"'){inQ=!inQ;}
-    else if(ch===','&&!inQ){cols.push(cur.trim());cur='';}
-    else{cur+=ch;}
-  }
-  cols.push(cur.trim());
-  return cols.map(function(c){return c.replace(/^"|"$/g,'').trim();});
-}
-
-/* ── HANDLE LOGIN ── */
+ 
+/* ── LOGIN ── */
 var _busy = false;
-
+ 
 async function handleLogin(){
   if(_busy) return;
   clearMsgs();
-
+ 
   var rawId = document.getElementById('inputUser').value.trim();
   var rawPw = document.getElementById('inputPass').value.trim();
-
-  if(!rawId){ document.getElementById('inputUser').focus(); showErr('Ingresa tu ID de domiciliario.'); return; }
+ 
+  if(!rawId){ document.getElementById('inputUser').focus(); showErr('Ingresa tu ID.'); return; }
   if(!rawPw){ document.getElementById('inputPass').focus(); showErr('Ingresa tu clave.'); return; }
-
+ 
   _busy = true;
   setLoading(true);
-
-  try{
-    // Misma URL que usa el panel — gviz/tq funciona con hojas públicas
-    var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
-            + '/gviz/tq?tqx=out:csv&sheet=Domiciliarios&t=' + Date.now();
-
-    var res = await fetch(url, { signal: AbortSignal.timeout(12000) });
-
-    if(!res.ok) throw new Error('HTTP ' + res.status);
-
-    var raw = await res.text();
-
-    // Si Google devuelve HTML (hoja no pública o error) — detectar
-    if(raw.trim().slice(0,5).toLowerCase().startsWith('<')){
-      throw new Error('Hoja no accesible. Comparte el Sheet como público (ver).');
-    }
-
-    // Parsear CSV — cada línea es una fila
-    var lines = raw.split('\n').map(function(l){ return l.replace(/\r/g,''); }).filter(function(l){ return l.trim() !== ''; });
-
-    // Línea 0 = encabezado, datos desde línea 1
-    var datos = lines.slice(1);
-
-    // DEBUG: mostrar en consola lo que lee
-    console.log('[WIL Login] Filas leídas:', datos.length);
-    datos.forEach(function(l, i){
-      var c = parseCSVLine(l);
-      console.log('Fila '+(i+1)+' | A=«'+c[0]+'» C=«'+c[2]+'»');
+ 
+  try {
+    var res = await fetch('/api/auth', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ idWil: rawId, password: rawPw, rol: 'admin' }),
+      signal:  AbortSignal.timeout(12000),
     });
-    console.log('[WIL Login] Usuario ingresado: «'+rawId+'» Clave: «'+rawPw+'»');
-
-    var match = null;
-    for(var i = 0; i < datos.length; i++){
-      var cols    = parseCSVLine(datos[i]);
-      // Col A = ID_DOMI, Col C = CLAVE
-      var sId = (cols[0] || '').replace(/\r|\n|\t/g,'').trim();
-      var sPw = (cols[2] || '').replace(/\r|\n|\t/g,'').trim();
-
-      if(!sId) continue;
-
-      var idOk = sId.toLowerCase() === rawId.toLowerCase();
-      var pwOk = sPw === rawPw;
-
-      console.log('  Compare «'+sId+'» vs «'+rawId+'» =', idOk, '| «'+sPw+'» vs «'+rawPw+'» =', pwOk);
-
-      if(idOk && pwOk){
-        match = {
-          id     : sId,
-          nombre : (cols[1] || '').trim(),
-          tel    : (cols[3] || '').trim(),
-          foto   : (cols[4] || '').trim(),
-          activo : (cols[5] || '').trim(),
-        };
-        break;
-      }
-    }
-
-    if(!match){
-      showErr('ID o clave incorrectos. Acceso denegado.');
+ 
+    var data = await res.json();
+ 
+    if(!res.ok){
+      showErr(data.error || 'ID o clave incorrectos.');
       setLoading(false);
       _busy = false;
       return;
     }
-
-    // ✅ Acceso confirmado
+ 
+    // ✅ Acceso confirmado — guardar sesión
     sessionStorage.setItem('wil_admin', JSON.stringify({
-      id: match.id, nombre: match.nombre,
-      tel: match.tel, foto: match.foto,
-      loginAt: new Date().toISOString()
+      id:      data.id,
+      nombre:  data.nombre,
+      rol:     data.rol,
+      loginAt: new Date().toISOString(),
     }));
-
-    showOk('¡Hola ' + (match.nombre.split(' ')[0] || match.id) + '! Acceso correcto. Ingresando…');
+ 
+    showOk('¡Hola ' + (data.nombre.split(' ')[0] || data.id) + '! Acceso correcto. Ingresando…');
     setTimeout(function(){ location.href = 'panel-administrador.html'; }, 1400);
-
-  } catch(e){
+ 
+  } catch(e) {
     var msg = 'Error de conexión. Intenta de nuevo.';
-    if(e.name === 'TimeoutError' || e.name === 'AbortError') msg = 'Tiempo agotado. Verifica tu conexión.';
-    else if(e.message && e.message.length < 140) msg = e.message;
+    if(e.name==='TimeoutError'||e.name==='AbortError') msg='Tiempo agotado. Verifica tu conexión.';
     showErr(msg);
     setLoading(false);
     _busy = false;
   }
 }
-
-document.addEventListener('keydown', function(e){ if(e.key === 'Enter') handleLogin(); });
+ 
+document.addEventListener('keydown', function(e){ if(e.key==='Enter') handleLogin(); });
 </script>
 </body>
 </html>
