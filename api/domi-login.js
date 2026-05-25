@@ -1,70 +1,52 @@
-// api/domi-login.js
-// POST { idWil, password }
-// Responde: { ok: true, domi: { id, nombre, tel, foto, activo, rol } }
-//           { ok: false, error: "..." }
-
-import { MongoClient } from 'mongodb';
-import bcrypt from 'bcrypt';
-
-const client = new MongoClient(process.env.MONGODB_URI);
+import { dbConnect }   from '../lib/db.js'
+import Domiciliario    from '../lib/Domiciliario.js'
 
 export default async function handler(req, res) {
-  // ── CORS ──────────────────────────────────────────────────────────────────
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  if (req.method === 'OPTIONS') return res.status(200).end()
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ ok: false, error: 'Método no permitido' });
-  }
-
-  const { idWil, password } = req.body;
-
-  // ── Validar campos requeridos ─────────────────────────────────────────────
-  if (!idWil || !password) {
-    return res.status(400).json({ ok: false, error: 'ID y contraseña son requeridos' });
-  }
+  if (req.method !== 'POST')
+    return res.status(405).json({ ok: false, error: 'Método no permitido' })
 
   try {
-    await client.connect();
-    const db = client.db('AppWill');
-    const col = db.collection('Domiciliarios');
+    const { idWil, password } = req.body
 
-    // Buscar por idWil (case-insensitive)
-    const domi = await col.findOne({ idWil: idWil.toUpperCase().trim() });
+    if (!idWil || !password)
+      return res.status(400).json({ ok: false, error: 'ID y contraseña son requeridos' })
 
-    if (!domi) {
-      return res.status(401).json({ ok: false, error: 'ID o clave incorrectos' });
-    }
+    await dbConnect()
 
-    if (!domi.activo) {
-      return res.status(403).json({ ok: false, error: 'Tu cuenta está desactivada. Contacta a WIL.' });
-    }
+    const domi = await Domiciliario.findOne({ idWil: idWil.toUpperCase().trim() })
 
-    // Comparar contraseña con bcrypt
-    const match = await bcrypt.compare(password, domi.password);
-    if (!match) {
-      return res.status(401).json({ ok: false, error: 'ID o clave incorrectos' });
-    }
+    if (!domi)
+      return res.status(401).json({ ok: false, error: 'ID o clave incorrectos.' })
 
-    // ── Login exitoso ─────────────────────────────────────────────────────
+    if (!domi.activo)
+      return res.status(403).json({ ok: false, error: 'Cuenta inactiva. Contacta al administrador.' })
+
+    const ok = await domi.compararPassword(password)
+
+    if (!ok)
+      return res.status(401).json({ ok: false, error: 'ID o clave incorrectos.' })
+
+    await Domiciliario.findByIdAndUpdate(domi._id, { ultimoAcceso: new Date() })
+
     return res.status(200).json({
-      ok: true,
+      ok:     true,
       domi: {
         id:     domi.idWil,
         nombre: domi.nombre,
-        tel:    domi.tel    || '',
-        foto:   domi.foto   || '',
+        tel:    domi.tel  || '',
+        foto:   domi.foto || '',
         activo: domi.activo,
-        rol:    domi.rol    || 'domiciliario',
+        rol:    domi.rol  || 'domiciliario',
       }
-    });
+    })
 
   } catch (err) {
-    console.error('[domi-login] Error:', err);
-    return res.status(500).json({ ok: false, error: 'Error interno del servidor' });
-  } finally {
-    await client.close();
+    console.error('[POST /api/domi-login]', err.message)
+    return res.status(500).json({ ok: false, error: 'Error interno del servidor' })
   }
 }
