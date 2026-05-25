@@ -2263,15 +2263,22 @@ async function crearDomiciliario(){
 
   try{
     /* 1 ── Subir foto si la seleccionaron ── */
-    let fotoUrl = '';
-    if(fotoFile){
-      const fd = new FormData();
-      fd.append('foto',  fotoFile);
-      fd.append('idWil', idWil);
-      const upRes  = await fetch('/api/upload-foto', { method:'POST', body:fd });
-      const upJson = await upRes.json();
-      if(upJson.ok) fotoUrl = upJson.url;   // nombre o URL devuelta por el servidor
-    }
+   let fotoUrl = ''
+const fotoFile = document.getElementById('nd-foto-input').files?.[0]
+if (fotoFile) {
+  const base64 = await new Promise(res => {
+    const reader = new FileReader()
+    reader.onload = e => res(e.target.result.split(',')[1])
+    reader.readAsDataURL(fotoFile)
+  })
+  const r    = await fetch('/api/foto', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ base64, mime: fotoFile.type })
+  })
+  const data = await r.json()
+  if (data.ok) fotoUrl = data.url  // → /api/foto?id=507f1f77bcf86cd799439011
+}
 
     /* 2 ── Crear en MongoDB ── */
     const res  = await fetch('/api/domiciliarios', {
