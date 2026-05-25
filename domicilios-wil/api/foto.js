@@ -1,46 +1,52 @@
-// api/foto.js
-import { MongoClient, ObjectId } from 'mongodb'
+// pages/api/foto.js
+import { dbConnect } from '../lib/db.js';
+import mongoose      from 'mongoose';
 
-const client = new MongoClient(process.env.MONGODB_URI)
-
-async function getDb() {
-  if (!client.topology?.isConnected()) await client.connect()
-  return client.db().collection('fotos')
-}
+// Modelo liviano solo para guardar la imagen como Buffer
+const FotoSchema = new mongoose.Schema({
+  data: Buffer,
+  mime: { type: String, default: 'image/jpeg' },
+  ts:   { type: Date,   default: Date.now }
+});
+const Foto = mongoose.models.Foto || mongoose.model('Foto', FotoSchema, 'Fotos');
 
 export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin',  '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-  /* ── GET /api/foto?id=abc  →  sirve la imagen ── */
+  await dbConnect();
+
+  /* ── GET /api/foto?id=<objectId> → devuelve la imagen ── */
   if (req.method === 'GET') {
-    const { id } = req.query
-    if (!id) return res.status(400).end('Falta id')
-
+    const { id } = req.query;
+    if (!id) return res.status(400).end('Missing id');
     try {
-      const col  = await getDb()
-      const doc  = await col.findOne({ _id: new ObjectId(id) })
-      if (!doc) return res.status(404).end('No encontrada')
-
-      res.setHeader('Content-Type', doc.mime)
-      res.setHeader('Cache-Control', 'public, max-age=31536000')
-      return res.send(Buffer.from(doc.data, 'base64'))
-    } catch (e) {
-      return res.status(500).json({ ok: false, error: e.message })
+      const foto = await Foto.findById(id).lean();
+      if (!foto) return res.status(404).end('Not found');
+      res.setHeader('Content-Type',  foto.mime || 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      return res.status(200).send(foto.data);
+    } catch(e) {
+      return res.status(500).json({ ok: false, error: e.message });
     }
   }
 
-  /* ── POST /api/foto  { base64, mime }  →  { ok, url } ── */
+  /* ── POST /api/foto { base64, mime } → guarda y devuelve URL corta ── */
   if (req.method === 'POST') {
-    const { base64, mime } = req.body ?? {}
-    if (!base64 || !mime) return res.status(400).json({ ok: false, error: 'Faltan campos' })
-
+    const { base64, mime = 'image/jpeg' } = req.body;
+    if (!base64) return res.status(400).json({ ok: false, error: 'No image data' });
     try {
-      const col    = await getDb()
-      const result = await col.insertOne({ data: base64, mime, ts: new Date() })
-      return res.json({ ok: true, url: `/api/foto?id=${result.insertedId}` })
-    } catch (e) {
-      return res.status(500).json({ ok: false, error: e.message })
+      const buffer = Buffer.from(base64, 'base64');
+      if (buffer.length > 5 * 1024 * 1024)   // límite 5 MB
+        return res.status(400).json({ ok: false, error: 'Imagen demasiado grande (máx 5MB)' });
+      const doc = await Foto.create({ data: buffer, mime });
+      return res.status(200).json({ ok: true, url: `/api/foto?id=${doc._id}` });
+    } catch(e) {
+      return res.status(500).json({ ok: false, error: e.message });
     }
   }
 
-  res.status(405).end()
+  res.status(405).end();
 }

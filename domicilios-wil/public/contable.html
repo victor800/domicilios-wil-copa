@@ -2216,23 +2216,37 @@ async function crearDomiciliario(){
 
   try {
     /* 1 ── Subir foto → obtener URL corta ── */
-    let fotoUrl = '';
-    const fotoFile = document.getElementById('nd-foto-input').files?.[0];
-    if (fotoFile) {
-      const base64 = await new Promise(res => {
-        const reader = new FileReader();
-        reader.onload = e => res(e.target.result.split(',')[1]); // solo bytes, sin prefijo data:
-        reader.readAsDataURL(fotoFile);
-      });
-      const r    = await fetch('/api/foto', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ base64, mime: fotoFile.type })
-      });
-      const data = await r.json();
-      if (!data.ok) throw new Error('Error subiendo foto: ' + (data.error || 'desconocido'));
-      fotoUrl = data.url; // → "/api/foto?id=507f1f77bcf86cd799439011"  (43 chars)
-    }
+   // ── Comprimir imagen a máx 300px, JPEG 0.75 ──
+let fotoUrl = '';
+const fotoFile = document.getElementById('nd-foto-input').files?.[0];
+if (fotoFile) {
+  const base64 = await new Promise(res => {
+    const img = new Image();
+    const blobUrl = URL.createObjectURL(fotoFile);
+    img.onload = () => {
+      const MAX = 300;
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const w = Math.round(img.width  * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(blobUrl);
+      // Solo los bytes, sin prefijo "data:..."
+      res(canvas.toDataURL('image/jpeg', 0.75).split(',')[1]);
+    };
+    img.src = blobUrl;
+  });
+
+  const r    = await fetch('/api/foto', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ base64, mime: 'image/jpeg' })
+  });
+  const data = await r.json();
+  if (!data.ok) throw new Error('Error subiendo foto: ' + (data.error || '?'));
+  fotoUrl = data.url;   // → "/api/foto?id=abc123"  (≈ 35 chars)
+}
 
     /* 2 ── Crear domiciliario en MongoDB ── */
     const res  = await fetch('/api/domiciliarios', {
