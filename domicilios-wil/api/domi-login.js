@@ -1,8 +1,18 @@
-import { dbConnect }   from '../lib/db.js'
-import Domiciliario    from '../lib/Domiciliario.js'
+// pages/api/domi-login.js
+import { dbConnect }  from '../lib/db.js'
+import Domiciliario   from '../lib/Domiciliario.js'
+
+// ─── Construye la URL de la foto ─────────────────────────────────────────────
+// Si el doc tiene foto en BD  →  /icons/Robinson.jpeg
+// Si no tiene foto            →  '' (el frontend mostrará iniciales)
+function getFotoUrl(domi) {
+  const archivo = (domi.foto || '').trim()
+  if (!archivo) return ''
+  return `/icons/${archivo}`
+}
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Origin',  '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
   if (req.method === 'OPTIONS') return res.status(200).end()
@@ -34,14 +44,14 @@ export default async function handler(req, res) {
     await Domiciliario.findByIdAndUpdate(domi._id, { ultimoAcceso: new Date() })
 
     return res.status(200).json({
-      ok:     true,
+      ok:   true,
       domi: {
         id:     domi.idWil,
         nombre: domi.nombre,
-        tel:    domi.tel  || '',
-        foto:   domi.foto || '',
+        tel:    domi.tel    || '',
+        foto:   getFotoUrl(domi),   // ← /icons/Robinson.jpeg  o  ''
         activo: domi.activo,
-        rol:    domi.rol  || 'domiciliario',
+        rol:    domi.rol    || 'domiciliario',
       }
     })
 
