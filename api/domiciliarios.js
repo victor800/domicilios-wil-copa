@@ -83,10 +83,10 @@ export default async function handler(req, res) {
           rol:    nuevo.rol,
         }
       })
-    } catch (err) {
-      console.error('[POST /api/domiciliarios]', err.message)
-      return res.status(500).json({ ok: false, error: err.message })
-    }
+   } catch (err) {
+  console.error('[POST /api/domiciliarios]', err.message, err.stack)
+  return res.status(500).json({ ok: false, error: err.message })
+}
   }
 
   return res.status(405).json({ ok: false, error: 'Método no permitido' })
