@@ -1,33 +1,11 @@
-import mongoose     from 'mongoose'
-import bcrypt       from 'bcryptjs'
-import Domiciliario from '../lib/Domiciliario.js'
+import { dbConnect }  from '../lib/db.js'
+import bcrypt         from 'bcryptjs'
+import Domiciliario   from '../lib/Domiciliario.js'
 
-let cached = global._mongoose || null
-
-async function conectar() {
-  if (cached && mongoose.connection.readyState === 1) return
-  cached = await mongoose.connect(process.env.MONGODB_URI)
-  global._mongoose = cached
-}
-
-/**
- * Devuelve la URL correcta de la foto sin importar cómo esté guardada:
- *  - ''                          → ''              (sin foto)
- *  - 'data:image/...'            → igual            (base64 legacy)
- *  - 'http://...' / 'https://…'  → igual            (URL externa)
- *  - '/api/foto?id=...'          → igual            (URL interna ya absoluta)
- *  - 'Robinson.jpeg'             → '/icons/Robinson.jpeg' (nombre de archivo)
- */
 function getFotoUrl(foto) {
   if (!foto || !foto.trim()) return ''
   const f = foto.trim()
-  // Ya es una URL absoluta o ruta interna — no tocar
-  if (
-    f.startsWith('http')  ||
-    f.startsWith('data:') ||
-    f.startsWith('/')
-  ) return f
-  // Solo nombre de archivo → añadir prefijo icons/
+  if (f.startsWith('http') || f.startsWith('data:') || f.startsWith('/')) return f
   return `/icons/${f}`
 }
 
@@ -37,13 +15,9 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
   if (req.method === 'OPTIONS') return res.status(200).end()
 
-  try {
-    await conectar()
-  } catch (err) {
-    return res.status(500).json({ ok: false, error: 'Error de conexión: ' + err.message })
-  }
+  await dbConnect()
 
-  /* ════ GET — listar domiciliarios ════ */
+  /* ── GET /api/domiciliarios ── */
   if (req.method === 'GET') {
     try {
       const domis = await Domiciliario
@@ -57,7 +31,7 @@ export default async function handler(req, res) {
           id:     d.idWil,
           nombre: d.nombre,
           tel:    d.tel  || '',
-          foto:   getFotoUrl(d.foto),   // ← URL limpia para el frontend
+          foto:   getFotoUrl(d.foto),
           activo: d.activo !== false,
           rol:    d.rol  || 'domiciliario',
         }))
@@ -67,7 +41,7 @@ export default async function handler(req, res) {
     }
   }
 
-  /* ════ POST — crear domiciliario ════ */
+  /* ── POST /api/domiciliarios ── */
   if (req.method === 'POST') {
     try {
       const { idWil, nombre, password, tel, zona, rol, activo, foto } = req.body
@@ -76,18 +50,15 @@ export default async function handler(req, res) {
         return res.status(400).json({ ok: false, error: 'Faltan campos obligatorios' })
 
       if (password.length < 6)
-        return res.status(400).json({ ok: false, error: 'La clave debe tener al menos 6 caracteres' })
+        return res.status(400).json({ ok: false, error: 'Clave mínimo 6 caracteres' })
 
       const existe = await Domiciliario.findOne({ idWil: idWil.toUpperCase().trim() })
       if (existe)
-        return res.status(409).json({ ok: false, error: `El ID ${idWil} ya está registrado` })
+        return res.status(409).json({ ok: false, error: `${idWil} ya está registrado` })
 
-      // Hashear manualmente para evitar doble-hash si el pre-save hook también existe
       const passwordHash = await bcrypt.hash(password, 12)
 
-      // Guardar foto tal cual llega del frontend:
-      //   - Si viene de /api/foto → ya es '/api/foto?id=...'  (URL corta)
-      //   - Si viene vacío       → ''
+      // foto llega como '/api/foto?id=<objectId>' — URL corta, nunca base64
       const fotoGuardar = foto ? foto.trim() : ''
 
       const nuevo = await Domiciliario.create({
@@ -97,7 +68,7 @@ export default async function handler(req, res) {
         tel:      tel  || '',
         zona:     zona || '',
         rol:      rol  || 'domiciliario',
-        foto:     fotoGuardar,           // URL corta o ''
+        foto:     fotoGuardar,
         activo:   activo === 'true' || activo === true,
       })
 
@@ -107,7 +78,7 @@ export default async function handler(req, res) {
           id:     nuevo.idWil,
           nombre: nuevo.nombre,
           tel:    nuevo.tel,
-          foto:   getFotoUrl(nuevo.foto), // URL lista para el frontend
+          foto:   getFotoUrl(nuevo.foto),
           activo: nuevo.activo,
           rol:    nuevo.rol,
         }
