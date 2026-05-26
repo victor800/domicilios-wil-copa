@@ -1648,7 +1648,12 @@ var esAdmin=ADMIN_IDS.includes((domi.id||'').toUpperCase());
 
 /* HEADER */
 if(domi.foto&&domi.foto.trim()!==''){
-  var _fs=domi.foto.trim().startsWith('http')?domi.foto.trim():'icons/'+domi.foto.trim();
+ var _f = (domi.foto || '').trim();
+var _fs = _f
+  ? (_f.startsWith('http') || _f.startsWith('/') || _f.startsWith('data:'))
+      ? _f
+      : 'icons/' + _f
+  : null;
   var _ie=document.getElementById('headerFotoImg');
   _ie.src=_fs;_ie.onerror=function(){this.src='icons/icon-192.png';};
 }
@@ -4074,7 +4079,8 @@ document.getElementById('perfilEntregas').textContent = '· ' + entregados.lengt
   if(esAdmin)document.getElementById('perfilAdminBadge').classList.remove('hidden');
   var fw=document.getElementById('perfilFotoWrap');
   if(domi.foto&&domi.foto.trim()!==''){
-    var src=domi.foto.trim().startsWith('http')?domi.foto.trim():'icons/'+domi.foto.trim();
+    var f = (domi.foto || '').trim();
+var src = (f.startsWith('http') || f.startsWith('/') || f.startsWith('data:')) ? f : 'icons/' + f;
     fw.innerHTML='<img src="'+src+'" alt="foto" style="width:100%;height:100%;object-fit:cover;border-radius:17px" onerror="this.parentElement.innerHTML=\'<span style=\\\"font-family:Plus Jakarta Sans;font-weight:800;font-size:2rem;color:#fff;display:flex;align-items:center;justify-content:center;width:100%;height:100%\\\">'+(domi.nombre?domi.nombre.charAt(0).toUpperCase():'🛵')+'</span>\'">';
   }else{
     fw.innerHTML='<span style="font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:800;font-size:2rem;color:#fff;display:flex;align-items:center;justify-content:center;width:100%;height:100%">'+(domi.nombre?domi.nombre.charAt(0).toUpperCase():'🛵')+'</span>';
