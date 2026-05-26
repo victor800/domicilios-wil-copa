@@ -4088,6 +4088,8 @@ var src = (f.startsWith('http') || f.startsWith('/') || f.startsWith('data:')) ?
   var hoy=state.historial.filter(function(h){return h.periodo==='hoy';});
   document.getElementById('statHoy').textContent=hoy.length;
   document.getElementById('statEntregas').textContent=state.historial.length;
+
+  mostrarFotoDomi()
 }
 
 /* ═══════════════════ CHAT ═══════════════════ */
@@ -9329,39 +9331,60 @@ setTimeout(function () { chip.style.display = 'none'; }, 4000);
 
   <script>
     function mostrarFotoDomi() {
-      var src     = (window.domi && window.domi.foto) || ''
-      var inicial = window.domi && window.domi.nombre
-                      ? window.domi.nombre.charAt(0).toUpperCase() : '🛵'
-      function ponAvatar(el) {
-        el.innerHTML = '<span style="font-family:\'Plus Jakarta Sans\',sans-serif;'
-          + 'font-weight:800;font-size:2rem;color:#fff;display:flex;'
-          + 'align-items:center;justify-content:center;width:100%;height:100%">'
-          + inicial + '</span>'
-      }
-      var h = document.getElementById('headerFotoImg')
-      if (h) {
-        if (src) { h.src = src; h.style.display = 'block'; h.onerror = function(){ this.style.display='none' } }
-        else     { h.style.display = 'none' }
-      }
-      var fw = document.getElementById('perfilFotoWrap')
-      if (!fw) return
-      fw.innerHTML = ''
-      if (src) {
-        var img = document.createElement('img')
-        img.src = src
-        img.style.cssText = 'width:100%;height:100%;object-fit:cover;object-position:center 20%;border-radius:17px;'
-        img.onerror = function(){ ponAvatar(fw) }
-        fw.appendChild(img)
-      } else {
-        ponAvatar(fw)
-      }
+  var src     = (window.domi && window.domi.foto) || ''
+  var inicial = window.domi && window.domi.nombre
+                  ? window.domi.nombre.charAt(0).toUpperCase() : '🛵'
+
+  function ponAvatar(el) {
+    el.innerHTML = '<span style="font-family:\'Plus Jakarta Sans\',sans-serif;'
+      + 'font-weight:800;font-size:2rem;color:#fff;display:flex;'
+      + 'align-items:center;justify-content:center;width:100%;height:100%">'
+      + inicial + '</span>'
+  }
+
+  function ponerFoto() {
+    // Header
+    var h = document.getElementById('headerFotoImg')
+    if (h) {
+      if (src) { h.src = src; h.style.display = 'block'; h.onerror = function(){ this.style.display='none' } }
+      else     { h.style.display = 'none' }
     }
-    setTimeout(mostrarFotoDomi, 300)
-    var _sw = window.switchTab
-    window.switchTab = function(tab){
-      if (typeof _sw === 'function') _sw.apply(this, arguments)
-      if (tab === 'perfil') setTimeout(mostrarFotoDomi, 80)
+
+    // Perfil
+    var fw = document.getElementById('perfilFotoWrap')
+    if (!fw) return
+    fw.innerHTML = ''
+    if (src) {
+      var img = document.createElement('img')
+      img.src = src
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;object-position:center 20%;border-radius:17px;'
+      img.onerror = function(){ ponAvatar(fw) }
+      fw.appendChild(img)
+    } else {
+      ponAvatar(fw)
     }
+  }
+
+  // Ejecutar inmediato + dos reintentos para ganarle a renderPerfil
+  ponerFoto()
+  setTimeout(ponerFoto, 200)
+  setTimeout(ponerFoto, 600)
+}
+
+setTimeout(mostrarFotoDomi, 300)
+
+var _sw = window.switchTab
+window.switchTab = function(tab){
+  if (typeof _sw === 'function') _sw.apply(this, arguments)
+  if (tab === 'perfil') setTimeout(mostrarFotoDomi, 300)
+}
+
+// Interceptar renderPerfil para que siempre termine con la foto
+var _rp = window.renderPerfil
+window.renderPerfil = function(){
+  if (typeof _rp === 'function') _rp.apply(this, arguments)
+  setTimeout(mostrarFotoDomi, 150)
+}
     </script>
 
 
