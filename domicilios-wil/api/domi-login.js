@@ -6,9 +6,7 @@ import Domiciliario   from '../lib/Domiciliario.js'
 // Si el doc tiene foto en BD  →  /icons/Robinson.jpeg
 // Si no tiene foto            →  '' (el frontend mostrará iniciales)
 function getFotoUrl(domi) {
-  const archivo = (domi.foto || '').trim()
-  if (!archivo) return ''
-  return `/icons/${archivo}`
+  return (domi.foto || '').trim()
 }
 
 export default async function handler(req, res) {
