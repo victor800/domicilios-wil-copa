@@ -1,6 +1,6 @@
-import { dbConnect }  from '../lib/db.js'
-import bcrypt         from 'bcryptjs'
-import Domiciliario   from '../lib/Domiciliario.js'
+// api/domiciliarios.js
+import { dbConnect } from '../lib/db.js'
+import Domiciliario  from '../lib/Domiciliario.js'
 
 function getFotoUrl(foto) {
   if (!foto || !foto.trim()) return ''
@@ -56,21 +56,20 @@ export default async function handler(req, res) {
       if (existe)
         return res.status(409).json({ ok: false, error: `${idWil} ya está registrado` })
 
-      const passwordHash = await bcrypt.hash(password, 12)
-
+      // ⚠️ NO hashear aquí — el hook pre('save') en Domiciliario.js lo hace solo
       // foto llega como '/api/foto?id=<objectId>' — URL corta, nunca base64
-      const fotoGuardar = foto ? foto.trim() : ''
-
-      const nuevo = await Domiciliario.create({
+      const nuevo = new Domiciliario({
         idWil:    idWil.toUpperCase().trim(),
         nombre:   nombre.trim(),
-        password: passwordHash,
+        password,                              // sin hashear — el hook lo hace
         tel:      tel  || '',
         zona:     zona || '',
         rol:      rol  || 'domiciliario',
-        foto:     fotoGuardar,
+        foto:     foto ? foto.trim() : '',     // URL corta o ''
         activo:   activo === 'true' || activo === true,
       })
+
+      await nuevo.save()                       // dispara el hook pre('save')
 
       return res.status(201).json({
         ok: true,
@@ -84,7 +83,7 @@ export default async function handler(req, res) {
         }
       })
     } catch (err) {
-      console.error('[POST /api/domiciliarios]', err.message)
+      console.error('[POST /api/domiciliarios]', err.message, err.stack)
       return res.status(500).json({ ok: false, error: err.message })
     }
   }
