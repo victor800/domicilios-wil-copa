@@ -13124,80 +13124,37 @@ try {
 
 
 
-
-
- <script>
-  /* ═══════════════════════════════════════════════════════════════
-   WIL PATCH — Botón CANCELAR PEDIDO en rastreador
-   ─────────────────────────────────────────────────────────────
-   - Muestra botón "Cancelar pedido" solo si estado es
-     Pendiente o Confirmado (ya en camino no se puede cancelar)
-   - Pide confirmación con un modal antes de cancelar
-   - Actualiza columna E (ESTADO) de hoja Pedidos via GAS
-   - Oculta el botón si el pedido está En camino / Entregado
-═══════════════════════════════════════════════════════════════ */
+<script>
 ;(function (W) {
   'use strict';
 
   var GAS_URL = 'https://script.google.com/macros/s/AKfycbwrTFN2O1l3y9wZgZNw6UYlJZRbeU8deTHgRJ7B9aqqtHhRPwLmm3xrOwnqr-24xMtv0g/exec';
 
-  /* ─── CSS ─── */
   var st = document.createElement('style');
   st.id = 'wil-cancelar-css';
   st.textContent = `
-    /* ── Botón cancelar ── */
-    #wil-cancel-btn-wrap {
-      padding: 0 14px 14px;
-    }
+    #wil-cancel-btn-wrap { padding: 0 14px 14px; }
     #wil-cancel-btn {
-      width: 100%;
-      padding: 11px 14px;
-      border-radius: 12px;
-      border: 1.5px solid rgba(220,38,38,.35);
-      background: rgba(220,38,38,.05);
-      font-family: 'Plus Jakarta Sans', sans-serif;
-      font-size: 13px;
-      font-weight: 800;
-      color: #dc2626;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 7px;
-      transition: background .15s, transform .1s;
+      width: 100%; padding: 11px 14px; border-radius: 12px;
+      border: 1.5px solid rgba(220,38,38,.35); background: rgba(220,38,38,.05);
+      font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; font-weight: 800;
+      color: #dc2626; cursor: pointer; display: flex; align-items: center;
+      justify-content: center; gap: 7px; transition: background .15s, transform .1s;
       -webkit-tap-highlight-color: transparent;
     }
-    #wil-cancel-btn:active {
-      background: rgba(220,38,38,.12);
-      transform: scale(.97);
-    }
-    #wil-cancel-btn .sym {
-      font-family: 'Material Symbols Rounded';
-      font-size: 17px;
-      font-variation-settings: 'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24;
-    }
-
-    /* ── Modal de confirmación ── */
+    #wil-cancel-btn:active { background: rgba(220,38,38,.12); transform: scale(.97); }
+    #wil-cancel-btn .sym { font-family: 'Material Symbols Rounded'; font-size: 17px;
+      font-variation-settings: 'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24; }
     #wil-cancel-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 9000;
-      background: rgba(0,0,0,.55);
-      backdrop-filter: blur(5px);
-      -webkit-backdrop-filter: blur(5px);
-      display: none;
-      align-items: flex-end;
-      justify-content: center;
+      position: fixed; inset: 0; z-index: 9000; background: rgba(0,0,0,.55);
+      backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+      display: none; align-items: flex-end; justify-content: center;
       padding-bottom: env(safe-area-inset-bottom, 0px);
     }
     #wil-cancel-overlay.open { display: flex; }
-
     #wil-cancel-sheet {
-      width: 100%;
-      max-width: 480px;
-      background: #fff;
-      border-radius: 24px 24px 0 0;
-      padding: 0 0 16px;
+      width: 100%; max-width: 480px; background: #fff;
+      border-radius: 24px 24px 0 0; padding: 0 0 16px;
       box-shadow: 0 -8px 40px rgba(0,0,0,.22);
       animation: wcSlideUp .3s cubic-bezier(.22,1,.36,1);
     }
@@ -13205,87 +13162,43 @@ try {
       from { transform: translateY(60px); opacity: 0; }
       to   { transform: translateY(0);    opacity: 1; }
     }
-    .wc-handle {
-      width: 36px; height: 4px;
-      background: #e0e4e8; border-radius: 4px;
-      margin: 14px auto 0;
-    }
-    .wc-body {
-      padding: 20px 20px 8px;
-      text-align: center;
-    }
+    .wc-handle { width: 36px; height: 4px; background: #e0e4e8; border-radius: 4px; margin: 14px auto 0; }
+    .wc-body { padding: 20px 20px 8px; text-align: center; }
     .wc-icon {
       width: 60px; height: 60px; border-radius: 50%;
-      background: rgba(220,38,38,.08);
-      border: 1.5px solid rgba(220,38,38,.2);
+      background: rgba(220,38,38,.08); border: 1.5px solid rgba(220,38,38,.2);
       display: flex; align-items: center; justify-content: center;
-      margin: 0 auto 14px;
-      font-size: 28px;
+      margin: 0 auto 14px; font-size: 28px;
     }
-    .wc-title {
-      font-size: 18px; font-weight: 900;
-      color: #18222e; margin-bottom: 7px;
-      letter-spacing: -.01em;
-    }
-    .wc-sub {
-      font-size: 13px; font-weight: 500;
-      color: #7a8fa6; line-height: 1.6;
-      margin-bottom: 20px;
-    }
+    .wc-title { font-size: 18px; font-weight: 900; color: #18222e; margin-bottom: 7px; letter-spacing: -.01em; }
+    .wc-sub { font-size: 13px; font-weight: 500; color: #7a8fa6; line-height: 1.6; margin-bottom: 20px; }
     .wc-sub strong { color: #dc2626; font-weight: 800; }
-    .wc-btns {
-      display: flex;
-      gap: 10px;
-      padding: 0 20px 4px;
-    }
+    .wc-btns { display: flex; gap: 10px; padding: 0 20px 4px; }
     .wc-btn-keep {
-      flex: 1;
-      padding: 13px;
-      border-radius: 12px;
-      border: 1.5px solid #dce3ea;
-      background: #f8fafb;
-      font-family: 'Plus Jakarta Sans', sans-serif;
-      font-size: 14px; font-weight: 700;
-      color: #3d5068; cursor: pointer;
-      transition: background .15s;
+      flex: 1; padding: 13px; border-radius: 12px; border: 1.5px solid #dce3ea;
+      background: #f8fafb; font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 14px; font-weight: 700; color: #3d5068; cursor: pointer; transition: background .15s;
     }
     .wc-btn-keep:active { background: #e5eaef; }
     .wc-btn-cancel {
-      flex: 1;
-      padding: 13px;
-      border-radius: 12px;
-      border: none;
-      background: #dc2626;
-      font-family: 'Plus Jakarta Sans', sans-serif;
-      font-size: 14px; font-weight: 800;
-      color: #fff; cursor: pointer;
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      box-shadow: 0 4px 14px rgba(220,38,38,.3);
+      flex: 1; padding: 13px; border-radius: 12px; border: none; background: #dc2626;
+      font-family: 'Plus Jakarta Sans', sans-serif; font-size: 14px; font-weight: 800;
+      color: #fff; cursor: pointer; display: flex; align-items: center;
+      justify-content: center; gap: 6px; box-shadow: 0 4px 14px rgba(220,38,38,.3);
       transition: background .15s, transform .1s;
     }
     .wc-btn-cancel:active { background: #b91c1c; transform: scale(.97); }
     .wc-btn-cancel:disabled { opacity: .6; pointer-events: none; }
-
-    /* ── Aviso "ya en camino" ── */
     #wil-cancel-encamino {
-      display: none;
-      margin: 0 14px 14px;
-      padding: 10px 13px;
-      border-radius: 10px;
-      background: #fffbeb;
-      border: 1.5px solid rgba(217,119,6,.25);
-      font-size: 11.5px; font-weight: 600;
-      color: #92400e; line-height: 1.5;
+      display: none; margin: 0 14px 14px; padding: 10px 13px; border-radius: 10px;
+      background: #fffbeb; border: 1.5px solid rgba(217,119,6,.25);
+      font-size: 11.5px; font-weight: 600; color: #92400e; line-height: 1.5;
       align-items: flex-start; gap: 7px;
     }
-    #wil-cancel-encamino .sym {
-      font-family: 'Material Symbols Rounded';
-      font-size: 16px; color: #d97706; flex-shrink: 0; margin-top: 1px;
-    }
+    #wil-cancel-encamino .sym { font-family: 'Material Symbols Rounded'; font-size: 16px; color: #d97706; flex-shrink: 0; margin-top: 1px; }
   `;
   document.head.appendChild(st);
 
-  /* ─── HTML modal ─── */
   document.body.insertAdjacentHTML('beforeend', `
     <div id="wil-cancel-overlay" onclick="if(event.target===this)wilCerrarCancelar()">
       <div id="wil-cancel-sheet">
@@ -13308,23 +13221,14 @@ try {
     </div>
   `);
 
-  /* ─── Inyectar botón en el rastreador ─── */
   function _inyectarBoton() {
-    /* Buscar el contenedor blanco del rastreador */
     var rtResult = document.getElementById('rt-result');
     if (!rtResult) return;
-
-    /* ¿Ya existe? */
     if (document.getElementById('wil-cancel-btn-wrap')) return;
 
-    /* Buscar el div blanco principal (tiene los steps, domi card, etc.) */
     var contenedor = rtResult.querySelector('div[style*="border-radius: 20px"]')
-                  || rtResult.querySelector('div[style*="border-radius:20px"]');
-
-    if (!contenedor) {
-      /* Fallback: insertar antes del primer hijo de rt-result */
-      contenedor = rtResult;
-    }
+                  || rtResult.querySelector('div[style*="border-radius:20px"]')
+                  || rtResult;
 
     var wrapAviso = document.createElement('div');
     wrapAviso.id = 'wil-cancel-encamino';
@@ -13345,15 +13249,22 @@ try {
     contenedor.appendChild(wrap);
   }
 
-  /* ─── Mostrar / ocultar según estado ─── */
   function _actualizarVisibilidadBoton(estado) {
-    var wrap     = document.getElementById('wil-cancel-btn-wrap');
-    var aviso    = document.getElementById('wil-cancel-encamino');
+    var wrap  = document.getElementById('wil-cancel-btn-wrap');
+    var aviso = document.getElementById('wil-cancel-encamino');
     if (!wrap) return;
 
-    var CANCELABLES   = ['Pendiente', 'Confirmado'];
-    var EN_PROCESO    = ['En camino'];
-    var FINALIZADOS   = ['Entregado', 'Cancelado'];
+    /* ── FIX 3: Si fue cancelado manualmente, nunca volver a mostrar el botón ── */
+    var p = W.state && W.state.pedidoRastreado;
+    if (p && p._canceladoManualmente) {
+      wrap.style.display  = 'none';
+      aviso.style.display = 'none';
+      return;
+    }
+
+    var CANCELABLES = ['Pendiente', 'Confirmado'];
+    var EN_PROCESO  = ['En camino'];
+    var FINALIZADOS = ['Entregado', 'Cancelado'];
 
     if (FINALIZADOS.indexOf(estado) !== -1) {
       wrap.style.display  = 'none';
@@ -13365,13 +13276,11 @@ try {
       wrap.style.display  = 'block';
       aviso.style.display = 'none';
     } else {
-      /* Estado desconocido — mostrar por defecto */
       wrap.style.display  = 'block';
       aviso.style.display = 'none';
     }
   }
 
-  /* ─── Abrir modal ─── */
   W.wilAbrirCancelar = function () {
     var p = W.state && W.state.pedidoRastreado;
     if (!p) return;
@@ -13383,13 +13292,12 @@ try {
     document.body.style.overflow = 'hidden';
   };
 
-  /* ─── Cerrar modal ─── */
   W.wilCerrarCancelar = function () {
     document.getElementById('wil-cancel-overlay').classList.remove('open');
     document.body.style.overflow = '';
   };
 
-  /* ─── Confirmar cancelación → actualizar Sheets ─── */
+  /* ── FIX 1 + 2 + 3: fetch con text/plain + flag _canceladoManualmente ── */
   W.wilConfirmarCancelacion = async function () {
     var p = W.state && W.state.pedidoRastreado;
     if (!p || !p.id) return;
@@ -13401,23 +13309,27 @@ try {
     }
 
     try {
+      /* ── FIX 1: Content-Type text/plain para que GAS reciba el body con no-cors ── */
       await fetch(GAS_URL, {
         method:  'POST',
         mode:    'no-cors',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'text/plain' },   /* ← CAMBIO CLAVE */
         body: JSON.stringify({
-          accion:    'actualizar-estado',
-          id:        p.id,
+          accion:      'actualizar-estado',
+          id:          String(p.id),
           nuevoEstado: 'Cancelado'
         })
       });
 
-      /* Actualizar estado local */
-      p.estado = 'Cancelado';
+      /* ── FIX 2: Marcar manualmente + detener polling antes de que sobreescriba ── */
+      p.estado              = 'Cancelado';
+      p._canceladoManualmente = true;        /* ← FLAG que bloquea el polling */
       if (W.state) W.state.pedidoRastreado = p;
 
-      /* Actualizar UI del rastreador */
-      var COLS = { 'Cancelado': '#dc2626' };
+      /* Detener polling ANTES de actualizar UI (evita race condition) */
+      if (typeof W.rtDetenerPolling === 'function') W.rtDetenerPolling();
+
+      /* Actualizar UI */
       var col = '#dc2626';
       var pb  = document.getElementById('estadoPingBase');
       var pp  = document.getElementById('estadoPing');
@@ -13426,26 +13338,20 @@ try {
       var elLbl = document.getElementById('estadoLabel');
       if (elLbl) { elLbl.textContent = '❌ Cancelado'; elLbl.style.color = col; }
 
-      /* Stepper */
       if (typeof W.rtActualizarStepper === 'function') {
         W.rtActualizarStepper('Cancelado', {
-          hora: p.hora,
+          hora:          p.hora,
           horaEnProceso: p.horaEnProceso || '',
           horaEnCamino:  p.horaEnCamino  || '',
           horaEntrego:   p.horaEntrego   || ''
         });
       }
 
-      /* Detener polling */
-      if (typeof W.rtDetenerPolling === 'function') W.rtDetenerPolling();
-
-      /* Ocultar botón cancelar */
+      /* ── FIX 3: Ocultar botón usando el flag (no el estado que el polling puede pisar) ── */
       _actualizarVisibilidadBoton('Cancelado');
 
-      /* Cerrar modal */
       W.wilCerrarCancelar();
 
-      /* Toast */
       if (typeof W.mostrarToast === 'function')
         W.mostrarToast('Pedido #' + p.id + ' cancelado', 'cancel');
 
@@ -13459,7 +13365,7 @@ try {
     }
   };
 
-  /* ─── Hook: inyectar botón tras rastrear ─── */
+  /* ─── Hook rastrearPedido ─── */
   (function _hook() {
     var orig = W.rastrearPedido;
     if (typeof orig !== 'function') {
@@ -13478,22 +13384,24 @@ try {
     };
   })();
 
-  /* ─── Hook: actualizar visibilidad cuando cambia el estado (polling) ─── */
+  /* ─── Hook rtActualizarStepper: respeta el flag _canceladoManualmente ─── */
   (function _hookStepper() {
     var orig = W.rtActualizarStepper;
     if (typeof orig !== 'function') return;
     W.rtActualizarStepper = function (estado) {
+      /* ── FIX 3: Si fue cancelado manualmente, ignorar lo que diga el polling ── */
+      var p = W.state && W.state.pedidoRastreado;
+      if (p && p._canceladoManualmente) return;
+
       orig.apply(this, arguments);
       _actualizarVisibilidadBoton(estado);
     };
   })();
 
-  console.log('[WIL] ✅ Botón cancelar pedido — Pendiente/Confirmado → GAS → col E Cancelado');
+  console.log('[WIL] ✅ Botón cancelar pedido v2 — text/plain fix + polling guard');
 
 })(window);
-
- </script>
-
+</script>
 
 </body>
 </html>
