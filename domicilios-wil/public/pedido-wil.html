@@ -1175,9 +1175,8 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 
     </div>
   </div>
-
-  <!-- ════ DOMICILIOS ════ -->
-<div id="sec-domicilios">
+<!-- ════ DOMICILIOS ════ -->
+<div id="sec-domicilios" style="margin-bottom:20px;">
 
   <!-- HEADER ROW -->
   <div class="sec-row" style="padding-bottom:8px">
@@ -1187,40 +1186,48 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
     </button>
   </div>
 
-  <!-- CAROUSEL CON FLECHAS -->
-  <div style="position:relative;display:flex;align-items:center;gap:6px;">
+  <!-- CAROUSEL WRAPPER -->
+  <div style="position:relative;">
 
-    <!-- FLECHA IZQUIERDA -->
+    <!-- FLECHA IZQUIERDA (flotante sobre el carrusel) -->
     <button id="dom-prev" onclick="domSlide(-1)" style="
-      flex-shrink:0;width:34px;height:34px;border-radius:50%;
-      background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);
+      position:absolute;left:-4px;top:50%;transform:translateY(-50%);
+      z-index:20;
+      width:36px;height:36px;border-radius:50%;
+      background:rgba(20,20,20,0.92);
+      border:2px solid rgba(233,195,73,0.7);
+      box-shadow:0 2px 12px rgba(0,0,0,0.7);
       display:flex;align-items:center;justify-content:center;
-      cursor:pointer;transition:background .2s,opacity .2s;color:#fff;
-      opacity:0.4;pointer-events:none;"
-      onmouseover="this.style.background='rgba(233,195,73,0.18)'"
-      onmouseout="this.style.background='rgba(255,255,255,0.08)'">
-      <span class="sym f" style="font-size:18px;">chevron_left</span>
+      cursor:pointer;color:#E9C349;
+      opacity:0.35;pointer-events:none;
+      transition:opacity .2s,background .2s;">
+      <span class="sym f" style="font-size:20px;font-variation-settings:'FILL' 1;">chevron_left</span>
     </button>
 
-    <!-- TRACK -->
-    <div style="overflow:hidden;flex:1;">
-      <div class="cats-ticker-track" id="catsTicker" style="
-        transition:transform .3s cubic-bezier(0.4,0,0.2,1);
-        will-change:transform;
-        flex-wrap:nowrap;">
+    <!-- OVERFLOW HIDDEN -->
+    <div id="dom-outer" style="overflow:hidden;padding:0 6px;">
+      <div id="catsTicker" style="
+        display:flex;flex-direction:row;flex-wrap:nowrap;
+        gap:10px;
+        transition:transform .32s cubic-bezier(0.4,0,0.2,1);
+        will-change:transform;">
+        <!-- cards dinámicas -->
       </div>
     </div>
 
-    <!-- FLECHA DERECHA -->
+    <!-- FLECHA DERECHA (flotante sobre el carrusel) -->
     <button id="dom-next" onclick="domSlide(1)" style="
-      flex-shrink:0;width:34px;height:34px;border-radius:50%;
-      background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);
+      position:absolute;right:-4px;top:50%;transform:translateY(-50%);
+      z-index:20;
+      width:36px;height:36px;border-radius:50%;
+      background:rgba(20,20,20,0.92);
+      border:2px solid rgba(233,195,73,0.7);
+      box-shadow:0 2px 12px rgba(0,0,0,0.7);
       display:flex;align-items:center;justify-content:center;
-      cursor:pointer;transition:background .2s,opacity .2s;color:#fff;
-      opacity:0.4;pointer-events:none;"
-      onmouseover="this.style.background='rgba(233,195,73,0.18)'"
-      onmouseout="this.style.background='rgba(255,255,255,0.08)'">
-      <span class="sym f" style="font-size:18px;">chevron_right</span>
+      cursor:pointer;color:#E9C349;
+      opacity:0.35;pointer-events:none;
+      transition:opacity .2s,background .2s;">
+      <span class="sym f" style="font-size:20px;font-variation-settings:'FILL' 1;">chevron_right</span>
     </button>
 
   </div>
@@ -13430,9 +13437,17 @@ try {
 
 <script>
 (function(){
-  var API_URL = 'https://food-display-pro.vercel.app/api/upload-foto';
-  var domIdx  = 0;
+  var API_URL  = 'https://food-display-pro.vercel.app/api/upload-foto';
+  var domIdx   = 0;
   var domTotal = 0;
+  var GAP      = 10;
+
+  function getItemW() {
+    var track = document.getElementById('catsTicker');
+    if (!track) return 0;
+    var first = track.querySelector('.cat-real-pill');
+    return first ? first.offsetWidth + GAP : 0;
+  }
 
   function updateBtns() {
     var prev = document.getElementById('dom-prev');
@@ -13440,19 +13455,18 @@ try {
     if (!prev || !next) return;
     var canPrev = domIdx > 0;
     var canNext = domIdx < domTotal - 1;
-    prev.style.opacity        = canPrev ? '1'    : '0.3';
-    prev.style.pointerEvents  = canPrev ? 'auto' : 'none';
-    next.style.opacity        = canNext ? '1'    : '0.3';
-    next.style.pointerEvents  = canNext ? 'auto' : 'none';
+    prev.style.opacity       = canPrev ? '1'    : '0.35';
+    prev.style.pointerEvents = canPrev ? 'auto' : 'none';
+    next.style.opacity       = canNext ? '1'    : '0.35';
+    next.style.pointerEvents = canNext ? 'auto' : 'none';
   }
 
   function syncTrack() {
     var track = document.getElementById('catsTicker');
     if (!track) return;
-    var items = track.querySelectorAll('.cat-real-pill');
-    if (!items.length) return;
-    var itemW = items[0].offsetWidth + 10; /* 10 = gap aprox */
-    track.style.transform = 'translateX(-' + (domIdx * itemW) + 'px)';
+    var iw = getItemW();
+    if (!iw) return;
+    track.style.transform = 'translateX(-' + (domIdx * iw) + 'px)';
     updateBtns();
   }
 
@@ -13465,7 +13479,7 @@ try {
     var track = document.getElementById('catsTicker');
     if (!track) return;
     if (!data || !data.length) {
-      track.innerHTML = '<div style="color:#aaa;font-size:13px;padding:8px 4px;">No hay comercios disponibles.</div>';
+      track.innerHTML = '<div style="color:#aaa;font-size:13px;padding:8px 4px;">No hay comercios.</div>';
       return;
     }
     domTotal = data.length;
@@ -13478,7 +13492,7 @@ try {
       var nom      = encodeURIComponent(c.nombre  || '');
       var loginUrl = 'https://food-display-pro.vercel.app/login?adminId=' + aid + '&nombre=' + nom;
 
-      return '<div class="cat-real-pill" onclick="window.location.href=\'' + loginUrl + '\'" style="cursor:pointer;">' +
+      return '<div class="cat-real-pill" onclick="window.location.href=\'' + loginUrl + '\'" style="cursor:pointer;flex-shrink:0;">' +
         '<div class="cat-real-ico" style="background:#1a1a1a;padding:0;overflow:hidden;border-radius:12px;width:48px;height:48px;flex-shrink:0;">' +
           (img
             ? '<img src="' + img + '" alt="' + nombre + '" style="width:100%;height:100%;object-fit:cover;border-radius:12px;" onerror="this.style.display=\'none\';this.parentNode.innerHTML=\'🏪\'">'
@@ -13491,20 +13505,20 @@ try {
       '</div>';
     }).join('');
 
-    setTimeout(syncTrack, 50);
+    setTimeout(function(){ syncTrack(); }, 60);
   }
 
   /* Swipe táctil */
   var txStart = 0;
-  document.addEventListener('DOMContentLoaded', function(){
-    var track = document.getElementById('catsTicker');
-    if (!track) return;
-    track.addEventListener('touchstart', function(e){ txStart = e.touches[0].clientX; }, {passive:true});
-    track.addEventListener('touchend',   function(e){
+  (function waitDom(){
+    var outer = document.getElementById('dom-outer');
+    if (!outer) { setTimeout(waitDom, 50); return; }
+    outer.addEventListener('touchstart', function(e){ txStart = e.touches[0].clientX; }, {passive:true});
+    outer.addEventListener('touchend',   function(e){
       var dx = e.changedTouches[0].clientX - txStart;
       if (Math.abs(dx) > 35) domSlide(dx < 0 ? 1 : -1);
     }, {passive:true});
-  });
+  })();
 
   window.addEventListener('resize', function(){ setTimeout(syncTrack, 60); });
 
