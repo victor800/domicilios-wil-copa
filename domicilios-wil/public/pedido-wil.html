@@ -1175,67 +1175,51 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 
     </div>
   </div>
-  <!-- ════ DOMICILIOS ════ -->
+
+
+<!-- ════ DOMICILIOS ════ -->
 <div id="sec-domicilios" style="margin-bottom:20px;">
 
-  <!-- HEADER ROW -->
-  <div class="sec-row" style="padding-bottom:8px">
+  <!-- HEADER ROW con flechas al extremo derecho -->
+  <div class="sec-row" style="padding-bottom:10px;display:flex;align-items:center;justify-content:space-between;">
     <div class="sec-lbl"><span class="sym f">storefront</span>Nuestros Comercios</div>
-    <button class="sec-ver-mas" onclick="window.location.href='comerciosActivos.html'">
-      <span class="sym f">storefront</span>Ver más
-    </button>
-  </div>
-
-  <!-- CAROUSEL WRAPPER -->
-  <div style="position:relative;margin:0;padding:0;">
-
-    <!-- GRADIENTE BORDE IZQ (fade visual) -->
-    <div id="dom-fade-l" style="
-      position:absolute;left:0;top:0;bottom:0;width:48px;z-index:10;
-      background:linear-gradient(to right,var(--bg,#fff) 0%,transparent 100%);
-      pointer-events:none;opacity:0;transition:opacity .3s;"></div>
-
-    <!-- GRADIENTE BORDE DER -->
-    <div id="dom-fade-r" style="
-      position:absolute;right:0;top:0;bottom:0;width:48px;z-index:10;
-      background:linear-gradient(to left,var(--bg,#fff) 0%,transparent 100%);
-      pointer-events:none;opacity:1;transition:opacity .3s;"></div>
-
-    <!-- FLECHA IZQ -->
-    <button id="dom-prev" onclick="domSlideFn(-1)" style="
-      position:absolute;left:2px;top:50%;transform:translateY(-50%);z-index:20;
-      width:32px;height:32px;border-radius:50%;
-      background:rgba(15,15,15,0.95);border:2px solid #E9C349;
-      box-shadow:0 2px 10px rgba(0,0,0,0.8);
-      display:flex;align-items:center;justify-content:center;
-      cursor:pointer;color:#E9C349;padding:0;
-      opacity:0;pointer-events:none;transition:opacity .25s;">
-      <span class="sym f" style="font-size:19px;">chevron_left</span>
-    </button>
-
-    <!-- OVERFLOW -->
-    <div id="dom-outer" style="overflow:hidden;width:100%;padding:4px 0 6px 0;">
-      <div id="catsTicker" style="
-        display:flex;flex-direction:row;flex-wrap:nowrap;
-        gap:10px;
-        transition:transform .35s cubic-bezier(0.4,0,0.2,1);
-        will-change:transform;">
-      </div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <button id="dom-prev" onclick="domSlideFn(-1)" style="
+        width:28px;height:28px;border-radius:50%;padding:0;
+        background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);
+        display:flex;align-items:center;justify-content:center;
+        cursor:pointer;color:#fff;opacity:0.3;pointer-events:none;
+        transition:opacity .2s,background .2s;">
+        <span class="sym f" style="font-size:17px;">chevron_left</span>
+      </button>
+      <button id="dom-next" onclick="domSlideFn(1)" style="
+        width:28px;height:28px;border-radius:50%;padding:0;
+        background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);
+        display:flex;align-items:center;justify-content:center;
+        cursor:pointer;color:#fff;opacity:0.3;pointer-events:none;
+        transition:opacity .2s,background .2s;">
+        <span class="sym f" style="font-size:17px;">chevron_right</span>
+      </button>
+      <div style="width:1px;height:16px;background:rgba(255,255,255,0.15);margin:0 2px;"></div>
+      <button class="sec-ver-mas" onclick="window.location.href='comerciosActivos.html'" style="margin:0;">
+        <span class="sym f">storefront</span>Ver más
+      </button>
     </div>
-
-    <!-- FLECHA DER -->
-    <button id="dom-next" onclick="domSlideFn(1)" style="
-      position:absolute;right:2px;top:50%;transform:translateY(-50%);z-index:20;
-      width:32px;height:32px;border-radius:50%;
-      background:rgba(15,15,15,0.95);border:2px solid #E9C349;
-      box-shadow:0 2px 10px rgba(0,0,0,0.8);
-      display:flex;align-items:center;justify-content:center;
-      cursor:pointer;color:#E9C349;padding:0;
-      opacity:0;pointer-events:none;transition:opacity .25s;">
-      <span class="sym f" style="font-size:19px;">chevron_right</span>
-    </button>
-
   </div>
+
+  <!-- OVERFLOW SIN BOTONES ENCIMA -->
+  <div id="dom-outer" style="overflow:hidden;width:100%;padding:2px 0 8px 0;">
+    <div id="catsTicker" style="
+      display:flex;flex-direction:row;flex-wrap:nowrap;
+      gap:10px;
+      transition:transform .38s cubic-bezier(0.4,0,0.2,1);
+      will-change:transform;">
+    </div>
+  </div>
+
+  <!-- DOTS -->
+  <div id="dom-dots" style="display:flex;justify-content:center;gap:5px;margin-top:6px;"></div>
+
 </div>
 
 
@@ -13443,63 +13427,76 @@ try {
 
 <script>
 (function(){
-  var API_URL    = 'https://food-display-pro.vercel.app/api/upload-foto';
-  var domIdx     = 0;
-  var domTotal   = 0;
-  var GAP        = 10;
-  var autoTimer  = null;
-  var AUTO_MS    = 3000; // avanza cada 3 seg
+  var API_URL   = 'https://food-display-pro.vercel.app/api/upload-foto';
+  var domIdx    = 0;
+  var domTotal  = 0;
+  var GAP       = 10;
+  var autoTimer = null;
+  var AUTO_MS   = 2800;
+  var paused    = false;
 
   function getItemW() {
     var first = document.querySelector('#catsTicker .cat-real-pill');
     return first ? first.offsetWidth + GAP : 0;
   }
 
-  function updateUI() {
-    var prev   = document.getElementById('dom-prev');
-    var next   = document.getElementById('dom-next');
-    var fadeL  = document.getElementById('dom-fade-l');
-    var fadeR  = document.getElementById('dom-fade-r');
-    var canP   = domIdx > 0;
-    var canN   = domIdx < domTotal - 1;
-
-    prev.style.opacity       = canP ? '1' : '0';
-    prev.style.pointerEvents = canP ? 'auto' : 'none';
-    next.style.opacity       = canN ? '1' : '0';
-    next.style.pointerEvents = canN ? 'auto' : 'none';
-
-    if (fadeL) fadeL.style.opacity = canP ? '1' : '0';
-    if (fadeR) fadeR.style.opacity = canN ? '1' : '0';
+  function renderDots() {
+    var dots = document.getElementById('dom-dots');
+    if (!dots) return;
+    dots.innerHTML = '';
+    for (var i = 0; i < domTotal; i++) {
+      var d = document.createElement('div');
+      d.style.cssText = 'width:'+(i===domIdx?'16px':'6px')+';height:6px;border-radius:3px;background:'+(i===domIdx?'#E9C349':'rgba(255,255,255,0.25)')+';transition:all .3s;';
+      dots.appendChild(d);
+    }
   }
 
-  function syncTrack() {
+  function updateBtns() {
+    var prev = document.getElementById('dom-prev');
+    var next = document.getElementById('dom-next');
+    if (!prev||!next) return;
+    var canP = domIdx > 0;
+    var canN = domIdx < domTotal - 1;
+    prev.style.opacity       = canP ? '1' : '0.3';
+    prev.style.pointerEvents = canP ? 'auto' : 'none';
+    prev.style.background    = canP ? 'rgba(233,195,73,0.15)' : 'rgba(255,255,255,0.08)';
+    prev.style.borderColor   = canP ? 'rgba(233,195,73,0.5)'  : 'rgba(255,255,255,0.2)';
+    prev.style.color         = canP ? '#E9C349' : '#fff';
+    next.style.opacity       = canN ? '1' : '0.3';
+    next.style.pointerEvents = canN ? 'auto' : 'none';
+    next.style.background    = canN ? 'rgba(233,195,73,0.15)' : 'rgba(255,255,255,0.08)';
+    next.style.borderColor   = canN ? 'rgba(233,195,73,0.5)'  : 'rgba(255,255,255,0.2)';
+    next.style.color         = canN ? '#E9C349' : '#fff';
+  }
+
+  function syncTrack(animate) {
     var track = document.getElementById('catsTicker');
     if (!track) return;
     var iw = getItemW();
     if (!iw) return;
+    if (animate === false) track.style.transition = 'none';
+    else track.style.transition = 'transform .38s cubic-bezier(0.4,0,0.2,1)';
     track.style.transform = 'translateX(-' + (domIdx * iw) + 'px)';
-    updateUI();
+    updateBtns();
+    renderDots();
   }
 
+  function stopAuto()  { if (autoTimer) { clearInterval(autoTimer); autoTimer = null; } }
   function startAuto() {
     stopAuto();
+    if (domTotal < 2) return;
     autoTimer = setInterval(function(){
-      if (domTotal < 2) return;
+      if (paused) return;
       domIdx = domIdx >= domTotal - 1 ? 0 : domIdx + 1;
       syncTrack();
     }, AUTO_MS);
   }
 
-  function stopAuto() {
-    if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
-  }
-
-  /* expuesta globalmente para los onclick */
   window.domSlideFn = function(dir) {
     stopAuto();
     domIdx = Math.max(0, Math.min(domIdx + dir, domTotal - 1));
     syncTrack();
-    startAuto(); /* retoma auto tras 3s */
+    startAuto();
   };
 
   function renderComercios(data) {
@@ -13513,55 +13510,58 @@ try {
     domIdx   = 0;
 
     track.innerHTML = data.map(function(c) {
-      var img      = c.config && c.config.image ? c.config.image : null;
-      var nombre   = c.nombre || 'Comercio';
-      var aid      = encodeURIComponent(c.adminId || '');
-      var nom      = encodeURIComponent(nombre);
-      var url      = 'https://food-display-pro.vercel.app/login?adminId='+aid+'&nombre='+nom;
-
+      var img  = c.config && c.config.image ? c.config.image : null;
+      var nom  = c.nombre || 'Comercio';
+      var aid  = encodeURIComponent(c.adminId || '');
+      var enm  = encodeURIComponent(nom);
+      var url  = 'https://food-display-pro.vercel.app/login?adminId='+aid+'&nombre='+enm;
       return '<div class="cat-real-pill" onclick="window.location.href=\''+url+'\'" style="cursor:pointer;flex-shrink:0;">' +
         '<div class="cat-real-ico" style="padding:0;overflow:hidden;border-radius:12px;width:48px;height:48px;flex-shrink:0;background:#1a1a1a;">' +
           (img
-            ? '<img src="'+img+'" alt="'+nombre+'" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display=\'none\';this.parentNode.textContent=\'🏪\'">'
+            ? '<img src="'+img+'" alt="'+nom+'" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display=\'none\';this.parentNode.textContent=\'🏪\'">'
             : '<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:1.4rem;">🏪</span>') +
         '</div>' +
-        '<div><div class="cat-real-name">'+nombre+'</div><div class="cat-real-sub">Ver menú</div></div>' +
+        '<div><div class="cat-real-name">'+nom+'</div><div class="cat-real-sub">Ver menú</div></div>' +
       '</div>';
     }).join('');
 
-    setTimeout(function(){ syncTrack(); startAuto(); }, 60);
+    setTimeout(function(){
+      syncTrack(false);
+      startAuto();
+    }, 80);
   }
 
-  /* Swipe táctil — pausa auto mientras el usuario interactúa */
+  /* Swipe */
   var txStart = 0;
   (function waitDom(){
     var outer = document.getElementById('dom-outer');
     if (!outer) { setTimeout(waitDom, 50); return; }
     outer.addEventListener('touchstart', function(e){
       txStart = e.touches[0].clientX;
-      stopAuto();
+      paused  = true;
     }, {passive:true});
     outer.addEventListener('touchend', function(e){
       var dx = e.changedTouches[0].clientX - txStart;
-      if (Math.abs(dx) > 35) {
+      if (Math.abs(dx) > 30) {
         domIdx = Math.max(0, Math.min(domIdx + (dx < 0 ? 1 : -1), domTotal - 1));
         syncTrack();
       }
-      startAuto();
+      paused = false;
     }, {passive:true});
   })();
 
-  window.addEventListener('resize', function(){ setTimeout(syncTrack, 60); });
+  window.addEventListener('resize', function(){ setTimeout(function(){ syncTrack(false); }, 60); });
 
   fetch(API_URL, {redirect:'follow', mode:'cors'})
     .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
     .then(renderComercios)
     .catch(function(){
       var t = document.getElementById('catsTicker');
-      if (t) t.innerHTML = '<div style="color:#f87171;font-size:13px;padding:8px 4px;">Error al cargar.</div>';
+      if (t) t.innerHTML = '<div style="color:#f87171;font-size:13px;">Error al cargar.</div>';
     });
 })();
 </script>
+
 
 </body>
 </html>
