@@ -13425,6 +13425,8 @@ try {
 })(window);
 </script>
 
+
+
 <script>
 (function(){
   var API_URL   = 'https://food-display-pro.vercel.app/api/upload-foto';
@@ -13552,13 +13554,15 @@ try {
 
   window.addEventListener('resize', function(){ setTimeout(function(){ syncTrack(false); }, 60); });
 
-  fetch(API_URL, {redirect:'follow', mode:'cors'})
+   fetch(API_URL, {redirect:'follow', mode:'cors'})
     .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(function(data){ return (data || []).filter(function(c){ return c.codigo === 1; }); }) // ✅
     .then(renderComercios)
     .catch(function(){
       var t = document.getElementById('catsTicker');
       if (t) t.innerHTML = '<div style="color:#f87171;font-size:13px;">Error al cargar.</div>';
     });
+
 })();
 </script>
 
