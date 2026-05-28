@@ -13501,12 +13501,32 @@ try {
 
   window.fdpGoMenu = function(url, nom, img, e) {
   e.stopPropagation();
-  var loader  = document.getElementById('fdp-loader');
-  var nameEl  = document.getElementById('fdp-name');
-  var logoEl  = document.getElementById('fdp-logo');
-  var ring    = document.getElementById('fdp-ring');
-  var pctEl   = document.getElementById('fdp-pct');
-  var C       = 188.5;
+
+  // Inyecta el overlay si no existe
+  var loader = document.getElementById('fdp-loader');
+  if (!loader) {
+    loader = document.createElement('div');
+    loader.id = 'fdp-loader';
+    loader.innerHTML =
+      '<div id="fdp-logo" style="width:64px;height:64px;border-radius:16px;background:#1a1a1a;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:28px;">🏪</div>' +
+      '<div id="fdp-name" style="font-size:15px;font-weight:800;color:#fff;text-transform:uppercase;letter-spacing:0.06em;text-align:center;max-width:220px;line-height:1.3;"></div>' +
+      '<div style="position:relative;width:72px;height:72px;">' +
+        '<svg width="72" height="72" viewBox="0 0 72 72" style="transform:rotate(-90deg);">' +
+          '<circle cx="36" cy="36" r="30" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="5"/>' +
+          '<circle id="fdp-ring" cx="36" cy="36" r="30" fill="none" stroke="#10b981" stroke-width="5" stroke-linecap="round" stroke-dasharray="188.5" stroke-dashoffset="188.5"/>' +
+        '</svg>' +
+        '<div id="fdp-pct" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#10b981;">0%</div>' +
+      '</div>' +
+      '<div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.3);letter-spacing:0.08em;text-transform:uppercase;">Preparando tu experiencia</div>';
+    loader.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;';
+    document.body.appendChild(loader);
+  }
+
+  var nameEl = document.getElementById('fdp-name');
+  var logoEl = document.getElementById('fdp-logo');
+  var ring   = document.getElementById('fdp-ring');
+  var pctEl  = document.getElementById('fdp-pct');
+  var C      = 188.5;
 
   nameEl.textContent = nom;
   logoEl.innerHTML   = img
@@ -13517,7 +13537,7 @@ try {
   pctEl.textContent = '0%';
   loader.style.display = 'flex';
 
-  var start = null;
+  var start    = null;
   var DURATION = 2200;
   function ease(t) { return 1 - Math.pow(1 - t, 2.5); }
   function step(ts) {
