@@ -1175,7 +1175,7 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 
     </div>
   </div>
-<!-- ════ DOMICILIOS ════ -->
+  <!-- ════ DOMICILIOS ════ -->
 <div id="sec-domicilios" style="margin-bottom:20px;">
 
   <!-- HEADER ROW -->
@@ -1187,51 +1187,57 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
   </div>
 
   <!-- CAROUSEL WRAPPER -->
-  <div style="position:relative;">
+  <div style="position:relative;margin:0;padding:0;">
 
-    <!-- FLECHA IZQUIERDA (flotante sobre el carrusel) -->
-    <button id="dom-prev" onclick="domSlide(-1)" style="
-      position:absolute;left:-4px;top:50%;transform:translateY(-50%);
-      z-index:20;
-      width:36px;height:36px;border-radius:50%;
-      background:rgba(20,20,20,0.92);
-      border:2px solid rgba(233,195,73,0.7);
-      box-shadow:0 2px 12px rgba(0,0,0,0.7);
+    <!-- GRADIENTE BORDE IZQ (fade visual) -->
+    <div id="dom-fade-l" style="
+      position:absolute;left:0;top:0;bottom:0;width:48px;z-index:10;
+      background:linear-gradient(to right,var(--bg,#fff) 0%,transparent 100%);
+      pointer-events:none;opacity:0;transition:opacity .3s;"></div>
+
+    <!-- GRADIENTE BORDE DER -->
+    <div id="dom-fade-r" style="
+      position:absolute;right:0;top:0;bottom:0;width:48px;z-index:10;
+      background:linear-gradient(to left,var(--bg,#fff) 0%,transparent 100%);
+      pointer-events:none;opacity:1;transition:opacity .3s;"></div>
+
+    <!-- FLECHA IZQ -->
+    <button id="dom-prev" onclick="domSlideFn(-1)" style="
+      position:absolute;left:2px;top:50%;transform:translateY(-50%);z-index:20;
+      width:32px;height:32px;border-radius:50%;
+      background:rgba(15,15,15,0.95);border:2px solid #E9C349;
+      box-shadow:0 2px 10px rgba(0,0,0,0.8);
       display:flex;align-items:center;justify-content:center;
-      cursor:pointer;color:#E9C349;
-      opacity:0.35;pointer-events:none;
-      transition:opacity .2s,background .2s;">
-      <span class="sym f" style="font-size:20px;font-variation-settings:'FILL' 1;">chevron_left</span>
+      cursor:pointer;color:#E9C349;padding:0;
+      opacity:0;pointer-events:none;transition:opacity .25s;">
+      <span class="sym f" style="font-size:19px;">chevron_left</span>
     </button>
 
-    <!-- OVERFLOW HIDDEN -->
-    <div id="dom-outer" style="overflow:hidden;padding:0 6px;">
+    <!-- OVERFLOW -->
+    <div id="dom-outer" style="overflow:hidden;width:100%;padding:4px 0 6px 0;">
       <div id="catsTicker" style="
         display:flex;flex-direction:row;flex-wrap:nowrap;
         gap:10px;
-        transition:transform .32s cubic-bezier(0.4,0,0.2,1);
+        transition:transform .35s cubic-bezier(0.4,0,0.2,1);
         will-change:transform;">
-        <!-- cards dinámicas -->
       </div>
     </div>
 
-    <!-- FLECHA DERECHA (flotante sobre el carrusel) -->
-    <button id="dom-next" onclick="domSlide(1)" style="
-      position:absolute;right:-4px;top:50%;transform:translateY(-50%);
-      z-index:20;
-      width:36px;height:36px;border-radius:50%;
-      background:rgba(20,20,20,0.92);
-      border:2px solid rgba(233,195,73,0.7);
-      box-shadow:0 2px 12px rgba(0,0,0,0.7);
+    <!-- FLECHA DER -->
+    <button id="dom-next" onclick="domSlideFn(1)" style="
+      position:absolute;right:2px;top:50%;transform:translateY(-50%);z-index:20;
+      width:32px;height:32px;border-radius:50%;
+      background:rgba(15,15,15,0.95);border:2px solid #E9C349;
+      box-shadow:0 2px 10px rgba(0,0,0,0.8);
       display:flex;align-items:center;justify-content:center;
-      cursor:pointer;color:#E9C349;
-      opacity:0.35;pointer-events:none;
-      transition:opacity .2s,background .2s;">
-      <span class="sym f" style="font-size:20px;font-variation-settings:'FILL' 1;">chevron_right</span>
+      cursor:pointer;color:#E9C349;padding:0;
+      opacity:0;pointer-events:none;transition:opacity .25s;">
+      <span class="sym f" style="font-size:19px;">chevron_right</span>
     </button>
 
   </div>
 </div>
+
 
     <!-- PEDIDO LIBRE -->
     <div class="wil-libre" onclick="startLibre()">
@@ -13437,28 +13443,33 @@ try {
 
 <script>
 (function(){
-  var API_URL  = 'https://food-display-pro.vercel.app/api/upload-foto';
-  var domIdx   = 0;
-  var domTotal = 0;
-  var GAP      = 10;
+  var API_URL    = 'https://food-display-pro.vercel.app/api/upload-foto';
+  var domIdx     = 0;
+  var domTotal   = 0;
+  var GAP        = 10;
+  var autoTimer  = null;
+  var AUTO_MS    = 3000; // avanza cada 3 seg
 
   function getItemW() {
-    var track = document.getElementById('catsTicker');
-    if (!track) return 0;
-    var first = track.querySelector('.cat-real-pill');
+    var first = document.querySelector('#catsTicker .cat-real-pill');
     return first ? first.offsetWidth + GAP : 0;
   }
 
-  function updateBtns() {
-    var prev = document.getElementById('dom-prev');
-    var next = document.getElementById('dom-next');
-    if (!prev || !next) return;
-    var canPrev = domIdx > 0;
-    var canNext = domIdx < domTotal - 1;
-    prev.style.opacity       = canPrev ? '1'    : '0.35';
-    prev.style.pointerEvents = canPrev ? 'auto' : 'none';
-    next.style.opacity       = canNext ? '1'    : '0.35';
-    next.style.pointerEvents = canNext ? 'auto' : 'none';
+  function updateUI() {
+    var prev   = document.getElementById('dom-prev');
+    var next   = document.getElementById('dom-next');
+    var fadeL  = document.getElementById('dom-fade-l');
+    var fadeR  = document.getElementById('dom-fade-r');
+    var canP   = domIdx > 0;
+    var canN   = domIdx < domTotal - 1;
+
+    prev.style.opacity       = canP ? '1' : '0';
+    prev.style.pointerEvents = canP ? 'auto' : 'none';
+    next.style.opacity       = canN ? '1' : '0';
+    next.style.pointerEvents = canN ? 'auto' : 'none';
+
+    if (fadeL) fadeL.style.opacity = canP ? '1' : '0';
+    if (fadeR) fadeR.style.opacity = canN ? '1' : '0';
   }
 
   function syncTrack() {
@@ -13467,19 +13478,35 @@ try {
     var iw = getItemW();
     if (!iw) return;
     track.style.transform = 'translateX(-' + (domIdx * iw) + 'px)';
-    updateBtns();
+    updateUI();
   }
 
-  window.domSlide = function(dir) {
+  function startAuto() {
+    stopAuto();
+    autoTimer = setInterval(function(){
+      if (domTotal < 2) return;
+      domIdx = domIdx >= domTotal - 1 ? 0 : domIdx + 1;
+      syncTrack();
+    }, AUTO_MS);
+  }
+
+  function stopAuto() {
+    if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  }
+
+  /* expuesta globalmente para los onclick */
+  window.domSlideFn = function(dir) {
+    stopAuto();
     domIdx = Math.max(0, Math.min(domIdx + dir, domTotal - 1));
     syncTrack();
+    startAuto(); /* retoma auto tras 3s */
   };
 
   function renderComercios(data) {
     var track = document.getElementById('catsTicker');
     if (!track) return;
     if (!data || !data.length) {
-      track.innerHTML = '<div style="color:#aaa;font-size:13px;padding:8px 4px;">No hay comercios.</div>';
+      track.innerHTML = '<div style="color:#aaa;font-size:13px;padding:8px 4px;">Sin comercios.</div>';
       return;
     }
     domTotal = data.length;
@@ -13489,45 +13516,49 @@ try {
       var img      = c.config && c.config.image ? c.config.image : null;
       var nombre   = c.nombre || 'Comercio';
       var aid      = encodeURIComponent(c.adminId || '');
-      var nom      = encodeURIComponent(c.nombre  || '');
-      var loginUrl = 'https://food-display-pro.vercel.app/login?adminId=' + aid + '&nombre=' + nom;
+      var nom      = encodeURIComponent(nombre);
+      var url      = 'https://food-display-pro.vercel.app/login?adminId='+aid+'&nombre='+nom;
 
-      return '<div class="cat-real-pill" onclick="window.location.href=\'' + loginUrl + '\'" style="cursor:pointer;flex-shrink:0;">' +
-        '<div class="cat-real-ico" style="background:#1a1a1a;padding:0;overflow:hidden;border-radius:12px;width:48px;height:48px;flex-shrink:0;">' +
+      return '<div class="cat-real-pill" onclick="window.location.href=\''+url+'\'" style="cursor:pointer;flex-shrink:0;">' +
+        '<div class="cat-real-ico" style="padding:0;overflow:hidden;border-radius:12px;width:48px;height:48px;flex-shrink:0;background:#1a1a1a;">' +
           (img
-            ? '<img src="' + img + '" alt="' + nombre + '" style="width:100%;height:100%;object-fit:cover;border-radius:12px;" onerror="this.style.display=\'none\';this.parentNode.innerHTML=\'🏪\'">'
+            ? '<img src="'+img+'" alt="'+nombre+'" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display=\'none\';this.parentNode.textContent=\'🏪\'">'
             : '<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:1.4rem;">🏪</span>') +
         '</div>' +
-        '<div>' +
-          '<div class="cat-real-name">' + nombre + '</div>' +
-          '<div class="cat-real-sub">Ver menú</div>' +
-        '</div>' +
+        '<div><div class="cat-real-name">'+nombre+'</div><div class="cat-real-sub">Ver menú</div></div>' +
       '</div>';
     }).join('');
 
-    setTimeout(function(){ syncTrack(); }, 60);
+    setTimeout(function(){ syncTrack(); startAuto(); }, 60);
   }
 
-  /* Swipe táctil */
+  /* Swipe táctil — pausa auto mientras el usuario interactúa */
   var txStart = 0;
   (function waitDom(){
     var outer = document.getElementById('dom-outer');
     if (!outer) { setTimeout(waitDom, 50); return; }
-    outer.addEventListener('touchstart', function(e){ txStart = e.touches[0].clientX; }, {passive:true});
-    outer.addEventListener('touchend',   function(e){
+    outer.addEventListener('touchstart', function(e){
+      txStart = e.touches[0].clientX;
+      stopAuto();
+    }, {passive:true});
+    outer.addEventListener('touchend', function(e){
       var dx = e.changedTouches[0].clientX - txStart;
-      if (Math.abs(dx) > 35) domSlide(dx < 0 ? 1 : -1);
+      if (Math.abs(dx) > 35) {
+        domIdx = Math.max(0, Math.min(domIdx + (dx < 0 ? 1 : -1), domTotal - 1));
+        syncTrack();
+      }
+      startAuto();
     }, {passive:true});
   })();
 
   window.addEventListener('resize', function(){ setTimeout(syncTrack, 60); });
 
-  fetch(API_URL, { redirect:'follow', mode:'cors' })
-    .then(function(r){ return r.ok ? r.json() : Promise.reject('HTTP ' + r.status); })
+  fetch(API_URL, {redirect:'follow', mode:'cors'})
+    .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
     .then(renderComercios)
     .catch(function(){
-      var track = document.getElementById('catsTicker');
-      if (track) track.innerHTML = '<div style="color:#f87171;font-size:13px;padding:8px 4px;">No se pudo cargar los comercios.</div>';
+      var t = document.getElementById('catsTicker');
+      if (t) t.innerHTML = '<div style="color:#f87171;font-size:13px;padding:8px 4px;">Error al cargar.</div>';
     });
 })();
 </script>
