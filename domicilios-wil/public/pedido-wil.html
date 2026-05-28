@@ -1177,31 +1177,24 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
   </div>
 
   <!-- ════ DOMICILIOS ════ -->
-  <div id="sec-domicilios">
+ <div id="sec-domicilios">
 
-    <!-- CATEGORÍAS -->
-    <div class="sec-row" style="padding-bottom:8px">
-      <div class="sec-lbl"><span class="sym f">grid_view</span>¿Qué quieres pedir?</div>
-     <button class="sec-ver-mas" onclick="window.location.href='comerciosActivos.html'">
-  <span class="sym f">storefront</span>Ver más
-</button>
+  <!-- HEADER ROW -->
+  <div class="sec-row" style="padding-bottom:8px">
+    <div class="sec-lbl"><span class="sym f">storefront</span>Nuestros Comercios</div>
+    <button class="sec-ver-mas" onclick="window.location.href='comerciosActivos.html'">
+      <span class="sym f">storefront</span>Ver más
+    </button>
+  </div>
+
+  <!-- COMERCIOS TRACK -->
+  <div class="cats-ticker-outer">
+    <div class="cats-ticker-track" id="catsTicker">
+      <!-- Se llena dinámicamente -->
     </div>
-    <div class="cats-ticker-outer">
-      <div class="cats-ticker-track" id="catsTicker">
-        <!-- Set 1 -->
-        <div class="cat-real-pill" onclick="startLibreConCat('Supermercado / Tienda')"><div class="cat-real-ico" style="background:#e8f5e9">🛒</div><div><div class="cat-real-name">Mercado</div><div class="cat-real-sub">Tiendas y supermercados</div></div></div>
-        <div class="cat-real-pill" onclick="startLibreConCat('Restaurante / Comida')"><div class="cat-real-ico" style="background:#fff3e0">🍔</div><div><div class="cat-real-name">Comida</div><div class="cat-real-sub">Restaurantes y locales</div></div></div>
-        <div class="cat-real-pill" onclick="startLibreConCat('Frutas y verduras')"><div class="cat-real-ico" style="background:#f1f8e9">🍅</div><div><div class="cat-real-name">Frutas y verduras</div><div class="cat-real-sub">Mercado fresco</div></div></div>
-        <div class="cat-real-pill" onclick="startLibreConCat('Panadería / Pastelería')"><div class="cat-real-ico" style="background:#fffde7">🥐</div><div><div class="cat-real-name">Panadería</div><div class="cat-real-sub">Pan y pastelería</div></div></div>
-        <div class="cat-real-pill" onclick="startLibreConCat('Licores y bebidas')"><div class="cat-real-ico" style="background:#fce4ec">🍷</div><div><div class="cat-real-name">Licores</div><div class="cat-real-sub">Bebidas y licorería</div></div></div>
-        <div class="cat-real-pill" onclick="startLibreConCat('Aseo y hogar')"><div class="cat-real-ico" style="background:#e3f2fd">🧴</div><div><div class="cat-real-name">Aseo y hogar</div><div class="cat-real-sub">Limpieza y cuidado</div></div></div>
-        <div class="cat-real-pill" onclick="startLibreConCat('Medicamentos / Droguería')"><div class="cat-real-ico" style="background:#fce4ec">💊</div><div><div class="cat-real-name">Medicamentos</div><div class="cat-real-sub">Farmacias y droguerías</div></div></div>
-        <div class="cat-real-pill" onclick="startLibreConCat('Mascotas')"><div class="cat-real-ico" style="background:#f3e5f5">🐾</div><div><div class="cat-real-name">Mascotas</div><div class="cat-real-sub">Alimentos y accesorios</div></div></div>
-        <div class="cat-real-pill" onclick="startLibreConCat('Cafetería / Café')"><div class="cat-real-ico" style="background:#efebe9">☕</div><div><div class="cat-real-name">Café</div><div class="cat-real-sub">Cafeterías y bebidas</div></div></div>
-        <div class="cat-real-pill" onclick="startLibreConCat('Farmacia / Medicamentos')"><div class="cat-real-ico" style="background:#e0f2f1">🩺</div><div><div class="cat-real-name">Salud</div><div class="cat-real-sub">Equipos y cuidado personal</div></div></div>
-       
-      </div>
-    </div>
+  </div>
+
+</div>
 
     <!-- PEDIDO LIBRE -->
     <div class="wil-libre" onclick="startLibre()">
@@ -13403,6 +13396,49 @@ try {
   console.log('[WIL] ✅ Botón cancelar pedido v2 — text/plain fix + polling guard');
 
 })(window);
+</script>
+
+
+<script>
+(function(){
+  var API_URL = 'https://food-display-pro.vercel.app/api/upload-foto';
+
+  function renderComercios(data) {
+    var track = document.getElementById('catsTicker');
+    if (!track) return;
+    if (!data || !data.length) {
+      track.innerHTML = '<div style="color:#aaa;font-size:13px;padding:8px 4px;">No hay comercios disponibles.</div>';
+      return;
+    }
+    track.innerHTML = data.map(function(c) {
+      var img   = c.config && c.config.image ? c.config.image : null;
+      var nombre = c.nombre || 'Comercio';
+      var aid   = encodeURIComponent(c.adminId || '');
+      var nom   = encodeURIComponent(c.nombre  || '');
+      var loginUrl = 'https://food-display-pro.vercel.app/login?adminId=' + aid + '&nombre=' + nom;
+
+      return '<div class="cat-real-pill" onclick="window.location.href=\'' + loginUrl + '\'" style="cursor:pointer;">' +
+        '<div class="cat-real-ico" style="background:#1a1a1a;padding:0;overflow:hidden;border-radius:12px;width:48px;height:48px;flex-shrink:0;">' +
+          (img
+            ? '<img src="' + img + '" alt="' + nombre + '" style="width:100%;height:100%;object-fit:cover;border-radius:12px;" onerror="this.style.display=\'none\';this.parentNode.innerHTML=\'🏪\'">'
+            : '<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:1.4rem;">🏪</span>') +
+        '</div>' +
+        '<div>' +
+          '<div class="cat-real-name">' + nombre + '</div>' +
+          '<div class="cat-real-sub">Ver menú</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  fetch(API_URL, { redirect:'follow', mode:'cors' })
+    .then(function(r){ return r.ok ? r.json() : Promise.reject('HTTP ' + r.status); })
+    .then(renderComercios)
+    .catch(function(){
+      var track = document.getElementById('catsTicker');
+      if (track) track.innerHTML = '<div style="color:#f87171;font-size:13px;padding:8px 4px;">No se pudo cargar los comercios.</div>';
+    });
+})();
 </script>
 
 </body>
