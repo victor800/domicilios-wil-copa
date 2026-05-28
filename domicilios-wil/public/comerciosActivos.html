@@ -199,8 +199,9 @@
         <button onclick="setRange('3m')" id="btn3m" style="padding:4px 10px;border-radius:999px;font-size:10px;font-weight:700;border:1px solid rgba(255,255,255,0.1);cursor:pointer;background:transparent;color:rgba(255,255,255,0.4);transition:all .2s;">3M</button>
       </div>
     </div>
-    <div style="position:relative;width:100%;height:120px;">
+    <div style="position:relative;width:100%;height:120px;padding:14px 16px 10px;">
       <canvas id="salesChart" role="img" aria-label="Gráfica de ventas en ascenso">Ventas en crecimiento.</canvas>
+      <p id="salesPct" style="font-size:11px;color:#22c55e;margin:2px 0 0;font-weight:600;">▲ +12.4% este mes</p>
     </div>
   </div>
 </section>
@@ -415,26 +416,26 @@ init()
 
 <script>
 var salesChart = null
+var liveData = [280,310,295,340,380,420,465]
+var liveLabels = ['Lun','Mar','Mié','Jue','Vie','Sáb','Hoy']
+var currentRange = '7d'
 
 var datasets = {
-  '7d': {
-    labels: ['Lun','Mar','Mié','Jue','Vie','Sáb','Hoy'],
-    data:   [280,310,295,340,380,420,465],
-    total:  '$4.28M', pct: '+12.4%'
-  },
-  '1m': {
-    labels: ['S1','S2','S3','S4'],
-    data:   [980,1120,1350,1580],
-    total:  '$5.03M', pct: '+18.2%'
-  },
-  '3m': {
-    labels: ['Ene','Feb','Mar'],
-    data:   [3200,3850,4280],
-    total:  '$11.3M', pct: '+33.7%'
-  }
+  '7d': { labels: ['Lun','Mar','Mié','Jue','Vie','Sáb','Hoy'], base: [280,310,295,340,380,420,465], total: '$4.28M', pct: '+12.4%' },
+  '1m': { labels: ['S1','S2','S3','S4'], base: [980,1120,1350,1580], total: '$5.03M', pct: '+18.2%' },
+  '3m': { labels: ['Ene','Feb','Mar'], base: [3200,3850,4280], total: '$11.3M', pct: '+33.7%' }
+}
+
+function jitter(arr) {
+  return arr.map(function(v, i) {
+    var wobble = (Math.random() - 0.48) * v * 0.06
+    var trend  = i * (Math.random() * 2)
+    return Math.round(Math.max(v * 0.85, v + wobble + trend))
+  })
 }
 
 function setRange(range) {
+  currentRange = range
   ;['7d','1m','3m'].forEach(function(r) {
     var b = document.getElementById('btn'+r)
     if (r === range) {
@@ -449,56 +450,91 @@ function setRange(range) {
   })
   var d = datasets[range]
   document.getElementById('totalVentas').textContent = d.total
+  liveData = d.base.slice()
   salesChart.data.labels = d.labels
-  salesChart.data.datasets[0].data = d.data
-  salesChart.update()
+  salesChart.data.datasets[0].data = liveData.slice()
+  salesChart.update('none')
+}
+
+function tick() {
+  var base = datasets[currentRange].base
+  var newData = jitter(base)
+
+  // Último valor cambia más dramáticamente para efecto live
+  var last = newData[newData.length - 1]
+  var delta = (Math.random() - 0.45) * last * 0.04
+  newData[newData.length - 1] = Math.round(last + delta)
+
+  // Color de línea según sube o baja el último punto
+  var prev = salesChart.data.datasets[0].data[newData.length - 1] || last
+  var color = newData[newData.length - 1] >= prev ? '#E9C349' : '#f87171'
+
+  salesChart.data.datasets[0].data = newData
+  salesChart.data.datasets[0].borderColor = color
+  salesChart.data.datasets[0].pointBackgroundColor = color
+
+  // Actualizar el % de cambio
+  var pct = (((newData[newData.length-1] - base[0]) / base[0]) * 100).toFixed(1)
+  var pctEl = document.getElementById('salesPct')
+  if (pct >= 0) {
+    pctEl.textContent = '▲ +' + pct + '% este mes'
+    pctEl.style.color = '#22c55e'
+  } else {
+    pctEl.textContent = '▼ ' + pct + '% este mes'
+    pctEl.style.color = '#f87171'
+  }
+
+  salesChart.update('none')
 }
 
 function initChart() {
   var ctx = document.getElementById('salesChart')
   if (!ctx) return
-  var d = datasets['7d']
 
-  var gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 120)
-  gradient.addColorStop(0, 'rgba(233,195,73,0.25)')
-  gradient.addColorStop(1, 'rgba(233,195,73,0.0)')
+  var grad = ctx.getContext('2d').createLinearGradient(0, 0, 0, 100)
+  grad.addColorStop(0, 'rgba(233,195,73,0.2)')
+  grad.addColorStop(1, 'rgba(233,195,73,0.0)')
 
   salesChart = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: d.labels,
+      labels: datasets['7d'].labels,
       datasets: [{
-        data: d.data,
+        data: datasets['7d'].base.slice(),
         borderColor: '#E9C349',
         borderWidth: 2,
-        pointRadius: 3,
+        pointRadius: 2.5,
         pointBackgroundColor: '#E9C349',
-        pointHoverRadius: 5,
+        pointHoverRadius: 4,
         fill: true,
-        backgroundColor: gradient,
-        tension: 0.45
+        backgroundColor: grad,
+        tension: 0.42
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: {
-        backgroundColor: 'rgba(20,20,20,0.95)',
-        borderColor: 'rgba(233,195,73,0.3)',
-        borderWidth: 1,
-        titleColor: '#E9C349',
-        bodyColor: '#fff',
-        padding: 10,
-        callbacks: {
-          label: function(ctx) { return ' $' + ctx.raw + 'K' }
+      animation: { duration: 600, easing: 'easeInOutQuart' },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(20,20,20,0.95)',
+          borderColor: 'rgba(233,195,73,0.3)',
+          borderWidth: 1,
+          titleColor: '#E9C349',
+          bodyColor: '#fff',
+          padding: 8,
+          callbacks: { label: function(c) { return ' $' + c.raw + 'K' } }
         }
-      }},
+      },
       scales: {
         x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 10 } } },
         y: { display: false, grid: { display: false } }
       }
     }
   })
+
+  setInterval(tick, 1800)
 }
 
 document.addEventListener('DOMContentLoaded', initChart)
