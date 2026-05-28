@@ -5,6 +5,8 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
   tailwind.config = {
@@ -125,7 +127,8 @@
     .mb-lg      { margin-bottom:1.2rem !important; }
     .gap-md     { gap:12px !important; }
     .p-10       { padding:1.1rem !important; }
-    h2.text-headline-lg { font-size:26px !important; line-height:32px !important; }
+    h2.text-headline-lg { font-size:20px !important; line-height:26px !important; }
+
     header .h-20 { height:3.2rem !important; }
     header .gap-8 { gap:.75rem !important; }
   }
@@ -177,8 +180,30 @@
       <p class="text-label-md font-bold tracking-[0.25em] uppercase">Nuestros Socios</p>
     </div>
     <h2 class="text-headline-lg font-headline-lg text-primary mb-6 md:text-display-lg md:font-display-lg tracking-tight">Comercios Aliados.</h2>
-    <p class="text-body-lg font-body-lg text-on-surface-variant leading-relaxed max-w-2xl">Gestiona y accede a todos tus comercios en un solo lugar. Monitorea el estado operativo en tiempo real.</p>
+    <p class="text-body-md font-body-md text-on-surface-variant leading-relaxed max-w-2xl">Gestiona y accede a todos tus comercios en un solo lugar. Monitorea el estado operativo en tiempo real.</p>
   </section>
+
+
+  <!-- Gráfica de ventas -->
+<section class="mb-lg">
+  <div style="background:linear-gradient(145deg,rgba(255,255,255,0.05) 0%,rgba(255,255,255,0.01) 100%);border:1px solid rgba(255,255,255,0.1);backdrop-filter:blur(18px);border-radius:16px;padding:20px 20px 12px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+      <div>
+        <p style="font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,0.35);margin:0 0 4px;">Ventas totales</p>
+        <p style="font-size:22px;font-weight:700;color:#fff;margin:0;font-family:'Montserrat',sans-serif;" id="totalVentas">$4.28M</p>
+        <p style="font-size:11px;color:#22c55e;margin:2px 0 0;font-weight:600;">▲ +12.4% este mes</p>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button onclick="setRange('7d')" id="btn7d" style="padding:4px 10px;border-radius:999px;font-size:10px;font-weight:700;border:1px solid rgba(255,255,255,0.15);cursor:pointer;background:rgba(233,195,73,0.15);color:#E9C349;transition:all .2s;">7D</button>
+        <button onclick="setRange('1m')" id="btn1m" style="padding:4px 10px;border-radius:999px;font-size:10px;font-weight:700;border:1px solid rgba(255,255,255,0.1);cursor:pointer;background:transparent;color:rgba(255,255,255,0.4);transition:all .2s;">1M</button>
+        <button onclick="setRange('3m')" id="btn3m" style="padding:4px 10px;border-radius:999px;font-size:10px;font-weight:700;border:1px solid rgba(255,255,255,0.1);cursor:pointer;background:transparent;color:rgba(255,255,255,0.4);transition:all .2s;">3M</button>
+      </div>
+    </div>
+    <div style="position:relative;width:100%;height:120px;">
+      <canvas id="salesChart" role="img" aria-label="Gráfica de ventas en ascenso">Ventas en crecimiento.</canvas>
+    </div>
+  </div>
+</section>
 
   <!-- Carousel -->
   <section class="relative">
@@ -386,5 +411,99 @@ async function init() {
 window.addEventListener('resize', function(){ setTimeout(syncSlide, 60) })
 init()
 </script>
+
+
+<script>
+var salesChart = null
+
+var datasets = {
+  '7d': {
+    labels: ['Lun','Mar','Mié','Jue','Vie','Sáb','Hoy'],
+    data:   [280,310,295,340,380,420,465],
+    total:  '$4.28M', pct: '+12.4%'
+  },
+  '1m': {
+    labels: ['S1','S2','S3','S4'],
+    data:   [980,1120,1350,1580],
+    total:  '$5.03M', pct: '+18.2%'
+  },
+  '3m': {
+    labels: ['Ene','Feb','Mar'],
+    data:   [3200,3850,4280],
+    total:  '$11.3M', pct: '+33.7%'
+  }
+}
+
+function setRange(range) {
+  ;['7d','1m','3m'].forEach(function(r) {
+    var b = document.getElementById('btn'+r)
+    if (r === range) {
+      b.style.background = 'rgba(233,195,73,0.15)'
+      b.style.color = '#E9C349'
+      b.style.borderColor = 'rgba(233,195,73,0.3)'
+    } else {
+      b.style.background = 'transparent'
+      b.style.color = 'rgba(255,255,255,0.4)'
+      b.style.borderColor = 'rgba(255,255,255,0.1)'
+    }
+  })
+  var d = datasets[range]
+  document.getElementById('totalVentas').textContent = d.total
+  salesChart.data.labels = d.labels
+  salesChart.data.datasets[0].data = d.data
+  salesChart.update()
+}
+
+function initChart() {
+  var ctx = document.getElementById('salesChart')
+  if (!ctx) return
+  var d = datasets['7d']
+
+  var gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 120)
+  gradient.addColorStop(0, 'rgba(233,195,73,0.25)')
+  gradient.addColorStop(1, 'rgba(233,195,73,0.0)')
+
+  salesChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: d.labels,
+      datasets: [{
+        data: d.data,
+        borderColor: '#E9C349',
+        borderWidth: 2,
+        pointRadius: 3,
+        pointBackgroundColor: '#E9C349',
+        pointHoverRadius: 5,
+        fill: true,
+        backgroundColor: gradient,
+        tension: 0.45
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: {
+        backgroundColor: 'rgba(20,20,20,0.95)',
+        borderColor: 'rgba(233,195,73,0.3)',
+        borderWidth: 1,
+        titleColor: '#E9C349',
+        bodyColor: '#fff',
+        padding: 10,
+        callbacks: {
+          label: function(ctx) { return ' $' + ctx.raw + 'K' }
+        }
+      }},
+      scales: {
+        x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 10 } } },
+        y: { display: false, grid: { display: false } }
+      }
+    }
+  })
+}
+
+document.addEventListener('DOMContentLoaded', initChart)
+if (document.readyState !== 'loading') initChart()
+</script>
+
 </body>
 </html>
