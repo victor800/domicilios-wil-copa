@@ -307,12 +307,6 @@ mark{background:#dbeafe;color:#1e40af;border-radius:3px;padding:0 2px}
   <a class="fm-link" href="/formula-medica.html">Ver más <span aria-hidden="true">→</span></a>
 </div>
 
-
-
-
-
-
-
   <!-- Categorías -->
   <div style="margin-top:18px">
     <div class="sec-hdr">
@@ -934,7 +928,7 @@ mark{background:#dbeafe;color:#1e40af;border-radius:3px;padding:0 2px}
     <div id="co-upload-loading" style="display:none;padding:8px 0">
       <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
         <div class="spinner" style="width:24px;height:24px;border-width:2.5px"></div>
-        <div style="font-size:12px;font-weight:700;color:#003f87">Verificando con IA…</div>
+        <div style="font-size:12px;font-weight:700;color:#003f87">Verificando…</div>
         <div style="font-size:10px;color:#9ca3af">Analizando el comprobante</div>
       </div>
     </div>
@@ -3306,117 +3300,113 @@ function coNext(){
 }
 
 async function coEnviarPedido(){
-  var btn=document.getElementById('co-btn-next');
-  btn.disabled=true;
-  btn.innerHTML='<span style="display:inline-block;width:16px;height:16px;border:2.5px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle"></span> Enviando…';
-
-  var nom=document.getElementById('co-nombre').value.trim();
-  var tel=document.getElementById('co-telefono').value.trim();
-  var dir=document.getElementById('co-direccion').value.trim();
-  var ref=document.getElementById('co-referencia').value.trim();
-  var dirCompleta=dir+(ref?' — Ref: '+ref:'');
-
-  var now=new Date();
-  var hora=now.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true});
-  var fecha=now.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
-  var idPedido=String(Math.floor(100+Math.random()*900));
-
-  var items=Object.values(cart);
-  var subtotal=items.reduce(function(a,c){
-    var p=c.it.precio>0?c.it.precio:c.it.pUnit;
-    return a+p*c.qty;
-  },0);
-  var domVal=modoEntrega==='reco'?0:(coDomicilio||CO_DEFAULT_PRECIO);
-  var totalFinal=subtotal+domVal;
-  var modoLabel=modoEntrega==='domi'?'DOMICILIO':'RECOGIDA_EN_TIENDA';
-  // Validar que el comercio esté bien definido
+  var btn = document.getElementById('co-btn-next');
+  btn.disabled = true;
+  btn.innerHTML = '<span style="display:inline-block;width:16px;height:16px;border:2.5px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle"></span> Enviando…';
+ 
+  var nom = document.getElementById('co-nombre').value.trim();
+  var tel = document.getElementById('co-telefono').value.trim();
+  var dir = document.getElementById('co-direccion').value.trim();
+  var ref = document.getElementById('co-referencia').value.trim();
+  var dirCompleta = dir + (ref ? ' — Ref: ' + ref : '');
+ 
+  var now   = new Date();
+  var hora  = now.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true});
+  var fecha = now.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
+  var idPedido = String(Math.floor(100 + Math.random() * 900));
+ 
+  var items     = Object.values(cart);
+  var subtotal  = items.reduce(function(a,c){
+    var p = c.it.precio > 0 ? c.it.precio : c.it.pUnit;
+    return a + p * c.qty;
+  }, 0);
+  var domVal      = modoEntrega === 'reco' ? 0 : (coDomicilio || CO_DEFAULT_PRECIO);
+  var totalFinal  = subtotal + domVal;
+  var modoLabel   = modoEntrega === 'domi' ? 'DOMICILIO' : 'RECOGIDA_EN_TIENDA';
   var comercioLabel = tienda === 'central' ? 'Droguería Central' : 'Farma Expertos';
-  var hojaStock = tienda === 'central' ? 'STOCK_DROGUERIA_CENTRAL' : 'STOCK_DROGUERIA_EXPERTOS';
-  console.log('[Pedido] Comercio:', comercioLabel, '| Hoja:', hojaStock, '| Productos:', Object.keys(cart).length);
-
-  var rows=[];
-  items.forEach(function(c,i){
-    var p=c.it.precio>0?c.it.precio:c.it.pUnit;
-    var vtotal=p*c.qty;
-   if(i===0){
-      // ── imgTransf declarado ANTES del push ──
-      var imgTransf = (coPago === 'TRANSFERENCIA' && _comprobanteBase64)
-        ? _comprobanteBase64
-        : '';
-rows.push([idPedido, nom, tel, coPago, 'Pendiente', '', 
-  c.it.desc, c.it.lab||'', c.qty, p, vtotal,
-  dirCompleta, hora, fecha, totalFinal,
-  '','','','', domVal, modoLabel, comercioLabel]);
+  var hojaStock   = tienda === 'central' ? 'STOCK_DROGUERIA_CENTRAL' : 'STOCK_DROGUERIA_EXPERTOS';
+ 
+  // Construir rows igual que antes (para compatibilidad con el campo items del doc)
+  var rows = [];
+  items.forEach(function(c, i){
+    var p      = c.it.precio > 0 ? c.it.precio : c.it.pUnit;
+    var vtotal = p * c.qty;
+    if(i === 0){
+      rows.push([idPedido, nom, tel, coPago, 'Pendiente', '',
+        c.it.desc, c.it.lab||'', c.qty, p, vtotal,
+        dirCompleta, hora, fecha, totalFinal,
+        '','','','', domVal, modoLabel, comercioLabel]);
     } else {
       rows.push(['','','','','','',
-        c.it.desc,c.it.lab||'',c.qty,p,vtotal,
+        c.it.desc, c.it.lab||'', c.qty, p, vtotal,
         '','','','','','','','','','']);
     }
   });
-  if(domVal>0&&modoEntrega==='domi'){
-    rows.push(['','','','','','',
-      'Domicilio ('+(coZonaNombre||'Copacabana')+')',
-      'WIL Domicilios',1,domVal,domVal,
-      '','','','','','','','','','']);
-  }
-
-  var payload={
-    accion:'pedido-farmacia',
-    rows:rows,
-    id:idPedido,
-    sede:tienda,
-    hojaStock:hojaStock,
-    comercio:comercioLabel,
-    nombre:nom,
-    telefono:tel,
-    total:totalFinal,
-    domicilio:domVal,
-    zona:coZonaNombre||CO_DEFAULT_ZONA,
-    direccion:dirCompleta,
-    metodoPago:coPago,
-    coords:coCoords,
+ 
+  var payload = {
+    // Identificación
+    id:          idPedido,
+    sede:        tienda,
+    hojaStock:   hojaStock,
+    comercio:    comercioLabel,
+ 
+    // Cliente
+    nombre:      nom,
+    telefono:    tel,
+    direccion:   dirCompleta,
+    coords:      coCoords,
+ 
+    // Entrega
+    modoEntrega: modoLabel,
+    zona:        coZonaNombre || CO_DEFAULT_ZONA,
+    domicilio:   domVal,
+ 
+    // Pago
+    metodoPago:  coPago,
     comprobanteBase64: (coPago === 'TRANSFERENCIA' && _comprobanteBase64)
-    ? _comprobanteBase64
-    : null
+      ? _comprobanteBase64
+      : null,
+ 
+    // Totales
+    total:       totalFinal,
+ 
+    // Rows (compatibilidad)
+    rows:        rows,
+ 
+    // Fecha/hora
+    fecha:       fecha,
+    hora:        hora,
   };
-
-
-
-  var GAS_URL='https://script.google.com/macros/s/AKfycbwrTFN2O1l3y9wZgZNw6UYlJZRbeU8deTHgRJ7B9aqqtHhRPwLmm3xrOwnqr-24xMtv0g/exec';
-
-  try{
-    var res=await fetch(GAS_URL,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(payload)
+ 
+  // ── URL de tu API en Vercel ──────────────────────────────────
+  // Si el HTML vive en el mismo proyecto Vercel: '/api/pedido'
+  // Si es otro dominio: 'https://tu-proyecto.vercel.app/api/pedido'
+  var API_URL = '/api/pedido';
+  // ─────────────────────────────────────────────────────────────
+ 
+  try {
+    var res = await fetch(API_URL, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
     });
-    var txt=await res.text();
-    var data={ok:false};
-    try{ data=JSON.parse(txt); }catch(e){}
-    if(data.ok){ _coExito(idPedido,tel); return; }
-    throw new Error(data.error||'Error desconocido');
-  }catch(e1){
-    try{
-      var params=new URLSearchParams();
-      params.append('data',JSON.stringify(payload));
-      var res2=await fetch(GAS_URL,{method:'POST',body:params});
-      var txt2=await res2.text();
-      var data2={ok:false};
-      try{ data2=JSON.parse(txt2); }catch(e){}
-      if(data2.ok){ _coExito(idPedido,tel); return; }
-      throw new Error(data2.error||'Error método 2');
-    }catch(e2){
-      try{
-        await fetch(GAS_URL+'?fallback=1&data='+encodeURIComponent(JSON.stringify(payload)),{mode:'no-cors'});
-        _coExito(idPedido,tel);
-      }catch(e3){
-        btn.disabled=false;
-        btn.innerHTML='<span class="sym symf" style="font-size:18px">check_circle</span> Confirmar pedido';
-        alert('Error al enviar: '+e3.message);
-      }
+ 
+    var data = await res.json();
+ 
+    if (data.ok) {
+      _coExito(idPedido, tel);
+    } else {
+      throw new Error(data.error || 'Error del servidor');
     }
+ 
+  } catch(err) {
+    console.error('[coEnviarPedido]', err);
+    btn.disabled = false;
+    btn.innerHTML = '<span class="sym symf" style="font-size:18px">check_circle</span> Confirmar pedido';
+    alert('No se pudo enviar el pedido: ' + err.message + '\nIntenta de nuevo.');
   }
 }
+
 
 function _coExito(idPedido, tel){
   // ── Restar stock en la hoja (best-effort) ──

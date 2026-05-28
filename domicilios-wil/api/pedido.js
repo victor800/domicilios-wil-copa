@@ -1,69 +1,101 @@
-// api/pedido.js
-// GET /api/pedido?id=WIL-001
-// Lee un pedido específico del sheet por ID
+// api/pedido.js — Vercel Serverless Function
+// Guarda pedidos de Farmacias WIL en MongoDB Atlas
+// Variables de entorno requeridas: MONGODB_URI, DB_NAME
 
-const { google } = require('googleapis');
+import { MongoClient } from 'mongodb';
 
-function setCors(res) {
+const uri    = process.env.MONGODB_URI;
+const dbName = process.env.DB_NAME;
+
+// Reutilizar conexión entre invocaciones (cold-start optimization)
+let cachedClient = null;
+
+async function getDb() {
+  if (!cachedClient) {
+    cachedClient = new MongoClient(uri);
+    await cachedClient.connect();
+  }
+  return cachedClient.db(dbName);
+}
+
+export default async function handler(req, res) {
+  // CORS — permite llamadas desde tu dominio en Vercel y localhost
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-}
 
-async function getSheets() {
-  const auth = new google.auth.GoogleAuth({
-    credentials: {
-      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      private_key: (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-    },
-    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-  });
-  const client = await auth.getClient();
-  return google.sheets({ version: 'v4', auth: client });
-}
-
-module.exports = async (req, res) => {
-  setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
-
-  const { id } = req.query;
-  if (!id) return res.status(400).json({ error: 'Falta id' });
+  if (req.method !== 'POST')   return res.status(405).json({ ok: false, error: 'Método no permitido' });
 
   try {
-    const sheets = await getSheets();
-    const resp = await sheets.spreadsheets.values.get({
-      spreadsheetId: process.env.GOOGLE_SHEETS_ID,
-      range: 'Pedidos!A2:Q',
-    });
+    const body = req.body;
 
-    const rows = resp.data.values || [];
-    const r = rows.find(r => (r[0] || '').trim() === id);
+    // Validación mínima
+    if (!body || !body.nombre || !body.telefono) {
+      return res.status(400).json({ ok: false, error: 'Faltan datos obligatorios (nombre, telefono)' });
+    }
 
-    if (!r) return res.status(404).json({ error: 'Pedido no encontrado' });
+    const db  = await getDb();
+    const col = db.collection('pedidos');
+
+    // Documento que se guarda en MongoDB
+    const doc = {
+      // Metadata
+      creadoEn:   new Date(),
+      idPedido:   body.id          || String(Math.floor(100 + Math.random() * 900)),
+      estado:     'Pendiente',
+
+      // Farmacia
+      sede:       body.sede        || 'expertos',
+      comercio:   body.comercio    || 'Farma Expertos',
+
+      // Cliente
+      nombre:     body.nombre,
+      telefono:   body.telefono,
+      direccion:  body.direccion   || '',
+      coords:     body.coords      || null,
+
+      // Entrega
+      modoEntrega:   body.metodoPago ? body.modoEntrega || 'DOMICILIO' : 'DOMICILIO',
+      zona:          body.zona        || '',
+      domicilio:     body.domicilio   || 0,
+
+      // Pago
+      metodoPago:    body.metodoPago  || '',
+      // El comprobante base64 se guarda solo si existe (transferencia)
+      ...(body.comprobanteBase64
+        ? { comprobanteBase64: body.comprobanteBase64 }
+        : {}),
+
+      // Productos
+      items: (body.rows || [])
+        .filter(r => r[6])          // solo filas con nombre de producto
+        .map(r => ({
+          producto: r[6]  || '',
+          laboratorio: r[7] || '',
+          cantidad: r[8]  || 1,
+          precioUnit: r[9] || 0,
+          subtotal: r[10] || 0,
+        })),
+
+      // Totales
+      subtotal:   body.total - (body.domicilio || 0),
+      total:      body.total || 0,
+
+      // Envío a tercero (opcional)
+      destinatario: body.destinatario || null,
+    };
+
+    const result = await col.insertOne(doc);
 
     return res.status(200).json({
-      ok: true,
-      id:              (r[0]  || '').trim(),
-      cliente:         (r[1]  || '').trim(),
-      telefono:        (r[2]  || '').trim(),
-      metodoPago:      (r[3]  || '').trim(),
-      estado:          (r[4]  || '').trim().toUpperCase(),
-      negocioNombre:   (r[5]  || '').trim(),
-      tienda:          (r[6]  || '').trim() || null,
-      productos:       (r[7]  || '').trim(),
-      direccion:       (r[8]  || '').trim(),
-      precioDomicilio: parseFloat((r[9]  || '0').replace(/[^0-9.]/g, '')) || 0,
-      total:           parseFloat((r[10] || '0').replace(/[^0-9.]/g, '')) || 0,
-      domiciliario:    (r[11] || '').trim(),
-      hora:            (r[12] || '').trim(),
-      fecha:           (r[13] || '').trim(),
-      presupuesto:     (r[14] || '').trim(),
-      barrioDetectado: (r[15] || '').trim(),
-      horaEntrega:     (r[16] || '').trim(),
+      ok:      true,
+      id:      doc.idPedido,
+      mongoId: result.insertedId,
     });
 
-  } catch (e) {
-    console.error('api/pedido ERROR:', e.message);
-    return res.status(500).json({ error: 'Error leyendo pedido', detail: e.message });
+  } catch (err) {
+    console.error('[/api/pedido] Error:', err);
+    return res.status(500).json({ ok: false, error: err.message });
   }
-};
+}
