@@ -13499,6 +13499,39 @@ try {
     startAuto();
   };
 
+  window.fdpGoMenu = function(url, nom, img, e) {
+  e.stopPropagation();
+  var loader  = document.getElementById('fdp-loader');
+  var nameEl  = document.getElementById('fdp-name');
+  var logoEl  = document.getElementById('fdp-logo');
+  var ring    = document.getElementById('fdp-ring');
+  var pctEl   = document.getElementById('fdp-pct');
+  var C       = 188.5;
+
+  nameEl.textContent = nom;
+  logoEl.innerHTML   = img
+    ? '<img src="'+img+'" style="width:100%;height:100%;object-fit:cover;">'
+    : '🏪';
+
+  ring.style.strokeDashoffset = C;
+  pctEl.textContent = '0%';
+  loader.style.display = 'flex';
+
+  var start = null;
+  var DURATION = 2200;
+  function ease(t) { return 1 - Math.pow(1 - t, 2.5); }
+  function step(ts) {
+    if (!start) start = ts;
+    var p = Math.min((ts - start) / DURATION, 1);
+    var v = Math.round(ease(p) * 100);
+    ring.style.strokeDashoffset = C * (1 - v / 100);
+    pctEl.textContent = v + '%';
+    if (p < 1) { requestAnimationFrame(step); }
+    else { window.location.href = url; }
+  }
+  requestAnimationFrame(step);
+};
+
   function renderComercios(data) {
     var track = document.getElementById('catsTicker');
     if (!track) return;
@@ -13517,14 +13550,22 @@ try {
     
      var url = 'https://food-display-pro.vercel.app/customer/menu/' + String(c._id || c.adminId || '');
 
-      return '<div class="cat-real-pill" onclick="window.location.href=\''+url+'\'" style="cursor:pointer;flex-shrink:0;">' +
-        '<div class="cat-real-ico" style="padding:0;overflow:hidden;border-radius:12px;width:48px;height:48px;flex-shrink:0;background:#1a1a1a;">' +
-          (img
-            ? '<img src="'+img+'" alt="'+nom+'" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display=\'none\';this.parentNode.textContent=\'🏪\'">'
-            : '<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:1.4rem;">🏪</span>') +
-        '</div>' +
-        '<div><div class="cat-real-name">'+nom+'</div><div class="cat-real-sub">Ver menú</div></div>' +
-      '</div>';
+return '<div class="cat-real-pill" style="cursor:pointer;flex-shrink:0;">' +
+  '<div class="cat-real-ico" style="padding:0;overflow:hidden;border-radius:12px;width:48px;height:48px;flex-shrink:0;background:#1a1a1a;">' +
+    (img
+      ? '<img src="'+img+'" alt="'+nom+'" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display=\'none\';this.parentNode.textContent=\'🏪\'">'
+      : '<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:1.4rem;">🏪</span>') +
+  '</div>' +
+  '<div style="flex:1;min-width:0;">' +
+    '<div class="cat-real-name">'+nom+'</div>' +
+    '<div class="cat-real-sub" style="margin-bottom:8px;">Restaurante · Activo</div>' +
+    '<button onclick="window.fdpGoMenu(\''+url+'\',\''+nom+'\',\''+(img||'')+'\',event)" style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:#10b981;border:none;border-radius:8px;color:#000;font-size:11px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;transition:background .15s,transform .1s;" onmouseover="this.style.background=\'#34d399\'" onmouseout="this.style.background=\'#10b981\'" onmousedown="this.style.transform=\'scale(0.95)\'" onmouseup="this.style.transform=\'scale(1)\'">' +
+      '<svg viewBox="0 0 24 24" style="width:13px;height:13px;flex-shrink:0;" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>' +
+      'Ver menú' +
+    '</button>' +
+  '</div>' +
+'</div>';
+
     }).join('');
 
     setTimeout(function(){
