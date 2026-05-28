@@ -3381,30 +3381,27 @@ async function coEnviarPedido(){
   // ── URL de tu API en Vercel ──────────────────────────────────
   // Si el HTML vive en el mismo proyecto Vercel: '/api/pedido'
   // Si es otro dominio: 'https://tu-proyecto.vercel.app/api/pedido'
-  var API_URL = '/api/pedido';
+  var GAS_URL = '/api/foto?tipo=pedido';
+
   // ─────────────────────────────────────────────────────────────
  
   try {
-    var res = await fetch(API_URL, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(payload),
-    });
- 
-    var data = await res.json();
- 
-    if (data.ok) {
-      _coExito(idPedido, tel);
-    } else {
-      throw new Error(data.error || 'Error del servidor');
-    }
- 
-  } catch(err) {
-    console.error('[coEnviarPedido]', err);
-    btn.disabled = false;
-    btn.innerHTML = '<span class="sym symf" style="font-size:18px">check_circle</span> Confirmar pedido';
-    alert('No se pudo enviar el pedido: ' + err.message + '\nIntenta de nuevo.');
+  var res = await fetch(GAS_URL, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(payload),
+  });
+  var data = await res.json();
+  if (data.ok) {
+    _coExito(idPedido, tel);
+  } else {
+    throw new Error(data.error || 'Error del servidor');
   }
+} catch(e) {
+  btn.disabled = false;
+  btn.innerHTML = '<span class="sym symf" style="font-size:18px">check_circle</span> Confirmar pedido';
+  alert('No se pudo enviar el pedido: ' + e.message);
+}
 }
 
 
