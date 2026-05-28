@@ -1,161 +1,1058 @@
-// api/foto.js
-import { dbConnect } from '../lib/db.js';
-import mongoose      from 'mongoose';
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>Pedido Libre – WIL Domicilios</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+/* ── TOKENS ── */
+:root{
+  --bg:#0d0f14;
+  --surface:#161a22;
+  --surface2:#1e2330;
+  --border:#2a2f3e;
+  --accent:#00e5a0;
+  --accent2:#00b8ff;
+  --warn:#ff6b35;
+  --text:#f0f2f7;
+  --muted:#7a8299;
+  --radius:18px;
+  --radius-sm:10px;
+  --font-head:'Syne',sans-serif;
+  --font-body:'DM Sans',sans-serif;
+  --shadow:0 8px 32px rgba(0,0,0,.45);
+  --glow:0 0 24px rgba(0,229,160,.18);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font-body)}
+body{overflow-x:hidden;min-height:100vh;display:flex;flex-direction:column}
 
-/* ══ SCHEMA: Fotos ══ */
-const FotoSchema = new mongoose.Schema({
-  data: Buffer,
-  mime: { type: String, default: 'image/jpeg' },
-  ts:   { type: Date,   default: Date.now }
-});
-const Foto = mongoose.models.Foto || mongoose.model('Foto', FotoSchema, 'Fotos');
+/* ── BG GLOW ── */
+.bg-blob{position:fixed;border-radius:50%;filter:blur(80px);opacity:.25;pointer-events:none;z-index:0}
+.bg-blob.a{width:420px;height:420px;background:var(--accent);top:-140px;left:-100px}
+.bg-blob.b{width:320px;height:320px;background:var(--accent2);bottom:-80px;right:-80px}
 
-/* ══ SCHEMA: Pedidos ══ */
-const ItemSchema = new mongoose.Schema({
-  producto:    String,
-  laboratorio: String,
-  cantidad:    Number,
-  precioUnit:  Number,
-  subtotal:    Number,
-}, { _id: false });
+/* ── APP SHELL ── */
+#app{position:relative;z-index:1;max-width:480px;margin:0 auto;width:100%;min-height:100vh;display:flex;flex-direction:column;padding:0 0 72px}
 
-const PedidoSchema = new mongoose.Schema({
-  creadoEn:      { type: Date,   default: Date.now },
-  idPedido:      String,
-  estado:        { type: String, default: 'Pendiente' },
-  sede:          String,
-  comercio:      String,
-  nombre:        String,
-  telefono:      String,
-  direccion:     String,
-  coords:        mongoose.Schema.Types.Mixed,
-  modoEntrega:   String,
-  zona:          String,
-  domicilio:     Number,
-  metodoPago:    String,
-  comprobanteId: String,   // ObjectId de Foto (si pagó con transferencia)
-  items:         [ItemSchema],
-  subtotal:      Number,
-  total:         Number,
-  fecha:         String,
-  hora:          String,
-  destinatario:  mongoose.Schema.Types.Mixed,
-});
-const Pedido = mongoose.models.Pedido || mongoose.model('Pedido', PedidoSchema, 'pedidos');
+/* ── HEADER ── */
+.topbar{display:flex;align-items:center;gap:10px;padding:14px 16px 10px;position:sticky;top:0;z-index:10;background:linear-gradient(to bottom,var(--bg) 80%,transparent)}
+.topbar .back-btn{width:38px;height:38px;background:var(--surface2);border:1px solid var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;color:var(--text);flex-shrink:0;transition:.2s}
+.topbar .back-btn:hover{background:var(--surface);border-color:var(--accent)}
+.topbar h1{font-family:var(--font-head);font-size:16px;font-weight:800;flex:1}
+.topbar h1 span{color:var(--accent)}
+.step-pill{background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px}
 
-/* ══ CONFIG ══ */
-export const config = {
-  api: { bodyParser: { sizeLimit: '5mb' } }
+/* ── PROGRESS ── */
+.progress-wrap{padding:0 16px 16px}
+.progress-track{height:3px;background:var(--surface2);border-radius:4px;overflow:hidden;margin-bottom:8px}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:4px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+.step-labels{display:flex;justify-content:space-between}
+.step-labels span{font-size:9px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;transition:.3s}
+.step-labels span.active{color:var(--accent)}
+
+/* ── SCREENS ── */
+.screen{display:none;flex-direction:column;gap:0;animation:fadeUp .35s ease both}
+.screen.active{display:flex}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── CARD ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin:0 16px 12px}
+.card-title{font-family:var(--font-head);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.card-title::before{content:'';width:3px;height:14px;background:var(--accent);border-radius:2px;display:inline-block}
+
+/* ── GEO SCREEN ── */
+.geo-screen{margin:auto;padding:32px 20px;text-align:center;display:none;flex-direction:column;align-items:center;gap:24px}
+.geo-screen.active{display:flex}
+.geo-icon{width:90px;height:90px;background:linear-gradient(135deg,rgba(0,229,160,.15),rgba(0,184,255,.15));border:1px solid rgba(0,229,160,.3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:38px;animation:pulse 2.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,229,160,.35)}50%{box-shadow:0 0 0 18px rgba(0,229,160,0)}}
+.geo-title{font-family:var(--font-head);font-size:22px;font-weight:800;line-height:1.2}
+.geo-title span{color:var(--accent)}
+.geo-sub{font-size:14px;color:var(--muted);line-height:1.6;max-width:300px}
+.geo-perks{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;width:100%;display:flex;flex-direction:column;gap:12px;text-align:left}
+.geo-perk{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--text)}
+.geo-perk-icon{width:32px;height:32px;background:var(--surface2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.btn-primary{width:100%;padding:16px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:var(--radius-sm);font-family:var(--font-head);font-size:15px;font-weight:700;color:#0d0f14;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:.2s;letter-spacing:.3px}
+.btn-primary:hover{opacity:.9;transform:translateY(-1px);box-shadow:var(--glow)}
+.btn-primary:active{transform:scale(.98)}
+.btn-secondary{width:100%;padding:14px;background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;font-weight:500;color:var(--muted);cursor:pointer;transition:.2s}
+.btn-secondary:hover{border-color:var(--muted);color:var(--text)}
+.geo-badge{background:rgba(0,229,160,.08);border:1px solid rgba(0,229,160,.2);border-radius:8px;padding:8px 14px;font-size:12px;color:var(--accent);display:flex;align-items:center;gap:6px}
+
+/* ── SERVICE TYPE ── */
+.svc-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.svc-card{background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:13px 10px;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;transition:.2s;text-align:center}
+.svc-card:hover{border-color:var(--muted)}
+.svc-card.selected{border-color:var(--accent);background:rgba(0,229,160,.06);box-shadow:var(--glow)}
+.svc-card-icon{font-size:22px}
+.svc-card-label{font-family:var(--font-head);font-size:12px;font-weight:700}
+.svc-card-desc{font-size:10px;color:var(--muted);line-height:1.3}
+
+/* ── INPUTS ── */
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.field label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+.field input,.field textarea,.field select{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:var(--font-body);font-size:13px;font-weight:400;color:var(--text);outline:none;transition:.2s;-webkit-appearance:none}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,229,160,.1)}
+.field input::placeholder,.field textarea::placeholder{color:rgba(122,130,153,.6)}
+.field textarea{resize:none;min-height:80px;line-height:1.5}
+.field .hint{font-size:10px;color:var(--muted);line-height:1.4}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* ── AUTOCOMPLETE ── */
+.autocomplete-wrap{position:relative}
+.autocomplete-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:var(--font-body);font-size:13px;font-weight:400;color:var(--text);outline:none;transition:.2s}
+.autocomplete-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,229,160,.1)}
+.autocomplete-input::placeholder{color:rgba(122,130,153,.6)}
+.dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);z-index:100;overflow:hidden;box-shadow:var(--shadow);max-height:220px;overflow-y:auto}
+.dropdown::-webkit-scrollbar{width:4px}
+.dropdown::-webkit-scrollbar-track{background:transparent}
+.dropdown::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.dd-item{padding:9px 12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;font-size:12px;transition:.15s;border-bottom:1px solid rgba(255,255,255,.04)}
+.dd-item:last-child{border-bottom:none}
+.dd-item:hover,.dd-item.focused{background:var(--surface2)}
+.dd-item .dd-name{font-weight:500}
+.dd-item .dd-price{font-size:11px;font-weight:700;color:var(--accent);background:rgba(0,229,160,.1);padding:2px 8px;border-radius:20px}
+.dd-empty{padding:14px;font-size:13px;color:var(--muted);text-align:center}
+.barrio-selected{background:rgba(0,229,160,.06);border:1px solid rgba(0,229,160,.3);border-radius:8px;padding:9px 12px;display:flex;align-items:center;justify-content:space-between;cursor:pointer}
+.barrio-selected .bs-name{font-weight:600;font-size:13px}
+.barrio-selected .bs-price{font-size:12px;font-weight:700;color:var(--accent)}
+.barrio-selected .bs-clear{color:var(--muted);font-size:18px;line-height:1}
+
+/* ── TARIFA PREVIEW ── */
+.tarifa-preview{background:rgba(0,229,160,.05);border:1px solid rgba(0,229,160,.2);border-radius:var(--radius-sm);padding:14px;margin-bottom:16px;display:none}
+.tarifa-preview.show{display:block}
+.tp-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:3px 0}
+.tp-row.total{font-family:var(--font-head);font-weight:700;font-size:14px;border-top:1px solid rgba(0,229,160,.2);margin-top:6px;padding-top:8px}
+.tp-row.total .v{color:var(--accent)}
+
+/* ── PRODUCTOS (paso 2) ── */
+.product-entry-row{display:flex;gap:8px;margin-bottom:12px}
+.product-entry-row input{flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;font-family:var(--font-body);font-size:13px;color:var(--text);outline:none;transition:.2s}
+.product-entry-row input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,229,160,.1)}
+.btn-add{background:var(--accent);border:none;border-radius:var(--radius-sm);padding:12px 16px;color:#0d0f14;font-size:18px;cursor:pointer;font-weight:700;transition:.2s;flex-shrink:0}
+.btn-add:hover{opacity:.85}
+.products-list{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+.product-chip{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;display:flex;align-items:center;gap:12px;animation:fadeUp .25s ease}
+.product-chip-name{flex:1;font-size:13px;font-weight:500}
+.qty-ctrl{display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:8px;padding:4px}
+.qty-btn{width:26px;height:26px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;font-weight:700;color:var(--text);transition:.15s}
+.qty-btn:hover{border-color:var(--accent);color:var(--accent)}
+.qty-val{font-size:13px;font-weight:700;min-width:20px;text-align:center}
+.del-btn{color:var(--warn);background:rgba(255,107,53,.1);border:none;border-radius:6px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;transition:.15s}
+.del-btn:hover{background:rgba(255,107,53,.2)}
+.products-empty{text-align:center;padding:24px;color:var(--muted);font-size:13px}
+.tip-box{background:rgba(0,184,255,.06);border:1px solid rgba(0,184,255,.2);border-radius:var(--radius-sm);padding:12px 14px;font-size:12px;color:#00b8ff;line-height:1.5;margin-bottom:14px}
+
+/* ── PAGO ── */
+.pay-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.pay-card{background:var(--surface2);border:2px solid var(--border);border-radius:var(--radius-sm);padding:16px 12px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;transition:.2s;text-align:center}
+.pay-card:hover{border-color:var(--muted)}
+.pay-card.selected{border-color:var(--accent);background:rgba(0,229,160,.06)}
+.pay-card-icon{font-size:26px}
+.pay-card-label{font-size:13px;font-weight:700;font-family:var(--font-head)}
+.pay-card-desc{font-size:11px;color:var(--muted)}
+
+/* TRANSFER CARD */
+.bank-card{background:linear-gradient(135deg,#1a2640,#0f1a2e);border:1px solid rgba(0,184,255,.25);border-radius:14px;padding:20px;position:relative;overflow:hidden;margin-bottom:16px}
+.bank-card::before{content:'';position:absolute;width:160px;height:160px;background:rgba(0,184,255,.08);border-radius:50%;top:-50px;right:-50px}
+.bank-card-label{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:rgba(0,184,255,.7);margin-bottom:4px}
+.bank-card-bank{font-family:var(--font-head);font-size:18px;font-weight:800;color:#fff;margin-bottom:14px}
+.bank-card-row{display:flex;justify-content:space-between;align-items:flex-end}
+.bank-card-sub{font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px}
+.bank-card-val{font-size:13px;font-weight:600;color:rgba(255,255,255,.9)}
+.bank-card-num{font-size:15px;font-weight:700;letter-spacing:1px;color:#00b8ff}
+.bank-card-chip{position:absolute;top:20px;right:20px;width:36px;height:28px;background:linear-gradient(135deg,#f0c040,#c0880a);border-radius:4px}
+
+.copy-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;background:var(--surface2);border:1px dashed rgba(0,184,255,.4);border-radius:var(--radius-sm);color:var(--accent2);font-size:13px;font-weight:600;cursor:pointer;transition:.2s;margin-bottom:16px}
+.copy-btn:hover{background:rgba(0,184,255,.08)}
+
+/* ── FILE UPLOAD ── */
+.upload-zone{border:2px dashed var(--border);border-radius:var(--radius-sm);padding:24px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:.2s;margin-bottom:14px;position:relative;overflow:hidden}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:rgba(0,229,160,.04)}
+.upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+.upload-zone-icon{font-size:32px}
+.upload-zone-text{font-size:13px;font-weight:500;text-align:center;color:var(--text)}
+.upload-zone-sub{font-size:11px;color:var(--muted)}
+.upload-preview{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.upload-preview img{width:48px;height:48px;object-fit:cover;border-radius:6px}
+.up-info{flex:1}
+.up-name{font-size:12px;font-weight:600}
+.up-size{font-size:11px;color:var(--muted)}
+.up-del{color:var(--warn);cursor:pointer;font-size:18px}
+.privacy-note{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;padding:10px 12px;background:var(--surface2);border-radius:8px;margin-bottom:14px}
+
+/* ── RESUMEN ── */
+.summary-section{margin-bottom:16px}
+.sum-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px}
+.sum-row:last-child{border-bottom:none}
+.sum-row .k{color:var(--muted);font-size:12px}
+.sum-row .v{font-weight:600;text-align:right;max-width:60%}
+.sum-total{background:rgba(0,229,160,.06);border:1px solid rgba(0,229,160,.2);border-radius:var(--radius-sm);padding:16px;display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.sum-total-label{font-family:var(--font-head);font-size:14px;font-weight:700}
+.sum-total-val{font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--accent)}
+
+/* ── SUCCESS ── */
+.success-screen{display:none;flex-direction:column;align-items:center;gap:20px;padding:60px 24px;text-align:center;animation:fadeUp .4s ease}
+.success-screen.active{display:flex}
+.success-icon{width:90px;height:90px;background:linear-gradient(135deg,rgba(0,229,160,.2),rgba(0,184,255,.2));border:2px solid var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:36px}
+.success-title{font-family:var(--font-head);font-size:26px;font-weight:800}
+.success-title span{color:var(--accent)}
+.success-sub{font-size:14px;color:var(--muted);line-height:1.6;max-width:280px}
+.order-id{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 20px;font-family:'Courier New',monospace;font-size:14px;color:var(--accent);letter-spacing:1px}
+
+/* ── NAV BOTTOM ── */
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:linear-gradient(to top,var(--bg) 60%,transparent);padding:10px 16px 16px;z-index:20}
+.nav-btns{display:flex;gap:10px}
+.nav-btns .btn-back-step{flex:0 0 auto;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:13px;font-weight:500;color:var(--text);cursor:pointer;transition:.2s}
+.nav-btns .btn-back-step:hover{border-color:var(--muted)}
+.nav-btns .btn-next{flex:1;padding:13px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:var(--radius-sm);font-family:var(--font-head);font-size:14px;font-weight:700;color:#0d0f14;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:.2s;letter-spacing:.3px}
+.nav-btns .btn-next:hover{opacity:.9;box-shadow:var(--glow)}
+.nav-btns .btn-next:active{transform:scale(.98)}
+.nav-btns .btn-next:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
+
+/* ── TOAST ── */
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-80px);background:var(--surface);border:1px solid var(--border);border-radius:30px;padding:10px 20px;font-size:13px;font-weight:500;white-space:nowrap;z-index:999;transition:transform .35s cubic-bezier(.4,0,.2,1),opacity .35s;opacity:0;display:flex;align-items:center;gap:8px;box-shadow:var(--shadow)}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.toast.success{border-color:rgba(0,229,160,.4);color:var(--accent)}
+.toast.error{border-color:rgba(255,107,53,.4);color:var(--warn)}
+
+/* ── LOADER ── */
+.loader-overlay{position:fixed;inset:0;background:rgba(13,15,20,.85);backdrop-filter:blur(6px);z-index:500;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+.loader-overlay.active{display:flex}
+.loader-ring{width:52px;height:52px;border:3px solid var(--surface2);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loader-text{font-size:14px;color:var(--muted)}
+
+/* ── PRODUCT CHIP ICON ── */
+.product-chip{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:11px 14px;display:flex;align-items:center;gap:10px;animation:fadeUp .25s ease}
+.product-chip-icon{font-size:16px;flex-shrink:0}
+.product-chip-name{flex:1;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+
+/* ── SUM PRODUCTOS CHIPS ── */
+.sum-productos-wrap{display:flex;flex-direction:column;gap:8px}
+.sum-prod-chip{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;display:flex;align-items:center;gap:10px;animation:fadeUp .2s ease}
+.spc-icon{font-size:16px;flex-shrink:0}
+.spc-name{flex:1;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.spc-qty{background:rgba(0,229,160,.12);border:1px solid rgba(0,229,160,.25);color:var(--accent);font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;flex-shrink:0}
+
+/* ── DETECTED BADGE ── */
+.detected-badge{display:flex;align-items:center;gap:8px;background:rgba(0,229,160,.08);border:1px solid rgba(0,229,160,.25);border-radius:8px;padding:8px 12px;font-size:12px;font-weight:600;color:var(--accent);margin-top:10px;animation:fadeUp .25s ease}
+.detected-badge::before{content:'✅';font-size:14px}
+
+/* ── UTIL ── */
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+
+<div class="bg-blob a"></div>
+<div class="bg-blob b"></div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- LOADER -->
+<div class="loader-overlay" id="loader">
+  <div class="loader-ring"></div>
+  <span class="loader-text" id="loaderText">Enviando pedido…</span>
+</div>
+
+<div id="app">
+
+  <!-- ══ SCREEN 0: GEO ══ -->
+  <div class="geo-screen active" id="scr-geo">
+    <div class="geo-icon">📍</div>
+    <div>
+      <div class="geo-title">Comparte tu<br><span>ubicación</span></div>
+    </div>
+    <div class="geo-sub">Para calcular la tarifa exacta de tu domicilio necesitamos saber desde dónde nos escribes.</div>
+    <div class="geo-perks">
+      <div class="geo-perk"><div class="geo-perk-icon">⚡</div>Tarifa calculada al instante</div>
+      <div class="geo-perk"><div class="geo-perk-icon">🛵</div>Domiciliario más cercano</div>
+      <div class="geo-perk"><div class="geo-perk-icon">🔒</div>Solo usamos coordenadas, nada más</div>
+    </div>
+    <div class="geo-badge">🌐 Los datos NO se comparten con terceros</div>
+    <div style="width:100%;display:flex;flex-direction:column;gap:10px">
+      <button class="btn-primary" onclick="requestGeo()">📍 Activar ubicación</button>
+      <button class="btn-secondary" onclick="skipGeo()">Omitir por ahora</button>
+    </div>
+  </div>
+
+  <!-- ══ MAIN FORM ══ -->
+  <div id="main-form" class="hidden">
+    <div class="topbar">
+      <div class="back-btn" onclick="stepBack()">←</div>
+      <h1>Pedido <span>Libre</span> 🛍️</h1>
+      <span class="step-pill" id="stepPill">Paso 1/3</span>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:33%"></div></div>
+      <div class="step-labels">
+        <span id="sl1" class="active">Entrega</span>
+        <span id="sl2">Productos</span>
+        <span id="sl3">Pago</span>
+      </div>
+    </div>
+
+    <!-- ── STEP 1: Servicio + Datos ── -->
+    <div class="screen active" id="scr1">
+      <div class="card">
+        <div class="card-title">¿Qué necesitas?</div>
+        <div class="svc-grid">
+          <div class="svc-card selected" id="svc-recoger" onclick="setSvc('recoger')">
+            <div class="svc-card-icon">🏪→🏠</div>
+            <div class="svc-card-label">Recoger y Entregar</div>
+            <div class="svc-card-desc">Vamos por tu pedido y te lo llevamos</div>
+          </div>
+          <div class="svc-card" id="svc-compra" onclick="setSvc('compra')">
+            <div class="svc-card-icon">🛒</div>
+            <div class="svc-card-label">Realizar Compra</div>
+            <div class="svc-card-desc">Compramos por ti con tu lista</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CARD COMPRA LIBRE (solo visible en modo compra) -->
+      <div class="card" id="card-compra-libre" style="display:none">
+        <div class="card-title">¿Qué necesitas comprar?</div>
+        <div class="field">
+          <textarea id="textoLibreCompra" rows="4"
+            placeholder="Ej: 1 hamburguesa 1 cocacola 2 papas fritas…"
+            oninput="detectarProductos(this.value)"
+            style="min-height:90px"></textarea>
+          <span class="hint">Escribe todo en texto libre — el sistema lo organiza automáticamente.<br>Peso máximo permitido: 30 kg.</span>
+        </div>
+        <div id="detectedBadge" class="detected-badge hidden"></div>
+      </div>
+
+      <div class="card" id="card-recogida">
+        <div class="card-title">Recogida</div>
+        <div class="field">
+          <label>Comercio o punto de origen</label>
+          <input type="text" id="comercio" placeholder="Ej: Pollos caleños, Éxito, Farmatodo…" maxlength="80"/>
+        </div>
+        <div class="field">
+          <label>Barrio de recogida</label>
+          <div class="autocomplete-wrap" id="wrap-recogida">
+            <div id="sel-recogida" class="hidden">
+              <div class="barrio-selected" onclick="clearBarrio('recogida')">
+                <span class="bs-name" id="sel-recogida-name"></span>
+                <span class="bs-price" id="sel-recogida-price"></span>
+                <span class="bs-clear">×</span>
+              </div>
+            </div>
+            <div id="input-recogida-wrap">
+              <input class="autocomplete-input" id="inp-recogida" placeholder="Escribe tu barrio…" autocomplete="off" oninput="filterBarrios('recogida',this.value)" onkeydown="ddNav(event,'recogida')"/>
+              <div class="dropdown hidden" id="dd-recogida"></div>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label>Teléfono de recogida <span style="color:var(--muted)">(opcional)</span></label>
+          <input type="tel" id="tel-recogida" placeholder="3XX XXX XXXX" maxlength="15"/>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Entrega</div>
+        <div class="field">
+          <label>Barrio de entrega</label>
+          <div class="autocomplete-wrap" id="wrap-entrega">
+            <div id="sel-entrega" class="hidden">
+              <div class="barrio-selected" onclick="clearBarrio('entrega')">
+                <span class="bs-name" id="sel-entrega-name"></span>
+                <span class="bs-price" id="sel-entrega-price"></span>
+                <span class="bs-clear">×</span>
+              </div>
+            </div>
+            <div id="input-entrega-wrap">
+              <input class="autocomplete-input" id="inp-entrega" placeholder="Escribe tu barrio…" autocomplete="off" oninput="filterBarrios('entrega',this.value)" onkeydown="ddNav(event,'entrega')"/>
+              <div class="dropdown hidden" id="dd-entrega"></div>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label>Tu nombre *</label>
+          <input type="text" id="nombre" placeholder="Nombre completo" maxlength="60"/>
+        </div>
+        <div class="field">
+          <label>Dirección de entrega *</label>
+          <input type="text" id="direccion" placeholder="Calle, carrera, número…" maxlength="80"/>
+        </div>
+        <div class="field">
+          <label>Punto de referencia</label>
+          <input type="text" id="referencia" placeholder="Cerca de… frente a…" maxlength="80"/>
+        </div>
+        <div class="field">
+          <label>Tu teléfono *</label>
+          <input type="tel" id="tel-cliente" placeholder="3XX XXX XXXX" maxlength="15"/>
+        </div>
+      </div>
+
+      <div class="tarifa-preview" id="tarifaPreview">
+        <div class="tp-row"><span class="k">Tarifa recogida</span><span id="tp-r">—</span></div>
+        <div class="tp-row"><span class="k">Tarifa entrega</span><span id="tp-e">—</span></div>
+        <div class="tp-row total"><span>Tarifa domicilio</span><span class="v" id="tp-total">—</span></div>
+      </div>
+    </div>
+
+    <!-- ── STEP 2: Productos ── -->
+    <div class="screen" id="scr2">
+
+      <!-- Textarea libre detector -->
+      <div class="card">
+        <div class="card-title" id="s2-title-txt">¿Qué vamos a recoger?</div>
+        <div class="field">
+          <textarea id="textoLibre" rows="4"
+            placeholder="Ej: 1 hamburguesa 1 cocacola 2 papas fritas…"
+            oninput="detectarProductos(this.value)"
+            style="min-height:90px"></textarea>
+          <span class="hint">Escribe todo en texto libre — el sistema lo organiza automáticamente con cantidades.<br>Recuerda que el peso máximo permitido es de 30 kg.</span>
+        </div>
+        <div id="detectedBadge" class="detected-badge hidden"></div>
+      </div>
+
+      <!-- Productos detectados / lista -->
+      <div class="card" id="productosCard">
+        <div class="card-title" style="justify-content:space-between;display:flex;align-items:center">
+          <span style="display:flex;align-items:center;gap:8px"><span style="width:3px;height:14px;background:var(--accent);border-radius:2px;display:inline-block"></span>Productos detectados</span>
+          <span id="prodCount" style="font-size:11px;color:var(--muted);font-weight:600"></span>
+        </div>
+        <div id="productsList" class="products-list"></div>
+        <div id="productsEmpty" class="products-empty">✍️ Escribe arriba para detectar productos</div>
+
+        <!-- Agregar manual -->
+        <div class="product-entry-row" style="margin-top:12px">
+          <input type="text" id="prodInput" placeholder="Agregar producto manualmente…" maxlength="100"
+            onkeydown="if(event.key==='Enter')addProductManual()"/>
+          <button class="btn-add" onclick="addProductManual()">+</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Notas adicionales</div>
+        <div class="field">
+          <textarea id="notas" placeholder="Instrucciones especiales, alternativas si no hay, etc…"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── STEP 3: Pago ── -->
+    <div class="screen" id="scr3">
+      <div class="card">
+        <div class="card-title">¿Cómo pagas?</div>
+        <div class="pay-grid">
+          <div class="pay-card selected" id="pay-efectivo" onclick="setPago('efectivo')">
+            <div class="pay-card-icon">💵</div>
+            <div class="pay-card-label">Efectivo</div>
+            <div class="pay-card-desc">El domi cobra al entregar</div>
+          </div>
+          <div class="pay-card" id="pay-transferencia" onclick="setPago('transferencia')">
+            <div class="pay-card-icon">🏦</div>
+            <div class="pay-card-label">Transferencia</div>
+            <div class="pay-card-desc">Pagas al recibir foto de factura</div>
+          </div>
+        </div>
+
+        <!-- EFECTIVO note -->
+        <div id="ef-note" class="tip-box">💵 El domiciliario cobra cuando hace entrega. Ten el dinero listo.</div>
+
+        <!-- TRANSFERENCIA -->
+        <div id="tr-section" class="hidden">
+          <div class="bank-card">
+            <div class="bank-card-chip"></div>
+            <div class="bank-card-label">Banco</div>
+            <div class="bank-card-bank">Bancolombia</div>
+            <div class="bank-card-row">
+              <div>
+                <div class="bank-card-sub">Titular</div>
+                <div class="bank-card-val">WIL ••••••••</div>
+              </div>
+              <div style="text-align:right">
+                <div class="bank-card-sub">Cuenta ahorros</div>
+                <div class="bank-card-num">553 2969 2468</div>
+              </div>
+            </div>
+          </div>
+          <button class="copy-btn" onclick="copyAccount()">📋 Copiar número de cuenta</button>
+          <div class="privacy-note">🔒 Tu comprobante es confidencial y solo lo ve el equipo WIL para verificar el pago.</div>
+          <div class="field">
+            <label>Adjuntar comprobante</label>
+          </div>
+          <div class="upload-zone" id="uploadZone">
+            <input type="file" id="fileInput" accept="image/*,application/pdf" onchange="handleFile(this)"/>
+            <div class="upload-zone-icon">📎</div>
+            <div class="upload-zone-text">Toca para subir tu comprobante</div>
+            <div class="upload-zone-sub">JPG, PNG, PDF · máx 4 MB</div>
+          </div>
+          <div id="uploadPreview" class="upload-preview hidden">
+            <img id="uploadThumb" src="" alt=""/>
+            <div class="up-info">
+              <div class="up-name" id="uploadName"></div>
+              <div class="up-size" id="uploadSize"></div>
+            </div>
+            <span class="up-del" onclick="clearFile()">🗑</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- RESUMEN -->
+      <div class="card">
+        <div class="card-title">Resumen de entrega</div>
+        <div class="summary-section" id="summaryContent"></div>
+        <div class="tip-box" style="font-size:11px;margin-top:8px">⚠️ En caso de demoras en punto de recogida o entrega se cobra <strong>$2.000 por cada 15 min</strong>. El tiempo inicia cuando el domiciliario envía la evidencia (foto).</div>
+      </div>
+
+      <!-- PRODUCTOS DEL PEDIDO -->
+      <div class="card">
+        <div class="card-title">Productos del pedido</div>
+        <div id="sumProductos" class="sum-productos-wrap"></div>
+      </div>
+
+      <div class="sum-total" style="margin:0 20px 16px">
+        <span class="sum-total-label">💰 Tarifa domicilio</span>
+        <span class="sum-total-val" id="sumTotalVal">$0</span>
+      </div>
+
+      <div style="padding:0 20px">
+        <button class="btn-primary" id="btnConfirm" onclick="submitPedido()">✅ Confirmar pedido</button>
+      </div>
+      <div style="height:8px"></div>
+    </div>
+
+  </div><!-- /main-form -->
+
+  <!-- ══ SUCCESS ══ -->
+  <div class="success-screen" id="scr-success">
+    <div class="success-icon">🎉</div>
+    <div class="success-title">¡Pedido <span>enviado!</span></div>
+    <div class="success-sub">Tu domicilio está siendo procesado. Te contactaremos pronto para confirmar.</div>
+    <div class="order-id" id="orderId">WIL-000000</div>
+    <div style="color:var(--muted);font-size:12px">Guarda este código como referencia</div>
+    <button class="btn-primary" style="max-width:280px" onclick="location.reload()">Hacer otro pedido</button>
+  </div>
+
+</div><!-- /app -->
+
+<!-- BOTTOM NAV (solo en pasos del form) -->
+<div class="bottom-nav" id="bottomNav" style="display:none">
+  <div class="nav-btns">
+    <button class="btn-back-step" id="btnBack" onclick="stepBack()">← Atrás</button>
+    <button class="btn-next" id="btnNext" onclick="stepNext()">Continuar →</button>
+  </div>
+</div>
+
+<script>
+/* ── BARRIOS ── */
+const BARRIOS = [
+  ["ASUNCION",5000],["FÁTIMA",5000],["MIRADOR AZUL",5000],["AZULITA PARTE BAJA",5000],
+  ["CRISTO REY (ABAJO DE LA PISCINA)",5000],["HORIZONTES",5000],["MIRAFLORES",5000],
+  ["MISERICORDIA HASTA PRINCESS",5000],["MOJÓN",5000],["PARQUE COPACABANA",5000],
+  ["OBRERO",5000],["PEDREGAL PARTE BAJA",5000],["PEDRERA",5000],["SAN FRANCISCO",5000],
+  ["SHANGAY",5000],["SIMÓN BOLÍVAR",5000],["TOBÓN QUINTERO",5000],["VEGAS PARTE BAJA",5000],
+  ["MONTE VERDE",5000],["REMANSO",5000],["YARUMITO PARTE BAJA",5000],
+  ["CANOAS HASTA LA TIENDA DEL CUSCO",5000],["PIEDRAS BLANCAS",5000],["PORVENIR",5000],["RECREO",5000],
+  ["CALORCOL",6000],["AZULITA PARTE ALTA",6000],["VILLAS DE COPACABANA",6000],["TABLAZO",6000],
+  ["CANOAS DESPUÉS DE LA TIENDA DEL CUSCO",6000],["CRISTO REY DE LA PISCINA HACIA ARRIBA",6000],
+  ["PEDREGAL PARTE ALTA",6000],["COLINAS DEL PEDREGAL",6000],
+  ["VEGAS INTERIORES IGLESIA MANANTIALES",6000],["YARUMITO DESPUÉS DEL EMPEDRADO",6000],
+  ["YARUMITO INTERIOR CANCHA NUEVA",6000],["VEGAS PARTE ALTA",6000],["EDIFICIOS AMARILLOS",6000],
+  ["MONTESION",6000],["JARDÍN DE LA MARGARITA",6000],["RESERVAS DE SAN JUAN 1",6000],
+  ["POSADA DEL VIENTO",6000],["ROSA DE LOS VIENTOS",6000],["VICENZA",6000],
+  ["RESERVAS DE SAN JUAN 2",6000],
+  ["BARRIO MARIA",7000],["PORTERIA PARCELACIÓN EL PARAISO",7000],["TORRE DEL BOSQUE",7000],
+  ["EDIFICIO POBLADO NORTE",7000],["SAN JUAN CAMPESTRE",7000],
+  ["VIA MACHADO",8000],["CANTERAS",8000],["VILLANUEVA PARTE BAJA Y ALTA",8000],
+  ["VILLA ROCA",8000],["SAN JUAN",8000],
+  ["GUASIMALITO (PARTE BAJA)",10000],["MACHADO",10000],
+  ["GUASIMALITO (PARTE ALTA)",13000],
+  ["UNIDADES DE MACHADO",11000],["ARBOLEDA DEL CAMPO",11000],
+  ["FONTIDUEÑO",13000],["NAVARRA",14000],["NIQUIA PARTE BAJA",14000],
+  ["UNIDADES DE NAVARRA",14000],
+  ["PARQUE DE GIRARDOTA",17000],["TOLEDO CAMPESTRE",17000],
+  ["PARQUE DE BELLO",18000],["FABRICATO",19000],["UNIDADES DE MADERA",25000]
+];
+
+/* ── STATE ── */
+const st = {
+  step:1, svc:'recoger', pago:'efectivo',
+  barrio:{recogida:null,entrega:null},
+  productos:[],
+  geo:{lat:null,lng:null},
+  file:null
 };
 
-/* ══ CORS helper ══ */
-function setCors(res) {
-  res.setHeader('Access-Control-Allow-Origin',  '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+const fmt = v => '$'+v.toLocaleString('es-CO');
+
+/* ── GEO ── */
+function requestGeo(){
+  if(!navigator.geolocation){skipGeo();return;}
+  navigator.geolocation.getCurrentPosition(pos=>{
+    st.geo.lat=pos.coords.latitude;
+    st.geo.lng=pos.coords.longitude;
+    showToast('📍 Ubicación capturada','success');
+    startForm();
+  },()=>skipGeo(),{timeout:8000});
+}
+function skipGeo(){startForm();}
+function startForm(){
+  document.getElementById('scr-geo').classList.remove('active');
+  document.getElementById('main-form').classList.remove('hidden');
+  document.getElementById('bottomNav').style.display='block';
+  renderStep();
 }
 
-/* ══ HANDLER ══ */
-export default async function handler(req, res) {
-  setCors(res);
-  if (req.method === 'OPTIONS') return res.status(200).end();
-
-  await dbConnect();
-
-  const { tipo } = req.query;   // ?tipo=pedido  →  lógica de pedido
-                                 // sin tipo      →  lógica de foto (original)
-
-  /* ────────────────────────────────────────────────────────────
-     PEDIDO  →  POST /api/foto?tipo=pedido
-  ──────────────────────────────────────────────────────────── */
-  if (tipo === 'pedido') {
-    if (req.method !== 'POST')
-      return res.status(405).json({ ok: false, error: 'Método no permitido' });
-
-    try {
-      const body = req.body;
-
-      if (!body?.nombre || !body?.telefono)
-        return res.status(400).json({ ok: false, error: 'Faltan nombre o telefono' });
-
-      // Si viene comprobante base64 → guardarlo como Foto y guardar solo el id
-      let comprobanteId = null;
-      if (body.comprobanteBase64) {
-        const b64   = body.comprobanteBase64.split(',').pop(); // quitar prefijo data:...
-        const mime  = (body.comprobanteBase64.match(/data:(image\/\w+);/) || [])[1] || 'image/jpeg';
-        const buf   = Buffer.from(b64, 'base64');
-        const foto  = await Foto.create({ data: buf, mime });
-        comprobanteId = String(foto._id);
-      }
-
-      const doc = await Pedido.create({
-        idPedido:    body.id       || String(Math.floor(100 + Math.random() * 900)),
-        sede:        body.sede     || 'expertos',
-        comercio:    body.comercio || 'Farma Expertos',
-        nombre:      body.nombre,
-        telefono:    body.telefono,
-        direccion:   body.direccion   || '',
-        coords:      body.coords      || null,
-        modoEntrega: body.modoEntrega || 'DOMICILIO',
-        zona:        body.zona        || '',
-        domicilio:   body.domicilio   || 0,
-        metodoPago:  body.metodoPago  || '',
-        comprobanteId,
-        items: (body.rows || [])
-          .filter(r => r[6])
-          .map(r => ({
-            producto:    r[6]  || '',
-            laboratorio: r[7]  || '',
-            cantidad:    r[8]  || 1,
-            precioUnit:  r[9]  || 0,
-            subtotal:    r[10] || 0,
-          })),
-        subtotal:    (body.total || 0) - (body.domicilio || 0),
-        total:       body.total    || 0,
-        fecha:       body.fecha    || '',
-        hora:        body.hora     || '',
-        destinatario: body.destinatario || null,
-      });
-
-      return res.status(200).json({ ok: true, id: doc.idPedido, mongoId: doc._id });
-
-    } catch(e) {
-      console.error('[pedido]', e);
-      return res.status(500).json({ ok: false, error: e.message });
-    }
-  }
-
-  /* ────────────────────────────────────────────────────────────
-     FOTO ORIGINAL  →  GET /api/foto?id=<objectId>
-                        POST /api/foto  { base64, mime }
-  ──────────────────────────────────────────────────────────── */
-  if (req.method === 'GET') {
-    const { id } = req.query;
-    if (!id) return res.status(400).end('Missing id');
-    try {
-      const foto = await Foto.findById(id);
-      if (!foto) return res.status(404).end('Not found');
-      res.setHeader('Content-Type',  foto.mime || 'image/jpeg');
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-      return res.status(200).send(foto.data);
-    } catch(e) {
-      return res.status(500).json({ ok: false, error: e.message });
-    }
-  }
-
-  if (req.method === 'POST') {
-    const { base64, mime = 'image/jpeg' } = req.body;
-    if (!base64) return res.status(400).json({ ok: false, error: 'No image data' });
-    try {
-      const buffer = Buffer.from(base64, 'base64');
-      if (buffer.length > 5 * 1024 * 1024)
-        return res.status(400).json({ ok: false, error: 'Imagen demasiado grande (máx 5MB)' });
-      const doc = await Foto.create({ data: buffer, mime });
-      return res.status(200).json({ ok: true, url: `/api/foto?id=${doc._id}` });
-    } catch(e) {
-      return res.status(500).json({ ok: false, error: e.message });
-    }
-  }
-
-  res.status(405).end();
+/* ── STEPS ── */
+function renderStep(){
+  const s=st.step;
+  const esCompra=st.svc==='compra';
+  const totalSteps=esCompra?2:3;
+  const displayStep=esCompra?(s===1?1:2):s;
+  document.getElementById('stepPill').textContent='Paso '+displayStep+'/'+totalSteps;
+  document.getElementById('progressFill').style.width=(s/3*100)+'%';
+  document.getElementById('sl1').classList.toggle('active',s===1);
+  document.getElementById('sl2').classList.toggle('active',s===2);
+  document.getElementById('sl3').classList.toggle('active',s===3);
+  document.getElementById('sl2').style.display=esCompra?'none':'';
+  ['scr1','scr2','scr3'].forEach((id,i)=>{
+    document.getElementById(id).classList.toggle('active',i+1===s);
+  });
+  if(s===3)buildSummary();
+  document.getElementById('btnBack').style.display=s===1?'none':'';
+  document.getElementById('btnNext').style.display=s===3?'none':'';
 }
+
+function stepNext(){
+  if(st.step===1&&!validateStep1())return;
+  if(st.step===2&&!validateStep2())return;
+  if(st.step<3){
+    if(st.svc==='compra'&&st.step===1){
+      const tlEl=document.getElementById('textoLibreCompra')||document.getElementById('textoLibre');
+    detectarProductos(tlEl?tlEl.value:'');
+      st.step=3;
+    } else {
+      st.step++;
+    }
+    renderStep();
+  }
+}
+function stepBack(){
+  if(st.step===3&&st.svc==='compra'){st.step=1;renderStep();return;}
+  if(st.step>1){st.step--;renderStep();}
+  else location.href='index.html';
+}
+
+/* ── VALIDATE ── */
+function validateStep1(){
+  const nom=v('nombre'),dir=v('direccion'),tel=v('tel-cliente');
+  const esCompra=st.svc==='compra';
+  // En compra validar textarea con algo escrito
+  if(esCompra){
+    const tl=document.getElementById('textoLibreCompra');
+    if(!tl||!tl.value.trim()){showToast('⚠️ Escribe qué necesitas comprar','error');if(tl)tl.focus();return false;}
+  }
+  if(!st.barrio.entrega){showToast('⚠️ Selecciona el barrio de entrega','error');return false;}
+  if(!esCompra&&!st.barrio.recogida){showToast('⚠️ Selecciona el barrio de recogida','error');return false;}
+  if(!nom){showToast('⚠️ Ingresa tu nombre','error');hilight('nombre');return false;}
+  if(!dir){showToast('⚠️ Ingresa la dirección de entrega','error');hilight('direccion');return false;}
+  if(!tel||tel.length<7){showToast('⚠️ Ingresa tu teléfono','error');hilight('tel-cliente');return false;}
+  return true;
+}
+function validateStep2(){
+  if(st.productos.length===0){showToast('⚠️ Agrega al menos un producto','error');return false;}
+  return true;
+}
+
+/* ── SERVICE ── */
+function setSvc(t){
+  st.svc=t;
+  document.getElementById('svc-recoger').classList.toggle('selected',t==='recoger');
+  document.getElementById('svc-compra').classList.toggle('selected',t==='compra');
+  const esCompra=t==='compra';
+  // Mostrar/ocultar secciones del step1
+  const cardCompraLibre=document.getElementById('card-compra-libre');
+  const cardRecogida=document.getElementById('card-recogida');
+  if(cardCompraLibre) cardCompraLibre.style.display=esCompra?'':'none';
+  if(cardRecogida) cardRecogida.style.display=esCompra?'none':'';
+  // Reset productos al cambiar modo
+  st.productos=[];
+  if(!esCompra){
+    const tl=document.getElementById('textoLibreCompra');
+    if(tl) tl.value='';
+    const badge=document.getElementById('detectedBadge');
+    if(badge) badge.classList.add('hidden');
+  }
+}
+
+/* ── PAGO ── */
+function setPago(t){
+  st.pago=t;
+  document.getElementById('pay-efectivo').classList.toggle('selected',t==='efectivo');
+  document.getElementById('pay-transferencia').classList.toggle('selected',t==='transferencia');
+  document.getElementById('ef-note').classList.toggle('hidden',t!=='efectivo');
+  document.getElementById('tr-section').classList.toggle('hidden',t!=='transferencia');
+}
+
+/* ── AUTOCOMPLETE ── */
+let ddFocus={recogida:-1,entrega:-1};
+function filterBarrios(which,q){
+  const dd=document.getElementById('dd-'+which);
+  ddFocus[which]=-1;
+  if(q.length<1){dd.classList.add('hidden');return;}
+  const res=BARRIOS.filter(([n])=>n.toLowerCase().includes(q.toLowerCase())).slice(0,10);
+  if(!res.length){dd.innerHTML='<div class="dd-empty">Sin resultados</div>';dd.classList.remove('hidden');return;}
+  dd.innerHTML=res.map(([n,p],i)=>
+    `<div class="dd-item" data-name="${n}" data-price="${p}" data-idx="${i}" onclick="selectBarrio('${which}','${n}',${p})">`+
+    `<span class="dd-name">${n}</span><span class="dd-price">${fmt(p)}</span></div>`
+  ).join('');
+  dd.classList.remove('hidden');
+}
+function ddNav(e,which){
+  const dd=document.getElementById('dd-'+which);
+  if(dd.classList.contains('hidden'))return;
+  const items=dd.querySelectorAll('.dd-item');
+  if(!items.length)return;
+  if(e.key==='ArrowDown'){ddFocus[which]=Math.min(ddFocus[which]+1,items.length-1);}
+  else if(e.key==='ArrowUp'){ddFocus[which]=Math.max(ddFocus[which]-1,0);}
+  else if(e.key==='Enter'&&ddFocus[which]>=0){items[ddFocus[which]].click();return;}
+  else return;
+  items.forEach((it,i)=>it.classList.toggle('focused',i===ddFocus[which]));
+  e.preventDefault();
+}
+function selectBarrio(which,name,price){
+  st.barrio[which]={name,price};
+  document.getElementById('inp-'+which).value='';
+  document.getElementById('dd-'+which).classList.add('hidden');
+  document.getElementById('sel-'+which+'-name').textContent=name;
+  document.getElementById('sel-'+which+'-price').textContent=fmt(price);
+  document.getElementById('sel-'+which).classList.remove('hidden');
+  document.getElementById('input-'+which+'-wrap').classList.add('hidden');
+  updateTarifa();
+  document.body.click();
+}
+function clearBarrio(which){
+  st.barrio[which]=null;
+  document.getElementById('sel-'+which).classList.add('hidden');
+  document.getElementById('input-'+which+'-wrap').classList.remove('hidden');
+  document.getElementById('inp-'+which).value='';
+  updateTarifa();
+}
+document.addEventListener('click',e=>{
+  ['recogida','entrega'].forEach(w=>{
+    const dd=document.getElementById('dd-'+w);
+    if(dd&&!document.getElementById('wrap-'+w).contains(e.target))dd.classList.add('hidden');
+  });
+});
+
+function updateTarifa(){
+  const r=st.barrio.recogida, e=st.barrio.entrega;
+  const prev=document.getElementById('tarifaPreview');
+  if(!r&&!e){prev.classList.remove('show');return;}
+  document.getElementById('tp-r').textContent=r?fmt(r.price):'—';
+  document.getElementById('tp-e').textContent=e?fmt(e.price):'—';
+  if(r&&e){
+    const total=Math.max(r.price,e.price);
+    document.getElementById('tp-total').textContent=fmt(total);
+  }else{
+    document.getElementById('tp-total').textContent='—';
+  }
+  prev.classList.add('show');
+}
+
+/* ── PRODUCTOS ── */
+let prodId=0;
+
+// Detecta "N NOMBRE" desde texto libre
+function detectarProductos(txt){
+  if(!txt.trim()){
+    // limpiar solo los detectados automáticamente, mantener manuales
+    st.productos=st.productos.filter(p=>p.manual);
+    renderProducts();
+    updateDetectedBadge();
+    return;
+  }
+  // Tokenizar: separar por saltos, comas o secuencias
+  // Patrón: número opcional + texto
+  const tokens=[];
+  const raw=txt.replace(/\n|,/g,' ');
+  const regex=/(\d+)?\s*([a-záéíóúüñA-ZÁÉÍÓÚÜÑ][a-záéíóúüñA-ZÁÉÍÓÚÜÑ\s\/\-\.]{1,50}?)(?=\s+\d|\s*,|\s*\n|$)/g;
+  let m;
+  while((m=regex.exec(raw))!==null){
+    const qty=parseInt(m[1])||1;
+    const name=m[2].trim().toUpperCase();
+    if(name.length>1)tokens.push({qty,name});
+  }
+  // Reemplazar productos auto (no manuales)
+  const manuales=st.productos.filter(p=>p.manual);
+  const auto=tokens.map(t=>({id:++prodId,name:t.name,qty:t.qty,manual:false}));
+  st.productos=[...auto,...manuales];
+  renderProducts();
+  updateDetectedBadge();
+}
+
+function updateDetectedBadge(){
+  const badge=document.getElementById('detectedBadge');
+  if(!badge)return;
+  const auto=st.productos.filter(p=>!p.manual).length;
+  if(auto>0){
+    badge.textContent=auto+' producto'+(auto>1?'s':'')+' detectado'+(auto>1?'s':'');
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
+  const cnt=document.getElementById('prodCount');
+  if(cnt) cnt.textContent=st.productos.length>0?st.productos.length+' ítem'+(st.productos.length>1?'s':''):'';
+}
+
+function addProductManual(){
+  const inp=document.getElementById('prodInput');
+  const txt=inp.value.trim().toUpperCase();
+  if(!txt)return;
+  st.productos.push({id:++prodId,name:txt,qty:1,manual:true});
+  inp.value='';
+  renderProducts();
+  updateDetectedBadge();
+}
+
+function renderProducts(){
+  const list=document.getElementById('productsList');
+  if(!list)return;
+  const empty=document.getElementById('productsEmpty');
+  empty.classList.toggle('hidden',st.productos.length>0);
+  list.innerHTML=st.productos.map(p=>`
+    <div class="product-chip" id="pc-${p.id}" style="${p.manual?'border-color:rgba(0,184,255,.3)':''}">
+      <span class="product-chip-icon">${p.manual?'✏️':'🛒'}</span>
+      <span class="product-chip-name">${p.name}</span>
+      <div class="qty-ctrl">
+        <div class="qty-btn" onclick="chQty(${p.id},-1)">−</div>
+        <span class="qty-val">${p.qty}</span>
+        <div class="qty-btn" onclick="chQty(${p.id},1)">+</div>
+      </div>
+      <button class="del-btn" onclick="delProduct(${p.id})">🗑</button>
+    </div>`
+  ).join('');
+}
+function chQty(id,d){
+  const p=st.productos.find(x=>x.id===id);
+  if(!p)return;
+  p.qty=Math.max(1,p.qty+d);
+  renderProducts();
+}
+function delProduct(id){
+  st.productos=st.productos.filter(x=>x.id!==id);
+  renderProducts();
+  updateDetectedBadge();
+}
+
+/* ── FILE ── */
+function handleFile(inp){
+  const f=inp.files[0];
+  if(!f)return;
+  if(f.size>4*1024*1024){showToast('❌ Archivo demasiado grande (máx 4 MB)','error');return;}
+  st.file=f;
+  document.getElementById('uploadZone').classList.add('hidden');
+  const prev=document.getElementById('uploadPreview');
+  prev.classList.remove('hidden');
+  document.getElementById('uploadName').textContent=f.name;
+  document.getElementById('uploadSize').textContent=(f.size/1024).toFixed(1)+' KB';
+  if(f.type.startsWith('image/')){
+    const reader=new FileReader();
+    reader.onload=e=>document.getElementById('uploadThumb').src=e.target.result;
+    reader.readAsDataURL(f);
+  }else{
+    document.getElementById('uploadThumb').src='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><text y="36" font-size="36">📄</text></svg>';
+  }
+}
+function clearFile(){
+  st.file=null;
+  document.getElementById('fileInput').value='';
+  document.getElementById('uploadPreview').classList.add('hidden');
+  document.getElementById('uploadZone').classList.remove('hidden');
+}
+function copyAccount(){
+  navigator.clipboard.writeText('55329692468').then(()=>showToast('✅ Número copiado','success')).catch(()=>{});
+}
+
+/* ── RESUMEN ── */
+function buildSummary(){
+  const r=st.barrio.recogida, e=st.barrio.entrega;
+  const esCompra=st.svc==='compra';
+  // Tarifa: compra = solo entrega; recoger = max(recogida, entrega)
+  let tarifa=0;
+  if(esCompra && e) tarifa=e.price;
+  else if(r && e) tarifa=Math.max(r.price,e.price);
+  document.getElementById('sumTotalVal').textContent=fmt(tarifa);
+
+  // Filas resumen de entrega
+  const rows=[];
+  rows.push(['Servicio', esCompra?'🛒 Realizar Compra':'🏪 Recoger y Entregar']);
+  if(!esCompra){
+    rows.push(['Recogida', r?r.name:'—']);
+    rows.push(['Comercio', v('comercio')||'—']);
+  }
+  rows.push(['Entrega', e?e.name:'—']);
+  rows.push(['Dirección', v('direccion')]);
+  if(v('referencia')) rows.push(['Referencia', v('referencia')]);
+  rows.push(['Cliente', v('nombre')]);
+  rows.push(['Teléfono', v('tel-cliente')]);
+  rows.push(['Tarifa domi', '<strong style="color:var(--accent)">'+fmt(tarifa)+'</strong>']);
+
+  document.getElementById('summaryContent').innerHTML=rows.map(([k,v2])=>
+    '<div class="sum-row"><span class="k">'+k+'</span><span class="v">'+v2+'</span></div>'
+  ).join('');
+
+  // Productos como chips en el resumen
+  const prodWrap=document.getElementById('sumProductos');
+  if(prodWrap){
+    if(st.productos.length===0){
+      prodWrap.innerHTML='<div style="font-size:12px;color:var(--muted);padding:8px 0">Sin productos agregados</div>';
+    } else {
+      prodWrap.innerHTML=st.productos.map(p=>
+        '<div class="sum-prod-chip">'+
+          '<span class="spc-icon">'+(p.manual?'✏️':'🛒')+'</span>'+
+          '<span class="spc-name">'+p.name+'</span>'+
+          '<span class="spc-qty">x'+p.qty+'</span>'+
+        '</div>'
+      ).join('');
+    }
+  }
+}
+
+/* ── SUBMIT ── */
+async function submitPedido(){
+  if(st.pago==='transferencia'&&!st.file){
+    showToast('⚠️ Adjunta el comprobante de pago','error');return;
+  }
+  showLoader('Enviando tu pedido…');
+  try{
+    const bRecogida = st.barrio.recogida;
+    const bEntrega  = st.barrio.entrega;
+    const esCompra  = st.svc==='compra';
+
+    // Tarifa: compra → precio entrega | recoger → max(recogida, entrega)
+    const tarifa = esCompra
+      ? (bEntrega?.price||0)
+      : (bRecogida&&bEntrega ? Math.max(bRecogida.price,bEntrega.price) : 0);
+
+    // Zona = barrio de entrega (o recogida si no hay entrega)
+    const zona = bEntrega?.name || bRecogida?.name || '';
+
+    // Comprobante base64 completo (con prefijo data:...) para que la API
+    // extraiga el mime y el buffer correctamente
+    let comprobanteBase64 = null;
+    if(st.file){
+      comprobanteBase64 = await toBase64Full(st.file);  // incluye "data:image/...;base64,"
+    }
+
+    // ID único WIL
+    const idPedido = 'WIL-'+Date.now().toString().slice(-6);
+
+    // Fecha / hora locales
+    const ahora = new Date();
+    const fecha = ahora.toLocaleDateString('es-CO');
+    const hora  = ahora.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+
+    // ── Mapeo exacto al schema de /api/foto?tipo=pedido ──
+    const payload = {
+      // Identificación
+      id:          idPedido,
+      sede:        'wil',
+      comercio:    esCompra ? 'Realizar Compra WIL' : (v('comercio')||'Domicilios WIL'),
+
+      // Cliente
+      nombre:      v('nombre'),
+      telefono:    v('tel-cliente'),
+      direccion:   v('direccion') + (v('referencia')?' – Ref: '+v('referencia'):''),
+
+      // Geo
+      coords: st.geo.lat ? { lat:st.geo.lat, lng:st.geo.lng } : null,
+
+      // Entrega
+      modoEntrega: st.svc==='recoger' ? 'RECOGER_Y_ENTREGAR' : 'REALIZAR_COMPRA',
+      zona,
+      domicilio:   tarifa,
+
+      // Pago
+      metodoPago:  st.pago==='efectivo' ? 'Efectivo' : 'Transferencia',
+      comprobanteBase64,   // la API separa mime y guarda el buffer en Fotos
+
+      // Productos → mapeados a rows[] que la API espera en posición [6..10]
+      // rows[6]=producto, rows[7]=laboratorio(=barrio origen), rows[8]=cantidad,
+      // rows[9]=precioUnit(0 para domicilio libre), rows[10]=subtotal(0)
+      rows: st.productos.map(p=>[
+        null,null,null,null,null,null,   // [0..5] vacíos
+        p.name,                          // [6] producto
+        esCompra ? 'Compra' : (bRecogida?.name||''),  // [7] origen/laboratorio
+        p.qty,                           // [8] cantidad
+        0,                               // [9] precioUnit (sin precio en pedido libre)
+        0                                // [10] subtotal
+      ]),
+
+      // Info extra en destinatario (campo Mixed, lo usamos para contexto WIL)
+      destinatario: {
+        tipo_servicio: st.svc,
+        barrio_recogida: bRecogida?.name || null,
+        tarifa_recogida: bRecogida?.price || null,
+        barrio_entrega:  bEntrega?.name  || null,
+        tarifa_entrega:  bEntrega?.price || null,
+        tel_recogida:    v('tel-recogida') || null,
+        notas:           v('notas')        || null,
+        geo:             st.geo
+      },
+
+      // Totales
+      total:  tarifa,
+      fecha,
+      hora
+    };
+
+    const res = await fetch('/api/foto?tipo=pedido',{
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+
+    let data={};
+    try{ data=await res.json(); }catch(_){}
+    if(!res.ok) throw new Error(data.error||'Error del servidor');
+
+    hideLoader();
+    showSuccess(data.id||idPedido);
+
+  }catch(err){
+    hideLoader();
+    showToast('❌ '+err.message,'error');
+    console.error('[submitPedido]',err);
+  }
+}
+
+function showSuccess(id){
+  document.getElementById('main-form').classList.add('hidden');
+  document.getElementById('bottomNav').style.display='none';
+  document.getElementById('orderId').textContent=id;
+  document.getElementById('scr-success').classList.add('active');
+}
+
+/* ── UTILS ── */
+function v(id){return document.getElementById(id)?.value?.trim()||'';}
+function hilight(id){const el=document.getElementById(id);if(el){el.focus();el.style.borderColor='var(--warn)';setTimeout(()=>el.style.borderColor='',1500);}}
+function toBase64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});}
+// Retorna base64 CON prefijo 'data:mime;base64,...' (lo necesita /api/foto?tipo=pedido)
+function toBase64Full(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(file);});}
+let toastTimer;
+function showToast(msg,type=''){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.className='toast show '+(type||'');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),2800);
+}
+function showLoader(txt=''){
+  document.getElementById('loaderText').textContent=txt||'Cargando…';
+  document.getElementById('loader').classList.add('active');
+}
+function hideLoader(){document.getElementById('loader').classList.remove('active');}
+</script>
+</body>
+</html>
