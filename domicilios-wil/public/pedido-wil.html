@@ -1177,7 +1177,7 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
   </div>
 
   <!-- ════ DOMICILIOS ════ -->
- <div id="sec-domicilios">
+<div id="sec-domicilios">
 
   <!-- HEADER ROW -->
   <div class="sec-row" style="padding-bottom:8px">
@@ -1187,13 +1187,43 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
     </button>
   </div>
 
-  <!-- COMERCIOS TRACK -->
-  <div class="cats-ticker-outer">
-    <div class="cats-ticker-track" id="catsTicker">
-      <!-- Se llena dinámicamente -->
-    </div>
-  </div>
+  <!-- CAROUSEL CON FLECHAS -->
+  <div style="position:relative;display:flex;align-items:center;gap:6px;">
 
+    <!-- FLECHA IZQUIERDA -->
+    <button id="dom-prev" onclick="domSlide(-1)" style="
+      flex-shrink:0;width:34px;height:34px;border-radius:50%;
+      background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);
+      display:flex;align-items:center;justify-content:center;
+      cursor:pointer;transition:background .2s,opacity .2s;color:#fff;
+      opacity:0.4;pointer-events:none;"
+      onmouseover="this.style.background='rgba(233,195,73,0.18)'"
+      onmouseout="this.style.background='rgba(255,255,255,0.08)'">
+      <span class="sym f" style="font-size:18px;">chevron_left</span>
+    </button>
+
+    <!-- TRACK -->
+    <div style="overflow:hidden;flex:1;">
+      <div class="cats-ticker-track" id="catsTicker" style="
+        transition:transform .3s cubic-bezier(0.4,0,0.2,1);
+        will-change:transform;
+        flex-wrap:nowrap;">
+      </div>
+    </div>
+
+    <!-- FLECHA DERECHA -->
+    <button id="dom-next" onclick="domSlide(1)" style="
+      flex-shrink:0;width:34px;height:34px;border-radius:50%;
+      background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);
+      display:flex;align-items:center;justify-content:center;
+      cursor:pointer;transition:background .2s,opacity .2s;color:#fff;
+      opacity:0.4;pointer-events:none;"
+      onmouseover="this.style.background='rgba(233,195,73,0.18)'"
+      onmouseout="this.style.background='rgba(255,255,255,0.08)'">
+      <span class="sym f" style="font-size:18px;">chevron_right</span>
+    </button>
+
+  </div>
 </div>
 
     <!-- PEDIDO LIBRE -->
@@ -13398,10 +13428,38 @@ try {
 })(window);
 </script>
 
-
 <script>
 (function(){
   var API_URL = 'https://food-display-pro.vercel.app/api/upload-foto';
+  var domIdx  = 0;
+  var domTotal = 0;
+
+  function updateBtns() {
+    var prev = document.getElementById('dom-prev');
+    var next = document.getElementById('dom-next');
+    if (!prev || !next) return;
+    var canPrev = domIdx > 0;
+    var canNext = domIdx < domTotal - 1;
+    prev.style.opacity        = canPrev ? '1'    : '0.3';
+    prev.style.pointerEvents  = canPrev ? 'auto' : 'none';
+    next.style.opacity        = canNext ? '1'    : '0.3';
+    next.style.pointerEvents  = canNext ? 'auto' : 'none';
+  }
+
+  function syncTrack() {
+    var track = document.getElementById('catsTicker');
+    if (!track) return;
+    var items = track.querySelectorAll('.cat-real-pill');
+    if (!items.length) return;
+    var itemW = items[0].offsetWidth + 10; /* 10 = gap aprox */
+    track.style.transform = 'translateX(-' + (domIdx * itemW) + 'px)';
+    updateBtns();
+  }
+
+  window.domSlide = function(dir) {
+    domIdx = Math.max(0, Math.min(domIdx + dir, domTotal - 1));
+    syncTrack();
+  };
 
   function renderComercios(data) {
     var track = document.getElementById('catsTicker');
@@ -13410,11 +13468,14 @@ try {
       track.innerHTML = '<div style="color:#aaa;font-size:13px;padding:8px 4px;">No hay comercios disponibles.</div>';
       return;
     }
+    domTotal = data.length;
+    domIdx   = 0;
+
     track.innerHTML = data.map(function(c) {
-      var img   = c.config && c.config.image ? c.config.image : null;
-      var nombre = c.nombre || 'Comercio';
-      var aid   = encodeURIComponent(c.adminId || '');
-      var nom   = encodeURIComponent(c.nombre  || '');
+      var img      = c.config && c.config.image ? c.config.image : null;
+      var nombre   = c.nombre || 'Comercio';
+      var aid      = encodeURIComponent(c.adminId || '');
+      var nom      = encodeURIComponent(c.nombre  || '');
       var loginUrl = 'https://food-display-pro.vercel.app/login?adminId=' + aid + '&nombre=' + nom;
 
       return '<div class="cat-real-pill" onclick="window.location.href=\'' + loginUrl + '\'" style="cursor:pointer;">' +
@@ -13429,7 +13490,23 @@ try {
         '</div>' +
       '</div>';
     }).join('');
+
+    setTimeout(syncTrack, 50);
   }
+
+  /* Swipe táctil */
+  var txStart = 0;
+  document.addEventListener('DOMContentLoaded', function(){
+    var track = document.getElementById('catsTicker');
+    if (!track) return;
+    track.addEventListener('touchstart', function(e){ txStart = e.touches[0].clientX; }, {passive:true});
+    track.addEventListener('touchend',   function(e){
+      var dx = e.changedTouches[0].clientX - txStart;
+      if (Math.abs(dx) > 35) domSlide(dx < 0 ? 1 : -1);
+    }, {passive:true});
+  });
+
+  window.addEventListener('resize', function(){ setTimeout(syncTrack, 60); });
 
   fetch(API_URL, { redirect:'follow', mode:'cors' })
     .then(function(r){ return r.ok ? r.json() : Promise.reject('HTTP ' + r.status); })
