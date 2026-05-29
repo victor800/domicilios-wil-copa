@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Pedidos & Domiciliarios — WIL Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,500,1,0&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --teal:#28B9C1; --teal-d:#1e9aa1; --teal-m:rgba(40,185,193,.13); --teal-l:#e6f8f9;
+  --white:#fff; --bg:#f0f5f6; --bg2:#e8f0f1;
+  --border:#dde8ea; --border2:rgba(40,185,193,.22);
+  --text:#0c2225; --text2:#3f6165; --text3:#7da0a4;
+  --green:#16a34a; --green-l:#dcfce7;
+  --red:#dc2626; --red-l:#fee2e2;
+  --orange:#d97706; --orange-l:#fef3c7;
+  --blue:#2563eb; --blue-l:#dbeafe;
+  --purple:#7c3aed; --purple-l:#ede9fe;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px;}
+
+/* ── TOP BAR ── */
+.topbar {
+  position:sticky;top:0;z-index:100;
+  background:rgba(255,255,255,.92);backdrop-filter:blur(16px);
+  border-bottom:1.5px solid var(--border);
+  padding:0 24px;height:62px;
+  display:flex;align-items:center;gap:14px;
+}
+.topbar-logo {
+  width:38px;height:38px;border-radius:11px;
+  background:var(--teal);display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.topbar-logo span{font-size:18px;font-weight:900;color:#fff;font-family:'DM Mono',monospace;}
+.topbar-title{font-size:16px;font-weight:800;color:var(--text);}
+.topbar-sub{font-size:11px;color:var(--text3);margin-top:1px;}
+.sync-badge {
+  margin-left:auto;display:flex;align-items:center;gap:7px;
+  background:var(--bg);border:1.5px solid var(--border);border-radius:9px;
+  padding:6px 12px;font-size:11px;font-weight:700;color:var(--text2);
+}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--text3);transition:background .3s;}
+.sync-dot.ok{background:var(--green);}
+.sync-dot.syncing{background:var(--orange);animation:blink .7s infinite;}
+.sync-dot.err{background:var(--red);}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.btn-refresh{width:36px;height:36px;border-radius:9px;border:1.5px solid var(--border);background:var(--white);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text2);transition:all .15s;font-size:17px;}
+.btn-refresh:hover{border-color:var(--teal);color:var(--teal);background:var(--teal-l);}
+.material-symbols-rounded{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;font-size:20px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;word-wrap:normal;direction:ltr;-webkit-font-smoothing:antialiased;}
+
+/* ── LAYOUT ── */
+.layout{display:grid;grid-template-columns:320px 1fr;gap:0;height:calc(100vh - 62px);}
+.panel-left{background:var(--white);border-right:1.5px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.panel-right{display:flex;flex-direction:column;overflow:hidden;}
+
+/* ── DOMICILIARIOS PANEL ── */
+.domis-header{padding:18px 18px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.domis-title{font-size:12px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:7px;margin-bottom:10px;}
+.domis-title .ico{font-size:16px;color:var(--teal);}
+.domis-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;}
+.dstat{background:var(--bg);border-radius:9px;padding:8px;text-align:center;}
+.dstat-val{font-size:18px;font-weight:800;line-height:1;}
+.dstat-lbl{font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-top:2px;}
+.domis-scroll{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;}
+
+/* ── DOMI CARD ── */
+.domi-card {
+  background:var(--bg);border:1.5px solid var(--border);border-radius:14px;
+  padding:12px 13px;cursor:pointer;transition:all .18s;
+  display:flex;align-items:center;gap:11px;
+  position:relative;overflow:hidden;
+}
+.domi-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:99px;background:var(--border);transition:background .18s;}
+.domi-card.activo::before{background:var(--green);}
+.domi-card.inactivo::before{background:var(--text3);}
+.domi-card.selected{border-color:var(--teal);background:var(--teal-l);box-shadow:0 4px 16px rgba(40,185,193,.15);}
+.domi-card.selected::before{background:var(--teal);}
+.domi-card:hover:not(.selected){border-color:var(--border2);background:var(--teal-l);}
+.domi-avatar{position:relative;flex-shrink:0;}
+.domi-avatar img,.domi-avatar-ph{width:44px;height:44px;border-radius:13px;object-fit:cover;object-position:center 20%;}
+.domi-avatar-ph{background:var(--teal-m);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:var(--teal-d);}
+.domi-status-dot{position:absolute;bottom:-2px;right:-2px;width:13px;height:13px;border-radius:50%;border:2.5px solid var(--white);}
+.domi-status-dot.online{background:var(--green);}
+.domi-status-dot.offline{background:var(--text3);}
+.domi-info{flex:1;min-width:0;}
+.domi-name{font-size:12px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.domi-id{font-size:9px;color:var(--teal);font-family:'DM Mono',monospace;margin-top:1px;}
+.domi-tel{font-size:9px;color:var(--text3);margin-top:2px;display:flex;align-items:center;gap:3px;}
+.domi-counts{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;}
+.domi-chip{font-size:8px;font-weight:800;padding:2px 7px;border-radius:99px;}
+.chip-g{background:var(--green-l);color:var(--green);}
+.chip-b{background:var(--blue-l);color:var(--blue);}
+.chip-o{background:var(--orange-l);color:var(--orange);}
+.domi-right{text-align:right;flex-shrink:0;}
+.domi-pedidos-n{font-size:20px;font-weight:800;color:var(--teal);line-height:1;}
+.domi-pedidos-l{font-size:8px;color:var(--text3);font-weight:700;}
+
+/* ── PEDIDOS PANEL ── */
+.ped-header{padding:16px 20px 12px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--white);}
+.ped-toprow{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;}
+.ped-title{font-size:14px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:7px;}
+.ped-title .ico{font-size:18px;color:var(--teal);}
+.ped-count{font-size:11px;color:var(--text3);font-weight:700;margin-left:auto;}
+
+/* Tabs */
+.tabs{display:flex;gap:3px;background:var(--bg2);border-radius:10px;padding:4px;flex-wrap:nowrap;overflow-x:auto;}
+.tab{padding:6px 12px;border-radius:7px;font-size:10px;font-weight:800;cursor:pointer;transition:all .15s;color:var(--text2);white-space:nowrap;flex-shrink:0;}
+.tab.on{background:var(--white);color:var(--teal);box-shadow:0 2px 8px rgba(40,185,193,.1);}
+.tab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;border-radius:99px;font-size:8px;font-weight:800;padding:0 4px;margin-left:4px;}
+.tab.on .tab-badge{background:var(--teal-m);color:var(--teal);}
+.tab:not(.on) .tab-badge{background:var(--red);color:#fff;}
+
+/* ── ASIGN PANEL ── */
+.asign-panel {
+  display:none;margin:0 20px 12px;
+  background:linear-gradient(135deg,#071e22 0%,#0d3540 100%);
+  border-radius:14px;padding:14px 16px;
+  border:1.5px solid rgba(40,185,193,.25);
+  flex-shrink:0;
+}
+.asign-panel.show{display:block;}
+.asign-top{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.asign-ico{width:34px;height:34px;border-radius:10px;background:rgba(40,185,193,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.asign-ttl{font-size:12px;font-weight:800;color:#fff;}
+.asign-sub{font-size:9px;color:rgba(255,255,255,.4);margin-top:2px;}
+.asign-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.asign-select{flex:1;min-width:160px;background:rgba(255,255,255,.08);border:1.5px solid rgba(40,185,193,.3);border-radius:9px;padding:8px 12px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;color:#fff;outline:none;cursor:pointer;}
+.asign-select option{background:#071e22;color:#fff;}
+.btn-asignar{display:inline-flex;align-items:center;gap:6px;background:var(--teal);color:#071e22;border:none;border-radius:9px;padding:8px 16px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.btn-asignar:hover{background:var(--teal-d);}
+.btn-cancelar-asign{background:rgba(255,255,255,.07);color:rgba(255,255,255,.5);border:1.5px solid rgba(255,255,255,.1);border-radius:9px;padding:8px 12px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;cursor:pointer;}
+.asign-chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;}
+.asign-chip{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.1);border-radius:99px;padding:4px 10px;cursor:pointer;transition:all .14s;}
+.asign-chip:hover{background:rgba(40,185,193,.2);border-color:rgba(40,185,193,.4);}
+.asign-chip-name{font-size:10px;font-weight:700;color:#fff;}
+.asign-chip-badge{font-size:8px;font-weight:800;padding:2px 7px;border-radius:99px;}
+
+/* ── TABLA ── */
+.ped-table-wrap{flex:1;overflow-y:auto;background:var(--white);}
+.ped-table-inner{padding:8px 12px;min-width:900px;}
+table.ptbl{width:100%;border-collapse:separate;border-spacing:0 4px;}
+table.ptbl thead th{font-size:8px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.12em;padding:0 12px 6px;text-align:left;}
+table.ptbl tbody tr{background:var(--white);transition:all .16s;cursor:pointer;}
+table.ptbl tbody tr:hover{box-shadow:0 4px 14px rgba(40,185,193,.1);}
+table.ptbl tbody tr.selected-row{box-shadow:0 0 0 2px var(--teal);border-radius:10px;}
+table.ptbl tbody td{padding:11px 12px;font-size:11px;border-top:1.5px solid var(--border);border-bottom:1.5px solid var(--border);}
+table.ptbl tbody td:first-child{border-left:1.5px solid var(--border);border-radius:10px 0 0 10px;font-family:'DM Mono',monospace;font-size:10px;color:var(--teal-d);font-weight:700;}
+table.ptbl tbody td:last-child{border-right:1.5px solid var(--border);border-radius:0 10px 10px 0;}
+table.ptbl tbody tr.pendiente-row td:first-child{border-left:3px solid var(--orange);}
+table.ptbl tbody tr.asignado-row td:first-child{border-left:3px solid var(--purple);}
+table.ptbl tbody tr.proceso-row td:first-child{border-left:3px solid var(--blue);}
+table.ptbl tbody tr.entregado-row td:first-child{border-left:3px solid var(--green);}
+table.ptbl tbody tr.cancelado-row td:first-child{border-left:3px solid var(--red);}
+
+/* stag badges */
+.stag{font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:3px 9px;border-radius:99px;display:inline-flex;align-items:center;gap:3px;white-space:nowrap;}
+.stag.pendiente{background:var(--orange-l);color:var(--orange);}
+.stag.asignado{background:var(--purple-l);color:var(--purple);}
+.stag.proceso{background:var(--blue-l);color:var(--blue);}
+.stag.encamino{background:#ede9fe;color:#7c3aed;}
+.stag.entregado{background:var(--green-l);color:var(--green);}
+.stag.cancelado{background:var(--red-l);color:var(--red);}
+
+/* domi avatar mini */
+.domi-mini{display:flex;align-items:center;gap:6px;}
+.domi-mini-av{width:26px;height:26px;border-radius:8px;object-fit:cover;flex-shrink:0;}
+.domi-mini-ph{width:26px;height:26px;border-radius:8px;background:var(--teal-m);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--teal-d);flex-shrink:0;}
+.domi-mini-name{font-size:11px;font-weight:700;}
+.btn-asign-row{display:inline-flex;align-items:center;gap:3px;background:var(--red-l);color:var(--red);border:1px solid rgba(220,38,38,.2);border-radius:7px;padding:3px 8px;font-size:9px;font-weight:800;cursor:pointer;white-space:nowrap;transition:all .14s;}
+.btn-asign-row:hover{background:var(--red);color:#fff;}
+
+/* estado dropdown */
+.estado-select{background:transparent;border:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:800;cursor:pointer;outline:none;padding:2px;border-radius:6px;}
+
+/* ── MODAL DETALLE ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(4,18,20,.75);backdrop-filter:blur(10px);z-index:200;display:none;align-items:center;justify-content:center;padding:16px;}
+.modal-overlay.show{display:flex;}
+.modal-box{width:min(700px,100%);max-height:90vh;overflow-y:auto;border-radius:22px;background:var(--white);box-shadow:0 48px 100px rgba(4,18,20,.4);}
+.modal-box::-webkit-scrollbar{width:3px;}
+.modal-box::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px;}
+.m-hero{background:linear-gradient(135deg,#071e22 0%,#0d3540 60%,#145060 100%);border-radius:22px 22px 0 0;padding:22px 26px 26px;position:relative;overflow:hidden;}
+.m-hero::before{content:'';position:absolute;top:-60px;right:-60px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(40,185,193,.18) 0%,transparent 65%);pointer-events:none;}
+.m-topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;position:relative;z-index:2;}
+.m-brand{font-size:11px;font-weight:800;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.1em;}
+.m-close{width:32px;height:32px;border-radius:9px;background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.12);cursor:pointer;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.6);font-size:16px;transition:all .15s;}
+.m-close:hover{background:rgba(220,38,38,.35);color:#fff;}
+.m-client{font-size:26px;font-weight:800;color:#fff;margin-bottom:5px;position:relative;z-index:2;}
+.m-pedid{font-family:'DM Mono',monospace;font-size:10px;color:rgba(255,255,255,.4);margin-bottom:12px;position:relative;z-index:2;}
+.m-meta{display:flex;gap:12px;flex-wrap:wrap;position:relative;z-index:2;}
+.m-meta-item{font-size:10px;color:rgba(255,255,255,.45);display:flex;align-items:center;gap:4px;}
+.m-meta-item span{font-size:13px;}
+.m-status{padding:7px 16px;border-radius:11px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;display:inline-flex;align-items:center;gap:6px;border:1.5px solid;position:absolute;top:22px;right:68px;z-index:2;}
+.m-body{display:grid;grid-template-columns:1fr 1.3fr;gap:0;}
+.m-left{padding:22px;border-right:1.5px solid var(--border);display:flex;flex-direction:column;gap:18px;}
+.m-right{padding:22px;display:flex;flex-direction:column;gap:18px;}
+.m-sec-lbl{font-size:9px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.12em;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.m-sec-lbl::before{content:'';width:3px;height:12px;background:var(--teal);border-radius:99px;}
+.m-infocard{background:var(--bg);border:1.5px solid var(--border);border-radius:13px;padding:14px;}
+.m-row{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);}
+.m-row:last-child{border-bottom:none;}
+.m-rlbl{font-size:10px;color:var(--text3);font-weight:600;}
+.m-rval{font-size:11px;font-weight:700;text-align:right;}
+.m-addr{background:linear-gradient(135deg,var(--teal-l),#f0fdfe);border:1.5px solid var(--border2);border-radius:13px;padding:13px 15px;display:flex;gap:11px;align-items:flex-start;}
+.m-addr-pin{width:32px;height:32px;border-radius:9px;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.m-addr-val{font-size:12px;font-weight:600;line-height:1.5;margin-top:1px;}
+.m-prod-item{display:flex;align-items:center;gap:9px;background:var(--bg);border:1.5px solid var(--border);border-radius:11px;padding:10px 12px;margin-bottom:5px;transition:all .14s;}
+.m-prod-item:hover{background:var(--teal-l);border-color:var(--border2);}
+.m-prod-num{width:22px;height:22px;border-radius:6px;background:var(--teal-m);color:var(--teal-d);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;flex-shrink:0;}
+.m-prod-name{flex:1;font-size:11px;font-weight:600;}
+.m-prod-qty{font-size:10px;color:var(--text2);}
+.m-prod-sub{font-size:11px;font-weight:800;color:var(--teal-d);font-family:'DM Mono',monospace;}
+.m-totals{background:linear-gradient(145deg,#071e22,#0d3540);border-radius:14px;padding:16px 18px;color:#fff;}
+.m-tot-row{display:flex;justify-content:space-between;padding:4px 0;}
+.m-tot-lbl{font-size:10px;color:rgba(255,255,255,.5);}
+.m-tot-val{font-size:11px;font-family:'DM Mono',monospace;color:rgba(255,255,255,.8);}
+.m-tot-sep{border:none;border-top:1px dashed rgba(255,255,255,.12);margin:8px 0;}
+.m-tot-final{display:flex;justify-content:space-between;align-items:center;}
+.m-tot-final-lbl{font-size:12px;font-weight:800;color:#fff;}
+.m-tot-final-val{font-size:26px;font-weight:800;color:var(--teal);font-family:'DM Mono',monospace;}
+
+/* estado changer en modal */
+.estado-btns{display:flex;gap:6px;flex-wrap:wrap;}
+.estado-btn{display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border-radius:9px;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:800;cursor:pointer;border:1.5px solid transparent;transition:all .15s;}
+.estado-btn.active{box-shadow:0 4px 12px rgba(0,0,0,.1);}
+.estado-btn:not(.active){opacity:.5;filter:grayscale(.3);}
+.estado-btn:hover{opacity:1;filter:none;}
+
+/* wa button */
+.wa-btn{display:flex;align-items:center;gap:9px;background:#25D366;color:#fff;border:none;border-radius:11px;padding:10px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer;text-decoration:none;transition:all .16s;width:100%;justify-content:center;}
+.wa-btn:hover{background:#1ec45d;transform:translateY(-1px);}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--white);border:1.5px solid var(--border2);border-radius:13px;padding:13px 15px;display:flex;align-items:center;gap:11px;z-index:999;box-shadow:0 16px 48px rgba(40,185,193,.14);transform:translateY(90px);opacity:0;transition:all .4s cubic-bezier(.34,1.56,.64,1);max-width:300px;}
+.toast.show{transform:translateY(0);opacity:1;}
+.t-ico{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+.t-ico.s{background:var(--green-l);color:var(--green);}
+.t-ico.i{background:var(--teal-m);color:var(--teal);}
+.t-ico.w{background:var(--orange-l);color:var(--orange);}
+.t-ico.e{background:var(--red-l);color:var(--red);}
+.t-title{font-size:12px;font-weight:800;}
+.t-msg{font-size:10px;color:var(--text2);margin-top:1px;}
+
+/* empty */
+.empty-state{text-align:center;padding:48px 20px;color:var(--text3);}
+.empty-state .ico{font-size:38px;margin-bottom:10px;opacity:.3;display:block;}
+.empty-state p{font-size:12px;}
+
+/* spinner */
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{animation:spin .8s linear infinite;display:inline-block;}
+
+/* mobile */
+@media(max-width:900px){
+  .layout{grid-template-columns:1fr;grid-template-rows:auto 1fr;}
+  .panel-left{height:280px;border-right:none;border-bottom:1.5px solid var(--border);}
+  .domis-scroll{flex-direction:row;overflow-x:auto;overflow-y:hidden;padding:10px 12px;}
+  .domi-card{min-width:200px;}
+  .m-body{grid-template-columns:1fr;}
+  .m-left{border-right:none;border-bottom:1.5px solid var(--border);}
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<header class="topbar">
+  <div class="topbar-logo"><span>W</span></div>
+  <div>
+    <div class="topbar-title">Pedidos & Domiciliarios</div>
+    <div class="topbar-sub">Panel de administración — WIL</div>
+  </div>
+  <div class="sync-badge">
+    <div class="sync-dot" id="sync-dot"></div>
+    <span id="sync-lbl">Conectando…</span>
+  </div>
+  <button class="btn-refresh" onclick="doRefresh()" title="Actualizar">
+    <span class="material-symbols-rounded" id="refresh-ico" style="font-size:17px;">refresh</span>
+  </button>
+</header>
+
+<!-- LAYOUT -->
+<div class="layout">
+
+  <!-- ══ PANEL IZQUIERDO: DOMICILIARIOS ══ -->
+  <aside class="panel-left">
+    <div class="domis-header">
+      <div class="domis-title">
+        <span class="material-symbols-rounded ico">delivery_dining</span>
+        Domiciliarios
+      </div>
+      <div class="domis-stats">
+        <div class="dstat">
+          <div class="dstat-val" id="ds-total" style="color:var(--teal);">–</div>
+          <div class="dstat-lbl">Total</div>
+        </div>
+        <div class="dstat">
+          <div class="dstat-val" id="ds-activos" style="color:var(--green);">–</div>
+          <div class="dstat-lbl">Activos</div>
+        </div>
+        <div class="dstat">
+          <div class="dstat-val" id="ds-inactivos" style="color:var(--text3);">–</div>
+          <div class="dstat-lbl">Inactivos</div>
+        </div>
+      </div>
+    </div>
+    <div class="domis-scroll" id="domis-list">
+      <div class="empty-state"><span class="ico">🛵</span><p>Cargando…</p></div>
+    </div>
+  </aside>
+
+  <!-- ══ PANEL DERECHO: PEDIDOS ══ -->
+  <section class="panel-right">
+
+    <!-- Header filtros -->
+    <div class="ped-header">
+      <div class="ped-toprow">
+        <div class="ped-title">
+          <span class="material-symbols-rounded ico">package_2</span>
+          Pedidos
+        </div>
+        <span class="ped-count" id="ped-count">–</span>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <div class="tabs" id="ped-tabs">
+          <div class="tab on" data-f="todos" onclick="setTab(this)">
+            Todos <span class="tab-badge" id="tb-todos">–</span>
+          </div>
+          <div class="tab" data-f="pendiente" onclick="setTab(this)">
+            Pendientes <span class="tab-badge" id="tb-pendiente">–</span>
+          </div>
+          <div class="tab" data-f="asignado" onclick="setTab(this)">
+            Asignados <span class="tab-badge" id="tb-asignado">–</span>
+          </div>
+          <div class="tab" data-f="proceso" onclick="setTab(this)">
+            En proceso <span class="tab-badge" id="tb-proceso">–</span>
+          </div>
+          <div class="tab" data-f="encamino" onclick="setTab(this)">
+            En camino <span class="tab-badge" id="tb-encamino">–</span>
+          </div>
+          <div class="tab" data-f="entregado" onclick="setTab(this)">
+            Entregados <span class="tab-badge" id="tb-entregado">–</span>
+          </div>
+          <div class="tab" data-f="cancelado" onclick="setTab(this)">
+            Cancelados <span class="tab-badge" id="tb-cancelado">–</span>
+          </div>
+        </div>
+        <!-- Filtro domi -->
+        <select id="fil-domi" onchange="renderTable()" style="background:var(--bg);border:1.5px solid var(--border);border-radius:9px;padding:6px 10px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;color:var(--text);outline:none;cursor:pointer;">
+          <option value="">Todos los domis</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Panel asignación -->
+    <div class="asign-panel" id="asign-panel">
+      <div class="asign-top">
+        <div class="asign-ico">
+          <span class="material-symbols-rounded" style="color:var(--teal);font-size:18px;">assignment_ind</span>
+        </div>
+        <div>
+          <div class="asign-ttl">Asignar domiciliario</div>
+          <div class="asign-sub" id="asign-sub">Selecciona un pedido de la tabla</div>
+        </div>
+        <button class="btn-cancelar-asign" onclick="cancelarAsign()" style="margin-left:auto;">Cancelar</button>
+      </div>
+      <div class="asign-row">
+        <select class="asign-select" id="asign-select">
+          <option value="">— Selecciona domiciliario —</option>
+        </select>
+        <button class="btn-asignar" onclick="ejecutarAsignacion()">
+          <span class="material-symbols-rounded" style="font-size:15px;">check_circle</span>
+          Asignar
+        </button>
+      </div>
+      <div class="asign-chips" id="asign-chips"></div>
+    </div>
+
+    <!-- Tabla -->
+    <div class="ped-table-wrap">
+      <div class="ped-table-inner">
+        <table class="ptbl">
+          <thead>
+            <tr>
+              <th>Pedido</th>
+              <th>Cliente</th>
+              <th>Dirección</th>
+              <th>Domiciliario</th>
+              <th>Estado</th>
+              <th>Comercio</th>
+              <th>Método</th>
+              <th>Total</th>
+              <th>Hora</th>
+            </tr>
+          </thead>
+          <tbody id="ped-tbody">
+            <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3);">Cargando pedidos…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- MODAL DETALLE PEDIDO -->
+<div class="modal-overlay" id="modal-ped" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box" id="modal-inner"></div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <div class="t-ico s" id="t-ico"><span class="material-symbols-rounded">check_circle</span></div>
+  <div><div class="t-title" id="t-title">–</div><div class="t-msg" id="t-msg">–</div></div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════
+   CONFIG — ajusta la URL base de tu API
+══════════════════════════════════════════ */
+const API = '';  // '' = mismo dominio, o pon 'https://tudominio.vercel.app'
+
+/* ══════════════════════════════════════════
+   STATE
+══════════════════════════════════════════ */
+let allPedidos   = [];
+let allDomis     = [];
+let pedidoSelId  = null;
+let tabActual    = 'todos';
+
+/* ══════════════════════════════════════════
+   UTILS
+══════════════════════════════════════════ */
+function fmtMoney(v) {
+  const n = parseFloat(String(v || 0).replace(/[^0-9.]/g, '')) || 0;
+  return n ? '$\u2009' + n.toLocaleString('es-CO', {minimumFractionDigits:0}) : '—';
+}
+
+function normEstado(s) {
+  const v = (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if (v.includes('entregad'))  return 'entregado';
+  if (v.includes('cancelad'))  return 'cancelado';
+  if (v.includes('asignad'))   return 'asignado';
+  if (v.includes('camino'))    return 'encamino';
+  if (v.includes('proceso') || v.includes('ruta')) return 'proceso';
+  return 'pendiente';
+}
+
+function estadoLabel(e) {
+  return {pendiente:'Pendiente',asignado:'Asignado ✦',proceso:'En proceso',
+          encamino:'🛵 En camino',entregado:'Entregado ✓',cancelado:'❌ Cancelado'}[e] || e;
+}
+
+function setSyncState(state, msg) {
+  const dot = document.getElementById('sync-dot');
+  const lbl = document.getElementById('sync-lbl');
+  dot.className = 'sync-dot ' + state;
+  lbl.textContent = msg;
+}
+
+function showToast(type, title, msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('t-title').textContent = title;
+  document.getElementById('t-msg').textContent   = msg || '';
+  document.getElementById('t-ico').className = 't-ico ' + type;
+  const icons = {s:'check_circle',i:'info',w:'warning',e:'error'};
+  document.getElementById('t-ico').innerHTML = `<span class="material-symbols-rounded">${icons[type]||'info'}</span>`;
+  t.classList.add('show');
+  clearTimeout(t._to);
+  t._to = setTimeout(() => t.classList.remove('show'), 4000);
+}
+
+function domiAvatar(domi, size=44, radius=13) {
+  if (domi?.foto) {
+    return `<img src="${domi.foto}" style="width:${size}px;height:${size}px;border-radius:${radius}px;object-fit:cover;object-position:center 20%;" onerror="this.outerHTML='<div class=domi-avatar-ph style=width:${size}px;height:${size}px;border-radius:${radius}px>${(domi.nombre||'?').charAt(0)}</div>'">`;
+  }
+  return `<div class="domi-avatar-ph" style="width:${size}px;height:${size}px;border-radius:${radius}px;">${(domi?.nombre||'?').charAt(0)}</div>`;
+}
+
+/* ══════════════════════════════════════════
+   API CALLS
+══════════════════════════════════════════ */
+async function fetchDomis() {
+  const r = await fetch(`${API}/api/pedidos?recurso=domiciliarios`);
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || 'Error al cargar domis');
+  return j.data;
+}
+
+async function fetchPedidos(estado, domiNombre) {
+  let url = `${API}/api/pedidos?recurso=pedidos&limit=300`;
+  if (estado && estado !== 'todos') url += `&estado=${estado}`;
+  if (domiNombre) url += `&domi=${encodeURIComponent(domiNombre)}`;
+  const r = await fetch(url);
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || 'Error al cargar pedidos');
+  return j.data;
+}
+
+async function apiAsignar(pedidoId, domiciliarioId, domiciliarioNombre) {
+  const r = await fetch(`${API}/api/pedidos?recurso=asignar`, {
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ pedidoId, domiciliarioId, domiciliarioNombre })
+  });
+  return r.json();
+}
+
+async function apiCambiarEstado(pedidoId, estado) {
+  const r = await fetch(`${API}/api/pedidos?recurso=estado`, {
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ pedidoId, estado })
+  });
+  return r.json();
+}
+
+/* ══════════════════════════════════════════
+   RENDER DOMICILIARIOS
+══════════════════════════════════════════ */
+function renderDomis() {
+  const activos   = allDomis.filter(d => d.activo).length;
+  const inactivos = allDomis.length - activos;
+  document.getElementById('ds-total').textContent    = allDomis.length;
+  document.getElementById('ds-activos').textContent  = activos;
+  document.getElementById('ds-inactivos').textContent= inactivos;
+
+  // Poblar filtro
+  const fil = document.getElementById('fil-domi');
+  const prev = fil.value;
+  fil.innerHTML = '<option value="">Todos los domis</option>' +
+    allDomis.map(d => `<option value="${d.nombre}">${d.activo?'●':'○'} ${d.nombre}</option>`).join('');
+  if (prev) fil.value = prev;
+
+  // Poblar select asignación
+  const sel = document.getElementById('asign-select');
+  sel.innerHTML = '<option value="">— Selecciona domiciliario —</option>' +
+    allDomis.map(d => {
+      const enRuta = allPedidos.filter(p => p.domiciliarioNombre === d.nombre && ['proceso','encamino'].includes(normEstado(p.estado))).length;
+      return `<option value="${d._id}" data-nombre="${d.nombre}" data-enruta="${enRuta}">
+        ${d.activo?'🟢':'⚫'} ${d.nombre}${enRuta?' ('+enRuta+' en ruta)':''}
+      </option>`;
+    }).join('');
+
+  // Cards
+  const list = document.getElementById('domis-list');
+  if (!allDomis.length) {
+    list.innerHTML = `<div class="empty-state"><span class="ico">🛵</span><p>Sin domiciliarios</p></div>`;
+    return;
+  }
+
+  list.innerHTML = allDomis.map(d => {
+    const entregados = allPedidos.filter(p => p.domiciliarioNombre === d.nombre && normEstado(p.estado) === 'entregado').length;
+    const enRuta     = allPedidos.filter(p => p.domiciliarioNombre === d.nombre && ['proceso','encamino'].includes(normEstado(p.estado))).length;
+    const pendientes = allPedidos.filter(p => p.domiciliarioNombre === d.nombre && normEstado(p.estado) === 'pendiente').length;
+    const sc = d.activo ? 'activo' : 'inactivo';
+    return `
+    <div class="domi-card ${sc}" onclick="filtrarPorDomi('${d.nombre}')" id="dc-${d._id}">
+      <div class="domi-avatar">
+        ${domiAvatar(d)}
+        <div class="domi-status-dot ${d.activo?'online':'offline'}"></div>
+      </div>
+      <div class="domi-info">
+        <div class="domi-name">${d.nombre}</div>
+        <div class="domi-id">${d.idWil || d._id?.toString().slice(-6)}</div>
+        <div class="domi-tel"><span class="material-symbols-rounded" style="font-size:11px;">call</span>${d.tel||'–'}</div>
+        <div class="domi-counts">
+          ${entregados ? `<span class="domi-chip chip-g">✓ ${entregados} entregados</span>` : ''}
+          ${enRuta     ? `<span class="domi-chip chip-b">🛵 ${enRuta} en ruta</span>` : ''}
+          ${pendientes ? `<span class="domi-chip chip-o">⏳ ${pendientes} pend.</span>` : ''}
+          ${!entregados && !enRuta && !pendientes ? `<span class="domi-chip chip-g">Libre</span>` : ''}
+        </div>
+      </div>
+      <div class="domi-right">
+        <div class="domi-pedidos-n">${entregados+enRuta+pendientes}</div>
+        <div class="domi-pedidos-lbl" style="font-size:8px;color:var(--text3);font-weight:700;">pedidos</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Chips asignación
+  renderChips();
+}
+
+function renderChips() {
+  const chips = document.getElementById('asign-chips');
+  chips.innerHTML = allDomis.map(d => {
+    const enRuta = allPedidos.filter(p => p.domiciliarioNombre === d.nombre && ['proceso','encamino'].includes(normEstado(p.estado))).length;
+    const libre  = d.activo && enRuta === 0;
+    const bg  = libre ? 'rgba(22,163,74,.15)' : 'rgba(217,119,6,.12)';
+    const bc  = libre ? 'rgba(22,163,74,.3)'  : 'rgba(217,119,6,.25)';
+    const lbl = libre ? 'Libre' : enRuta + ' en ruta';
+    const lc  = libre ? '#4ade80' : '#fcd34d';
+    return `
+    <div class="asign-chip" onclick="selChip('${d._id}','${d.nombre}')" style="background:${bg};border-color:${bc};">
+      ${domiAvatar(d, 22, 6)}
+      <span class="asign-chip-name">${d.nombre.split(' ')[0]}</span>
+      <span class="asign-chip-badge" style="background:rgba(255,255,255,.1);color:${lc};">${lbl}</span>
+    </div>`;
+  }).join('');
+}
+
+function filtrarPorDomi(nombre) {
+  const fil = document.getElementById('fil-domi');
+  if (fil.value === nombre) {
+    fil.value = '';
+    document.querySelectorAll('.domi-card').forEach(c => c.classList.remove('selected'));
+  } else {
+    fil.value = nombre;
+    document.querySelectorAll('.domi-card').forEach(c => c.classList.remove('selected'));
+    const idx = allDomis.findIndex(d => d.nombre === nombre);
+    if (idx >= 0) document.getElementById('dc-' + allDomis[idx]._id)?.classList.add('selected');
+  }
+  renderTable();
+}
+
+/* ══════════════════════════════════════════
+   RENDER TABLA PEDIDOS
+══════════════════════════════════════════ */
+function renderTable() {
+  const domiF = (document.getElementById('fil-domi')?.value || '').trim();
+  let list = allPedidos.filter(p => {
+    const est = normEstado(p.estado);
+    if (tabActual !== 'todos' && est !== tabActual) return false;
+    if (domiF && (p.domiciliarioNombre || '') !== domiF) return false;
+    return true;
+  });
+
+  // badges tabs
+  const counts = {};
+  ['todos','pendiente','asignado','proceso','encamino','entregado','cancelado'].forEach(k => {
+    counts[k] = k === 'todos' ? allPedidos.length : allPedidos.filter(p => normEstado(p.estado) === k).length;
+    const el = document.getElementById('tb-' + k);
+    if (el) el.textContent = counts[k];
+  });
+  document.getElementById('ped-count').textContent = `${list.length} pedido${list.length!==1?'s':''}`;
+
+  const tbody = document.getElementById('ped-tbody');
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><span class="ico">📦</span><p>${allPedidos.length ? 'Sin resultados con este filtro' : 'Sin pedidos en la base de datos'}</p></div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = list.map(p => {
+    const est     = normEstado(p.estado);
+    const subtotal = (p.items||[]).reduce((s,i)=>s+(i.precioUnit||0)*(i.cantidad||1),0);
+    const total    = parseFloat(p.total||0) || subtotal;
+    const domi     = allDomis.find(d => d.nombre === p.domiciliarioNombre);
+    const sinDomi  = !p.domiciliarioNombre;
+
+    return `
+    <tr class="${est}-row" onclick="abrirModal('${p.idPedido||p._id}')">
+      <td>${p.idPedido || p._id?.toString().slice(-5)}</td>
+      <td>
+        <div style="font-weight:800;font-size:12px;">${p.nombre||'–'}</div>
+        <div style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;">${p.telefono||''}</div>
+      </td>
+      <td style="max-width:130px;color:var(--text2);">${(p.direccion||'–').substring(0,30)}${(p.direccion||'').length>30?'…':''}</td>
+      <td>
+        ${sinDomi
+          ? `<button class="btn-asign-row" onclick="event.stopPropagation();abrirAsign('${p.idPedido||p._id}','${(p.nombre||'').replace(/'/g,"\\'")}')">
+               <span class="material-symbols-rounded" style="font-size:12px;">person_add</span>Asignar
+             </button>`
+          : `<div class="domi-mini">
+               ${domi ? domiAvatar(domi,26,8) : `<div class="domi-mini-ph">${(p.domiciliarioNombre||'?').charAt(0)}</div>`}
+               <span class="domi-mini-name">${p.domiciliarioNombre}</span>
+             </div>`
+        }
+      </td>
+      <td><span class="stag ${est}">${estadoLabel(est)}</span></td>
+      <td style="font-size:10px;color:var(--text2);">${p.comercio||'–'}</td>
+      <td style="font-size:10px;color:var(--text2);">${p.metodoPago||'–'}</td>
+      <td style="font-family:'DM Mono',monospace;font-weight:800;color:var(--teal-d);">${fmtMoney(total)}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);">${p.hora||'–'}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ══════════════════════════════════════════
+   TABS
+══════════════════════════════════════════ */
+function setTab(el) {
+  document.querySelectorAll('#ped-tabs .tab').forEach(t => t.classList.remove('on'));
+  el.classList.add('on');
+  tabActual = el.dataset.f;
+  renderTable();
+}
+
+/* ══════════════════════════════════════════
+   ASIGNACIÓN
+══════════════════════════════════════════ */
+function abrirAsign(pedidoId, clienteNombre) {
+  pedidoSelId = pedidoId;
+  document.getElementById('asign-sub').textContent = `Pedido ${pedidoId} — ${clienteNombre}`;
+  document.getElementById('asign-panel').classList.add('show');
+  renderChips();
+  document.getElementById('asign-panel').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function cancelarAsign() {
+  pedidoSelId = null;
+  document.getElementById('asign-panel').classList.remove('show');
+  document.getElementById('asign-select').value = '';
+}
+
+function selChip(domiId, domiNombre) {
+  const sel = document.getElementById('asign-select');
+  // buscar por data-nombre
+  for (const opt of sel.options) {
+    if (opt.dataset.nombre === domiNombre) { sel.value = opt.value; break; }
+  }
+}
+
+async function ejecutarAsignacion() {
+  if (!pedidoSelId) { showToast('w','Sin pedido','Selecciona un pedido primero'); return; }
+  const sel    = document.getElementById('asign-select');
+  const domiId = sel.value;
+  const domiNombre = sel.options[sel.selectedIndex]?.dataset?.nombre || '';
+  if (!domiId) { showToast('w','Sin domiciliario','Selecciona un domiciliario'); return; }
+
+  const btn = document.querySelector('.btn-asignar');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-symbols-rounded spin" style="font-size:15px;">progress_activity</span> Asignando…';
+
+  try {
+    const json = await apiAsignar(pedidoSelId, domiId, domiNombre);
+    if (json.ok !== false) {
+      // actualizar en memoria
+      const p = allPedidos.find(x => (x.idPedido||x._id?.toString()) === pedidoSelId);
+      if (p) { p.domiciliarioNombre = domiNombre; p.domiciliarioId = domiId; p.estado = 'Asignado'; }
+      showToast('s','✓ Asignado',`${domiNombre} → Pedido ${pedidoSelId}`);
+      cancelarAsign();
+      renderDomis();
+      renderTable();
+    } else {
+      showToast('e','Error al asignar', json.error || '');
+    }
+  } catch(e) {
+    showToast('e','Error de red', e.message.substring(0,60));
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;">check_circle</span> Asignar';
+  }
+}
+
+/* ══════════════════════════════════════════
+   MODAL DETALLE
+══════════════════════════════════════════ */
+function abrirModal(pedidoId) {
+  const p = allPedidos.find(x => (x.idPedido||x._id?.toString()) === pedidoId);
+  if (!p) return;
+
+  const est      = normEstado(p.estado);
+  const domi     = allDomis.find(d => d.nombre === p.domiciliarioNombre);
+  const items    = p.items || [];
+  const subtotal = items.reduce((s,i)=>s+(i.precioUnit||0)*(i.cantidad||1),0);
+  const envio    = parseFloat(p.domicilio||0);
+  const total    = parseFloat(p.total||0) || (subtotal+envio);
+
+  const stColors = {
+    pendiente: {c:'#d97706',b:'rgba(217,119,6,.3)',bg:'rgba(254,243,199,.2)'},
+    asignado:  {c:'#fff',   b:'rgba(124,58,237,.5)',bg:'rgba(124,58,237,.2)'},
+    proceso:   {c:'#93c5fd',b:'rgba(37,99,235,.4)',bg:'rgba(37,99,235,.15)'},
+    encamino:  {c:'#c4b5fd',b:'rgba(124,58,237,.4)',bg:'rgba(124,58,237,.15)'},
+    entregado: {c:'#4ade80',b:'rgba(22,163,74,.4)', bg:'rgba(22,163,74,.15)'},
+    cancelado: {c:'#fca5a5',b:'rgba(220,38,38,.4)', bg:'rgba(220,38,38,.15)'},
+  };
+  const sc = stColors[est] || stColors.pendiente;
+  const telWA = ((p.telefono||'').replace(/\D/g,'').startsWith('57')?'':'57')+(p.telefono||'').replace(/\D/g,'');
+
+  const ESTADOS = ['pendiente','asignado','proceso','encamino','entregado','cancelado'];
+  const estadoBtns = ESTADOS.map(e => {
+    const clrs = {pendiente:['#fef3c7','#d97706'],asignado:['#ede9fe','#7c3aed'],proceso:['#dbeafe','#2563eb'],
+                  encamino:['#ede9fe','#7c3aed'],entregado:['#dcfce7','#16a34a'],cancelado:['#fee2e2','#dc2626']};
+    const [bg,clr] = clrs[e]||['#f1f5f9','#334155'];
+    return `<button class="estado-btn ${e===est?'active':''}"
+      onclick="cambiarEstadoModal('${pedidoId}','${e}',this)"
+      style="background:${bg};color:${clr};border-color:${clr}50;">
+      ${estadoLabel(e)}
+    </button>`;
+  }).join('');
+
+  document.getElementById('modal-inner').innerHTML = `
+    <div class="m-hero">
+      <div class="m-topbar">
+        <div class="m-brand">Domicilios WIL — Pedido</div>
+        <button class="m-close" onclick="closeModal()"><span class="material-symbols-rounded" style="font-size:17px;">close</span></button>
+      </div>
+      <div class="m-status" style="color:${sc.c};border-color:${sc.b};background:${sc.bg};">
+        <span style="width:7px;height:7px;border-radius:50%;background:${sc.c};flex-shrink:0;display:inline-block;"></span>
+        ${estadoLabel(est)}
+      </div>
+      <div class="m-pedid">PEDIDO # ${p.idPedido||p._id?.toString().slice(-6)}</div>
+      <div class="m-client">${p.nombre||'Cliente'}</div>
+      <div class="m-meta">
+        ${p.fecha?`<span class="m-meta-item"><span class="material-symbols-rounded">calendar_today</span>${p.fecha}</span>`:''}
+        ${p.hora ?`<span class="m-meta-item"><span class="material-symbols-rounded">schedule</span>${p.hora}</span>`:''}
+        ${p.metodoPago?`<span class="m-meta-item"><span class="material-symbols-rounded">payments</span>${p.metodoPago}</span>`:''}
+        ${p.modoEntrega?`<span class="m-meta-item"><span class="material-symbols-rounded">local_shipping</span>${p.modoEntrega}</span>`:''}
+      </div>
+    </div>
+
+    <div class="m-body">
+      <!-- LEFT -->
+      <div class="m-left">
+        <!-- Partes -->
+        <div>
+          <div class="m-sec-lbl">Partes del pedido</div>
+          <div class="m-infocard">
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+              <div style="width:34px;height:34px;border-radius:10px;background:var(--teal-m);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span class="material-symbols-rounded" style="color:var(--teal-d);font-size:17px;">person</span></div>
+              <div style="flex:1;">
+                <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;">Cliente</div>
+                <div style="font-size:13px;font-weight:800;margin-top:1px;">${p.nombre||'–'}</div>
+                ${p.telefono?`<div style="font-size:10px;color:var(--text3);margin-top:2px;">📞 ${p.telefono}</div>`:''}
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 0;">
+              <div style="width:34px;height:34px;border-radius:10px;background:${p.domiciliarioNombre?'var(--green-l)':'var(--orange-l)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;">
+                ${domi?.foto
+                  ? `<img src="${domi.foto}" style="width:34px;height:34px;object-fit:cover;" onerror="this.outerHTML='<span class=material-symbols-rounded style=color:var(--orange);font-size:17px>delivery_dining</span>'">`
+                  : `<span class="material-symbols-rounded" style="color:${p.domiciliarioNombre?'var(--green)':'var(--orange)'};font-size:17px;">delivery_dining</span>`
+                }
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;">Domiciliario</div>
+                <div style="font-size:13px;font-weight:800;margin-top:1px;color:${p.domiciliarioNombre?'var(--text)':'var(--orange)'};">${p.domiciliarioNombre||'Sin asignar'}</div>
+                ${domi?.tel?`<div style="font-size:10px;color:var(--text3);margin-top:2px;">📞 ${domi.tel}</div>`:''}
+              </div>
+              ${!p.domiciliarioNombre?`<button class="btn-asign-row" onclick="closeModal();abrirAsign('${pedidoId}','${(p.nombre||'').replace(/'/g,"\\'")}')">Asignar</button>`:''}
+            </div>
+          </div>
+        </div>
+
+        <!-- Dirección -->
+        <div class="m-addr">
+          <div class="m-addr-pin"><span class="material-symbols-rounded" style="font-size:17px;">location_on</span></div>
+          <div>
+            <div style="font-size:9px;font-weight:800;color:var(--teal-d);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;">Dirección de entrega</div>
+            <div class="m-addr-val">${p.direccion||'No especificada'}</div>
+            ${p.zona?`<div style="font-size:10px;color:var(--text3);margin-top:3px;">📍 Zona: ${p.zona}</div>`:''}
+          </div>
+        </div>
+
+        <!-- Cambiar estado -->
+        <div>
+          <div class="m-sec-lbl">Cambiar estado</div>
+          <div class="estado-btns" id="modal-estado-btns">${estadoBtns}</div>
+        </div>
+
+        <!-- WhatsApp -->
+        ${p.telefono?`
+        <a href="https://wa.me/${telWA}?text=${encodeURIComponent('Hola '+p.nombre+'! Tu pedido #'+p.idPedido+' está en proceso. 🛵')}" target="_blank" class="wa-btn">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.975-1.407A9.96 9.96 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a7.96 7.96 0 01-4.093-1.128l-.293-.174-3.032.857.843-3.07-.19-.312A7.96 7.96 0 014 12c0-4.418 3.582-8 8-8s8 3.582 8 8-3.582 8-8 8z"/></svg>
+          Contactar por WhatsApp
+        </a>`:''}
+      </div>
+
+      <!-- RIGHT -->
+      <div class="m-right">
+        <!-- Productos -->
+        <div>
+          <div class="m-sec-lbl">Productos del pedido</div>
+          ${items.length
+            ? items.map((it,i) => `
+              <div class="m-prod-item">
+                <div class="m-prod-num">${i+1}</div>
+                <div class="m-prod-name">${it.producto||'Producto'}<br><span style="font-size:9px;color:var(--text3);">${it.laboratorio||''}</span></div>
+                <div class="m-prod-qty">× ${it.cantidad||1}</div>
+                <div class="m-prod-sub">${fmtMoney((it.precioUnit||0)*(it.cantidad||1))}</div>
+              </div>`)
+              .join('')
+            : `<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px;">Sin detalle de productos</div>`
+          }
+        </div>
+
+        <!-- Totales -->
+        <div class="m-totals">
+          ${subtotal>0?`<div class="m-tot-row"><span class="m-tot-lbl">Subtotal productos</span><span class="m-tot-val">${fmtMoney(subtotal)}</span></div>`:''}
+          <div class="m-tot-row">
+            <span class="m-tot-lbl">🛵 Domicilio</span>
+            <span class="m-tot-val" style="color:${envio>0?'#fcd34d':'#4ade80'};">${envio>0?fmtMoney(envio):'Gratis 🎉'}</span>
+          </div>
+          <hr class="m-tot-sep">
+          <div class="m-tot-final">
+            <span class="m-tot-final-lbl">TOTAL</span>
+            <span class="m-tot-final-val">${fmtMoney(total)}</span>
+          </div>
+        </div>
+
+        <!-- Info adicional -->
+        <div class="m-infocard">
+          <div style="font-size:9px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;">Detalles</div>
+          ${p.comercio?`<div class="m-row"><span class="m-rlbl">Comercio</span><span class="m-rval">${p.comercio}</span></div>`:''}
+          ${p.metodoPago?`<div class="m-row"><span class="m-rlbl">Método pago</span><span class="m-rval">${p.metodoPago}</span></div>`:''}
+          ${p.modoEntrega?`<div class="m-row"><span class="m-rlbl">Modo entrega</span><span class="m-rval">${p.modoEntrega}</span></div>`:''}
+          ${p.sede?`<div class="m-row"><span class="m-rlbl">Sede</span><span class="m-rval">${p.sede}</span></div>`:''}
+          <div class="m-row"><span class="m-rlbl">Fecha</span><span class="m-rval">${p.fecha||'–'} ${p.hora||''}</span></div>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('modal-ped').classList.add('show');
+}
+
+async function cambiarEstadoModal(pedidoId, nuevoEstado, btnEl) {
+  const json = await apiCambiarEstado(pedidoId, nuevoEstado);
+  if (json.ok !== false) {
+    const p = allPedidos.find(x => (x.idPedido||x._id?.toString()) === pedidoId);
+    if (p) p.estado = nuevoEstado;
+    // actualizar botones activos
+    document.querySelectorAll('#modal-estado-btns .estado-btn').forEach(b => b.classList.remove('active'));
+    btnEl.classList.add('active');
+    showToast('s','Estado actualizado', estadoLabel(nuevoEstado));
+    renderTable();
+    renderDomis();
+  } else {
+    showToast('e','Error', json.error||'');
+  }
+}
+
+function closeModal() {
+  document.getElementById('modal-ped').classList.remove('show');
+}
+
+/* ══════════════════════════════════════════
+   REFRESH
+══════════════════════════════════════════ */
+async function doRefresh() {
+  setSyncState('syncing','Sincronizando…');
+  const ico = document.getElementById('refresh-ico');
+  ico.classList.add('spin');
+  try {
+    [allDomis, allPedidos] = await Promise.all([fetchDomis(), fetchPedidos()]);
+    renderDomis();
+    renderTable();
+    const hora = new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+    setSyncState('ok', hora);
+  } catch(e) {
+    setSyncState('err','Error');
+    showToast('e','Error de carga', e.message.substring(0,60));
+    console.error(e);
+  } finally {
+    ico.classList.remove('spin');
+  }
+}
+
+/* ══════════════════════════════════════════
+   BOOT
+══════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  doRefresh();
+  setInterval(doRefresh, 60000);
+});
+</script>
+</body>
+</html>
