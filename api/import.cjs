@@ -1,5 +1,5 @@
-const { google } = require('googleapis');
-const mongoose = require('mongoose');
+import { google } from 'googleapis';
+import mongoose from 'mongoose';
 
 let isConnected = false;
 async function dbConnect() {
@@ -52,7 +52,6 @@ const CierreCaja = mongoose.models.CierreCaja || mongoose.model('CierreCaja',
 );
 
 async function handleContable(req, res) {
-  // CAMBIO 1: try/catch para el dbConnect
   try {
     await dbConnect();
   } catch (e) {
@@ -62,9 +61,7 @@ async function handleContable(req, res) {
 
   const { recurso, id } = req.query;
 
-  // CAMBIO 2: try/catch global para todas las operaciones de Mongoose
   try {
-
     /* ── BASES ── */
     if (recurso === 'bases') {
       if (req.method === 'GET') {
@@ -158,13 +155,12 @@ async function handleContable(req, res) {
     return res.status(400).json({ ok: false, error: `Recurso no válido: "${recurso}". Usa: bases | multas | cierres` });
 
   } catch (e) {
-    // CAMBIO 2: ahora devuelve JSON con el error real en vez de texto plano
     console.error('[handleContable] error:', e.message);
     return res.status(500).json({ ok: false, error: e.message });
   }
 }
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
@@ -218,4 +214,4 @@ module.exports = async (req, res) => {
     console.error('import API error:', e.message);
     res.status(500).json({ error: e.message });
   }
-};
+}
