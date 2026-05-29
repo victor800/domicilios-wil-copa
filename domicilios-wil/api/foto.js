@@ -2,7 +2,7 @@ import { dbConnect } from '../lib/db.js';
 import mongoose from 'mongoose';
 
 /* ══════════════════════════════════════════════════════════════
-   MODELOS — patrón defensivo (serverless safe)
+   MODELOS
 ══════════════════════════════════════════════════════════════ */
 
 /* ── Item (sub-documento) ── */
@@ -11,7 +11,7 @@ const ItemSchema = new mongoose.Schema({
   cantidad: Number, precioUnit: Number, subtotal: Number,
 }, { _id: false });
 
-/* ── Pedido ── */
+/* ── Pedido ── colección: pedidos ── */
 const Pedido = mongoose.models.Pedido || mongoose.model('Pedido',
   new mongoose.Schema({
     creadoEn:           { type: Date, default: Date.now },
@@ -39,7 +39,7 @@ const Pedido = mongoose.models.Pedido || mongoose.model('Pedido',
   }), 'pedidos'
 );
 
-/* ── Domiciliario ← colección real: 'Domiciliarios' ── */
+/* ── Domiciliario ── colección: Domiciliarios (D mayúscula) ── */
 const Domiciliario = mongoose.models.Domiciliario || mongoose.model('Domiciliario',
   new mongoose.Schema({
     idWil:        { type: String, uppercase: true, trim: true },
@@ -52,7 +52,19 @@ const Domiciliario = mongoose.models.Domiciliario || mongoose.model('Domiciliari
     activo:       { type: Boolean, default: true },
     ultimoAcceso: Date,
   }, { timestamps: true }),
-  'Domiciliarios'   // ← nombre exacto de la colección en MongoDB
+  'Domiciliarios'
+);
+
+/* ── Foto ── colección: Fotos ── */
+// El _id de la foto parece ser el mismo _id del domiciliario
+// también guardamos idWil por si acaso
+const Foto = mongoose.models.Foto || mongoose.model('Foto',
+  new mongoose.Schema({
+    data: mongoose.Schema.Types.Mixed,  // Binary / base64
+    mime: String,
+    ts:   Date,
+  }),
+  'Fotos'
 );
 
 /* ══ CORS ══ */
@@ -80,11 +92,6 @@ export default async function handler(req, res) {
 
   /* ════════════════════════════════════════
      GET /api/foto?recurso=pedidos
-     Params opcionales:
-       estado = pendiente|asignado|proceso|encamino|entregado|cancelado|todos
-       domi   = <nombre parcial>
-       tipo   = domicilio|recogida
-       limit  = número (default 300)
   ════════════════════════════════════════ */
   if (recurso === 'pedidos' && req.method === 'GET') {
     try {
@@ -113,8 +120,11 @@ export default async function handler(req, res) {
 
   /* ════════════════════════════════════════
      GET /api/foto?recurso=domiciliarios
-     Colección: Domiciliarios
-     Param opcional: activo=false → trae todos
+     Trae los domiciliarios de la colección
+     Domiciliarios e intenta adjuntar la foto
+     de la colección Fotos buscando por _id
+     del domiciliario.
+     Param opcional: activo=false → todos
   ════════════════════════════════════════ */
   if (recurso === 'domiciliarios' && req.method === 'GET') {
     try {
@@ -128,20 +138,76 @@ export default async function handler(req, res) {
         .sort({ nombre: 1 })
         .lean();
 
-      const data = domis.map(d => ({
-        _id:          String(d._id),
-        idWil:        d.idWil        || '',
-        nombre:       d.nombre       || '',
-        tel:          d.tel          || '',
-        activo:       !!d.activo,
-        foto:         d.foto         || '',
-        zona:         d.zona         || '',
-        ultimoAcceso: d.ultimoAcceso || null,
+      // Para cada domi, intentar buscar su foto en colección Fotos
+      // El _id de la foto coincide con el _id del domiciliario
+      const data = await Promise.all(domis.map(async d => {
+        let fotoUrl = d.foto || '';
+
+        // Si no tiene foto en el campo directo, buscar en colección Fotos
+        if (!fotoUrl) {
+          try {
+            const fotoDoc = await Foto.findById(d._id).lean();
+            if (fotoDoc?.data) {
+              // data viene como Buffer o como objeto con base64
+              const b64 = fotoDoc.data?.buffer
+                ? Buffer.from(fotoDoc.data.buffer).toString('base64')
+                : (typeof fotoDoc.data === 'string'
+                    ? fotoDoc.data
+                    : Buffer.from(Object.values(fotoDoc.data)).toString('base64'));
+              fotoUrl = `data:${fotoDoc.mime || 'image/jpeg'};base64,${b64}`;
+            }
+          } catch (_) {
+            // sin foto, no pasa nada
+          }
+        }
+
+        return {
+          _id:          String(d._id),
+          idWil:        d.idWil        || '',
+          nombre:       d.nombre       || '',
+          tel:          d.tel          || '',
+          activo:       !!d.activo,
+          foto:         fotoUrl,
+          zona:         d.zona         || '',
+          ultimoAcceso: d.ultimoAcceso || null,
+        };
       }));
 
       return res.status(200).json({ ok: true, data });
     } catch (e) {
       console.error('[GET domiciliarios]', e.message);
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
+  /* ════════════════════════════════════════
+     GET /api/foto?recurso=foto&id=<_id>
+     Sirve la foto de un domiciliario como
+     imagen directa (para usar en <img src>)
+  ════════════════════════════════════════ */
+  if (recurso === 'foto' && req.method === 'GET') {
+    try {
+      const { id } = req.query;
+      if (!id) return res.status(400).json({ ok: false, error: 'Falta id' });
+
+      const fotoDoc = await Foto.findById(id).lean();
+      if (!fotoDoc) return res.status(404).json({ ok: false, error: 'Foto no encontrada' });
+
+      const mime = fotoDoc.mime || 'image/jpeg';
+      let buf;
+      if (Buffer.isBuffer(fotoDoc.data)) {
+        buf = fotoDoc.data;
+      } else if (fotoDoc.data?.buffer) {
+        buf = Buffer.from(fotoDoc.data.buffer);
+      } else {
+        buf = Buffer.from(Object.values(fotoDoc.data));
+      }
+
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.status(200).send(buf);
+    } catch (e) {
+      console.error('[GET foto]', e.message);
       return res.status(500).json({ ok: false, error: e.message });
     }
   }
@@ -209,6 +275,6 @@ export default async function handler(req, res) {
   ════════════════════════════════════════ */
   return res.status(400).json({
     ok: false,
-    error: `Recurso no válido: "${recurso}". Usa: pedidos | domiciliarios | asignar | estado`,
+    error: `Recurso no válido: "${recurso}". Usa: pedidos | domiciliarios | asignar | estado | foto`,
   });
 }
