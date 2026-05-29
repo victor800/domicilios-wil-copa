@@ -1852,7 +1852,12 @@ function calcResumen(){
     {c:'var(--teal)',val:fmtMoney(totalT),lbl:'Total caja'},
   ].map(k=>`<div class="cs-item"><div class="cs-val" style="color:${k.c};">${k.val}</div><div class="cs-lbl">${k.lbl}</div></div>`).join('');
   const efInput=document.getElementById('c-efectivo');if(efInput&&!efInput.value)efInput.value=String(Math.round(totalEf));
-  const basesTotal=basesData.reduce((s,b)=>s+b.monto,0);const bInput=document.getElementById('c-bases');if(bInput&&!bInput.value)bInput.value=String(Math.round(basesTotal));
+  const fechaCierre = document.getElementById('c-fecha')?.value || new Date().toISOString().slice(0,10);
+const basesTotal = basesData
+  .filter(b => (b.fecha || '').trim() === fechaCierre)
+  .reduce((s,b) => s+b.monto, 0);
+const bInput = document.getElementById('c-bases');
+if(bInput && !bInput.value) bInput.value = String(Math.round(basesTotal));
   calcDif();return{ent,totalEf,totalTf,totalT};
 }
 
