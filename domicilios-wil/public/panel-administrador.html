@@ -3194,15 +3194,27 @@ function renderFarmacias() {
 }
 
 function updateBadges() {
-  document.getElementById('nb-dri').textContent = allDrivers.filter(d=>d.activo).length || '0';
-  document.getElementById('nb-ped').textContent = allPedidos.filter(p=>p.estado==='pendiente'||p.estado==='proceso').length || '0';
-  document.getElementById('nb-prod').textContent = productos.filter(p=>p.estado==='activo').length||'0';
-    const contBadge = document.getElementById('nb-cont');
+  document.getElementById('nb-dri').textContent = allDrivers.filter(d => d.activo).length || '0';
+  
+  // Todos los pedidos que NO están entregados ni cancelados
+  const pedActivos = allPedidos.filter(p => {
+    const e = (p.estado || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return !e.includes('entregad') && !e.includes('cancelad');
+  });
+  document.getElementById('nb-ped').textContent = pedActivos.length || '0';
+
+  document.getElementById('nb-prod').textContent = productos.filter(p => p.estado === 'activo').length || '0';
+
+  const contBadge = document.getElementById('nb-cont');
   if (contBadge) {
-    const pendSinAsig = allPedidos.filter(p => p.estado === 'pendiente' && (!p.domi || !p.domi.trim())).length;
-    contBadge.textContent = pendSinAsig || '0';
+    const pendSinAsig = allPedidos.filter(p => {
+      const e = (p.estado || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return e.includes('pendiente') && (!p.domi || !p.domi.trim());
+    });
+    contBadge.textContent = pendSinAsig.length || '0';
+  }
 }
-}
+
 
 /* ════ OFERTAS RENDER ════ */
 function renderOfertas() {
