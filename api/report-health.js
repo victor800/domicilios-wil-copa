@@ -54,7 +54,7 @@ function statusEmoji(pct) {
   return '🟢';
 }
 
-// ── Colecciones (ajusta los nombres a los tuyos) ────────────
+
 const COLS = {
   pedidos:       'pedidos',
   domiciliarios: 'Domiciliarios',
