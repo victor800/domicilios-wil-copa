@@ -58,8 +58,8 @@ function statusEmoji(pct) {
 const COLS = {
   pedidos:       'pedidos',
   domiciliarios: 'Domiciliarios',
-  logs:          'logs',          // si tienes logs de acceso
-  instalar:      'instalar_logs', // descargas APK
+  logs:          'logs',          
+  instalar:      'instalar_logs', 
 };
 
 // ── HANDLER PRINCIPAL ───────────────────────────────────────
