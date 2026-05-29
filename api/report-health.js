@@ -67,6 +67,7 @@ export default async function handler(req, res) {
     const hace24h = new Date(now - 24 * 60 * 60 * 1000);
     const hace7d  = new Date(now - 7 * 24 * 60 * 60 * 1000);
     const hoy     = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const proximo = new Date(now.getTime() + 60 * 60 * 1000);
 
     const colPed = db.collection(COLS.pedidos);
 
@@ -121,13 +122,13 @@ export default async function handler(req, res) {
     ]);
 
     let accesosUltimaHora=0, accesos24h=0, errores404=0, errores500=0;
-    let ipsSospechosas=[], ipsNuevas=[], agentesRaros=[], paisesExtranjeros=[];
+    let ipsSospechosas=[], ipsNuevas=[], agentesRaros=[];
     let peticionesRaras=[], pathsMasFrecuentes=[], trafficPorHora=[];
     let intentosBrute=0, descargasAPK=0;
 
     try {
       const colLogs = db.collection(COLS.logs);
-      const [a1h,a24h,e404,e500,ips,ipN,agt,pais,brute,paths,petR,trafH] = await Promise.all([
+      const [a1h,a24h,e404,e500,ips,ipN,agt,brute,paths,petR,trafH] = await Promise.all([
         colLogs.countDocuments({ ts: { $gte: hace1h } }),
         colLogs.countDocuments({ ts: { $gte: hace24h } }),
         colLogs.countDocuments({ ts: { $gte: hace1h }, status: 404 }),
@@ -135,14 +136,13 @@ export default async function handler(req, res) {
         colLogs.aggregate([{ $match: { ts: { $gte: hace1h } } },{ $group: { _id: '$ip', count: { $sum: 1 } } },{ $match: { count: { $gt: 30 } } },{ $sort: { count: -1 } },{ $limit: 5 }]).toArray(),
         colLogs.aggregate([{ $match: { ts: { $gte: hoy } } },{ $group: { _id: '$ip' } },{ $lookup: { from: COLS.logs, let: { ip: '$_id' }, pipeline: [{ $match: { $expr: { $and: [{ $eq: ['$ip','$$ip'] },{ $lt: ['$ts',hoy] },{ $gte: ['$ts',hace7d] }] } } },{ $limit: 1 }], as: 'h' } },{ $match: { h: { $size: 0 } } },{ $limit: 5 }]).toArray(),
         colLogs.aggregate([{ $match: { ts: { $gte: hace24h }, userAgent: { $regex: /curl|python|scrapy|bot|crawler|scanner|nikto|sqlmap|nmap|masscan|zgrab|nuclei/i } } },{ $group: { _id: '$userAgent', count: { $sum: 1 }, ip: { $first: '$ip' } } },{ $sort: { count: -1 } },{ $limit: 5 }]).toArray(),
-        colLogs.aggregate([{ $match: { ts: { $gte: hace24h }, country: { $exists: true } } },{ $group: { _id: '$country', count: { $sum: 1 } } },{ $sort: { count: -1 } },{ $limit: 5 }]).toArray(),
         colLogs.countDocuments({ ts: { $gte: hace1h }, method: 'POST', path: { $regex: /auth|login|signin/i } }),
         colLogs.aggregate([{ $match: { ts: { $gte: hace24h } } },{ $group: { _id: '$path', count: { $sum: 1 } } },{ $sort: { count: -1 } },{ $limit: 5 }]).toArray(),
         colLogs.aggregate([{ $match: { ts: { $gte: hace24h }, path: { $regex: /\.env|\.git|wp-admin|phpmyadmin|eval\(|select\s+\*|union\s+select|<script|passwd|etc\/shadow|base64_decode/i } } },{ $group: { _id: '$path', count: { $sum: 1 }, ip: { $first: '$ip' } } },{ $sort: { count: -1 } },{ $limit: 5 }]).toArray(),
         colLogs.aggregate([{ $match: { ts: { $gte: hace6h } } },{ $group: { _id: { $hour: '$ts' }, count: { $sum: 1 } } },{ $sort: { _id: 1 } }]).toArray(),
       ]);
       accesosUltimaHora=a1h; accesos24h=a24h; errores404=e404; errores500=e500;
-      ipsSospechosas=ips; ipsNuevas=ipN; agentesRaros=agt; paisesExtranjeros=pais;
+      ipsSospechosas=ips; ipsNuevas=ipN; agentesRaros=agt;
       intentosBrute=brute; pathsMasFrecuentes=paths; peticionesRaras=petR; trafficPorHora=trafH;
     } catch(_) {}
 
@@ -159,7 +159,7 @@ export default async function handler(req, res) {
       pedidosIncompletos = await colPed.countDocuments({ createdAt: { $gte: hace24h }, $or: [{ nombre: { $in: [null,'',undefined] } },{ direccion: { $in: [null,'',undefined] } }] });
     } catch(_) {}
 
-    // ── Tráfico por hora ──
+    // Tráfico por hora
     const trafMap = {};
     for (const t of trafficPorHora) trafMap[t._id] = t.count;
     const trafficValues = horasLabels.map((_, i) => {
@@ -172,85 +172,89 @@ export default async function handler(req, res) {
     );
     const maxAttack = Math.max(...attackValues, 1);
 
-    // ── Alertas ──
+    // Alertas
     const alertasStr = [];
-    if (sinAsignar > 0)       alertasStr.push(`  >> ${sinAsignar} pedido(s) SIN domiciliario asignado`);
-    if (errores500 > 0)       alertasStr.push(`  >> ${errores500} errores 500 en ultima hora`);
-    if (ipsSospechosas.length) alertasStr.push(`  >> ${ipsSospechosas.length} IP(s) sospechosa(s) detectadas`);
+    if (sinAsignar > 0)         alertasStr.push(`  >> ${sinAsignar} pedido(s) SIN domiciliario asignado`);
+    if (errores500 > 0)         alertasStr.push(`  >> ${errores500} errores 500 en ultima hora`);
+    if (ipsSospechosas.length)  alertasStr.push(`  >> ${ipsSospechosas.length} IP(s) sospechosa(s) detectadas`);
     if (peticionesRaras.length) alertasStr.push(`  >> ${peticionesRaras.length} intento(s) de exploit`);
-    if (intentosBrute > 10)   alertasStr.push(`  >> ${intentosBrute} intentos brute-force en login`);
-    if (agentesRaros.length)  alertasStr.push(`  >> ${agentesRaros.length} bot/scanner activo`);
-    if (duplicados > 0)       alertasStr.push(`  >> ${duplicados} telefono(s) con +3 pedidos/24h`);
+    if (intentosBrute > 10)     alertasStr.push(`  >> ${intentosBrute} intentos brute-force en login`);
+    if (agentesRaros.length)    alertasStr.push(`  >> ${agentesRaros.length} bot/scanner activo`);
+    if (duplicados > 0)         alertasStr.push(`  >> ${duplicados} telefono(s) con +3 pedidos/24h`);
     if (pedidosIncompletos > 0) alertasStr.push(`  >> ${pedidosIncompletos} pedido(s) con datos incompletos`);
     if (pedidosCancelados24h > 5) alertasStr.push(`  >> ${pedidosCancelados24h} cancelaciones en 24h`);
-    if (errores404 > 20)      alertasStr.push(`  >> ${errores404} errores 404 — posible scraping`);
+    if (errores404 > 20)        alertasStr.push(`  >> ${errores404} errores 404 — posible scraping`);
 
-    const hayAlertas = alertasStr.length > 0;
-    const statusLine = hayAlertas
-      ? '[ STATUS: !! ANOMALIAS DETECTADAS !! ]'
-      : '[ STATUS: >> OPERACION NORMAL  [OK] ]';
+    const hayAlertas   = alertasStr.length > 0;
+    const nivelSeguridad = hayAlertas
+      ? Math.max(10, 100 - (alertasStr.length * 15))
+      : 100;
+    const barSeguridad = barChart(nivelSeguridad, 100, 12, hayAlertas);
 
-    // ── Líneas de gráficas ──
-    const pedHoraLines     = horasLabels.map((l,i) => `  ${l} ${barChart(horasValues[i],   maxPedHora,  14)}  ${String(horasValues[i]).padStart(4,' ')}`).join('\n');
-    const trafficHoraLines = horasLabels.map((l,i) => `  ${l} ${barChart(trafficValues[i], maxTraffic,  14)}  ${String(trafficValues[i]).padStart(5,' ')}`).join('\n');
-    const attackHoraLines  = horasLabels.map((l,i) => `  ${l} ${barChart(attackValues[i],  maxAttack,   14, true)}  ${String(attackValues[i]).padStart(4,' ')}`).join('\n');
+    // Fechas formateadas
+    const optsDate = { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Bogota' };
+    const optsTime = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'America/Bogota' };
+    const fechaScan  = now.toLocaleDateString('es-CO', optsDate).replace(/\//g,'/');
+    const horaScan   = now.toLocaleTimeString('es-CO', optsTime);
+    const fechaProx  = proximo.toLocaleDateString('es-CO', optsDate).replace(/\//g,'/');
+    const horaProx   = proximo.toLocaleTimeString('es-CO', optsTime);
+    const fechaLarga = now.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Bogota' });
 
-    const maxDomiPed  = Math.max(...conPedidos.map(d => d.pedidosHoy), 1);
-    const domiLines   = conPedidos.filter(d => d.pedidosHoy > 0)
+    // Gráficas
+    const pedHoraLines     = horasLabels.map((l,i) => `  ${l} ${barChart(horasValues[i],   maxPedHora, 14)}  ${String(horasValues[i]).padStart(4,' ')}`).join('\n');
+    const trafficHoraLines = horasLabels.map((l,i) => `  ${l} ${barChart(trafficValues[i], maxTraffic, 14)}  ${String(trafficValues[i]).padStart(5,' ')}`).join('\n');
+    const attackHoraLines  = horasLabels.map((l,i) => `  ${l} ${barChart(attackValues[i],  maxAttack,  14, true)}  ${String(attackValues[i]).padStart(4,' ')}`).join('\n');
+
+    const maxDomiPed    = Math.max(...conPedidos.map(d => d.pedidosHoy), 1);
+    const domiLines     = conPedidos.filter(d => d.pedidosHoy > 0)
       .map((d,i) => `  #${String(i+1).padStart(2,'0')} ${d.nombre.substring(0,10).padEnd(10,' ')} ${barChart(d.pedidosHoy, maxDomiPed, 10)}  ${d.pedidosHoy}`)
       .join('\n') || '  >> sin movimiento hoy';
 
-    const maxCom      = topComercio[0]?.total || 1;
+    const maxCom        = topComercio[0]?.total || 1;
     const comercioLines = topComercio.map((c,i) =>
       `  ${String(i+1).padStart(2,'0')} ${(c._id||'?').substring(0,10).padEnd(10,' ')} ${barChart(c.total, maxCom, 10)}  ${c.total}`
     ).join('\n') || '  >> sin datos';
 
-    const estadosOrden = [['pendiente','PEND'],['asignado','ASIG'],['proceso','PROC'],['encamino','ENVO'],['entregado','ENTR'],['cancelado','CANC']];
-    const maxEst = Math.max(...estadosOrden.map(([k]) => estadoMap[k]||0), 1);
-    const estadoLines = estadosOrden.map(([k,label]) => {
+    const estadosOrden  = [['pendiente','PEND'],['asignado','ASIG'],['proceso','PROC'],['encamino','ENVO'],['entregado','ENTR'],['cancelado','CANC']];
+    const maxEst        = Math.max(...estadosOrden.map(([k]) => estadoMap[k]||0), 1);
+    const estadoLines   = estadosOrden.map(([k,label]) => {
       const n = estadoMap[k]||0; if (!n) return null;
       return `  ${label} ${barChart(n, maxEst, 12, k==='cancelado')}  ${String(n).padStart(4,' ')}`;
     }).filter(Boolean).join('\n') || '  >> sin datos';
 
-    const ipsLines = ipsSospechosas.length
+    const ipsLines      = ipsSospechosas.length
       ? ipsSospechosas.map(x => `  ${x._id.padEnd(16,' ')} ${barChart(x.count, ipsSospechosas[0].count, 10, true)}  ${x.count} reqs`).join('\n')
       : '  >> ninguna detectada';
 
-    const botsLines = agentesRaros.length
+    const botsLines     = agentesRaros.length
       ? agentesRaros.map(x => `  [${x.count}x] ${x._id.substring(0,25)} :: ${x.ip||'?'}`).join('\n')
       : '  >> ninguno detectado';
 
-    const exploitLines = peticionesRaras.length
+    const exploitLines  = peticionesRaras.length
       ? peticionesRaras.map(x => `  [${x.count}x] ${(x._id||'?').substring(0,28)} >> ${x.ip||'?'}`).join('\n')
       : '  >> ninguno detectado';
 
-    const maxPath = pathsMasFrecuentes[0]?.count || 1;
-    const pathLines = pathsMasFrecuentes.length
+    const maxPath       = pathsMasFrecuentes[0]?.count || 1;
+    const pathLines     = pathsMasFrecuentes.length
       ? pathsMasFrecuentes.map(p => `  ${barChart(p.count, maxPath, 8)}  ${(p._id||'/').substring(0,25)}  (${p.count})`).join('\n')
       : '  >> sin datos';
 
-    const horaStr  = now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Bogota' });
-    const fechaStr = now.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Bogota' });
+    const sparkPed      = spark(horasValues);
+    const sparkTraffic  = spark(trafficValues);
+    const sparkAttack   = spark(attackValues);
 
-    const sparkPed     = spark(horasValues);
-    const sparkTraffic = spark(trafficValues);
-    const sparkAttack  = spark(attackValues);
-
+    // ── MENSAJE ──────────────────────────────────────────────
     const msg = `👋 <b>Hola Victor!</b> Aquí tu informe WIL.
 
 <pre>
 ╔══════════════════════════════════════╗
-║  ██╗    ██╗██╗██╗                   ║
-║  ██║    ██║██║██║                   ║
-║  ██║ █╗ ██║██║██║                   ║
-║  ██║███╗██║██║██║                   ║
-║  ╚███╔███╔╝██║███████╗  MONITOR     ║
-║   ╚══╝╚══╝ ╚═╝╚══════╝  v2.0       ║
-╠══════════════════════════════════════╣
-║ ${statusLine} ║
-╠══════════════════════════════════════╣
-║ DATE : ${fechaStr.substring(0,30).padEnd(30,' ')} ║
-║ TIME : ${horaStr} hrs (COL)                  ║
+║     /\_____/\                       ║
+║    /  o   o  \                      ║
+║   ( ==  ^  == )    MONITOR  v2.0    ║
+║    )         (                      ║
+║   (           )                     ║
+║  ( (  )   (  ) )                    ║
+║  (__(__)___(__)__)                   ║
 ╚══════════════════════════════════════╝
 
 ┌─────────────────────────────────────┐
@@ -342,9 +346,15 @@ ${exploitLines}
 ${alertasStr.length ? alertasStr.join('\n') : '  >> SIN ALERTAS ACTIVAS [OK]'}
 
 ╔══════════════════════════════════════╗
-║  >> PROXIMO INFORME EN ~1 HORA       ║
+║  ESCANEO >>  ${fechaScan}  ${horaScan}  ║
+║  PROXIMO >>  ${fechaProx}  ${horaProx}  ║
+╠══════════════════════════════════════╣
+║  AMENAZAS  >>  ${hayAlertas ? '!! ' + alertasStr.length + ' DETECTADA(S) !!' : 'NINGUNA              '}  ║
+║  SEGURIDAD >>  ${barSeguridad}  ${String(nivelSeguridad).padStart(3,'0')}%  ║
+║  SISTEMA   >>  ${hayAlertas ? '⚠ REVISAR AHORA      ' : '✓ TODO EN ORDEN      '}  ║
+╠══════════════════════════════════════╣
 ║  >> Ing. Victor Henao                ║
-║  >> ESCANEO v2.0 HACKER EDITION  ║
+║  >> WIL MONITOR v2.0                 ║
 ╚══════════════════════════════════════╝
 </pre>`;
 
@@ -366,6 +376,7 @@ ${alertasStr.length ? alertasStr.join('\n') : '  >> SIN ALERTAS ACTIVAS [OK]'}
         intentosBrute,
         bots: agentesRaros.length,
         exploits: peticionesRaras.length,
+        nivel: nivelSeguridad,
       },
       telegram: tgResult.ok,
     });
@@ -373,7 +384,7 @@ ${alertasStr.length ? alertasStr.join('\n') : '  >> SIN ALERTAS ACTIVAS [OK]'}
   } catch (err) {
     console.error('[report-health]', err);
     try {
-      await sendTelegram(`🔴 <b>Escaneo — ERROR</b>\n<code>${err.message?.substring(0,200)}</code>`);
+      await sendTelegram(`🔴 <b>WIL Monitor — ERROR</b>\n<code>${err.message?.substring(0,200)}</code>`);
     } catch(_) {}
     return res.status(500).json({ ok: false, error: err.message });
   }
