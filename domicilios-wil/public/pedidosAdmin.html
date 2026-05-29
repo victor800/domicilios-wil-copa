@@ -424,9 +424,8 @@ table.ptbl tbody tr.cancelado-row td:first-child{border-left:3px solid var(--red
    Si el HTML vive en el MISMO dominio que la API,
    déjalo como cadena vacía ''.
    Si es dominio distinto, pon la URL completa:
-     const API = 'https://domicilios-wil.vercel.app';
 ══════════════════════════════════════════ */
-const API = 'https://domicilios-wil.vercel.app';
+const API = '';  // '' = mismo dominio Vercel | 'https://domicilios-wil.vercel.app' si abres local
 
 /* ══════════════════════════════════════════
    STATE
@@ -487,17 +486,17 @@ function domiAvatar(domi, size=44, radius=13) {
 
 /* ══════════════════════════════════════════
    API CALLS
-   Todas las rutas usan ${API}/api/pedidos?recurso=...
+   Todas las rutas usan ${API}/api/foto?recurso=...
 ══════════════════════════════════════════ */
 async function fetchDomis() {
-  const r = await fetch(`${API}/api/pedidos?recurso=domiciliarios`);
+  const r = await fetch(`${API}/api/foto?recurso=domiciliarios`);
   const j = await r.json();
   if (!j.ok) throw new Error(j.error || 'Error al cargar domis');
   return j.data;
 }
 
 async function fetchPedidos(estado, domiNombre) {
-  let url = `${API}/api/pedidos?recurso=pedidos&limit=300`;
+  let url = `${API}/api/foto?recurso=pedidos&limit=300`;
   if (estado && estado !== 'todos') url += `&estado=${estado}`;
   if (domiNombre) url += `&domi=${encodeURIComponent(domiNombre)}`;
   const r = await fetch(url);
@@ -507,7 +506,7 @@ async function fetchPedidos(estado, domiNombre) {
 }
 
 async function apiAsignar(pedidoId, domiciliarioId, domiciliarioNombre) {
-  const r = await fetch(`${API}/api/pedidos?recurso=asignar`, {
+  const r = await fetch(`${API}/api/foto?recurso=asignar`, {
     method:'PATCH', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ pedidoId, domiciliarioId, domiciliarioNombre })
   });
@@ -515,7 +514,7 @@ async function apiAsignar(pedidoId, domiciliarioId, domiciliarioNombre) {
 }
 
 async function apiCambiarEstado(pedidoId, estado) {
-  const r = await fetch(`${API}/api/pedidos?recurso=estado`, {
+  const r = await fetch(`${API}/api/foto?recurso=estado`, {
     method:'PATCH', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ pedidoId, estado })
   });
