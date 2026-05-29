@@ -950,10 +950,11 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
       <span class="material-symbols-rounded ico">delivery_dining</span><span>Domiciliarios</span>
       <span class="nbadge" id="nb-dri">–</span>
     </div>
-    <div class="ni" onclick="sp('deliveries',this)">
-      <span class="material-symbols-rounded ico">package_2</span><span>Pedidos</span>
-      <span class="nbadge r" id="nb-ped">–</span>
-    </div>
+   <a href="pedidosAdmin.html" class="ni">
+  <span class="material-symbols-rounded ico">package_2</span>
+  <span>Pedidos</span>
+  <span class="nbadge r" id="nb-ped">–</span>
+</a>
     <div class="ni" onclick="sp('ofert',this)">
       <span class="material-symbols-rounded ico">local_offer</span><span>Ofertas</span>
       <span class="nbadge r" id="nb-ofer">–</span>
@@ -1130,6 +1131,9 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
   <div class="dgrid" id="drivers-grid"><div class="empty-state" style="grid-column:1/-1;"><div class="ico">🛵</div><p>Cargando…</p></div></div>
 </div>
 
+
+
+
 <!-- PEDIDOS -->
 
 <div class="pg" id="pg-deliveries">
@@ -1214,7 +1218,6 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
         <thead><tr>
           <th>Pedido #</th><th>Cliente</th><th>Dirección</th>
           <th>Domi</th><th>Estado</th><th>Comercio</th><th>Método</th>
-          
           <th>Subtotal</th><th>Domicilio</th><th>Total</th><th>Hora</th><th>Fecha</th>
         </tr></thead>
         <tbody id="ped-tbody"><tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text3);">Cargando…</td></tr></tbody>
@@ -1222,6 +1225,8 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
     </div>
   </div>
 </div>
+
+
 
 <!-- OFERTAS -->
 <div class="pg" id="pg-ofert">
@@ -4512,6 +4517,61 @@ function filterProductos(f, btn) {
   const okD = await cargarConReintentos(loadDrivers, 'Domis');
   const okP = await cargarConReintentos(loadPedidos, 'Pedidos');
 
+  // AGREGA justo después de los dos await anteriores:
+try {
+  const [resPeds, resDomis] = await Promise.all([
+    fetch('/api/pedidos?recurso=pedidos&limit=200'),
+    fetch('/api/pedidos?recurso=domiciliarios')
+  ]);
+  const pedsMongo  = await resPeds.json();
+  const domisMongo = await resDomis.json();
+
+  // Mezclar pedidos del sheet con los de MongoDB (MongoDB es la fuente de domiciliarios)
+  if (pedsMongo.ok && pedsMongo.data.length) {
+    // Normalizar campos de MongoDB al formato del dashboard
+    const mapped = pedsMongo.data.map(p => ({
+      id:           p.idPedido,
+      cliente:      p.nombre,
+      tel:          p.telefono,
+      direccion:    p.direccion,
+      estado:       normEstado(p.estado),
+      estadoRaw:    p.estado,
+      domi:         p.domiciliarioNombre || '',
+      metodo:       p.metodoPago,
+      total:        String(p.total || 0),
+      subtotal:     String(p.subtotal || 0),
+      costoEnvio:   String(p.domicilio || 0),
+      fecha:        p.fecha,
+      hora:         p.hora,
+      comercio:     p.comercio,
+      modoEntrega:  p.modoEntrega,
+      tipoEntrega:  p.modoEntrega,
+      _prods:       (p.items || []).map(i => ({
+        nom:    i.producto,
+        marca:  i.laboratorio || '',
+        qty:    i.cantidad,
+        vu:     i.precioUnit,
+        vtotal: i.subtotal
+      }))
+    }));
+    // Fusionar: priorizar MongoDB (más reciente), deduplicar por id
+    const idsExistentes = new Set(allPedidos.map(p => p.id));
+    mapped.forEach(p => { if (!idsExistentes.has(p.id)) allPedidos.unshift(p); });
+  }
+
+  if (domisMongo.ok && domisMongo.data.length) {
+  allDrivers = domisMongo.data.map(d => ({
+    id:     d.idWil || String(d._id),  // ← usa idWil (WIL-001)
+    nombre: d.nombre,
+    tel:    d.tel,
+    activo: d.activo,
+    foto:   d.foto || fotoPath(d.nombre)
+  }));
+}
+} catch(e) {
+  console.warn('[boot MongoDB]:', e.message);
+}
+
   loadProductos();
 
   // Ofertas y productos en paralelo, sin bloquear si fallan
@@ -4833,70 +4893,52 @@ function cancelarAsignacion() {
 async function ejecutarAsignacion() {
   if (!pedAsignId) { showToast('w', 'Sin pedido', 'Selecciona un pedido primero'); return; }
   const domiNombre = document.getElementById('asign-domi-select')?.value?.trim();
-  if (!domiNombre) { showToast('w', 'Sin domiciliario', 'Selecciona un domi de la lista'); return; }
+  if (!domiNombre) { showToast('w', 'Sin domiciliario', 'Selecciona un domi'); return; }
 
   const btn = document.getElementById('btn-ejecutar-asign');
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = '<span class="material-symbols-rounded" style="animation:spin .8s linear infinite;font-size:15px;">progress_activity</span> Asignando…';
-  }
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-rounded" style="animation:spin .8s linear infinite;font-size:15px;">progress_activity</span> Asignando…'; }
 
   try {
-    const payload = {
-      accion:    'asignar-domi',
-      pedidoId:  String(pedAsignId).trim(),
-      domi:      domiNombre,
-      estado:    'asignado',
-      horaAsign: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
-    };
-    const res  = await fetch(SHEET_SCRIPT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify(payload)
+    const res  = await fetch('/api/pedidos?recurso=asignar', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pedidoId:           String(pedAsignId).trim(),
+        domiciliarioId:     domiNombre,
+        domiciliarioNombre: domiNombre
+      })
     });
     const json = await res.json();
 
     if (json.ok !== false) {
-      const idGuardado = pedAsignId;
-
-      showToast('s', '✓ Asignado', `${domiNombre} → Pedido ${idGuardado}`);
+      showToast('s', '✓ Asignado', `${domiNombre} → Pedido ${pedAsignId}`);
       VOZ.hablar(`Pedido asignado a ${domiNombre.split(' ')[0]}`);
-
-      // Forzar en memoria ANTES del refresh
-      const pedLocal = allPedidos.find(p => p.id === idGuardado);
-      if (pedLocal) {
-        pedLocal.domi      = domiNombre;
-        pedLocal.estado    = 'asignado';
-        pedLocal.estadoRaw = 'Asignado';
-      }
+      const pedLocal = allPedidos.find(p => p.id === pedAsignId);
+      if (pedLocal) { pedLocal.domi = domiNombre; pedLocal.estado = 'asignado'; pedLocal.estadoRaw = 'Asignado'; }
       cancelarAsignacion();
       renderAll();
-
-      // Esperar 4s para que el caché de gviz expire
       await new Promise(r => setTimeout(r, 4000));
       await doRefresh(false);
-
-      // Si el refresh pisó el estado por caché, restaurarlo
-      const pedFinal = allPedidos.find(p => p.id === idGuardado);
-      if (pedFinal && pedFinal.estado !== 'asignado') {
-        pedFinal.domi      = domiNombre;
-        pedFinal.estado    = 'asignado';
-        pedFinal.estadoRaw = 'Asignado';
-        renderAll();
-      }
-
     } else {
       showToast('e', 'Error del servidor', json.error || 'Pedido no encontrado');
     }
-
   } catch(e) {
     showToast('e', 'Error de red', e.message.substring(0, 60));
   } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;">check_circle</span>Asignar';
-    }
+    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;">check_circle</span>Asignar'; }
   }
+}
+
+// AGREGA después de ejecutarAsignacion():
+async function cambiarEstado(pedidoId, nuevoEstado) {
+  const res  = await fetch('/api/pedidos?recurso=estado', {
+    method:  'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ pedidoId, estado: nuevoEstado })
+  });
+  const json = await res.json();
+  if (json.ok) { await doRefresh(false); renderAll(); }
+  else showToast('e', 'Error al cambiar estado', json.error || '');
 }
  
 /* ── renderPedidosTable MEJORADO — reemplaza el anterior ── */
@@ -10743,6 +10785,16 @@ function _programarRefreshCierre() {
   console.log(`[CIERRE] Próximo cierre en ${minutosHastaCierre} min · apertura en ${minutosHastaApertura} min`);
 }
 
+/* ════ FILTER PED — conecta tabs con renderPedidosTable ════ */
+function filterPed(estado, tabEl) {
+  if (tabEl) {
+    document.querySelectorAll('#ped-tabs .tab').forEach(t => t.classList.remove('on'));
+    tabEl.classList.add('on');
+  }
+  const domiId = (document.getElementById('ped-domi-filter')?.value || '').trim();
+  const tipo   = (document.getElementById('ped-tipo-filter')?.value || '').trim();
+  renderPedidosTable(estado, domiId, tipo);
+}
 
 
 </script>
