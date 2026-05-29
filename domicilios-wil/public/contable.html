@@ -1347,16 +1347,30 @@ async function loadPedidos() {
 }
 
 async function loadBases(){
-  try{const text=await fetchCSV('Bases',10000);const lines=parseCSVText(text);basesData=lines.map(c=>({domi:col(c,0),monto:parsePrecio(col(c,1)),nota:col(c,2),fecha:col(c,3)})).filter(b=>b.domi&&b.monto);}catch(e){basesData=[];}
+  try{
+    const r = await fetch('/api/contable?recurso=bases', { cache:'no-store' });
+    const j = await r.json();
+    if(!j.ok) throw new Error(j.error);
+    basesData = j.data; // cada item tiene _id, domi, monto, nota, fecha
+  }catch(e){ console.warn('[loadBases]:', e.message); basesData=[]; }
 }
+
 async function loadMultas(){
-  try{const text=await fetchCSV('Multas',10000);const lines=parseCSVText(text);multasData=lines.map(c=>({domi:col(c,0),monto:parsePrecio(col(c,1)),tipo:col(c,2)||'multa',nota:col(c,3),fecha:col(c,4)})).filter(m=>m.domi);}catch(e){multasData=[];}
+  try{
+    const r = await fetch('/api/contable?recurso=multas', { cache:'no-store' });
+    const j = await r.json();
+    if(!j.ok) throw new Error(j.error);
+    multasData = j.data; // cada item tiene _id, domi, monto, tipo, nota, fecha
+  }catch(e){ console.warn('[loadMultas]:', e.message); multasData=[]; }
 }
+
 async function loadCierres(){
   try{
-    const text=await fetchCSV('CierreCaja',10000);const lines=parseCSVText(text);
-    cierresData=lines.map(c=>({id:col(c,0),turno:col(c,1),fecha:col(c,2),hora:col(c,3),entrega:col(c,4),recibe:col(c,5),efectivo:parsePrecio(col(c,6)),bases:parsePrecio(col(c,7)),diferencia:parsePrecio(col(c,8)),pedidos:parseInt(col(c,9))||0,totalEf:parsePrecio(col(c,10)),totalTf:parsePrecio(col(c,11)),totalT:parsePrecio(col(c,12)),estado:col(c,13)||'ok',novedades:col(c,14),ts:col(c,15)})).filter(x=>x.id).reverse();
-  }catch(e){cierresData=[];}
+    const r = await fetch('/api/contable?recurso=cierres', { cache:'no-store' });
+    const j = await r.json();
+    if(!j.ok) throw new Error(j.error);
+    cierresData = j.data.slice().reverse();
+  }catch(e){ console.warn('[loadCierres]:', e.message); cierresData=[]; }
 }
 
 /* ════ PERÍODO ════ */
@@ -1630,7 +1644,7 @@ function renderBases(){
       <div class="bm-ico" style="background:var(--orange-l);color:var(--orange);"><span class="material-symbols-rounded" style="font-size:15px;">account_balance_wallet</span></div>
       <div style="flex:1;"><div class="bm-name">${b.domi}</div><div class="bm-meta">${b.nota||'Sin nota'} · ${b.fecha||'—'}</div></div>
       <div class="bm-amount" style="color:var(--orange);">${fmtMoney(b.monto)}</div>
-      <button class="bm-del" onclick="deleteBase(${i})"><span class="material-symbols-rounded" style="font-size:12px;">delete</span></button>
+      <button class="bm-del" onclick="deleteBase('${b._id}')"><span class="material-symbols-rounded" style="font-size:12px;">delete</span></button>
     </div>`;
   }).join('');
 }
@@ -1653,7 +1667,7 @@ function renderMultas(){
   if(multas.length){
     if(pyps.length)html+=`<div style="height:1px;background:var(--border);margin:8px 0;"></div>`;
     html+=`<div style="font-size:8px;font-weight:800;color:var(--red);text-transform:uppercase;letter-spacing:.1em;margin-bottom:7px;display:flex;align-items:center;gap:4px;"><span class="material-symbols-rounded" style="font-size:13px;">gavel</span>Multas / Descuentos</div>`;
-    html+=multas.slice().reverse().map(m=>{const i=multasData.indexOf(m);const lbl={multa:'Multa',otro:'Descuento'}[m.tipo]||'Multa';return `<div class="bm-item">
+    html+=multas.slice().reverse().map(m=>{onclick="deleteMulta('${m._id}')";const lbl={multa:'Multa',otro:'Descuento'}[m.tipo]||'Multa';return `<div class="bm-item">
       <div class="bm-ico" style="background:var(--red-l);color:var(--red);"><span class="material-symbols-rounded" style="font-size:14px;">gavel</span></div>
       <div style="flex:1;"><div class="bm-name">${m.domi} <span class="tag multa">${lbl}</span></div><div class="bm-meta">${m.nota||'Sin nota'} · ${m.fecha||'—'}</div></div>
       <div class="bm-amount" style="color:var(--red);">-${fmtMoney(m.monto)}</div>
@@ -1724,25 +1738,36 @@ function initCajaSelects(){
 }
 
 async function saveBase(){
-  const domi=document.getElementById('b-domi')?.value.trim();
-  const monto=parsePrecio(document.getElementById('b-monto')?.value||'0');
-  const nota=document.getElementById('b-nota')?.value.trim();
-  const fecha=document.getElementById('b-fecha')?.value||new Date().toISOString().slice(0,10);
-  if(!domi){showToast('w','Falta domiciliario','Selecciona un domi');return;}
-  if(!monto){showToast('w','Falta monto','Ingresa el monto');return;}
-  const btn=document.getElementById('btn-save-base');
-  btn.disabled=true;btn.innerHTML='<span class="material-symbols-rounded spin-ico">progress_activity</span> Guardando…';
-  basesData.push({domi,monto,nota,fecha});
-  renderBases();
-  showToast('i',`Guardando base — ${domi}`,fmtMoney(monto));
+  const domi  = document.getElementById('b-domi')?.value.trim();
+  const monto = parsePrecio(document.getElementById('b-monto')?.value||'0');
+  const nota  = document.getElementById('b-nota')?.value.trim();
+  const fecha = document.getElementById('b-fecha')?.value || new Date().toISOString().slice(0,10);
+  if(!domi)  { showToast('w','Falta domiciliario','Selecciona un domi'); return; }
+  if(!monto) { showToast('w','Falta monto','Ingresa el monto'); return; }
+  const btn = document.getElementById('btn-save-base');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-symbols-rounded spin-ico">progress_activity</span> Guardando…';
   try{
-    await fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({accion:'crear-base',domi,monto,nota,fecha})});
-    await loadBases();renderBases();
-    showToast('s',`Base dada a ${domi}`,fmtMoney(monto)+(nota?' · '+nota:''));
-    if(document.getElementById('b-monto'))document.getElementById('b-monto').value='';
-    if(document.getElementById('b-nota'))document.getElementById('b-nota').value='';
-  }catch(e){showToast('e','Error de red',e.message.substring(0,60));}
-  finally{btn.disabled=false;btn.innerHTML='<span class="material-symbols-rounded">savings</span>Dar base';}
+    const r = await fetch('/api/contable?recurso=bases', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({ domi, monto, nota, fecha })
+    });
+    const j = await r.json();
+    if(!j.ok) throw new Error(j.error);
+    showToast('s',`Base dada a ${domi}`, fmtMoney(monto)+(nota?' · '+nota:''));
+    document.getElementById('b-monto').value = '';
+    document.getElementById('b-nota').value  = '';
+    await loadBases(); renderBases(); renderDomiTable(
+      allPedidos.filter(p=>enPeriodo(p)),
+      allPedidos.filter(p=>enPeriodo(p)&&p.estado==='entregado'),
+      'domi-tbody'
+    );
+  }catch(e){ showToast('e','Error',e.message.substring(0,80)); }
+  finally{
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-symbols-rounded">savings</span>Dar base';
+  }
 }
 
 function togglePyP(){
@@ -1750,30 +1775,66 @@ function togglePyP(){
   const aviso=document.getElementById('pyp-aviso');if(aviso)aviso.style.display=esPyP?'flex':'none';
   const wrap=document.getElementById('m-monto-wrap');if(wrap)wrap.style.display=esPyP?'none':'grid';
 }
+
 async function saveMulta(){
-  const domi=document.getElementById('m-domi')?.value.trim();
-  const tipo=document.getElementById('m-tipo')?.value||'multa';
-  const nota=document.getElementById('m-nota')?.value.trim();
-  const fecha=document.getElementById('m-fecha')?.value||new Date().toISOString().slice(0,10);
-  const esPyP=tipo==='pyp';const monto=esPyP?0:parsePrecio(document.getElementById('m-monto')?.value||'0');
-  if(!domi){showToast('w','Falta domiciliario','Selecciona un domi');return;}
-  if(!esPyP&&!monto){showToast('w','Falta monto','Ingresa el monto');return;}
-  const btn=document.getElementById('btn-save-multa');
-  btn.disabled=true;btn.innerHTML='<span class="material-symbols-rounded spin-ico">progress_activity</span> Guardando…';
-  multasData.push({domi,monto,nota,tipo,fecha});
-  renderMultas();showToast('i',esPyP?`P&P — ${domi}`:`Multa — ${domi}`,esPyP?'Sin descuento':fmtMoney(monto));
+  const domi  = document.getElementById('m-domi')?.value.trim();
+  const tipo  = document.getElementById('m-tipo')?.value || 'multa';
+  const nota  = document.getElementById('m-nota')?.value.trim();
+  const fecha = document.getElementById('m-fecha')?.value || new Date().toISOString().slice(0,10);
+  const esPyP = tipo === 'pyp';
+  const monto = esPyP ? 0 : parsePrecio(document.getElementById('m-monto')?.value||'0');
+  if(!domi)           { showToast('w','Falta domiciliario','Selecciona un domi'); return; }
+  if(!esPyP && !monto){ showToast('w','Falta monto','Ingresa el monto'); return; }
+  const btn = document.getElementById('btn-save-multa');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-symbols-rounded spin-ico">progress_activity</span> Guardando…';
   try{
-    await fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({accion:'crear-multa',domi,monto,tipo,nota,fecha})});
-    await loadMultas();renderMultas();
-    showToast('s',esPyP?`P&P guardado — ${domi}`:`Multa registrada — ${domi}`,esPyP?'Solo registro':fmtMoney(monto));
-    if(document.getElementById('m-monto'))document.getElementById('m-monto').value='';
-    if(document.getElementById('m-nota'))document.getElementById('m-nota').value='';
-  }catch(e){showToast('e','Error de red',e.message.substring(0,60));}
-  finally{btn.disabled=false;btn.innerHTML='<span class="material-symbols-rounded">gavel</span>Registrar';}
+    const r = await fetch('/api/contable?recurso=multas', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({ domi, monto, tipo, nota, fecha })
+    });
+    const j = await r.json();
+    if(!j.ok) throw new Error(j.error);
+    showToast('s',
+      esPyP ? `P&P guardado — ${domi}` : `Multa registrada — ${domi}`,
+      esPyP ? 'Solo registro' : fmtMoney(monto)
+    );
+    document.getElementById('m-monto').value = '';
+    document.getElementById('m-nota').value  = '';
+    await loadMultas(); renderMultas(); renderDomiTable(
+      allPedidos.filter(p=>enPeriodo(p)),
+      allPedidos.filter(p=>enPeriodo(p)&&p.estado==='entregado'),
+      'domi-tbody'
+    );
+  }catch(e){ showToast('e','Error',e.message.substring(0,80)); }
+  finally{
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-symbols-rounded">gavel</span>Registrar';
+  }
+}
+async function deleteBase(id){
+  if(!confirm('¿Eliminar esta base?')) return;
+  try{
+    const r = await fetch(`/api/contable?recurso=bases&id=${id}`, { method:'DELETE' });
+    const j = await r.json();
+    if(!j.ok) throw new Error(j.error);
+    showToast('s','Base eliminada','');
+    await loadBases(); renderBases();
+  }catch(e){ showToast('e','Error',e.message.substring(0,60)); }
 }
 
-async function deleteBase(idx){if(!confirm('¿Eliminar esta base?')) return;const item=basesData[idx];basesData.splice(idx,1);renderBases();try{await fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({accion:'eliminar-base',domi:item.domi,monto:item.monto,fecha:item.fecha})});await loadBases();renderBases();showToast('s','Base eliminada','');}catch(e){showToast('e','Error',e.message.substring(0,60));}}
-async function deleteMulta(idx){if(!confirm('¿Eliminar este registro?')) return;const item=multasData[idx];multasData.splice(idx,1);renderMultas();try{await fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({accion:'eliminar-multa',domi:item.domi,monto:item.monto,tipo:item.tipo||'multa',fecha:item.fecha})});await loadMultas();renderMultas();showToast('s','Registro eliminado','');}catch(e){showToast('e','Error',e.message.substring(0,60));}}
+/* ════ DELETE MULTA ════ */
+async function deleteMulta(id){
+  if(!confirm('¿Eliminar este registro?')) return;
+  try{
+    const r = await fetch(`/api/contable?recurso=multas&id=${id}`, { method:'DELETE' });
+    const j = await r.json();
+    if(!j.ok) throw new Error(j.error);
+    showToast('s','Registro eliminado','');
+    await loadMultas(); renderMultas();
+  }catch(e){ showToast('e','Error',e.message.substring(0,60)); }
+}
 
 function calcResumen(){
   const turno=document.getElementById('c-turno')?.value||'1';const fecha=document.getElementById('c-fecha')?.value||new Date().toISOString().slice(0,10);
@@ -1794,6 +1855,7 @@ function calcResumen(){
   const basesTotal=basesData.reduce((s,b)=>s+b.monto,0);const bInput=document.getElementById('c-bases');if(bInput&&!bInput.value)bInput.value=String(Math.round(basesTotal));
   calcDif();return{ent,totalEf,totalTf,totalT};
 }
+
 function calcDif(){
   const ef=parsePrecio(document.getElementById('c-efectivo')?.value||'0');const bases=parsePrecio(document.getElementById('c-bases')?.value||'0');const dif=ef-bases;
   const esOk=Math.abs(dif)<500;
@@ -1802,28 +1864,54 @@ function calcDif(){
   if(difBox){difBox.style.borderColor=esOk?'rgba(22,163,74,.3)':dif<0?'rgba(220,38,38,.3)':'rgba(217,119,6,.3)';difBox.style.background=esOk?'rgba(22,163,74,.06)':dif<0?'rgba(220,38,38,.06)':'rgba(217,119,6,.06)';}
   if(difDetail)difDetail.textContent=esOk?'✓ Cuadre exacto — caja OK':dif<0?`Faltante de ${fmtMoney(Math.abs(dif))}`:`Sobrante de ${fmtMoney(dif)}`;
 }
+
 async function guardarCierreCaja(){
-  const turno=document.getElementById('c-turno')?.value||'';const fecha=document.getElementById('c-fecha')?.value||'';
-  const hora=document.getElementById('c-hora')?.value||'';
-  const entrega=(document.getElementById('c-entrega')?.value||'').trim();const recibe=(document.getElementById('c-recibe')?.value||'').trim();
-  const efectivo=parsePrecio(document.getElementById('c-efectivo')?.value||'0');const bases=parsePrecio(document.getElementById('c-bases')?.value||'0');
-  const novedades=(document.getElementById('c-novedades')?.value||'').trim();
-  if(!entrega){showToast('w','Falta quién entrega','Selecciona el responsable');return;}
-  if(!recibe){showToast('w','Falta quién recibe','Selecciona quién recibe');return;}
-  const btn=document.getElementById('btn-guardar-caja');
-  btn.disabled=true;btn.innerHTML='<span class="material-symbols-rounded spin-ico">progress_activity</span> Guardando…';
-  const resumen=calcResumen();const diferencia=efectivo-bases;const esOk=Math.abs(diferencia)<500;
-  const cierre={id:'CAJA-'+Date.now(),turno,fecha,hora,entrega,recibe,efectivo,bases,diferencia,pedidos:resumen.ent||0,totalEf:resumen.totalEf||0,totalTf:resumen.totalTf||0,totalT:resumen.totalT||0,estado:esOk?'ok':diferencia<0?'faltante':'sobrante',novedades,ts:new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})};
-  cierresData.unshift(cierre);renderCierres();updateSbBadges();
-  showToast('i',`Guardando cierre turno ${turno}…`,`${entrega} → ${recibe}`);
+  const turno    = document.getElementById('c-turno')?.value    || '';
+  const fecha    = document.getElementById('c-fecha')?.value    || '';
+  const hora     = document.getElementById('c-hora')?.value     || '';
+  const entrega  = (document.getElementById('c-entrega')?.value || '').trim();
+  const recibe   = (document.getElementById('c-recibe')?.value  || '').trim();
+  const efectivo = parsePrecio(document.getElementById('c-efectivo')?.value || '0');
+  const bases    = parsePrecio(document.getElementById('c-bases')?.value   || '0');
+  const novedades= (document.getElementById('c-novedades')?.value || '').trim();
+  if(!entrega){ showToast('w','Falta quién entrega','Selecciona el responsable'); return; }
+  if(!recibe) { showToast('w','Falta quién recibe','Selecciona quién recibe');   return; }
+  const btn = document.getElementById('btn-guardar-caja');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-symbols-rounded spin-ico">progress_activity</span> Guardando…';
+  const resumen   = calcResumen();
+  const diferencia= efectivo - bases;
+  const esOk      = Math.abs(diferencia) < 500;
+  const payload   = {
+    turno, fecha, hora, entrega, recibe,
+    efectivo, bases, diferencia,
+    pedidos:  resumen.ent    || 0,
+    totalEf:  resumen.totalEf|| 0,
+    totalTf:  resumen.totalTf|| 0,
+    totalT:   resumen.totalT || 0,
+    estado:   esOk ? 'ok' : diferencia < 0 ? 'faltante' : 'sobrante',
+    novedades,
+    ts: new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})
+  };
   try{
-    await fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({accion:'crear-cierre-caja',...cierre})});
-    await loadCierres();renderCierres();updateSbBadges();
-    showToast('s',`✓ Cierre turno ${turno} registrado`,`${entrega} → ${recibe} · ${esOk?'Caja OK ✓':'Revisar diferencia'}`);
-    ['c-efectivo','c-bases','c-novedades','c-entrega','c-recibe'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-    calcResumen();
-  }catch(e){showToast('e','Error de red',e.message.substring(0,60));}
-  finally{btn.disabled=false;btn.innerHTML='<span class="material-symbols-rounded">check_circle</span>Registrar cierre';}
+    const r = await fetch('/api/contable?recurso=cierres', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const j = await r.json();
+    if(!j.ok) throw new Error(j.error);
+    showToast('s',`✓ Cierre turno ${turno} registrado`,
+      `${entrega} → ${recibe} · ${esOk?'Caja OK ✓':'Revisar diferencia'}`);
+    ['c-efectivo','c-bases','c-novedades','c-entrega','c-recibe'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.value='';
+    });
+    await loadCierres(); renderCierres(); updateSbBadges(); calcResumen();
+  }catch(e){ showToast('e','Error de red', e.message.substring(0,60)); }
+  finally{
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-symbols-rounded">check_circle</span>Registrar cierre';
+  }
 }
 
 function renderPendientesRT(){
