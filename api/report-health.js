@@ -62,7 +62,7 @@ const COLS = {
   instalar:      'instalar_logs', 
 };
 
-// ── HANDLER PRINCIPAL ───────────────────────────────────────
+
 export default async function handler(req, res) {
 
   // Seguridad: solo GET con secret correcto o cron interno
