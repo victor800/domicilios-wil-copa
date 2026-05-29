@@ -1304,22 +1304,48 @@ async function loadDrivers(){
   }
 }
 
-async function loadPedidos(){
-  const text=await fetchCSV('Pedidos');const lines=parseCSVText(text);
-  const valid=lines.filter(l=>{const a=col(l,0).trim();if(!a) return col(l,6).trim().length>0;return /^\d{2,5}$/.test(a);});
-  const pedMap={},pedOrder=[];let lastId=null;
-  valid.forEach(l=>{
-    const id=col(l,0).trim();
-    if(id){
-      if(!pedMap[id]){pedMap[id]={id,cliente:col(l,1),tel:col(l,2),metodo:col(l,3),estado:normEstado(col(l,4)),estadoRaw:col(l,4),imagen:col(l,5),direccion:col(l,11),hora:col(l,12),fecha:col(l,13),total:col(l,14),domi:col(l,15),costoEnvio:col(l,19),tipoEntrega:col(l,20),comercio:col(l,21),_prods:[]};pedOrder.push(id);}
-      lastId=id;
-    }
-    const activeId=id||lastId;const ped=pedMap[activeId];
-    const nom=col(l,6).replace(/\|cat$/,'').trim();
-    if(ped&&nom&&!nom.toLowerCase().startsWith('domicilio ('))ped._prods.push({nom,marca:col(l,7)||'',qty:parseInt(col(l,8))||1,vu:parsePrecio(col(l,9)),vtotal:parsePrecio(col(l,10))});
-  });
-  allPedidos=pedOrder.reverse().map(id=>pedMap[id]);
+async function loadPedidos() {
+  // Llama al mismo API que ya tienes en el backend
+  const res  = await fetch('/api/foto?recurso=pedidos&limit=500');
+  const json = await res.json();
+  if (!json.ok) throw new Error('Error cargando pedidos: ' + json.error);
+
+  allPedidos = json.data.map(p => ({
+    // ── identificación ──────────────────────────────────────
+    id:          p.idPedido   || String(p._id),
+    // ── cliente ─────────────────────────────────────────────
+    cliente:     p.nombre     || '',
+    tel:         p.telefono   || '',
+    direccion:   p.direccion  || '',
+    // ── pago / entrega ───────────────────────────────────────
+    metodo:      p.metodoPago || '',
+    imagen:      p.comprobanteId || '',   // col(l,5) era la imagen/comprobante
+    costoEnvio:  p.domicilio  ?? 0,
+    tipoEntrega: p.modoEntrega || '',
+    // ── estado ───────────────────────────────────────────────
+    estado:      normEstado(p.estado || ''),
+    estadoRaw:   p.estado     || '',
+    // ── logística ────────────────────────────────────────────
+    domi:        p.domiciliarioNombre || '',
+    comercio:    p.comercio   || '',
+    zona:        p.zona       || '',
+    // ── fecha / hora ─────────────────────────────────────────
+    fecha:       p.fecha      || '',
+    hora:        p.hora       || '',
+    // ── totales ──────────────────────────────────────────────
+    total:       p.total      ?? p.subtotal ?? 0,
+    // ── productos (sub-documentos items) ─────────────────────
+    _prods: (p.items || []).map(it => ({
+      nom:    it.producto  || '',
+      marca:  it.laboratorio || '',
+      qty:    it.cantidad  ?? 1,
+      vu:     it.precioUnit ?? 0,
+      vtotal: it.subtotal  ?? 0,
+    })),
+  }));
+  // El CSV se revertía al final; la BD ya viene ordenada por creadoEn desc
 }
+
 async function loadBases(){
   try{const text=await fetchCSV('Bases',10000);const lines=parseCSVText(text);basesData=lines.map(c=>({domi:col(c,0),monto:parsePrecio(col(c,1)),nota:col(c,2),fecha:col(c,3)})).filter(b=>b.domi&&b.monto);}catch(e){basesData=[];}
 }
