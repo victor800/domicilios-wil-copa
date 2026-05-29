@@ -23,13 +23,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 .bg-blob.a{width:340px;height:340px;background:var(--accent);top:-130px;left:-90px}
 .bg-blob.b{width:260px;height:260px;background:var(--accent2);bottom:-70px;right:-70px}
 
-/* ── APP WRAPPER ── */
 #app{
   position:relative;z-index:1;
   max-width:480px;margin:0 auto;width:100%;
   min-height:100vh;min-height:-webkit-fill-available;
   display:flex;flex-direction:column;
-  /* espacio para que el último elemento no quede tapado por el nav fijo */
   padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 16px);
 }
 
@@ -86,6 +84,18 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   display:none;flex-direction:column;align-items:center;gap:22px;
 }
 .geo-screen.active{display:flex}
+
+/* Flecha atrás en la pantalla geo */
+.geo-back-btn{
+  position:absolute;top:14px;left:14px;
+  width:38px;height:38px;background:var(--surface2);
+  border:1px solid var(--border);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:17px;color:var(--text);transition:.2s;
+  text-decoration:none;z-index:10;
+}
+.geo-back-btn:active{border-color:var(--accent)}
+
 .geo-icon{
   width:84px;height:84px;
   background:linear-gradient(135deg,rgba(0,229,160,.15),rgba(0,184,255,.15));
@@ -193,7 +203,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 .dd-item .dd-name{font-weight:500;flex:1}
 .dd-empty{padding:14px;font-size:13px;color:var(--muted);text-align:center}
 
-/* Barrio seleccionado */
 .barrio-selected{
   background:rgba(0,229,160,.06);border:1px solid rgba(0,229,160,.3);
   border-radius:9px;padding:13px 12px;
@@ -342,7 +351,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   padding:3px 9px;border-radius:20px;flex-shrink:0;
 }
 
-/* ── BOTÓN CONFIRMAR (dentro del scroll, paso 3) ── */
+/* ── BOTÓN CONFIRMAR ── */
 .confirm-wrap{padding:4px 14px 8px}
 .confirm-wrap .btn-primary{
   background:linear-gradient(135deg,var(--accent),var(--accent2));
@@ -350,7 +359,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   box-shadow:0 4px 20px rgba(0,229,160,.25);
 }
 
-/* ── BOTTOM NAV (solo pasos 1 y 2) ── */
+/* ── BOTTOM NAV ── */
 .bottom-nav{
   position:fixed;bottom:0;left:50%;transform:translateX(-50%);
   width:100%;max-width:480px;
@@ -479,7 +488,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 <div id="app">
 
   <!-- ══ GEO ══ -->
-  <div class="geo-screen active" id="scr-geo">
+  <div class="geo-screen active" id="scr-geo" style="position:relative">
+    <!-- FIX 1: Flecha atrás en pantalla geo -->
+    <a class="geo-back-btn" href="https://domicilios-wil.vercel.app/pedido-wil.html" aria-label="Volver">←</a>
+
     <div class="geo-icon">📍</div>
     <div><div class="geo-title">Comparte tu<br><span>ubicación</span></div></div>
     <div class="geo-sub">Para asignar el domiciliario más cercano a ti.</div>
@@ -639,7 +651,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
       <div style="height:12px"></div>
     </div>
 
-    <!-- PASO 3 — sin bottom-nav; botón confirmar dentro del scroll -->
+    <!-- PASO 3 -->
     <div class="screen" id="scr3">
       <div class="card">
         <div class="card-title">¿Cómo pagas?</div>
@@ -689,8 +701,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
       <div class="card">
         <div class="card-title">Resumen de entrega</div>
         <div class="summary-section" id="summaryContent"></div>
-        <div class="tip-box" style="font-size:11px;margin-top:8px">
-          ⚠️ Demoras en recogida/entrega: <strong>$2.000 c/15 min</strong>. El tiempo inicia con foto del domiciliario.
+        <!-- FIX 3: mensaje actualizado con info de factura del domi -->
+        <div class="tip-box" style="font-size:11px;margin-top:8px" id="tipBoxTardanza">
+          ⚠️ Demoras en recogida o entrega: <strong>$2.000 cada 15 minutos</strong>. El tiempo inicia cuando el domiciliario envía foto del comprobante de tardanza. En compras, el domiciliario adjuntará la factura al momento de realizar la compra.
         </div>
       </div>
 
@@ -699,14 +712,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
         <div id="sumProductos"></div>
       </div>
 
-      <!-- Botón CONFIRMAR dentro del scroll, visible siempre -->
       <div class="confirm-wrap">
         <button class="btn-primary" id="btnConfirm" onclick="submitPedido()">
           ✅ Confirmar y enviar pedido
         </button>
       </div>
 
-      <!-- Botón Atrás en paso 3, también dentro del scroll -->
       <div style="padding:4px 14px 24px">
         <button class="btn-secondary" onclick="stepBack()">← Atrás</button>
       </div>
@@ -727,12 +738,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
       <div class="tracking-badge-sub">Usa este código para consultar el estado de tu pedido</div>
       <button class="tracking-copy-btn" id="copyTrackBtn" onclick="copyOrderId()">📋 Copiar código</button>
     </div>
-    <button class="btn-primary" style="max-width:280px" onclick="location.reload()">🛍️ Hacer otro pedido</button>
+    <!-- FIX 4: "Hacer otro pedido" vuelve a la ruta correcta -->
+    <a href="https://domicilios-wil.vercel.app/pedido-wil.html" class="btn-primary" style="max-width:280px;text-decoration:none">🛍️ Hacer otro pedido</a>
   </div>
 
-</div><!-- /#app -->
+</div>
 
-<!-- BOTTOM NAV — solo pasos 1 y 2 -->
+<!-- BOTTOM NAV -->
 <div class="bottom-nav" id="bottomNav" style="display:none">
   <div class="nav-btns">
     <button class="btn-back-step" id="btnBack" onclick="stepBack()">← Atrás</button>
@@ -741,14 +753,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 </div>
 
 <script>
-/* ════════════════════════════════════
-   CONFIGURACIÓN — cambia solo esto
-════════════════════════════════════ */
-const API_URL = '/api/foto?tipo=pedido';   // tu endpoint real
+const API_URL = '/api/foto?tipo=pedido';
 
-/* ════════════════════════════════════
-   BARRIOS
-════════════════════════════════════ */
 const BARRIOS=[
   ["ASUNCION",5000],["FÁTIMA",5000],["MIRADOR AZUL",5000],["AZULITA PARTE BAJA",5000],
   ["CRISTO REY (ABAJO DE LA PISCINA)",5000],["HORIZONTES",5000],["MIRAFLORES",5000],
@@ -774,9 +780,6 @@ const BARRIOS=[
   ["PARQUE DE BELLO",18000],["FABRICATO",19000],["UNIDADES DE MADERA",25000]
 ];
 
-/* ════════════════════════════════════
-   ESTADO
-════════════════════════════════════ */
 const st = {
   step:1, svc:'recoger', pago:'efectivo',
   barrio:{recogida:null, entrega:null},
@@ -784,9 +787,7 @@ const st = {
 };
 const fmt = n => '$' + n.toLocaleString('es-CO');
 
-/* ════════════════════════════════════
-   GEO
-════════════════════════════════════ */
+/* ── GEO ── */
 function requestGeo(){
   if(!navigator.geolocation){skipGeo();return;}
   navigator.geolocation.getCurrentPosition(
@@ -803,9 +804,7 @@ function startForm(){
   renderStep();
 }
 
-/* ════════════════════════════════════
-   NAVEGACIÓN PASOS
-════════════════════════════════════ */
+/* ── NAVEGACIÓN ── */
 function renderStep(){
   const s  = st.step;
   const ec = st.svc === 'compra';
@@ -826,11 +825,8 @@ function renderStep(){
 
   if(s===3) buildSummary();
 
-  // Bottom nav solo en pasos 1 y 2
   const nav = document.getElementById('bottomNav');
   nav.style.display = (s < 3) ? 'block' : 'none';
-
-  // En pasos 1/2: mostrar/ocultar botón Atrás del nav
   document.getElementById('btnBack').style.display = s===1 ? 'none' : '';
 
   window.scrollTo({top:0, behavior:'smooth'});
@@ -855,9 +851,7 @@ function stepBack(){
   else { history.back(); }
 }
 
-/* ════════════════════════════════════
-   VALIDACIÓN
-════════════════════════════════════ */
+/* ── VALIDACIÓN ── */
 function validateStep1(){
   const ec = st.svc==='compra';
   if(ec){
@@ -877,9 +871,7 @@ function validateStep2(){
   return true;
 }
 
-/* ════════════════════════════════════
-   SERVICIO / PAGO
-════════════════════════════════════ */
+/* ── SERVICIO / PAGO ── */
 function setSvc(t){
   st.svc = t;
   document.getElementById('svc-recoger').classList.toggle('selected', t==='recoger');
@@ -902,9 +894,7 @@ function setPago(t){
   document.getElementById('tr-section').classList.toggle('hidden', t!=='transferencia');
 }
 
-/* ════════════════════════════════════
-   BARRIOS AUTOCOMPLETE
-════════════════════════════════════ */
+/* ── BARRIOS AUTOCOMPLETE ── */
 let ddF = {recogida:-1, entrega:-1};
 function filterBarrios(w, q){
   const dd = document.getElementById('dd-'+w);
@@ -957,9 +947,7 @@ document.addEventListener('click', e=>{
   });
 });
 
-/* ════════════════════════════════════
-   DETECCIÓN DE PRODUCTOS
-════════════════════════════════════ */
+/* ── PRODUCTOS ── */
 let pid = 0;
 function detectarProductos(txt){
   if(!txt.trim()){ st.productos = st.productos.filter(p=>p.manual); renderProducts(); updateDetectedBadge(); return; }
@@ -1010,9 +998,7 @@ function renderProducts(){
 function chQty(id,d){ const p=st.productos.find(x=>x.id===id); if(!p) return; p.qty=Math.max(1,p.qty+d); renderProducts(); }
 function delProduct(id){ st.productos=st.productos.filter(x=>x.id!==id); renderProducts(); updateDetectedBadge(); }
 
-/* ════════════════════════════════════
-   ARCHIVO COMPROBANTE
-════════════════════════════════════ */
+/* ── ARCHIVO ── */
 function handleFile(inp){
   const f = inp.files[0]; if(!f) return;
   if(f.size > 4*1024*1024){ showToast('❌ Archivo muy grande (máx 4 MB)','error'); return; }
@@ -1040,18 +1026,28 @@ function copyAccount(){
     .then(()=>showToast('✅ Número copiado','success')).catch(()=>{});
 }
 
-/* ════════════════════════════════════
-   RESUMEN PASO 3
-════════════════════════════════════ */
+/* ── RESUMEN ── */
 function buildSummary(){
   const r = st.barrio.recogida, e = st.barrio.entrega, ec = st.svc==='compra';
+
+  // FIX 2: tarifa correcta — compra usa solo precio de entrega; recoger usa el mayor
+  const tarifa = ec
+    ? (e ? e.price : 0)
+    : (r && e ? Math.max(r.price, e.price) : (e ? e.price : 0));
+
   const rows = [['Servicio', ec?'🛒 Realizar Compra':'🏪 Recoger y Entregar']];
   if(!ec) rows.push(['Recogida', r?r.name:'—'], ['Comercio', v('comercio')||'—']);
-  rows.push(['Entrega', e?e.name:'—'], ['Dirección', v('direccion')]);
+  rows.push(
+    ['Entrega', e?e.name:'—'],
+    ['Tarifa domicilio', fmt(tarifa)],   // ← tarifa mostrada en resumen
+    ['Dirección', v('direccion')]
+  );
   if(v('referencia')) rows.push(['Referencia', v('referencia')]);
   rows.push(['Cliente', v('nombre')], ['Teléfono', v('tel-cliente')]);
+
   document.getElementById('summaryContent').innerHTML =
     rows.map(([k,vv])=>`<div class="sum-row"><span class="k">${k}</span><span class="v">${vv}</span></div>`).join('');
+
   const pw = document.getElementById('sumProductos');
   if(pw) pw.innerHTML = st.productos.length
     ? st.productos.map(p=>`
@@ -1063,29 +1059,29 @@ function buildSummary(){
     : '<div style="font-size:12px;color:var(--muted);padding:6px 0">Sin productos</div>';
 }
 
-/* ════════════════════════════════════
-   ENVÍO A LA BD  →  POST /api/foto?tipo=pedido
-════════════════════════════════════ */
+/* ── ENVÍO ── */
 async function submitPedido(){
   if(st.pago==='transferencia' && !st.file){
     showToast('⚠️ Adjunta el comprobante de pago','error'); return;
   }
 
-  // Deshabilitar botón para evitar doble envío
   const btn = document.getElementById('btnConfirm');
   btn.disabled = true;
   showLoader('Enviando tu pedido…');
 
   try {
-    const r = st.barrio.recogida, e = st.barrio.entrega;
-    const tarifa = r && e ? Math.max(r.price, e.price) : (e ? e.price : 0);
+    const r = st.barrio.recogida, e = st.barrio.entrega, ec = st.svc==='compra';
+
+    // FIX 1: tarifa según tipo de servicio
+    const tarifa = ec
+      ? (e ? e.price : 0)
+      : (r && e ? Math.max(r.price, e.price) : (e ? e.price : 0));
+
     const idPedido = 'WIL-' + Date.now().toString().slice(-6);
 
-    // Comprobante → base64
     let comprobanteBase64 = null;
     if(st.file) comprobanteBase64 = 'data:'+st.file.type+';base64,' + await toBase64(st.file);
 
-    // Hora y fecha
     const now = new Date();
     const fecha = now.toLocaleDateString('es-CO');
     const hora  = now.toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'});
@@ -1099,18 +1095,17 @@ async function submitPedido(){
       coords:          st.geo.lat ? {lat: st.geo.lat, lng: st.geo.lng} : null,
       modoEntrega:     'DOMICILIO',
       zona:            e ? e.name : '',
-      domicilio:       tarifa,
+      domicilio:       tarifa,          // ← FIX: valor correcto enviado a la BD
       metodoPago:      st.pago,
       comprobanteBase64,
       comercio:        v('comercio') || '',
-      // productos → filas  (formato compatible con el schema rows[6..10])
       rows: st.productos.map(p => [
-        '','','','','','',   // cols 0-5 vacías
-        p.name,              // col 6 producto
-        '',                  // col 7 laboratorio
-        p.qty,               // col 8 cantidad
-        0,                   // col 9 precioUnit
-        0                    // col 10 subtotal
+        '','','','','','',
+        p.name,
+        '',
+        p.qty,
+        0,
+        0
       ]),
       total:   tarifa,
       fecha,
@@ -1118,6 +1113,7 @@ async function submitPedido(){
       destinatario: {
         barrio_recogida: r ? r.name : null,
         barrio_entrega:  e ? e.name : null,
+        precio_domicilio: tarifa,       // ← también en destinatario por claridad
         tel_recogida:    v('tel-recogida') || null,
         referencia:      v('referencia')   || null,
         notas:           v('notas')        || null,
@@ -1143,7 +1139,6 @@ async function submitPedido(){
   } catch(err) {
     hideLoader();
     btn.disabled = false;
-    // Si no hay backend todavía, igual mostramos éxito local para pruebas
     if(err.message.includes('Failed to fetch') || err.message.includes('NetworkError')){
       showSuccess('WIL-' + Date.now().toString().slice(-6));
     } else {
@@ -1159,9 +1154,7 @@ function showSuccess(id){
   document.getElementById('scr-success').classList.add('active');
 }
 
-/* ════════════════════════════════════
-   UTILIDADES
-════════════════════════════════════ */
+/* ── UTILIDADES ── */
 function copyOrderId(){
   const code = document.getElementById('orderId').textContent;
   navigator.clipboard.writeText(code).then(()=>{
