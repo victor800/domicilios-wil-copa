@@ -419,9 +419,14 @@ table.ptbl tbody tr.cancelado-row td:first-child{border-left:3px solid var(--red
 
 <script>
 /* ══════════════════════════════════════════
-   CONFIG — ajusta la URL base de tu API
+   CONFIG
+   API = URL base de tu backend (sin slash final).
+   Si el HTML vive en el MISMO dominio que la API,
+   déjalo como cadena vacía ''.
+   Si es dominio distinto, pon la URL completa:
+     const API = 'https://domicilios-wil.vercel.app';
 ══════════════════════════════════════════ */
-const API = '/api/foto?tipo=pedido';  // '' = mismo dominio, o pon 'https://tudominio.vercel.app'
+const API = 'https://domicilios-wil.vercel.app';
 
 /* ══════════════════════════════════════════
    STATE
@@ -482,6 +487,7 @@ function domiAvatar(domi, size=44, radius=13) {
 
 /* ══════════════════════════════════════════
    API CALLS
+   Todas las rutas usan ${API}/api/pedidos?recurso=...
 ══════════════════════════════════════════ */
 async function fetchDomis() {
   const r = await fetch(`${API}/api/pedidos?recurso=domiciliarios`);
@@ -706,7 +712,6 @@ function cancelarAsign() {
 
 function selChip(domiId, domiNombre) {
   const sel = document.getElementById('asign-select');
-  // buscar por data-nombre
   for (const opt of sel.options) {
     if (opt.dataset.nombre === domiNombre) { sel.value = opt.value; break; }
   }
@@ -726,7 +731,6 @@ async function ejecutarAsignacion() {
   try {
     const json = await apiAsignar(pedidoSelId, domiId, domiNombre);
     if (json.ok !== false) {
-      // actualizar en memoria
       const p = allPedidos.find(x => (x.idPedido||x._id?.toString()) === pedidoSelId);
       if (p) { p.domiciliarioNombre = domiNombre; p.domiciliarioId = domiId; p.estado = 'Asignado'; }
       showToast('s','✓ Asignado',`${domiNombre} → Pedido ${pedidoSelId}`);
@@ -909,7 +913,6 @@ async function cambiarEstadoModal(pedidoId, nuevoEstado, btnEl) {
   if (json.ok !== false) {
     const p = allPedidos.find(x => (x.idPedido||x._id?.toString()) === pedidoId);
     if (p) p.estado = nuevoEstado;
-    // actualizar botones activos
     document.querySelectorAll('#modal-estado-btns .estado-btn').forEach(b => b.classList.remove('active'));
     btnEl.classList.add('active');
     showToast('s','Estado actualizado', estadoLabel(nuevoEstado));
