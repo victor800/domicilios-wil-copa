@@ -41,7 +41,7 @@ async function sendTelegram(text) {
   return res.json();
 }
 
-// ── Helpers ─────────────────────────────────────────────────
+
 const fmt = (n) => (n ?? 0).toLocaleString('es-CO');
 const pct = (a, b) => (b ? ((a / b) * 100).toFixed(1) + '%' : '—');
 const bar = (v, max, len = 8) => {
