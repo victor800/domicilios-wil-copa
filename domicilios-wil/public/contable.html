@@ -1305,45 +1305,39 @@ async function loadDrivers(){
 }
 
 async function loadPedidos() {
-  // Llama al mismo API que ya tienes en el backend
-  const res  = await fetch('/api/foto?recurso=pedidos&limit=500');
-  const json = await res.json();
-  if (!json.ok) throw new Error('Error cargando pedidos: ' + json.error);
-
-  allPedidos = json.data.map(p => ({
-    // ── identificación ──────────────────────────────────────
-    id:          p.idPedido   || String(p._id),
-    // ── cliente ─────────────────────────────────────────────
-    cliente:     p.nombre     || '',
-    tel:         p.telefono   || '',
-    direccion:   p.direccion  || '',
-    // ── pago / entrega ───────────────────────────────────────
-    metodo:      p.metodoPago || '',
-    imagen:      p.comprobanteId || '',   // col(l,5) era la imagen/comprobante
-    costoEnvio:  p.domicilio  ?? 0,
-    tipoEntrega: p.modoEntrega || '',
-    // ── estado ───────────────────────────────────────────────
-    estado:      normEstado(p.estado || ''),
-    estadoRaw:   p.estado     || '',
-    // ── logística ────────────────────────────────────────────
-    domi:        p.domiciliarioNombre || '',
-    comercio:    p.comercio   || '',
-    zona:        p.zona       || '',
-    // ── fecha / hora ─────────────────────────────────────────
-    fecha:       p.fecha      || '',
-    hora:        p.hora       || '',
-    // ── totales ──────────────────────────────────────────────
-    total:       p.total      ?? p.subtotal ?? 0,
-    // ── productos (sub-documentos items) ─────────────────────
-    _prods: (p.items || []).map(it => ({
-      nom:    it.producto  || '',
-      marca:  it.laboratorio || '',
-      qty:    it.cantidad  ?? 1,
-      vu:     it.precioUnit ?? 0,
-      vtotal: it.subtotal  ?? 0,
-    })),
-  }));
-  // El CSV se revertía al final; la BD ya viene ordenada por creadoEn desc
+  try {
+    const res  = await fetch('/api/foto?recurso=pedidos&limit=500');
+    const json = await res.json();
+    if (!json.ok) throw new Error('Error cargando pedidos: ' + json.error);
+    allPedidos = json.data.map(p => ({
+      id:          p.idPedido   || String(p._id),
+      cliente:     p.nombre     || '',
+      tel:         p.telefono   || '',
+      direccion:   p.direccion  || '',
+      metodo:      p.metodoPago || '',
+      imagen:      p.comprobanteId || '',
+      costoEnvio:  p.domicilio  ?? 0,
+      tipoEntrega: p.modoEntrega || '',
+      estado:      normEstado(p.estado || ''),
+      estadoRaw:   p.estado     || '',
+      domi:        p.domiciliarioNombre || '',
+      comercio:    p.comercio   || '',
+      zona:        p.zona       || '',
+      fecha:       p.fecha      || '',
+      hora:        p.hora       || '',
+      total:       p.total      ?? p.subtotal ?? 0,
+      _prods: (p.items || []).map(it => ({
+        nom:    it.producto  || '',
+        marca:  it.laboratorio || '',
+        qty:    it.cantidad  ?? 1,
+        vu:     it.precioUnit ?? 0,
+        vtotal: it.subtotal  ?? 0,
+      })),
+    }));
+  } catch(e) {
+    console.warn('[loadPedidos]:', e.message);
+    allPedidos = [];  // no rompe el resto
+  }
 }
 
 async function loadBases(){
@@ -2248,7 +2242,7 @@ async function doRefresh(){
   document.getElementById('sync-state').textContent='Actualizando…';
   document.getElementById('sync-state').style.color='var(--orange)';
   try{
-    await Promise.all([loadDrivers(),loadPedidos(),loadBases(),loadMultas(),loadCierres()]);
+    await Promise.all([loadDrivers(), loadPedidos(), loadBases(), loadMultas(), loadCierres()]);
     renderAll();
     const hora=new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
     document.getElementById('sync-hora').textContent=hora;
@@ -2256,9 +2250,10 @@ async function doRefresh(){
     document.getElementById('sync-state').textContent='✓ Sincronizado';
     document.getElementById('sync-state').style.color='var(--teal)';
   }catch(e){
+    console.error('[doRefresh] error completo:', e);  // <-- ver stack completo
     document.getElementById('sync-state').textContent='Error sync';
     document.getElementById('sync-state').style.color='var(--red)';
-    showToast('e','Error de conexión',e.message.substring(0,80));
+    showToast('e','Error de conexión', e.message.substring(0,120));  // más chars
   }
 }
 
