@@ -45,7 +45,6 @@ function spark(values) {
 // ── Guías de respuesta a incidentes ─────────────────────────
 function guiaAtaque(tipo, datos = {}) {
   const guias = {
-
     ip_sospechosa: {
       titulo: '🕵️ IP SOSPECHOSA — POSIBLE SCRAPING / BOT',
       donde: [
@@ -60,7 +59,6 @@ function guiaAtaque(tipo, datos = {}) {
         '  >> Código: npm install express-rate-limit y aplica en /api/*',
       ],
     },
-
     brute_force: {
       titulo: '🔐 FUERZA BRUTA — INTENTOS DE LOGIN',
       donde: [
@@ -76,7 +74,6 @@ function guiaAtaque(tipo, datos = {}) {
         '  >> npm install express-rate-limit → limita /api/auth a 5 req/min',
       ],
     },
-
     exploit: {
       titulo: '☠️ INTENTO DE EXPLOIT — ATAQUE ACTIVO',
       donde: [
@@ -93,7 +90,6 @@ function guiaAtaque(tipo, datos = {}) {
         '  >> Revisa MongoDB Atlas → accesos recientes en Security → Audit Log',
       ],
     },
-
     bot_scanner: {
       titulo: '🤖 BOT / SCANNER DETECTADO',
       donde: [
@@ -108,7 +104,6 @@ function guiaAtaque(tipo, datos = {}) {
         '  >> Si es nikto/sqlmap: reporta IP en abuseipdb.com',
       ],
     },
-
     errores_500: {
       titulo: '🔴 ERRORES 500 — FALLO INTERNO',
       donde: [
@@ -123,7 +118,6 @@ function guiaAtaque(tipo, datos = {}) {
         '  >> Si persiste: npm run dev localmente y reproduce el error',
       ],
     },
-
     sin_domiciliario: {
       titulo: '⚠️ PEDIDOS SIN DOMICILIARIO',
       donde: [
@@ -136,7 +130,6 @@ function guiaAtaque(tipo, datos = {}) {
         '  >> Si es recurrente: revisa el flujo de asignación automática',
       ],
     },
-
     cancelaciones: {
       titulo: '❌ ALTO ÍNDICE DE CANCELACIONES',
       donde: [
@@ -150,7 +143,6 @@ function guiaAtaque(tipo, datos = {}) {
         '  >> Si son pedidos sin domiciliario: hay escasez de domis activos',
       ],
     },
-
     errores_404: {
       titulo: '🔍 EXCESO DE ERRORES 404 — POSIBLE SCRAPING',
       donde: [
@@ -164,7 +156,6 @@ function guiaAtaque(tipo, datos = {}) {
         '  >> Usa Cloudflare Bot Fight Mode (gratis) para filtrar bots',
       ],
     },
-
     duplicados: {
       titulo: '🔁 TELÉFONOS CON MÚLTIPLES PEDIDOS',
       donde: [
@@ -179,7 +170,6 @@ function guiaAtaque(tipo, datos = {}) {
       ],
     },
   };
-
   return guias[tipo] || null;
 }
 
@@ -258,15 +248,22 @@ export default async function handler(req, res) {
       ]).toArray(),
     ]);
 
-    // ── SEGURIDAD ────────────────────────────────────────────
+    // ── SEGURIDAD + TRÁFICO ──────────────────────────────────
     let accesosUltimaHora=0, accesos24h=0, errores404=0, errores500=0;
     let ipsSospechosas=[], ipsNuevas=[], agentesRaros=[];
     let peticionesRaras=[], pathsMasFrecuentes=[], trafficPorHora=[];
     let intentosBrute=0, descargasAPK=0;
 
+    // ── NUEVAS: rutas con detalle ok/fail + login por IP ────
+    let rutasDetalle=[], loginPorIP=[], loginOk=0, loginFail=0;
+
     try {
       const colLogs = db.collection(COLS.logs);
-      const [a1h,a24h,e404,e500,ips,ipN,agt,brute,paths,petR,trafH] = await Promise.all([
+      const [
+        a1h, a24h, e404, e500, ips, ipN, agt, brute,
+        paths, petR, trafH,
+        rutDet, logIP, logResumen,
+      ] = await Promise.all([
         colLogs.countDocuments({ ts: { $gte: hace1h } }),
         colLogs.countDocuments({ ts: { $gte: hace24h } }),
         colLogs.countDocuments({ ts: { $gte: hace1h }, status: 404 }),
@@ -278,10 +275,61 @@ export default async function handler(req, res) {
         colLogs.aggregate([{ $match: { ts: { $gte: hace24h } } },{ $group: { _id: '$path', count: { $sum: 1 } } },{ $sort: { count: -1 } },{ $limit: 5 }]).toArray(),
         colLogs.aggregate([{ $match: { ts: { $gte: hace24h }, path: { $regex: /\.env|\.git|wp-admin|phpmyadmin|eval\(|select\s+\*|union\s+select|<script|passwd|etc\/shadow|base64_decode/i } } },{ $group: { _id: '$path', count: { $sum: 1 }, ip: { $first: '$ip' } } },{ $sort: { count: -1 } },{ $limit: 5 }]).toArray(),
         colLogs.aggregate([{ $match: { ts: { $gte: hace6h } } },{ $group: { _id: { $hour: '$ts' }, count: { $sum: 1 } } },{ $sort: { _id: 1 } }]).toArray(),
+
+        // ── NUEVO: top rutas con conteo ok (2xx) y fail (4xx/5xx) ──
+        colLogs.aggregate([
+          { $match: { ts: { $gte: hace24h } } },
+          { $group: {
+            _id: '$path',
+            total:  { $sum: 1 },
+            ok:     { $sum: { $cond: [{ $and: [{ $gte: ['$status', 200] }, { $lt: ['$status', 400] }] }, 1, 0] } },
+            fail:   { $sum: { $cond: [{ $gte: ['$status', 400] }, 1, 0] } },
+            s500:   { $sum: { $cond: [{ $gte: ['$status', 500] }, 1, 0] } },
+          }},
+          { $sort: { total: -1 } },
+          { $limit: 8 },
+        ]).toArray(),
+
+        // ── NUEVO: intentos login fallidos agrupados por IP ──
+        colLogs.aggregate([
+          { $match: {
+            ts:     { $gte: hace24h },
+            method: 'POST',
+            path:   { $regex: /auth|login|signin/i },
+            status: { $gte: 400 },
+          }},
+          { $group: {
+            _id:       '$ip',
+            intentos:  { $sum: 1 },
+            ultimaVez: { $max: '$ts' },
+          }},
+          { $sort: { intentos: -1 } },
+          { $limit: 5 },
+        ]).toArray(),
+
+        // ── NUEVO: total login ok vs fail en 24h ──
+        colLogs.aggregate([
+          { $match: {
+            ts:     { $gte: hace24h },
+            method: 'POST',
+            path:   { $regex: /auth|login|signin/i },
+          }},
+          { $group: {
+            _id: null,
+            ok:   { $sum: { $cond: [{ $and: [{ $gte: ['$status', 200] }, { $lt: ['$status', 400] }] }, 1, 0] } },
+            fail: { $sum: { $cond: [{ $gte: ['$status', 400] }, 1, 0] } },
+          }},
+        ]).toArray(),
       ]);
+
       accesosUltimaHora=a1h; accesos24h=a24h; errores404=e404; errores500=e500;
       ipsSospechosas=ips; ipsNuevas=ipN; agentesRaros=agt;
       intentosBrute=brute; pathsMasFrecuentes=paths; peticionesRaras=petR; trafficPorHora=trafH;
+      rutasDetalle=rutDet;
+      loginPorIP=logIP;
+      loginOk   = logResumen[0]?.ok   || 0;
+      loginFail = logResumen[0]?.fail  || 0;
+
     } catch(_) {}
 
     try {
@@ -362,6 +410,11 @@ export default async function handler(req, res) {
     if (pedidosIncompletos > 0) {
       alertasStr.push(`  >> ${pedidosIncompletos} pedido(s) con datos incompletos`);
     }
+    if (loginFail > 20) {
+      alertasStr.push(`  >> ${loginFail} intentos de login fallidos en 24h`);
+      const g = guiaAtaque('brute_force');
+      if (g && !guiasBlocks.find(x => x.titulo === g.titulo)) guiasBlocks.push(g);
+    }
 
     const hayAlertas = alertasStr.length > 0;
     const nivelSeguridad = hayAlertas ? Math.max(10, 100 - (guiasBlocks.length * 18)) : 100;
@@ -394,8 +447,8 @@ ${g.pasos.join('\n')}`).join('\n');
     const trafficHoraLines = horasLabels.map((l,i) => `  ${l} ${barChart(trafficValues[i], maxTraffic,  14)}  ${String(trafficValues[i]).padStart(5,' ')}`).join('\n');
     const attackHoraLines  = horasLabels.map((l,i) => `  ${l} ${barChart(attackValues[i],  maxAttack,   14, true)}  ${String(attackValues[i]).padStart(4,' ')}`).join('\n');
 
-    const maxDomiPed    = Math.max(...conPedidos.map(d => d.pedidosHoy), 1);
-    const domiLines     = conPedidos.filter(d => d.pedidosHoy > 0)
+    const maxDomiPed = Math.max(...conPedidos.map(d => d.pedidosHoy), 1);
+    const domiLines  = conPedidos.filter(d => d.pedidosHoy > 0)
       .map((d,i) => `  #${String(i+1).padStart(2,'0')} ${d.nombre.substring(0,10).padEnd(10,' ')} ${barChart(d.pedidosHoy, maxDomiPed, 10)}  ${d.pedidosHoy}`)
       .join('\n') || '  >> sin movimiento hoy';
 
@@ -404,9 +457,9 @@ ${g.pasos.join('\n')}`).join('\n');
       `  ${String(i+1).padStart(2,'0')} ${(c._id||'?').substring(0,10).padEnd(10,' ')} ${barChart(c.total, maxCom, 10)}  ${c.total}`
     ).join('\n') || '  >> sin datos';
 
-    const estadosOrden  = [['pendiente','PEND'],['asignado','ASIG'],['proceso','PROC'],['encamino','ENVO'],['entregado','ENTR'],['cancelado','CANC']];
-    const maxEst        = Math.max(...estadosOrden.map(([k]) => estadoMap[k]||0), 1);
-    const estadoLines   = estadosOrden.map(([k,label]) => {
+    const estadosOrden = [['pendiente','PEND'],['asignado','ASIG'],['proceso','PROC'],['encamino','ENVO'],['entregado','ENTR'],['cancelado','CANC']];
+    const maxEst       = Math.max(...estadosOrden.map(([k]) => estadoMap[k]||0), 1);
+    const estadoLines  = estadosOrden.map(([k,label]) => {
       const n = estadoMap[k]||0; if (!n) return null;
       return `  ${label} ${barChart(n, maxEst, 12, k==='cancelado')}  ${String(n).padStart(4,' ')}`;
     }).filter(Boolean).join('\n') || '  >> sin datos';
@@ -423,10 +476,30 @@ ${g.pasos.join('\n')}`).join('\n');
       ? peticionesRaras.map(x => `  [${x.count}x] ${(x._id||'?').substring(0,28)} >> ${x.ip||'?'}`).join('\n')
       : '  >> ninguno detectado';
 
-    const maxPath  = pathsMasFrecuentes[0]?.count || 1;
-    const pathLines = pathsMasFrecuentes.length
-      ? pathsMasFrecuentes.map(p => `  ${barChart(p.count, maxPath, 8)}  ${(p._id||'/').substring(0,25)}  (${p.count})`).join('\n')
+    // ── NUEVO: rutas con ok/fail detallado ───────────────────
+    const maxRutTotal = rutasDetalle[0]?.total || 1;
+    const rutasLines  = rutasDetalle.length
+      ? rutasDetalle.map(r => {
+          const ruta  = (r._id || '/').substring(0, 22).padEnd(22, ' ');
+          const bar   = barChart(r.total, maxRutTotal, 8, r.fail > r.ok);
+          const okStr   = String(r.ok  ).padStart(4, ' ');
+          const failStr = String(r.fail).padStart(4, ' ');
+          const s5Str   = r.s500 > 0 ? ` 💀${r.s500}` : '';
+          return `  ${ruta} ${bar}  ✅${okStr} ❌${failStr}${s5Str}`;
+        }).join('\n')
       : '  >> sin datos';
+
+    // ── NUEVO: login fallidos por IP ─────────────────────────
+    const loginIPLines = loginPorIP.length
+      ? loginPorIP.map(x => {
+          const ip  = (x._id || '?').padEnd(16, ' ');
+          const bar = barChart(x.intentos, loginPorIP[0].intentos, 10, true);
+          const hora = x.ultimaVez
+            ? new Date(x.ultimaVez).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Bogota' })
+            : '??:??';
+          return `  ${ip} ${bar}  ${x.intentos} intentos  última: ${hora}`;
+        }).join('\n')
+      : '  >> ningún intento fallido';
 
     const sparkPed     = spark(horasValues);
     const sparkTraffic = spark(trafficValues);
@@ -497,8 +570,19 @@ ${domiLines}
   TRAFICO/HORA:
 ${trafficHoraLines}
 
-  RUTAS MAS VISITADAS:
-${pathLines}
+  RUTAS 24H  [ruta               ]  ✅ OK  ❌FAIL
+${rutasLines}
+
+┌─────────────────────────────────────┐
+│  🔑  L O G I N   A U D I T          │
+├─────────────────────────────────────┤
+  Intentos 24h  >>  ${fmt(loginOk + loginFail)}
+  Exitosos      >>  ✅ ${fmt(loginOk)}
+  Fallidos      >>  ❌ ${fmt(loginFail)}
+  Tasa exito    >>  ${(loginOk + loginFail > 0 ? (loginOk / (loginOk + loginFail) * 100).toFixed(1) : '0.0')}%
+
+  IPs CON FALLOS (24h):
+${loginIPLines}
 
 ┌─────────────────────────────────────┐
 │  🔒  S E G U R I D A D              │
@@ -577,6 +661,7 @@ ${guiasSection}
       pedidosUltimaHora,
       totalVentas,
       descargasAPK,
+      login: { ok: loginOk, fail: loginFail },
       alertas: alertasStr.length,
       incidentes: guiasBlocks.length,
       seguridad: {

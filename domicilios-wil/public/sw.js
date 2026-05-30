@@ -3,7 +3,7 @@
    Versión: 2.0  |  Polling cada 30s en background
    ═══════════════════════════════════════════════════════════ */
 
-var SW_VERSION   = 'wil-sw-v2.0';
+var SW_VERSION = 'wil-sw-v2.0-20250529';
 var POLL_MS_BG   = 30 * 1000;   // 30 seg en background
 var POLL_MS_FG   = 0;            // En foreground lo maneja la página
 var SHEET_ID     = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
