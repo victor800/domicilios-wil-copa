@@ -1661,12 +1661,15 @@ function renderMultas(){
   if(multas.length){
     if(pyps.length)html+=`<div style="height:1px;background:var(--border);margin:8px 0;"></div>`;
     html+=`<div style="font-size:8px;font-weight:800;color:var(--red);text-transform:uppercase;letter-spacing:.1em;margin-bottom:7px;display:flex;align-items:center;gap:4px;"><span class="material-symbols-rounded" style="font-size:13px;">gavel</span>Multas / Descuentos</div>`;
-    html+=multas.slice().reverse().map(m=>{onclick="deleteMulta('${m._id}')";const lbl={multa:'Multa',otro:'Descuento'}[m.tipo]||'Multa';return `<div class="bm-item">
-      <div class="bm-ico" style="background:var(--red-l);color:var(--red);"><span class="material-symbols-rounded" style="font-size:14px;">gavel</span></div>
-      <div style="flex:1;"><div class="bm-name">${m.domi} <span class="tag multa">${lbl}</span></div><div class="bm-meta">${m.nota||'Sin nota'} · ${m.fecha||'—'}</div></div>
-      <div class="bm-amount" style="color:var(--red);">-${fmtMoney(m.monto)}</div>
-      <button class="bm-del" onclick="deleteMulta(${i})"><span class="material-symbols-rounded" style="font-size:12px;">delete</span></button>
-    </div>`;}).join('');
+    html+=multas.slice().reverse().map(m=>{
+  const lbl={multa:'Multa',otro:'Descuento'}[m.tipo]||'Multa';
+  return `<div class="bm-item">
+    <div class="bm-ico" style="background:var(--red-l);color:var(--red);"><span class="material-symbols-rounded" style="font-size:14px;">gavel</span></div>
+    <div style="flex:1;"><div class="bm-name">${m.domi} <span class="tag multa">${lbl}</span></div><div class="bm-meta">${m.nota||'Sin nota'} · ${m.fecha||'—'}</div></div>
+    <div class="bm-amount" style="color:var(--red);">-${fmtMoney(m.monto)}</div>
+    <button class="bm-del" onclick="deleteMulta('${m._id}')"><span class="material-symbols-rounded" style="font-size:12px;">delete</span></button>
+  </div>`;
+}).join('');
   }
   el.innerHTML=html;
 }
