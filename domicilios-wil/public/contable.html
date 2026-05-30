@@ -23,12 +23,28 @@
 body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
 ::-webkit-scrollbar{width:5px;height:5px;}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px;}
+
+/* ── ANIMACIONES ── */
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
 @keyframes bk{0%,100%{opacity:1}50%{opacity:.3}}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(40,185,193,.4)}50%{box-shadow:0 0 0 8px rgba(40,185,193,0)}}
 @keyframes slideIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
 @keyframes pulseRed{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.4)}50%{box-shadow:0 0 0 6px rgba(220,38,38,0)}}
+
+/* ── RADAR EFECTOS ── */
+@keyframes radarPulse{
+  0%  {transform:scale(0.55);opacity:.9;}
+  100%{transform:scale(2.4); opacity:0;}
+}
+@keyframes haloPulse{
+  0%,100%{transform:scale(1);   opacity:.45;}
+  50%    {transform:scale(1.18);opacity:.12;}
+}
+@keyframes dotOnline{
+  0%,100%{box-shadow:0 0 3px #22c55e;}
+  50%    {box-shadow:0 0 10px #22c55e,0 0 22px #22c55e55;}
+}
 
 /* TOPBAR */
 .topbar{position:fixed;top:0;left:0;right:0;height:var(--topbar);background:rgba(7,30,34,.97);backdrop-filter:blur(20px);border-bottom:1px solid rgba(40,185,193,.18);display:flex;align-items:center;padding:0 18px 0 14px;gap:10px;z-index:200;}
@@ -431,50 +447,35 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 <!-- SIDEBAR -->
 <aside class="sidebar">
   <div class="sb-section">Módulo Contable</div>
-
   <button class="sb-item active" id="sb-dashboard" onclick="setView('dashboard')">
-    <span class="material-symbols-rounded">dashboard</span>
-    Dashboard
+    <span class="material-symbols-rounded">dashboard</span>Dashboard
   </button>
-
   <div class="sb-divider"></div>
   <div class="sb-section">Operaciones</div>
-
   <button class="sb-item" id="sb-pedidos" onclick="setView('pedidos')">
-    <span class="material-symbols-rounded">package_2</span>
-    Pedidos
+    <span class="material-symbols-rounded">package_2</span>Pedidos
     <span class="sb-badge teal" id="sb-badge-pend">–</span>
   </button>
-
   <div class="sb-divider"></div>
   <div class="sb-section">Caja</div>
-
   <button class="sb-item" id="sb-caja-res" onclick="setView('caja');setCajaTab('resumen')">
-    <span class="material-symbols-rounded">bar_chart</span>
-    Resumen financiero
+    <span class="material-symbols-rounded">bar_chart</span>Resumen financiero
   </button>
   <button class="sb-item" id="sb-caja-base" onclick="setView('caja');setCajaTab('bases')">
-    <span class="material-symbols-rounded">account_balance_wallet</span>
-    Asignar base
+    <span class="material-symbols-rounded">account_balance_wallet</span>Asignar base
   </button>
   <button class="sb-item" id="sb-caja-multa" onclick="setView('caja');setCajaTab('multas')">
-    <span class="material-symbols-rounded">gavel</span>
-    Multa / Pico &amp; Placa
+    <span class="material-symbols-rounded">gavel</span>Multa / Pico &amp; Placa
   </button>
   <button class="sb-item" id="sb-caja-cierre" onclick="setView('caja');setCajaTab('cierres')">
-    <span class="material-symbols-rounded">point_of_sale</span>
-    Cierre de caja
+    <span class="material-symbols-rounded">point_of_sale</span>Cierre de caja
     <span class="sb-badge" id="sb-badge-cierres" style="background:var(--teal-m);color:var(--teal);">–</span>
   </button>
-
   <div class="sb-divider"></div>
   <div class="sb-section">Equipo</div>
-
   <button class="sb-item" id="sb-domis" onclick="setView('domis')">
-    <span class="material-symbols-rounded">badge</span>
-    Registrar Domiciliarios
+    <span class="material-symbols-rounded">badge</span>Registrar Domiciliarios
   </button>
-
   <div class="sb-footer">
     <div class="sb-footer-item">
       <span class="material-symbols-rounded">schedule</span>
@@ -649,7 +650,6 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
       </div>
     </div>
   </div>
-  <!-- FIN view-dashboard -->
 
   <!-- ════ VISTA PEDIDOS ════ -->
   <div class="view" id="view-pedidos">
@@ -714,7 +714,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
         <div style="padding:14px 16px 0;">
           <div style="font-size:8px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.11em;margin-bottom:10px;display:flex;align-items:center;gap:5px;">
             <div class="rt-live-dot" style="width:6px;height:6px;border-radius:50%;background:var(--green);animation:bk 1.4s infinite;"></div>
-            Domiciliarios activos · actualización 30s
+            Domiciliarios activos · actualización 12s
           </div>
           <div id="rastreo-domis-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:14px;"></div>
         </div>
@@ -1010,7 +1010,6 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
           <span class="material-symbols-rounded">check_circle</span>Registrar cierre
         </button>
       </div>
-
       <div class="panel">
         <div class="panel-hdr">
           <div class="panel-hdr-ico" style="background:var(--teal-m);color:var(--teal-d);">
@@ -1034,40 +1033,30 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
         <p>Registrar nuevos domiciliarios en el sistema</p>
       </div>
     </div>
-
     <div class="grid-2b">
       <div class="inline-form" style="border-color:rgba(40,185,193,.25);background:linear-gradient(135deg,rgba(40,185,193,.03),rgba(40,185,193,.01));">
         <div class="inline-form-title" style="color:var(--teal);">
           <span class="material-symbols-rounded" style="color:var(--teal);">person_add</span>
           Nuevo domiciliario
         </div>
-
         <div class="field">
-          <label>
-            <span class="material-symbols-rounded">badge</span>
-            ID WIL <span style="color:var(--red);">*</span>
-          </label>
+          <label><span class="material-symbols-rounded">badge</span>ID WIL <span style="color:var(--red);">*</span></label>
           <div style="display:flex;gap:7px;">
             <input id="nd-id" type="text" placeholder="WIL-028" style="flex:1;" oninput="this.value=this.value.toUpperCase()">
             <button class="btn btn-ghost btn-sm" onclick="sugerirIdWil()" title="Sugerir siguiente ID">
               <span class="material-symbols-rounded">auto_fix_high</span>
             </button>
           </div>
-          <span style="font-size:9px;color:var(--text3);margin-top:3px;display:block;" id="nd-id-hint">
-            Haz clic en ✨ para sugerir el siguiente ID disponible
-          </span>
+          <span style="font-size:9px;color:var(--text3);margin-top:3px;display:block;" id="nd-id-hint">Haz clic en ✨ para sugerir el siguiente ID disponible</span>
         </div>
-
         <div class="field">
           <label><span class="material-symbols-rounded">person</span>Nombre completo <span style="color:var(--red);">*</span></label>
           <input id="nd-nombre" type="text" placeholder="Ej: Juan Felipe David">
         </div>
-
         <div class="field">
           <label><span class="material-symbols-rounded">phone</span>Teléfono</label>
           <input id="nd-tel" type="tel" placeholder="3001234567" inputmode="numeric">
         </div>
-
         <div class="field">
           <label><span class="material-symbols-rounded">lock</span>Clave de acceso <span style="color:var(--red);">*</span></label>
           <div style="position:relative;">
@@ -1077,7 +1066,6 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
             </button>
           </div>
         </div>
-
         <div class="field-row">
           <div class="field">
             <label><span class="material-symbols-rounded">map</span>Zona</label>
@@ -1092,12 +1080,11 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
             </select>
           </div>
         </div>
-
         <div class="field">
           <label><span class="material-symbols-rounded">photo_camera</span>Foto de perfil</label>
           <div id="nd-foto-drop"
             onclick="document.getElementById('nd-foto-input').click()"
-            style="border:2px dashed var(--border2);border-radius:12px;padding:18px;text-align:center;cursor:pointer;transition:border-color .15s, background .15s;background:var(--bg);"
+            style="border:2px dashed var(--border2);border-radius:12px;padding:18px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;background:var(--bg);"
             ondragover="event.preventDefault();this.style.borderColor='var(--teal)';this.style.background='var(--teal-l)';"
             ondragleave="this.style.borderColor='var(--border2)';this.style.background='var(--bg)';"
             ondrop="handleFotoDrop(event)">
@@ -1110,7 +1097,6 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
           </div>
           <input id="nd-foto-input" type="file" accept="image/*" style="display:none;" onchange="previewFoto(this.files[0])">
         </div>
-
         <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--border);margin-top:4px;">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;">
             <div id="nd-activo-track" onclick="toggleActivoNd()" style="position:relative;width:38px;height:22px;background:var(--teal);border-radius:99px;transition:background .2s;cursor:pointer;flex-shrink:0;">
@@ -1120,18 +1106,14 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
           </label>
           <input type="hidden" id="nd-activo" value="true">
         </div>
-
         <div id="nd-error" style="display:none;background:var(--red-l);border:1.5px solid rgba(220,38,38,.2);border-radius:10px;padding:9px 12px;font-size:11px;font-weight:700;color:var(--red);align-items:center;gap:7px;">
           <span class="material-symbols-rounded" style="font-size:14px;flex-shrink:0;">error</span>
           <span id="nd-error-txt">Error</span>
         </div>
-
         <button class="btn btn-primary" id="btn-crear-domi" onclick="crearDomiciliario()" style="width:100%;justify-content:center;margin-top:6px;">
-          <span class="material-symbols-rounded">person_add</span>
-          Registrar domiciliario
+          <span class="material-symbols-rounded">person_add</span>Registrar domiciliario
         </button>
       </div>
-
       <div class="panel">
         <div class="panel-hdr">
           <div class="panel-hdr-ico" style="background:var(--teal-m);color:var(--teal-d);">
@@ -1284,89 +1266,68 @@ function calcSubtotal(p){
 }
 function safeEsc(s){return String(s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');}
 
-/* ════ FETCH CSV ════ */
-async function fetchCSV(sheet,timeout=18000){
-  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheet)}&cachebust=${Date.now()}`;
-  const ctrl=new AbortController();const t=setTimeout(()=>ctrl.abort(),timeout);
-  const r=await fetch(url,{signal:ctrl.signal,cache:'no-store'});
-  clearTimeout(t);if(!r.ok) throw new Error('HTTP '+r.status);return await r.text();
-}
-function parseCSVText(text){return text.trim().split('\n').slice(1).filter(Boolean).map(l=>parseCSVLine(l));}
-
 /* ════ LOAD DATA ════ */
 async function loadDrivers(){
   try{
-    const r = await fetch('/api/domiciliarios', { cache: 'no-store' });
-    if(!r.ok) throw new Error('HTTP ' + r.status);
-    const json = await r.json();
+    const r=await fetch('/api/domiciliarios',{cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const json=await r.json();
     if(!json.ok) throw new Error(json.error);
-    allDrivers = json.data;
-  }catch(e){
-    console.warn('[loadDrivers]:', e.message);
-  }
+    allDrivers=json.data;
+  }catch(e){console.warn('[loadDrivers]:',e.message);}
 }
-
-async function loadPedidos() {
-  try {
-    const res  = await fetch('/api/foto?recurso=pedidos&limit=500');
-    const json = await res.json();
-    if (!json.ok) throw new Error('Error cargando pedidos: ' + json.error);
-    allPedidos = json.data.map(p => ({
-      id:          p.idPedido   || String(p._id),
-      cliente:     p.nombre     || '',
-      tel:         p.telefono   || '',
-      direccion:   p.direccion  || '',
-      metodo:      p.metodoPago || '',
-      imagen:      p.comprobanteId || '',
-      costoEnvio:  p.domicilio  ?? 0,
-      tipoEntrega: p.modoEntrega || '',
-      estado:      normEstado(p.estado || ''),
-      estadoRaw:   p.estado     || '',
-      domi:        p.domiciliarioNombre || '',
-      comercio:    p.comercio   || '',
-      zona:        p.zona       || '',
-      fecha:       p.fecha      || '',
-      hora:        p.hora       || '',
-      total:       p.total      ?? p.subtotal ?? 0,
-      _prods: (p.items || []).map(it => ({
-        nom:    it.producto  || '',
-        marca:  it.laboratorio || '',
-        qty:    it.cantidad  ?? 1,
-        vu:     it.precioUnit ?? 0,
-        vtotal: it.subtotal  ?? 0,
+async function loadPedidos(){
+  try{
+    const res=await fetch('/api/foto?recurso=pedidos&limit=500');
+    const json=await res.json();
+    if(!json.ok) throw new Error('Error cargando pedidos: '+json.error);
+    allPedidos=json.data.map(p=>({
+      id:p.idPedido||String(p._id),
+      cliente:p.nombre||'',
+      tel:p.telefono||'',
+      direccion:p.direccion||'',
+      metodo:p.metodoPago||'',
+      imagen:p.comprobanteId||'',
+      costoEnvio:p.domicilio??0,
+      tipoEntrega:p.modoEntrega||'',
+      estado:normEstado(p.estado||''),
+      estadoRaw:p.estado||'',
+      domi:p.domiciliarioNombre||'',
+      comercio:p.comercio||'',
+      zona:p.zona||'',
+      fecha:p.fecha||'',
+      hora:p.hora||'',
+      total:p.total??p.subtotal??0,
+      _prods:(p.items||[]).map(it=>({
+        nom:it.producto||'',
+        marca:it.laboratorio||'',
+        qty:it.cantidad??1,
+        vu:it.precioUnit??0,
+        vtotal:it.subtotal??0,
       })),
     }));
-  } catch(e) {
-    console.warn('[loadPedidos]:', e.message);
-    allPedidos = [];  // no rompe el resto
-  }
+  }catch(e){console.warn('[loadPedidos]:',e.message);allPedidos=[];}
 }
-
 async function loadBases(){
   try{
-    const r = await fetch('/api/import?recurso=bases', { cache:'no-store' });
-    const j = await r.json();
-    if(!j.ok) throw new Error(j.error);
-    basesData = j.data; // cada item tiene _id, domi, monto, nota, fecha
-  }catch(e){ console.warn('[loadBases]:', e.message); basesData=[]; }
+    const r=await fetch('/api/import?recurso=bases',{cache:'no-store'});
+    const j=await r.json();if(!j.ok) throw new Error(j.error);
+    basesData=j.data;
+  }catch(e){console.warn('[loadBases]:',e.message);basesData=[];}
 }
-
 async function loadMultas(){
   try{
-    const r = await fetch('/api/import?recurso=multas', { cache:'no-store' });
-    const j = await r.json();
-    if(!j.ok) throw new Error(j.error);
-    multasData = j.data; // cada item tiene _id, domi, monto, tipo, nota, fecha
-  }catch(e){ console.warn('[loadMultas]:', e.message); multasData=[]; }
+    const r=await fetch('/api/import?recurso=multas',{cache:'no-store'});
+    const j=await r.json();if(!j.ok) throw new Error(j.error);
+    multasData=j.data;
+  }catch(e){console.warn('[loadMultas]:',e.message);multasData=[];}
 }
-
 async function loadCierres(){
   try{
-    const r = await fetch('/api/import?recurso=cierres', { cache:'no-store' });
-    const j = await r.json();
-    if(!j.ok) throw new Error(j.error);
-    cierresData = j.data.slice().reverse();
-  }catch(e){ console.warn('[loadCierres]:', e.message); cierresData=[]; }
+    const r=await fetch('/api/import?recurso=cierres',{cache:'no-store'});
+    const j=await r.json();if(!j.ok) throw new Error(j.error);
+    cierresData=j.data.slice().reverse();
+  }catch(e){console.warn('[loadCierres]:',e.message);cierresData=[];}
 }
 
 /* ════ PERÍODO ════ */
@@ -1393,21 +1354,16 @@ function setView(view){
   document.querySelectorAll('.mn-item').forEach(b=>b.classList.remove('active'));
   const mnEl=document.getElementById('mn-'+view);if(mnEl)mnEl.classList.add('active');
   if(view==='caja') initCajaSelects();
-  if(view==='domis'){ renderListaDomis(); sugerirIdWil(); }
+  if(view==='domis'){renderListaDomis();sugerirIdWil();}
 }
-
-function setPedTab(tab) {
-  document.querySelectorAll('#view-pedidos .ctab-view').forEach(v => v.classList.remove('active'));
-  document.getElementById('ptab-' + tab)?.classList.add('active');
-  document.querySelectorAll('#view-pedidos .caja-ntab').forEach(b => b.classList.remove('active'));
-  document.getElementById('pn-' + tab)?.classList.add('active');
-  if (tab === 'rastreo') {
-    setTimeout(initMapaRastreo, 150);
-  } else {
-    if (_mapaInterval) { clearInterval(_mapaInterval); _mapaInterval = null; }
-  }
+function setPedTab(tab){
+  document.querySelectorAll('#view-pedidos .ctab-view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('ptab-'+tab)?.classList.add('active');
+  document.querySelectorAll('#view-pedidos .caja-ntab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('pn-'+tab)?.classList.add('active');
+  if(tab==='rastreo'){setTimeout(initMapaRastreo,150);}
+  else{if(_mapaInterval){clearInterval(_mapaInterval);_mapaInterval=null;}}
 }
-
 function setCajaTab(tab){
   _currentView='caja';
   document.querySelectorAll('#view-caja .ctab-view').forEach(v=>v.classList.remove('active'));
@@ -1421,19 +1377,16 @@ function setCajaTab(tab){
   if(tab==='multas'){poblarDomis('m-domi');togglePyP();}
   if(tab==='cierres') initCajaSelects();
 }
-
 function setPeriodoCaja(p,btn){
   periodoCaja=p;
   document.querySelectorAll('.hdr-actions .ptab').forEach(t=>t.classList.remove('on'));
   if(btn) btn.classList.add('on');
-  renderCajaResumen();
-  renderDomiTableCaja();
+  renderCajaResumen();renderDomiTableCaja();
 }
 
 /* ════ RENDER ALL ════ */
 function renderAll(){
-  updateSbBadges();
-  renderPendientesRT();
+  updateSbBadges();renderPendientesRT();
   const peds=allPedidos.filter(p=>(p.estado==='entregado'||p.estado==='proceso'||p.estado==='encamino')&&enPeriodo(p));
   const pedsEnt=peds.filter(p=>p.estado==='entregado');
   const totalFacturado=pedsEnt.reduce((s,p)=>s+parsePrecio(p.total),0);
@@ -1451,9 +1404,7 @@ function renderAll(){
   renderBarChart(peds);renderDonut(peds);
   renderDomiTable(peds,pedsEnt,'domi-tbody');
   renderBases();renderMultas();renderCierres();
-  renderCajaResumen();
-  renderDomiTableCaja();
-  renderTablaPedidos();
+  renderCajaResumen();renderDomiTableCaja();renderTablaPedidos();
 }
 
 function updateSbBadges(){
@@ -1639,15 +1590,13 @@ function renderDomiTable(peds,pedsEnt,tbodyId){
 function renderBases(){
   const el=document.getElementById('bases-list');if(!el) return;
   if(!basesData.length){el.innerHTML='<div class="empty-state"><div class="es-ico">💵</div><p>Sin bases registradas</p></div>';return;}
-  el.innerHTML=basesData.slice().reverse().map((b,ri)=>{
-    const i=basesData.length-1-ri;
-    return `<div class="bm-item">
+  el.innerHTML=basesData.slice().reverse().map((b)=>`
+    <div class="bm-item">
       <div class="bm-ico" style="background:var(--orange-l);color:var(--orange);"><span class="material-symbols-rounded" style="font-size:15px;">account_balance_wallet</span></div>
       <div style="flex:1;"><div class="bm-name">${b.domi}</div><div class="bm-meta">${b.nota||'Sin nota'} · ${b.fecha||'—'}</div></div>
       <div class="bm-amount" style="color:var(--orange);">${fmtMoney(b.monto)}</div>
       <button class="bm-del" onclick="deleteBase('${b._id}')"><span class="material-symbols-rounded" style="font-size:12px;">delete</span></button>
-    </div>`;
-  }).join('');
+    </div>`).join('');
 }
 
 function renderMultas(){
@@ -1657,26 +1606,26 @@ function renderMultas(){
   let html='';
   if(pyps.length){
     html+=`<div style="font-size:8px;font-weight:800;color:var(--orange);text-transform:uppercase;letter-spacing:.1em;margin-bottom:7px;display:flex;align-items:center;gap:4px;"><span class="material-symbols-rounded" style="font-size:13px;">traffic</span>Pico &amp; Placa</div>`;
-    html+=pyps.slice().reverse().map(m=>{const i=multasData.indexOf(m);return `<div class="bm-item" style="border-color:rgba(217,119,6,.3);background:rgba(254,243,199,.3);">
+    html+=pyps.slice().reverse().map(m=>`<div class="bm-item" style="border-color:rgba(217,119,6,.3);background:rgba(254,243,199,.3);">
       <div class="bm-ico" style="background:var(--orange-l);color:var(--orange);"><span class="material-symbols-rounded" style="font-size:14px;">traffic</span></div>
       <div style="flex:1;"><div class="bm-name">${m.domi}</div><div class="bm-meta">${m.nota||'Sin nota'} · ${m.fecha||'—'}</div></div>
       <span class="tag pyp">P&amp;P</span>
       <div style="font-size:9px;font-weight:700;color:var(--orange);flex-shrink:0;">Sin descuento</div>
-      <button class="bm-del" onclick="deleteMulta(${i})"><span class="material-symbols-rounded" style="font-size:12px;">delete</span></button>
-    </div>`;}).join('');
+      <button class="bm-del" onclick="deleteMulta('${m._id}')"><span class="material-symbols-rounded" style="font-size:12px;">delete</span></button>
+    </div>`).join('');
   }
   if(multas.length){
     if(pyps.length)html+=`<div style="height:1px;background:var(--border);margin:8px 0;"></div>`;
     html+=`<div style="font-size:8px;font-weight:800;color:var(--red);text-transform:uppercase;letter-spacing:.1em;margin-bottom:7px;display:flex;align-items:center;gap:4px;"><span class="material-symbols-rounded" style="font-size:13px;">gavel</span>Multas / Descuentos</div>`;
     html+=multas.slice().reverse().map(m=>{
-  const lbl={multa:'Multa',otro:'Descuento'}[m.tipo]||'Multa';
-  return `<div class="bm-item">
-    <div class="bm-ico" style="background:var(--red-l);color:var(--red);"><span class="material-symbols-rounded" style="font-size:14px;">gavel</span></div>
-    <div style="flex:1;"><div class="bm-name">${m.domi} <span class="tag multa">${lbl}</span></div><div class="bm-meta">${m.nota||'Sin nota'} · ${m.fecha||'—'}</div></div>
-    <div class="bm-amount" style="color:var(--red);">-${fmtMoney(m.monto)}</div>
-    <button class="bm-del" onclick="deleteMulta('${m._id}')"><span class="material-symbols-rounded" style="font-size:12px;">delete</span></button>
-  </div>`;
-}).join('');
+      const lbl={multa:'Multa',otro:'Descuento'}[m.tipo]||'Multa';
+      return `<div class="bm-item">
+        <div class="bm-ico" style="background:var(--red-l);color:var(--red);"><span class="material-symbols-rounded" style="font-size:14px;">gavel</span></div>
+        <div style="flex:1;"><div class="bm-name">${m.domi} <span class="tag multa">${lbl}</span></div><div class="bm-meta">${m.nota||'Sin nota'} · ${m.fecha||'—'}</div></div>
+        <div class="bm-amount" style="color:var(--red);">-${fmtMoney(m.monto)}</div>
+        <button class="bm-del" onclick="deleteMulta('${m._id}')"><span class="material-symbols-rounded" style="font-size:12px;">delete</span></button>
+      </div>`;
+    }).join('');
   }
   el.innerHTML=html;
 }
@@ -1742,36 +1691,22 @@ function initCajaSelects(){
 }
 
 async function saveBase(){
-  const domi  = document.getElementById('b-domi')?.value.trim();
-  const monto = parsePrecio(document.getElementById('b-monto')?.value||'0');
-  const nota  = document.getElementById('b-nota')?.value.trim();
-  const fecha = document.getElementById('b-fecha')?.value || new Date().toISOString().slice(0,10);
-  if(!domi)  { showToast('w','Falta domiciliario','Selecciona un domi'); return; }
-  if(!monto) { showToast('w','Falta monto','Ingresa el monto'); return; }
-  const btn = document.getElementById('btn-save-base');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="material-symbols-rounded spin-ico">progress_activity</span> Guardando…';
+  const domi=document.getElementById('b-domi')?.value.trim();
+  const monto=parsePrecio(document.getElementById('b-monto')?.value||'0');
+  const nota=document.getElementById('b-nota')?.value.trim();
+  const fecha=document.getElementById('b-fecha')?.value||new Date().toISOString().slice(0,10);
+  if(!domi){showToast('w','Falta domiciliario','Selecciona un domi');return;}
+  if(!monto){showToast('w','Falta monto','Ingresa el monto');return;}
+  const btn=document.getElementById('btn-save-base');
+  btn.disabled=true;btn.innerHTML='<span class="material-symbols-rounded spin-ico">progress_activity</span> Guardando…';
   try{
-    const r = await fetch('/api/import?recurso=bases', {
-      method: 'POST',
-      headers: { 'Content-Type':'application/json' },
-      body: JSON.stringify({ domi, monto, nota, fecha })
-    });
-    const j = await r.json();
-    if(!j.ok) throw new Error(j.error);
-    showToast('s',`Base dada a ${domi}`, fmtMoney(monto)+(nota?' · '+nota:''));
-    document.getElementById('b-monto').value = '';
-    document.getElementById('b-nota').value  = '';
-    await loadBases(); renderBases(); renderDomiTable(
-      allPedidos.filter(p=>enPeriodo(p)),
-      allPedidos.filter(p=>enPeriodo(p)&&p.estado==='entregado'),
-      'domi-tbody'
-    );
-  }catch(e){ showToast('e','Error',e.message.substring(0,80)); }
-  finally{
-    btn.disabled = false;
-    btn.innerHTML = '<span class="material-symbols-rounded">savings</span>Dar base';
-  }
+    const r=await fetch('/api/import?recurso=bases',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domi,monto,nota,fecha})});
+    const j=await r.json();if(!j.ok) throw new Error(j.error);
+    showToast('s',`Base dada a ${domi}`,fmtMoney(monto)+(nota?' · '+nota:''));
+    document.getElementById('b-monto').value='';document.getElementById('b-nota').value='';
+    await loadBases();renderBases();renderDomiTable(allPedidos.filter(p=>enPeriodo(p)),allPedidos.filter(p=>enPeriodo(p)&&p.estado==='entregado'),'domi-tbody');
+  }catch(e){showToast('e','Error',e.message.substring(0,80));}
+  finally{btn.disabled=false;btn.innerHTML='<span class="material-symbols-rounded">savings</span>Dar base';}
 }
 
 function togglePyP(){
@@ -1781,63 +1716,42 @@ function togglePyP(){
 }
 
 async function saveMulta(){
-  const domi  = document.getElementById('m-domi')?.value.trim();
-  const tipo  = document.getElementById('m-tipo')?.value || 'multa';
-  const nota  = document.getElementById('m-nota')?.value.trim();
-  const fecha = document.getElementById('m-fecha')?.value || new Date().toISOString().slice(0,10);
-  const esPyP = tipo === 'pyp';
-  const monto = esPyP ? 0 : parsePrecio(document.getElementById('m-monto')?.value||'0');
-  if(!domi)           { showToast('w','Falta domiciliario','Selecciona un domi'); return; }
-  if(!esPyP && !monto){ showToast('w','Falta monto','Ingresa el monto'); return; }
-  const btn = document.getElementById('btn-save-multa');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="material-symbols-rounded spin-ico">progress_activity</span> Guardando…';
+  const domi=document.getElementById('m-domi')?.value.trim();
+  const tipo=document.getElementById('m-tipo')?.value||'multa';
+  const nota=document.getElementById('m-nota')?.value.trim();
+  const fecha=document.getElementById('m-fecha')?.value||new Date().toISOString().slice(0,10);
+  const esPyP=tipo==='pyp';
+  const monto=esPyP?0:parsePrecio(document.getElementById('m-monto')?.value||'0');
+  if(!domi){showToast('w','Falta domiciliario','Selecciona un domi');return;}
+  if(!esPyP&&!monto){showToast('w','Falta monto','Ingresa el monto');return;}
+  const btn=document.getElementById('btn-save-multa');
+  btn.disabled=true;btn.innerHTML='<span class="material-symbols-rounded spin-ico">progress_activity</span> Guardando…';
   try{
-    const r = await fetch('/api/import?recurso=multas', {
-      method: 'POST',
-      headers: { 'Content-Type':'application/json' },
-      body: JSON.stringify({ domi, monto, tipo, nota, fecha })
-    });
-    const j = await r.json();
-    if(!j.ok) throw new Error(j.error);
-    showToast('s',
-      esPyP ? `P&P guardado — ${domi}` : `Multa registrada — ${domi}`,
-      esPyP ? 'Solo registro' : fmtMoney(monto)
-    );
-    document.getElementById('m-monto').value = '';
-    document.getElementById('m-nota').value  = '';
-    await loadMultas(); renderMultas(); renderDomiTable(
-      allPedidos.filter(p=>enPeriodo(p)),
-      allPedidos.filter(p=>enPeriodo(p)&&p.estado==='entregado'),
-      'domi-tbody'
-    );
-  }catch(e){ showToast('e','Error',e.message.substring(0,80)); }
-  finally{
-    btn.disabled = false;
-    btn.innerHTML = '<span class="material-symbols-rounded">gavel</span>Registrar';
-  }
+    const r=await fetch('/api/import?recurso=multas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domi,monto,tipo,nota,fecha})});
+    const j=await r.json();if(!j.ok) throw new Error(j.error);
+    showToast('s',esPyP?`P&P guardado — ${domi}`:`Multa registrada — ${domi}`,esPyP?'Solo registro':fmtMoney(monto));
+    document.getElementById('m-monto').value='';document.getElementById('m-nota').value='';
+    await loadMultas();renderMultas();renderDomiTable(allPedidos.filter(p=>enPeriodo(p)),allPedidos.filter(p=>enPeriodo(p)&&p.estado==='entregado'),'domi-tbody');
+  }catch(e){showToast('e','Error',e.message.substring(0,80));}
+  finally{btn.disabled=false;btn.innerHTML='<span class="material-symbols-rounded">gavel</span>Registrar';}
 }
+
 async function deleteBase(id){
   if(!confirm('¿Eliminar esta base?')) return;
   try{
-    const r = await fetch(`/api/import?recurso=bases&id=${id}`, { method:'DELETE' });
-    const j = await r.json();
-    if(!j.ok) throw new Error(j.error);
-    showToast('s','Base eliminada','');
-    await loadBases(); renderBases();
-  }catch(e){ showToast('e','Error',e.message.substring(0,60)); }
+    const r=await fetch(`/api/import?recurso=bases&id=${id}`,{method:'DELETE'});
+    const j=await r.json();if(!j.ok) throw new Error(j.error);
+    showToast('s','Base eliminada','');await loadBases();renderBases();
+  }catch(e){showToast('e','Error',e.message.substring(0,60));}
 }
 
-/* ════ DELETE MULTA ════ */
 async function deleteMulta(id){
   if(!confirm('¿Eliminar este registro?')) return;
   try{
-    const r = await fetch(`/api/import?recurso=multas&id=${id}`, { method:'DELETE' });
-    const j = await r.json();
-    if(!j.ok) throw new Error(j.error);
-    showToast('s','Registro eliminado','');
-    await loadMultas(); renderMultas();
-  }catch(e){ showToast('e','Error',e.message.substring(0,60)); }
+    const r=await fetch(`/api/import?recurso=multas&id=${id}`,{method:'DELETE'});
+    const j=await r.json();if(!j.ok) throw new Error(j.error);
+    showToast('s','Registro eliminado','');await loadMultas();renderMultas();
+  }catch(e){showToast('e','Error',e.message.substring(0,60));}
 }
 
 function calcResumen(){
@@ -1856,12 +1770,9 @@ function calcResumen(){
     {c:'var(--teal)',val:fmtMoney(totalT),lbl:'Total caja'},
   ].map(k=>`<div class="cs-item"><div class="cs-val" style="color:${k.c};">${k.val}</div><div class="cs-lbl">${k.lbl}</div></div>`).join('');
   const efInput=document.getElementById('c-efectivo');if(efInput&&!efInput.value)efInput.value=String(Math.round(totalEf));
-  const fechaCierre = document.getElementById('c-fecha')?.value || new Date().toISOString().slice(0,10);
-const basesTotal = basesData
-  .filter(b => (b.fecha || '').trim() === fechaCierre)
-  .reduce((s,b) => s+b.monto, 0);
-const bInput = document.getElementById('c-bases');
-if(bInput && !bInput.value) bInput.value = String(Math.round(basesTotal));
+  const fechaCierre=document.getElementById('c-fecha')?.value||new Date().toISOString().slice(0,10);
+  const basesTotal=basesData.filter(b=>(b.fecha||'').trim()===fechaCierre).reduce((s,b)=>s+b.monto,0);
+  const bInput=document.getElementById('c-bases');if(bInput&&!bInput.value)bInput.value=String(Math.round(basesTotal));
   calcDif();return{ent,totalEf,totalTf,totalT};
 }
 
@@ -1875,52 +1786,30 @@ function calcDif(){
 }
 
 async function guardarCierreCaja(){
-  const turno    = document.getElementById('c-turno')?.value    || '';
-  const fecha    = document.getElementById('c-fecha')?.value    || '';
-  const hora     = document.getElementById('c-hora')?.value     || '';
-  const entrega  = (document.getElementById('c-entrega')?.value || '').trim();
-  const recibe   = (document.getElementById('c-recibe')?.value  || '').trim();
-  const efectivo = parsePrecio(document.getElementById('c-efectivo')?.value || '0');
-  const bases    = parsePrecio(document.getElementById('c-bases')?.value   || '0');
-  const novedades= (document.getElementById('c-novedades')?.value || '').trim();
-  if(!entrega){ showToast('w','Falta quién entrega','Selecciona el responsable'); return; }
-  if(!recibe) { showToast('w','Falta quién recibe','Selecciona quién recibe');   return; }
-  const btn = document.getElementById('btn-guardar-caja');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="material-symbols-rounded spin-ico">progress_activity</span> Guardando…';
-  const resumen   = calcResumen();
-  const diferencia= efectivo - bases;
-  const esOk      = Math.abs(diferencia) < 500;
-  const payload   = {
-    turno, fecha, hora, entrega, recibe,
-    efectivo, bases, diferencia,
-    pedidos:  resumen.ent    || 0,
-    totalEf:  resumen.totalEf|| 0,
-    totalTf:  resumen.totalTf|| 0,
-    totalT:   resumen.totalT || 0,
-    estado:   esOk ? 'ok' : diferencia < 0 ? 'faltante' : 'sobrante',
-    novedades,
-    ts: new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})
-  };
+  const turno=document.getElementById('c-turno')?.value||'';
+  const fecha=document.getElementById('c-fecha')?.value||'';
+  const hora=document.getElementById('c-hora')?.value||'';
+  const entrega=(document.getElementById('c-entrega')?.value||'').trim();
+  const recibe=(document.getElementById('c-recibe')?.value||'').trim();
+  const efectivo=parsePrecio(document.getElementById('c-efectivo')?.value||'0');
+  const bases=parsePrecio(document.getElementById('c-bases')?.value||'0');
+  const novedades=(document.getElementById('c-novedades')?.value||'').trim();
+  if(!entrega){showToast('w','Falta quién entrega','Selecciona el responsable');return;}
+  if(!recibe){showToast('w','Falta quién recibe','Selecciona quién recibe');return;}
+  const btn=document.getElementById('btn-guardar-caja');
+  btn.disabled=true;btn.innerHTML='<span class="material-symbols-rounded spin-ico">progress_activity</span> Guardando…';
+  const resumen=calcResumen();
+  const diferencia=efectivo-bases;
+  const esOk=Math.abs(diferencia)<500;
+  const payload={turno,fecha,hora,entrega,recibe,efectivo,bases,diferencia,pedidos:resumen.ent||0,totalEf:resumen.totalEf||0,totalTf:resumen.totalTf||0,totalT:resumen.totalT||0,estado:esOk?'ok':diferencia<0?'faltante':'sobrante',novedades,ts:new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})};
   try{
-    const r = await fetch('/api/import?recurso=cierres', {
-      method: 'POST',
-      headers: { 'Content-Type':'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const j = await r.json();
-    if(!j.ok) throw new Error(j.error);
-    showToast('s',`✓ Cierre turno ${turno} registrado`,
-      `${entrega} → ${recibe} · ${esOk?'Caja OK ✓':'Revisar diferencia'}`);
-    ['c-efectivo','c-bases','c-novedades','c-entrega','c-recibe'].forEach(id=>{
-      const el=document.getElementById(id); if(el) el.value='';
-    });
-    await loadCierres(); renderCierres(); updateSbBadges(); calcResumen();
-  }catch(e){ showToast('e','Error de red', e.message.substring(0,60)); }
-  finally{
-    btn.disabled = false;
-    btn.innerHTML = '<span class="material-symbols-rounded">check_circle</span>Registrar cierre';
-  }
+    const r=await fetch('/api/import?recurso=cierres',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const j=await r.json();if(!j.ok) throw new Error(j.error);
+    showToast('s',`✓ Cierre turno ${turno} registrado`,`${entrega} → ${recibe} · ${esOk?'Caja OK ✓':'Revisar diferencia'}`);
+    ['c-efectivo','c-bases','c-novedades','c-entrega','c-recibe'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    await loadCierres();renderCierres();updateSbBadges();calcResumen();
+  }catch(e){showToast('e','Error de red',e.message.substring(0,60));}
+  finally{btn.disabled=false;btn.innerHTML='<span class="material-symbols-rounded">check_circle</span>Registrar cierre';}
 }
 
 function renderPendientesRT(){
@@ -1969,7 +1858,7 @@ function renderPendientesRT(){
           <span class="stag-rt ${p.estado}">${st.lbl}</span>
           ${!p.domi?'<span style="font-size:7px;font-weight:800;color:var(--red);background:var(--red-l);padding:1px 5px;border-radius:99px;">⚠ Sin asignar</span>':''}
         </div>
-        <div class="ped-rt-meta">${p.domi?'🛵 '+p.domi:('')} ${p.direccion?'📍 '+p.direccion.substring(0,28)+(p.direccion.length>28?'…':''):''}</div>
+        <div class="ped-rt-meta">${p.domi?'🛵 '+p.domi:''} ${p.direccion?'📍 '+p.direccion.substring(0,28)+(p.direccion.length>28?'…':''):''}</div>
       </div>
       <div class="ped-rt-right">
         <div class="ped-rt-hora" style="color:${st.dot};">${p.hora||'–'}</div>
@@ -2073,9 +1962,8 @@ async function verificarTransferencia(){
   const pedsEnt=peds.filter(p=>p.estado==='entregado');
   const totalFacturado=pedsEnt.reduce((s,p)=>s+parsePrecio(p.total),0);
   const totalEnvio=pedsEnt.reduce((s,p)=>s+parsePrecio(p.costoEnvio),0);
-  const totalProductos=totalFacturado-totalEnvio;
   const diasPer=periodo==='hoy'||periodo==='ayer'?1:parseInt(periodo);
-  renderKPIs(pedsEnt,totalFacturado,totalEnvio,totalProductos,diasPer);
+  renderKPIs(pedsEnt,totalFacturado,totalEnvio,totalFacturado-totalEnvio,diasPer);
   renderTF(peds,'tf-panel-body','tf-header-sub');
   renderTF(peds,'tf2-panel-body','tf2-header-sub');
   renderPendientesRT();
@@ -2252,7 +2140,7 @@ async function doRefresh(){
   document.getElementById('sync-state').textContent='Actualizando…';
   document.getElementById('sync-state').style.color='var(--orange)';
   try{
-    await Promise.all([loadDrivers(), loadPedidos(), loadBases(), loadMultas(), loadCierres()]);
+    await Promise.all([loadDrivers(),loadPedidos(),loadBases(),loadMultas(),loadCierres()]);
     renderAll();
     const hora=new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
     document.getElementById('sync-hora').textContent=hora;
@@ -2260,10 +2148,9 @@ async function doRefresh(){
     document.getElementById('sync-state').textContent='✓ Sincronizado';
     document.getElementById('sync-state').style.color='var(--teal)';
   }catch(e){
-    console.error('[doRefresh] error completo:', e);  // <-- ver stack completo
     document.getElementById('sync-state').textContent='Error sync';
     document.getElementById('sync-state').style.color='var(--red)';
-    showToast('e','Error de conexión', e.message.substring(0,120));  // más chars
+    showToast('e','Error de conexión',e.message.substring(0,120));
   }
 }
 
@@ -2305,218 +2192,143 @@ function sugerirIdWil(){
   document.getElementById('nd-id').value=sugerido;
   document.getElementById('nd-id-hint').textContent=`✨ ID sugerido: ${sugerido}`;
 }
-function ndError(msg){
-  const box=document.getElementById('nd-error');
-  document.getElementById('nd-error-txt').textContent=msg;
-  box.style.display='flex';
-}
+function ndError(msg){const box=document.getElementById('nd-error');document.getElementById('nd-error-txt').textContent=msg;box.style.display='flex';}
 function ndOcultarError(){document.getElementById('nd-error').style.display='none';}
 
-/* ══════════════════════════════════════════════════
-   CAMBIO 1 — crearDomiciliario
-   · Eliminada la declaración duplicada de fotoFile
-   · El bloque de foto llama a /api/foto y guarda
-     SOLO la URL corta  →  /api/foto?id=<objectId>
-   · Si el endpoint falla lanza error (no guarda base64)
-══════════════════════════════════════════════════ */
 async function crearDomiciliario(){
   ndOcultarError();
-  const idWil    = document.getElementById('nd-id').value.trim().toUpperCase();
-  const nombre   = document.getElementById('nd-nombre').value.trim();
-  const password = document.getElementById('nd-password').value.trim();
-  const tel      = document.getElementById('nd-tel').value.trim();
-  const zona     = document.getElementById('nd-zona').value.trim();
-  const rol      = document.getElementById('nd-rol').value;
-  const activo   = document.getElementById('nd-activo').value;
-
-  if(!idWil)           { ndError('El ID WIL es obligatorio'); return; }
-  if(!nombre)          { ndError('El nombre es obligatorio'); return; }
-  if(!password)        { ndError('La clave es obligatoria'); return; }
-  if(password.length<6){ ndError('La clave debe tener al menos 6 caracteres'); return; }
-
-  const btn = document.getElementById('btn-crear-domi');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="material-symbols-rounded spin-ico">progress_activity</span> Registrando…';
-
-  try {
-    /* 1 ── Subir foto → obtener URL corta ── */
-   // ── Comprimir imagen a máx 300px, JPEG 0.75 ──
-let fotoUrl = '';
-const fotoFile = document.getElementById('nd-foto-input').files?.[0];
-if (fotoFile) {
-  const base64 = await new Promise(res => {
-    const img = new Image();
-    const blobUrl = URL.createObjectURL(fotoFile);
-    img.onload = () => {
-      const MAX = 300;
-      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
-      const w = Math.round(img.width  * scale);
-      const h = Math.round(img.height * scale);
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      URL.revokeObjectURL(blobUrl);
-      // Solo los bytes, sin prefijo "data:..."
-      res(canvas.toDataURL('image/jpeg', 0.75).split(',')[1]);
-    };
-    img.src = blobUrl;
-  });
-
-  const r    = await fetch('/api/foto', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ base64, mime: 'image/jpeg' })
-  });
-  const data = await r.json();
-  if (!data.ok) throw new Error('Error subiendo foto: ' + (data.error || '?'));
-  fotoUrl = data.url;   // → "/api/foto?id=abc123"  (≈ 35 chars)
+  const idWil=document.getElementById('nd-id').value.trim().toUpperCase();
+  const nombre=document.getElementById('nd-nombre').value.trim();
+  const password=document.getElementById('nd-password').value.trim();
+  const tel=document.getElementById('nd-tel').value.trim();
+  const zona=document.getElementById('nd-zona').value.trim();
+  const rol=document.getElementById('nd-rol').value;
+  const activo=document.getElementById('nd-activo').value;
+  if(!idWil){ndError('El ID WIL es obligatorio');return;}
+  if(!nombre){ndError('El nombre es obligatorio');return;}
+  if(!password){ndError('La clave es obligatoria');return;}
+  if(password.length<6){ndError('La clave debe tener al menos 6 caracteres');return;}
+  const btn=document.getElementById('btn-crear-domi');
+  btn.disabled=true;btn.innerHTML='<span class="material-symbols-rounded spin-ico">progress_activity</span> Registrando…';
+  try{
+    let fotoUrl='';
+    const fotoFile=document.getElementById('nd-foto-input').files?.[0];
+    if(fotoFile){
+      const base64=await new Promise(res=>{
+        const img=new Image();const blobUrl=URL.createObjectURL(fotoFile);
+        img.onload=()=>{
+          const MAX=300;const scale=Math.min(1,MAX/Math.max(img.width,img.height));
+          const w=Math.round(img.width*scale);const h=Math.round(img.height*scale);
+          const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+          canvas.getContext('2d').drawImage(img,0,0,w,h);URL.revokeObjectURL(blobUrl);
+          res(canvas.toDataURL('image/jpeg',0.75).split(',')[1]);
+        };
+        img.src=blobUrl;
+      });
+      const r=await fetch('/api/foto',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({base64,mime:'image/jpeg'})});
+      const data=await r.json();if(!data.ok) throw new Error('Error subiendo foto: '+(data.error||'?'));
+      fotoUrl=data.url;
+    }
+    const res=await fetch('/api/domiciliarios',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idWil,nombre,password,tel,zona,rol,activo,foto:fotoUrl})});
+    const data=await res.json();
+    if(!data.ok){ndError(data.error||'Error al registrar');return;}
+    showToast('s',`✓ ${nombre} registrado`,`${idWil} · ${rol}`);
+    allDrivers.push({id:idWil,nombre,tel,foto:data.data?.foto||fotoUrl,activo:activo==='true',rol});
+    ['nd-id','nd-nombre','nd-password','nd-tel','nd-zona'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    document.getElementById('nd-foto-preview-wrap').style.display='none';
+    document.getElementById('nd-foto-ico').style.display='block';
+    document.getElementById('nd-foto-lbl').textContent='Arrastra o haz clic para subir foto';
+    document.getElementById('nd-foto-input').value='';
+    document.getElementById('nd-password').type='password';
+    document.getElementById('nd-eye').textContent='visibility';
+    renderListaDomis();sugerirIdWil();poblarDomis('b-domi');poblarDomis('m-domi');
+  }catch(e){ndError('Error: '+e.message);}
+  finally{btn.disabled=false;btn.innerHTML='<span class="material-symbols-rounded">person_add</span>Registrar domiciliario';}
 }
 
-    /* 2 ── Crear domiciliario en MongoDB ── */
-    const res  = await fetch('/api/domiciliarios', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ idWil, nombre, password, tel, zona, rol, activo, foto: fotoUrl })
-    });
-    const data = await res.json();
-
-    if (!data.ok) { ndError(data.error || 'Error al registrar'); return; }
-
-    showToast('s', `✓ ${nombre} registrado`, `${idWil} · ${rol}`);
-
-    allDrivers.push({ id: idWil, nombre, tel, foto: data.data?.foto || fotoUrl, activo: activo === 'true', rol });
-
-    ['nd-id','nd-nombre','nd-password','nd-tel','nd-zona'].forEach(id => {
-      const el = document.getElementById(id); if(el) el.value = '';
-    });
-    document.getElementById('nd-foto-preview-wrap').style.display = 'none';
-    document.getElementById('nd-foto-ico').style.display          = 'block';
-    document.getElementById('nd-foto-lbl').textContent            = 'Arrastra o haz clic para subir foto';
-    document.getElementById('nd-foto-input').value = '';
-    document.getElementById('nd-password').type    = 'password';
-    document.getElementById('nd-eye').textContent  = 'visibility';
-
-    renderListaDomis(); sugerirIdWil();
-    poblarDomis('b-domi'); poblarDomis('m-domi');
-
-  } catch(e) {
-    ndError('Error: ' + e.message);
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<span class="material-symbols-rounded">person_add</span>Registrar domiciliario';
-  }
-}
-
-/* ══════════════════════════════════════════════════
-   CAMBIO 2 — renderListaDomis
-   · Eliminado FOTOS_MAP y el prefijo "icons/"
-   · d.foto ya es la URL completa  (/api/foto?id=…)
-     o vacío — en ese caso muestra avatar con iniciales
-══════════════════════════════════════════════════ */
 function renderListaDomis(){
-  const el  = document.getElementById('nd-lista');
-  const cnt = document.getElementById('nd-lista-count');
+  const el=document.getElementById('nd-lista');const cnt=document.getElementById('nd-lista-count');
   if(!el) return;
   if(!allDrivers.length){
-    el.innerHTML = '<div class="empty-state"><div class="es-ico">👥</div><p>Sin domiciliarios cargados</p></div>';
-    if(cnt) cnt.textContent = '0 registrados';
-    return;
+    el.innerHTML='<div class="empty-state"><div class="es-ico">👥</div><p>Sin domiciliarios cargados</p></div>';
+    if(cnt)cnt.textContent='0 registrados';return;
   }
-  if(cnt) cnt.textContent = allDrivers.length + ' registrados';
-  el.innerHTML = allDrivers.map(d => {
-    const fotoUrl   = d.foto || '';
-    const iniciales = (d.nombre || '?').split(' ').slice(0,2).map(p => p[0]).join('').toUpperCase();
-    const avatarHTML = fotoUrl
-      ? `<img src="${fotoUrl}" alt="${d.nombre}"
-           style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid var(--teal);flex-shrink:0;"
+  if(cnt)cnt.textContent=allDrivers.length+' registrados';
+  el.innerHTML=allDrivers.map(d=>{
+    const fotoUrl=d.foto||'';
+    const iniciales=(d.nombre||'?').split(' ').slice(0,2).map(p=>p[0]).join('').toUpperCase();
+    const avatarHTML=fotoUrl
+      ?`<img src="${fotoUrl}" alt="${d.nombre}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid var(--teal);flex-shrink:0;"
            onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
          <div style="display:none;width:40px;height:40px;border-radius:50%;background:var(--teal);align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#071e22;flex-shrink:0;">${iniciales}</div>`
-      : `<div style="width:40px;height:40px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#071e22;flex-shrink:0;">${iniciales}</div>`;
+      :`<div style="width:40px;height:40px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#071e22;flex-shrink:0;">${iniciales}</div>`;
     return `<div class="bm-item" style="align-items:center;">
       ${avatarHTML}
       <div style="flex:1;min-width:0;">
         <div class="bm-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${d.nombre}</div>
-        <div class="bm-meta">${d.id}${d.tel ? ' · 📞 ' + d.tel : ''}</div>
+        <div class="bm-meta">${d.id}${d.tel?' · 📞 '+d.tel:''}</div>
       </div>
       <span style="font-size:8px;font-weight:800;padding:2px 8px;border-radius:99px;background:${d.activo!==false?'var(--green-l)':'var(--red-l)'};color:${d.activo!==false?'var(--green)':'var(--red)'};flex-shrink:0;">${d.activo!==false?'Activo':'Inactivo'}</span>
     </div>`;
   }).join('');
 }
 
-/* ════════════════════════════════════════════════
+/* ════════════════════════════════════════════════════════
    MAPA RASTREO EN TIEMPO REAL
-   · Lee hoja "Domiciliarios" col A=idWil, B=nombre, G=actividad
+   · Hoja "Domiciliarios" col A=idWil, B=nombre, G=actividad
+   · Formato celda G: "6.321015,-75.559208|22:42:12|±13m"
    · Cruza con MongoDB (allDrivers) para foto/nombre
-   · parseActividadDetalle: extrae lat/lng de la celda G
-     Formatos soportados:
-       "6.2442,-75.5812"
-       "6.2442, -75.5812 | 10:35 | ±12m"
-       "lat:6.2442 lng:-75.5812"
-       JSON: {"lat":6.2442,"lng":-75.5812,"hora":"10:35","precision":"±12m"}
+   · Efecto RADAR palpitante en cada marcador
    · Actualiza cada 12 segundos
-════════════════════════════════════════════════ */
+════════════════════════════════════════════════════════ */
 let _mapaRastreo  = null;
 let _mapaMarkers  = {};
 let _mapaInterval = null;
 
+/* ── Parser de celda ACTIVIDAD ── */
 function parseActividadDetalle(raw) {
   const result = { coords: null, hora: '', precision: '' };
   if (!raw || !raw.trim()) return result;
   const s = raw.trim();
 
-  // ── Formato principal de la app móvil:
-  //    "6.321015,-75.559208|22:42:12|±13m"
-  //    partes separadas por "|"
+  // Formato principal: "6.321015,-75.559208|22:42:12|±13m"
   const partes = s.split('|').map(p => p.trim());
 
-  // Parte 0 → coordenadas  "6.321015,-75.559208"
   if (partes[0]) {
-    const coordMatch = partes[0].match(/^([-]?\d{1,3}\.\d+)[,\s]+([-]?\d{1,3}\.\d+)$/);
-    if (coordMatch) {
-      const lat = parseFloat(coordMatch[1]);
-      const lng = parseFloat(coordMatch[2]);
-      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+    const m = partes[0].match(/^([-]?\d{1,3}\.\d+)[,\s]+([-]?\d{1,3}\.\d+)$/);
+    if (m) {
+      const lat = parseFloat(m[1]), lng = parseFloat(m[2]);
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180)
         result.coords = [lat, lng];
-      }
     }
   }
+  if (partes[1]) { const h = partes[1].match(/\d{1,2}:\d{2}(?::\d{2})?/); if (h) result.hora = h[0]; }
+  if (partes[2]) result.precision = partes[2];
 
-  // Parte 1 → hora  "22:42:12"
-  if (partes[1]) {
-    const horaMatch = partes[1].match(/\d{1,2}:\d{2}(?::\d{2})?/);
-    if (horaMatch) result.hora = horaMatch[0];
-  }
-
-  // Parte 2 → precisión  "±13m"
-  if (partes[2]) {
-    result.precision = partes[2];
-  }
-
-  // ── Fallback: JSON  {"lat":6.24,"lng":-75.58}
+  // Fallback JSON
   if (!result.coords && s.startsWith('{')) {
     try {
       const j = JSON.parse(s);
       const lat = parseFloat(j.lat ?? j.latitude  ?? '');
       const lng = parseFloat(j.lng ?? j.longitude ?? j.long ?? '');
       if (!isNaN(lat) && !isNaN(lng)) {
-        result.coords    = [lat, lng];
-        result.hora      = j.hora || j.time || '';
+        result.coords = [lat, lng];
+        result.hora = j.hora || j.time || '';
         result.precision = j.precision || j.acc || '';
       }
     } catch (_) {}
   }
 
-  // ── Fallback: "lat:6.24 lng:-75.58"
+  // Fallback lat:x lng:y
   if (!result.coords) {
     const kv = s.match(/lat[=:]?\s*([-\d.]+)[,;\s]+lng[=:]?\s*([-\d.]+)/i);
-    if (kv) {
-      result.coords = [parseFloat(kv[1]), parseFloat(kv[2])];
-    }
+    if (kv) result.coords = [parseFloat(kv[1]), parseFloat(kv[2])];
   }
 
   return result;
 }
 
+/* ── Leer hoja Domiciliarios desde Google Sheets ── */
 async function fetchCoordenadasDomis() {
   try {
     const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('Domiciliarios')}&cachebust=${Date.now()}`;
@@ -2527,13 +2339,9 @@ async function fetchCoordenadasDomis() {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const text = await r.text();
     const rows = text.trim().split('\n').slice(1).filter(Boolean).map(l => parseCSVLine(l));
-    // Col A=0 → ID_DOMI,  Col B=1 → NOMBRE,  Col G=6 → ACTIVIDAD
+    // A=0 → idWil · B=1 → nombre · G=6 → actividad
     return rows
-      .map(r => ({
-        idDomi:    col(r, 0).trim(),
-        nombre:    col(r, 1).trim(),
-        actividad: col(r, 6).trim(),
-      }))
+      .map(r => ({ idDomi: col(r,0).trim(), nombre: col(r,1).trim(), actividad: col(r,6).trim() }))
       .filter(d => d.idDomi && d.actividad);
   } catch (e) {
     console.warn('[fetchCoordenadasDomis]:', e.message);
@@ -2541,12 +2349,56 @@ async function fetchCoordenadasDomis() {
   }
 }
 
+/* ── Construir HTML del icono radar ── */
+function buildRadarIcon(fotoUrl, iniciales, color) {
+  // Avatar: foto o iniciales
+  const avatar = fotoUrl
+    ? `<img src="${fotoUrl}" alt="${iniciales}"
+         style="position:relative;z-index:2;width:42px;height:42px;border-radius:50%;
+                object-fit:cover;border:3px solid ${color};
+                box-shadow:0 2px 10px ${color}88;"
+         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+    : '';
+
+  const fallback = `<div style="display:${fotoUrl ? 'none' : 'flex'};position:relative;z-index:2;
+    width:42px;height:42px;border-radius:50%;background:${color};
+    align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;
+    border:3px solid #fff;box-shadow:0 2px 10px ${color}88;">${iniciales}</div>`;
+
+  return `
+    <div style="position:relative;width:62px;height:62px;display:flex;align-items:center;justify-content:center;">
+      <!-- onda 1 -->
+      <div style="position:absolute;width:62px;height:62px;border-radius:50%;
+           border:2.5px solid ${color};opacity:0;
+           animation:radarPulse 2.2s ease-out infinite 0s;"></div>
+      <!-- onda 2 -->
+      <div style="position:absolute;width:62px;height:62px;border-radius:50%;
+           border:2px solid ${color};opacity:0;
+           animation:radarPulse 2.2s ease-out infinite 0.7s;"></div>
+      <!-- onda 3 -->
+      <div style="position:absolute;width:62px;height:62px;border-radius:50%;
+           border:1.5px solid ${color};opacity:0;
+           animation:radarPulse 2.2s ease-out infinite 1.4s;"></div>
+      <!-- halo interior -->
+      <div style="position:absolute;width:52px;height:52px;border-radius:50%;
+           background:${color}30;
+           animation:haloPulse 1.8s ease-in-out infinite;"></div>
+      <!-- foto o iniciales -->
+      ${avatar}${fallback}
+      <!-- punto verde online -->
+      <div style="position:absolute;bottom:2px;right:2px;z-index:3;
+           width:13px;height:13px;border-radius:50%;
+           background:#22c55e;border:2px solid #fff;
+           animation:dotOnline 1.4s ease-in-out infinite;"></div>
+    </div>`;
+}
+
+/* ── Actualizar marcadores en el mapa ── */
 async function actualizarMapaRastreo() {
   if (!_mapaRastreo) return;
 
   const coordsData = await fetchCoordenadasDomis();
 
-  // Timestamp en UI
   const tsEl = document.getElementById('rastreo-mapa-ts');
   if (tsEl) tsEl.textContent = 'Act: ' + new Date().toLocaleTimeString('es-CO',
     { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -2557,15 +2409,14 @@ async function actualizarMapaRastreo() {
   coordsData.forEach((d, idx) => {
     const detalle = parseActividadDetalle(d.actividad);
     const coords  = detalle.coords;
-    if (!coords) return;   // sin coordenadas válidas → skip
+    if (!coords) return;
 
     idsActivos.add(d.idDomi);
     bounds.push(coords);
 
-    // ── Cruce con MongoDB: primero por idWil, luego por nombre ──
-    const driver    = allDrivers.find(dr =>
-      dr.idWil === d.idDomi ||
-      dr.id    === d.idDomi ||
+    // Cruce con MongoDB: idWil > id > nombre
+    const driver  = allDrivers.find(dr =>
+      dr.idWil === d.idDomi || dr.id === d.idDomi ||
       (dr.nombre || '').toLowerCase() === d.nombre.toLowerCase()
     );
     const nombre    = driver?.nombre || d.nombre || d.idDomi;
@@ -2573,7 +2424,6 @@ async function actualizarMapaRastreo() {
     const iniciales = nombre.split(' ').slice(0, 2).map(p => p[0] || '').join('').toUpperCase();
     const color     = PALETA[idx % PALETA.length];
 
-    // Pedidos activos de este domi
     const pedsDomi = allPedidos.filter(p =>
       !['entregado', 'cancelado'].includes(p.estado) &&
       (p.domi || '').toLowerCase() === nombre.toLowerCase()
@@ -2583,64 +2433,43 @@ async function actualizarMapaRastreo() {
       <div style="font-family:'Plus Jakarta Sans',sans-serif;min-width:220px;padding:4px;">
         <div style="display:flex;align-items:center;gap:9px;margin-bottom:9px;">
           ${fotoUrl
-            ? `<img src="${fotoUrl}" alt="${nombre}"
-                 style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:2.5px solid ${color};"
+            ? `<img src="${fotoUrl}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:2.5px solid ${color};"
                  onerror="this.outerHTML='<div style=width:40px;height:40px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;>${iniciales}</div>'">`
-            : `<div style="width:40px;height:40px;border-radius:50%;background:${color};display:flex;align-items:center;
-                 justify-content:center;font-size:15px;font-weight:800;color:#fff;">${iniciales}</div>`
+            : `<div style="width:40px;height:40px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;">${iniciales}</div>`
           }
           <div>
             <div style="font-weight:800;font-size:13px;color:#0a1e21;">${nombre}</div>
-            <div style="font-size:9px;color:#6e979c;">${d.idDomi} · ${pedsDomi.length} pedido${pedsDomi.length !== 1 ? 's' : ''} activo${pedsDomi.length !== 1 ? 's' : ''}</div>
+            <div style="font-size:9px;color:#6e979c;">${d.idDomi} · ${pedsDomi.length} pedido${pedsDomi.length!==1?'s':''} activo${pedsDomi.length!==1?'s':''}</div>
           </div>
         </div>
         ${pedsDomi.length
-          ? pedsDomi.slice(0, 4).map(p => `
+          ? pedsDomi.slice(0,4).map(p=>`
               <div style="font-size:10px;padding:5px 0;border-top:1px solid #e5edef;">
-                <b style="color:#0a1e21;">#${p.id}</b>
+                <b>#${p.id}</b>
                 <span style="color:${color};background:${color}22;padding:1px 6px;border-radius:99px;font-size:8px;font-weight:800;margin-left:3px;">${p.estado}</span>
-                · ${p.cliente || '–'}<br>
-                <span style="color:#6e979c;">📍 ${(p.direccion || '').substring(0, 34)}</span>
+                · ${p.cliente||'–'}<br>
+                <span style="color:#6e979c;">📍 ${(p.direccion||'').substring(0,34)}</span>
               </div>`).join('')
           : '<div style="font-size:10px;color:#aaa;padding:5px 0;border-top:1px solid #e5edef;">Sin pedidos activos</div>'
         }
         <div style="margin-top:6px;font-size:8px;color:#aaa;padding-top:4px;border-top:1px solid #e5edef;">
           📍 ${coords[0].toFixed(5)}, ${coords[1].toFixed(5)}
-          ${detalle.hora      ? ' · 🕐 ' + detalle.hora      : ''}
-          ${detalle.precision ? ' · 🎯 ' + detalle.precision : ''}
+          ${detalle.hora ? ' · 🕐 '+detalle.hora : ''}
+          ${detalle.precision ? ' · 🎯 '+detalle.precision : ''}
         </div>
       </div>`;
 
-    // ── Icono con iniciales (siempre funciona aunque no haya foto) ──
-    const iconHTML = fotoUrl
-      ? `<div style="position:relative;width:46px;height:46px;">
-           <img src="${fotoUrl}" alt="${iniciales}"
-             style="width:46px;height:46px;border-radius:50%;object-fit:cover;border:3px solid ${color};
-                    box-shadow:0 3px 14px rgba(0,0,0,.4);"
-             onerror="this.outerHTML='<div style=width:46px;height:46px;border-radius:50%;background:${color};
-               display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;
-               border:3px solid #fff;box-shadow:0 3px 14px rgba(0,0,0,.4);>${iniciales}</div>'">
-           <div style="position:absolute;bottom:0;right:0;width:13px;height:13px;border-radius:50%;
-                       background:#22c55e;border:2px solid #fff;"></div>
-         </div>`
-      : `<div style="position:relative;width:46px;height:46px;border-radius:50%;background:${color};
-             display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;
-             border:3px solid #fff;box-shadow:0 3px 14px rgba(0,0,0,.4);">
-           ${iniciales}
-           <div style="position:absolute;bottom:0;right:0;width:13px;height:13px;border-radius:50%;
-                       background:#22c55e;border:2px solid #fff;"></div>
-         </div>`;
+    const iconHTML = buildRadarIcon(fotoUrl, iniciales, color);
 
     const icon = L.divIcon({
       className:   '',
       html:        iconHTML,
-      iconSize:    [46, 46],
-      iconAnchor:  [23, 23],
-      popupAnchor: [0, -28]
+      iconSize:    [62, 62],
+      iconAnchor:  [31, 31],
+      popupAnchor: [0, -36]
     });
 
     if (_mapaMarkers[d.idDomi]) {
-      // Mover marcador existente suavemente
       _mapaMarkers[d.idDomi].setLatLng(coords);
       _mapaMarkers[d.idDomi].setIcon(icon);
       _mapaMarkers[d.idDomi].setPopupContent(popupHTML);
@@ -2652,81 +2481,55 @@ async function actualizarMapaRastreo() {
     }
   });
 
-  // Eliminar marcadores de domis que ya no reportan coordenadas
+  // Eliminar marcadores de domis que ya no reportan
   Object.keys(_mapaMarkers).forEach(id => {
-    if (!idsActivos.has(id)) {
-      _mapaMarkers[id].remove();
-      delete _mapaMarkers[id];
-    }
+    if (!idsActivos.has(id)) { _mapaMarkers[id].remove(); delete _mapaMarkers[id]; }
   });
 
-  // Ajustar vista al conjunto de domis activos
-  if (bounds.length === 1) {
-    _mapaRastreo.setView(bounds[0], 15);
-  } else if (bounds.length > 1) {
-    _mapaRastreo.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
-  }
+  // Ajustar vista
+  if (bounds.length === 1)       _mapaRastreo.setView(bounds[0], 15);
+  else if (bounds.length > 1)    _mapaRastreo.fitBounds(bounds, { padding:[50,50], maxZoom:16 });
 
   actualizarCardsYLista(coordsData);
 }
 
+/* ── Cards y lista de pedidos activos ── */
 function actualizarCardsYLista(coordsData) {
   const cardsEl = document.getElementById('rastreo-domis-cards');
   const listaEl = document.getElementById('rastreo-lista-activos');
-  const stColors = { pendiente: '#d97706', asignado: '#7c3aed', proceso: '#2563eb', encamino: '#22c55e' };
-  const lblMap   = { pendiente: 'Pendiente', asignado: 'Asignado', proceso: 'En proceso', encamino: '🛵 En camino' };
+  const stColors = { pendiente:'#d97706', asignado:'#7c3aed', proceso:'#2563eb', encamino:'#22c55e' };
+  const lblMap   = { pendiente:'Pendiente', asignado:'Asignado', proceso:'En proceso', encamino:'🛵 En camino' };
 
   if (cardsEl) {
     if (!coordsData.length) {
-      cardsEl.innerHTML = `<div style="color:rgba(255,255,255,.35);font-size:11px;padding:8px;grid-column:1/-1;">
-        Sin domiciliarios con ubicación activa</div>`;
+      cardsEl.innerHTML = `<div style="color:rgba(255,255,255,.35);font-size:11px;padding:8px;grid-column:1/-1;">Sin domiciliarios con ubicación activa</div>`;
     } else {
       cardsEl.innerHTML = coordsData.map((d, idx) => {
         const detalle   = parseActividadDetalle(d.actividad);
         const coords    = detalle.coords;
-        const driver    = allDrivers.find(dr =>
-          dr.idWil === d.idDomi || dr.id === d.idDomi ||
-          (dr.nombre || '').toLowerCase() === d.nombre.toLowerCase()
-        );
+        const driver    = allDrivers.find(dr => dr.idWil===d.idDomi || dr.id===d.idDomi || (dr.nombre||'').toLowerCase()===d.nombre.toLowerCase());
         const nombre    = driver?.nombre || d.nombre || d.idDomi;
         const fotoUrl   = driver?.foto   || '';
-        const iniciales = nombre.split(' ').slice(0, 2).map(p => p[0] || '').join('').toUpperCase();
+        const iniciales = nombre.split(' ').slice(0,2).map(p=>p[0]||'').join('').toUpperCase();
         const color     = PALETA[idx % PALETA.length];
-        const pedsDomi  = allPedidos.filter(p =>
-          !['entregado', 'cancelado'].includes(p.estado) &&
-          (p.domi || '').toLowerCase() === nombre.toLowerCase()
-        );
-        const enCamino  = pedsDomi.filter(p => p.estado === 'encamino').length;
-
+        const pedsDomi  = allPedidos.filter(p => !['entregado','cancelado'].includes(p.estado) && (p.domi||'').toLowerCase()===nombre.toLowerCase());
+        const enCamino  = pedsDomi.filter(p=>p.estado==='encamino').length;
         return `
           <div style="background:rgba(255,255,255,.07);border:1.5px solid ${color}55;border-radius:12px;
                padding:10px 12px;display:flex;align-items:center;gap:9px;cursor:pointer;transition:border-color .15s;"
                onmouseover="this.style.borderColor='${color}'"
                onmouseout="this.style.borderColor='${color}55'"
-               onclick="if(_mapaRastreo&&_mapaMarkers['${d.idDomi}']){
-                 _mapaRastreo.setView(_mapaMarkers['${d.idDomi}'].getLatLng(),16);
-                 _mapaMarkers['${d.idDomi}'].openPopup();
-               }">
+               onclick="if(_mapaRastreo&&_mapaMarkers['${d.idDomi}']){_mapaRastreo.setView(_mapaMarkers['${d.idDomi}'].getLatLng(),16);_mapaMarkers['${d.idDomi}'].openPopup();}">
             ${fotoUrl
-              ? `<img src="${fotoUrl}" alt="${iniciales}"
-                   style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid ${color};flex-shrink:0;"
-                   onerror="this.outerHTML='<div style=width:38px;height:38px;border-radius:50%;background:${color};
-                     display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;
-                     color:#fff;flex-shrink:0;>${iniciales}</div>'">`
-              : `<div style="width:38px;height:38px;border-radius:50%;background:${color};display:flex;
-                   align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;flex-shrink:0;">${iniciales}</div>`
+              ? `<img src="${fotoUrl}" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid ${color};flex-shrink:0;"
+                   onerror="this.outerHTML='<div style=width:38px;height:38px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;flex-shrink:0;>${iniciales}</div>'">`
+              : `<div style="width:38px;height:38px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;flex-shrink:0;">${iniciales}</div>`
             }
             <div style="flex:1;min-width:0;">
               <div style="font-size:11px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nombre}</div>
-              <div style="font-size:9px;color:rgba(255,255,255,.5);margin-top:2px;">
-                ${pedsDomi.length} activos · ${enCamino} en camino
-              </div>
+              <div style="font-size:9px;color:rgba(255,255,255,.5);margin-top:2px;">${pedsDomi.length} activos · ${enCamino} en camino</div>
               ${coords
-                ? `<div style="font-size:8px;color:rgba(255,255,255,.3);margin-top:1px;font-family:'DM Mono',monospace;">
-                     ${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}
-                     ${detalle.hora      ? ' · ' + detalle.hora      : ''}
-                     ${detalle.precision ? ' · ' + detalle.precision : ''}
-                   </div>`
+                ? `<div style="font-size:8px;color:rgba(255,255,255,.3);margin-top:1px;font-family:'DM Mono',monospace;">${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}${detalle.hora?' · '+detalle.hora:''}${detalle.precision?' · '+detalle.precision:''}</div>`
                 : `<div style="font-size:8px;color:rgba(255,255,255,.2);margin-top:1px;">Sin coordenadas</div>`
               }
             </div>
@@ -2737,44 +2540,37 @@ function actualizarCardsYLista(coordsData) {
   }
 
   if (listaEl) {
-    const activos = allPedidos.filter(p => !['entregado', 'cancelado'].includes(p.estado));
+    const activos = allPedidos.filter(p => !['entregado','cancelado'].includes(p.estado));
     if (!activos.length) {
-      listaEl.innerHTML = `<div class="empty-state"><div class="es-ico">✅</div>
-        <p style="color:var(--text3);">Sin pedidos activos</p></div>`;
+      listaEl.innerHTML = `<div class="empty-state"><div class="es-ico">✅</div><p style="color:var(--text3);">Sin pedidos activos</p></div>`;
     } else {
-      listaEl.innerHTML = activos.slice(0, 20).map(p => {
+      listaEl.innerHTML = activos.slice(0,20).map(p => {
         const color = stColors[p.estado] || '#d97706';
-        return `
-          <div style="background:var(--white);border:1.5px solid var(--border);border-radius:11px;
-               padding:9px 12px;margin-bottom:6px;display:flex;align-items:center;gap:9px;">
-            <div style="width:8px;height:8px;border-radius:50%;background:${color};
-                 flex-shrink:0;animation:bk 2s infinite;"></div>
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:11px;font-weight:800;color:var(--text);">
-                ${p.cliente || '–'}
-                <span style="font-size:8px;font-weight:700;color:${color};background:${color}22;
-                     padding:1px 6px;border-radius:99px;margin-left:4px;">${lblMap[p.estado] || p.estado}</span>
-              </div>
-              <div style="font-size:9px;color:var(--text2);margin-top:2px;">
-                ${p.domi ? '🛵 ' + p.domi : '⚠ Sin asignar'} · 📍 ${(p.direccion || 'Sin dirección').substring(0, 38)}
-              </div>
+        return `<div style="background:var(--white);border:1.5px solid var(--border);border-radius:11px;padding:9px 12px;margin-bottom:6px;display:flex;align-items:center;gap:9px;">
+          <div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;animation:bk 2s infinite;"></div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:11px;font-weight:800;color:var(--text);">${p.cliente||'–'}
+              <span style="font-size:8px;font-weight:700;color:${color};background:${color}22;padding:1px 6px;border-radius:99px;margin-left:4px;">${lblMap[p.estado]||p.estado}</span>
             </div>
-            <div style="font-size:10px;font-weight:800;font-family:'DM Mono',monospace;color:var(--teal-d);flex-shrink:0;">
-              ${parsePrecio(p.total) > 0 ? fmtMoney(parsePrecio(p.total)) : ''}
+            <div style="font-size:9px;color:var(--text2);margin-top:2px;">
+              ${p.domi?'🛵 '+p.domi:'⚠ Sin asignar'} · 📍 ${(p.direccion||'Sin dirección').substring(0,38)}
             </div>
-          </div>`;
+          </div>
+          <div style="font-size:10px;font-weight:800;font-family:'DM Mono',monospace;color:var(--teal-d);flex-shrink:0;">${parsePrecio(p.total)>0?fmtMoney(parsePrecio(p.total)):''}</div>
+        </div>`;
       }).join('');
     }
   }
 }
 
+/* ── Inicializar mapa ── */
 function initMapaRastreo() {
   const contenedor = document.getElementById('mapa-rastreo');
   if (!contenedor) return;
 
   if (!_mapaRastreo) {
     _mapaRastreo = L.map('mapa-rastreo', { zoomControl: true })
-      .setView([6.2442, -75.5812], 13);   // Medellín por defecto
+      .setView([6.2442, -75.5812], 13);  // Medellín por defecto
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>',
       maxZoom: 19
@@ -2782,105 +2578,15 @@ function initMapaRastreo() {
   }
 
   setTimeout(() => _mapaRastreo.invalidateSize(), 200);
-
   actualizarMapaRastreo();
 
   if (_mapaInterval) clearInterval(_mapaInterval);
-  _mapaInterval = setInterval(actualizarMapaRastreo, 12000);   // ← 12 segundos
-}
-
-function actualizarCardsYLista(coordsData) {
-  const cardsEl = document.getElementById('rastreo-domis-cards');
-  const listaEl = document.getElementById('rastreo-lista-activos');
-  const stColors = { pendiente: '#d97706', asignado: '#7c3aed', proceso: '#2563eb', encamino: '#22c55e' };
-  const lblMap   = { pendiente: 'Pendiente', asignado: 'Asignado', proceso: 'En proceso', encamino: '🛵 En camino' };
-
-  if (cardsEl) {
-    if (!coordsData.length) {
-      cardsEl.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:11px;padding:8px;grid-column:1/-1;">Sin domiciliarios con ubicación activa</div>';
-    } else {
-      cardsEl.innerHTML = coordsData.map((d, idx) => {
-        const detalle   = parseActividadDetalle(d.actividad);
-        const coords    = detalle.coords;
-        const driver    = allDrivers.find(dr => dr.id === d.idDomi || (dr.nombre || '').toLowerCase() === d.nombre.toLowerCase());
-        const fotoUrl   = driver?.foto || '';
-        const nombre    = d.nombre || d.idDomi;
-        const iniciales = nombre.split(' ').slice(0, 2).map(p => p[0]).join('').toUpperCase();
-        const color     = PALETA[idx % PALETA.length];
-        const pedsDomi  = allPedidos.filter(p => !['entregado', 'cancelado'].includes(p.estado) && (p.domi || '').toLowerCase() === nombre.toLowerCase());
-        const enCamino  = pedsDomi.filter(p => p.estado === 'encamino').length;
-
-        return `<div style="background:rgba(255,255,255,.07);border:1.5px solid ${color}44;border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:9px;cursor:pointer;transition:border-color .15s;"
-          onclick="if(_mapaRastreo&&_mapaMarkers['${d.idDomi}']){_mapaRastreo.setView(_mapaMarkers['${d.idDomi}'].getLatLng(),16);_mapaMarkers['${d.idDomi}'].openPopup();}">
-          ${fotoUrl
-            ? `<img src="${fotoUrl}" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid ${color};flex-shrink:0;" onerror="this.style.display='none'">`
-            : `<div style="width:38px;height:38px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;flex-shrink:0;">${iniciales}</div>`
-          }
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:11px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nombre}</div>
-            <div style="font-size:9px;color:rgba(255,255,255,.5);margin-top:2px;">${pedsDomi.length} activos · ${enCamino} en camino</div>
-            ${coords
-              ? `<div style="font-size:8px;color:rgba(255,255,255,.3);margin-top:1px;font-family:'DM Mono',monospace;">
-                   ${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}
-                   ${detalle.hora ? ' · ' + detalle.hora : ''}
-                   ${detalle.precision ? ' · ' + detalle.precision : ''}
-                 </div>`
-              : ''
-            }
-          </div>
-          <div style="width:9px;height:9px;border-radius:50%;background:#22c55e;animation:bk 1.4s infinite;flex-shrink:0;"></div>
-        </div>`;
-      }).join('');
-    }
-  }
-
-  if (listaEl) {
-    const activos = allPedidos.filter(p => !['entregado', 'cancelado'].includes(p.estado));
-    if (!activos.length) {
-      listaEl.innerHTML = '<div class="empty-state"><div class="es-ico">✅</div><p style="color:var(--text3);">Sin pedidos activos</p></div>';
-    } else {
-      listaEl.innerHTML = activos.slice(0, 20).map(p => {
-        const color = stColors[p.estado] || '#d97706';
-        return `<div style="background:var(--white);border:1.5px solid var(--border);border-radius:11px;padding:9px 12px;margin-bottom:6px;display:flex;align-items:center;gap:9px;">
-          <div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;animation:bk 2s infinite;"></div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:11px;font-weight:800;color:var(--text);">${p.cliente || '–'}
-              <span style="font-size:8px;font-weight:700;color:${color};background:${color}22;padding:1px 6px;border-radius:99px;margin-left:4px;">${lblMap[p.estado] || p.estado}</span>
-            </div>
-            <div style="font-size:9px;color:var(--text2);margin-top:2px;">
-              ${p.domi ? '🛵 ' + p.domi : '⚠ Sin asignar'} · 📍 ${(p.direccion || 'Sin dirección').substring(0, 38)}
-            </div>
-          </div>
-          <div style="font-size:10px;font-weight:800;font-family:'DM Mono',monospace;color:var(--teal-d);flex-shrink:0;">${parsePrecio(p.total) > 0 ? fmtMoney(parsePrecio(p.total)) : ''}</div>
-        </div>`;
-      }).join('');
-    }
-  }
-}
-
-function initMapaRastreo() {
-  const contenedor = document.getElementById('mapa-rastreo');
-  if (!contenedor) return;
-
-  if (!_mapaRastreo) {
-    _mapaRastreo = L.map('mapa-rastreo', { zoomControl: true }).setView([6.2442, -75.5812], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>',
-      maxZoom: 19
-    }).addTo(_mapaRastreo);
-  }
-
-  setTimeout(() => _mapaRastreo.invalidateSize(), 200);
-
-  actualizarMapaRastreo();
-
-  if (_mapaInterval) clearInterval(_mapaInterval);
-  _mapaInterval = setInterval(actualizarMapaRastreo, 10000);
+  _mapaInterval = setInterval(actualizarMapaRastreo, 12000);  // ← 12 segundos
 }
 
 /* ═══ BOOT ═══ */
 (async function boot(){
-  document.getElementById('loading-txt').textContent='Conectando con Google Sheets…';
+  document.getElementById('loading-txt').textContent='Conectando…';
   try{
     await Promise.all([loadDrivers(),loadPedidos()]);
     document.getElementById('loading-txt').textContent='Cargando bases y cierres…';
