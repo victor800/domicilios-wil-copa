@@ -32,10 +32,8 @@ const fmt = (n) => (n ?? 0).toLocaleString('es-CO');
 
 function barChart(value, max, len = 16, isAttack = false) {
   const filled = max > 0 ? Math.round((value / max) * len) : 0;
-  const empty  = len - filled;
   const block  = isAttack ? '█' : '▓';
-  const danger = isAttack && value > 0;
-  return block.repeat(filled) + '░'.repeat(empty) + (danger ? ' ⚠' : '');
+  return block.repeat(filled) + '░'.repeat(len - filled) + (isAttack && value > 0 ? ' ⚠' : '');
 }
 
 function spark(values) {
@@ -44,9 +42,140 @@ function spark(values) {
   return values.map(v => chars[Math.round((v / max) * (chars.length - 1))]).join('');
 }
 
+// ── Guías de respuesta a incidentes ─────────────────────────
+function guiaAtaque(tipo, datos = {}) {
+  const guias = {
+    ip_sospechosa: {
+      titulo: '🕵️ IP SOSPECHOSA — POSIBLE SCRAPING / BOT',
+      donde: [
+        '  1. Vercel → Logs → filtra por IP: ' + (datos.ips?.map(x => x._id).join(', ') || '?'),
+        '  2. MongoDB Atlas → Collections → logs → busca esa IP',
+        '  3. Revisa qué rutas está golpeando (¿/api/pedidos? ¿/api/auth?)',
+      ],
+      pasos: [
+        '  >> Vercel: Settings → Firewall → Block IP',
+        '  >> Si es scraping: agrega rate-limit en tu API (max 10 req/min por IP)',
+        '  >> Si persiste: habilita Vercel WAF (plan Pro) o usa Cloudflare gratis',
+        '  >> Código: npm install express-rate-limit y aplica en /api/*',
+      ],
+    },
+    brute_force: {
+      titulo: '🔐 FUERZA BRUTA — INTENTOS DE LOGIN',
+      donde: [
+        '  1. Vercel → Logs → filtra POST /api/auth o /api/login',
+        '  2. Busca IPs que repiten muchas veces en poco tiempo',
+        '  3. MongoDB → logs → { method: "POST", path: /auth/ }',
+      ],
+      pasos: [
+        '  >> Bloquea la IP en Vercel Firewall inmediatamente',
+        '  >> Agrega captcha o delay de 3s después de 3 intentos fallidos',
+        '  >> Habilita 2FA en las cuentas admin de WIL',
+        '  >> Cambia las claves de CRON_SECRET y variables de entorno',
+        '  >> npm install express-rate-limit → limita /api/auth a 5 req/min',
+      ],
+    },
+    exploit: {
+      titulo: '☠️ INTENTO DE EXPLOIT — ATAQUE ACTIVO',
+      donde: [
+        '  1. URGENTE: Vercel → Logs → busca paths como .env, .git, sqlmap',
+        '  2. Rutas atacadas: ' + (datos.paths?.map(x => x._id?.substring(0,40)).join(' | ') || '?'),
+        '  3. IPs origen: ' + (datos.paths?.map(x => x.ip).filter(Boolean).join(', ') || '?'),
+      ],
+      pasos: [
+        '  >> INMEDIATO: bloquea IP en Vercel → Settings → Firewall',
+        '  >> Verifica que .env NO esté en tu repositorio público (git status)',
+        '  >> Revisa que /api/* requiera autenticación, no sea pública',
+        '  >> Activa Vercel WAF o pon el proyecto detrás de Cloudflare',
+        '  >> Rota TODAS las variables de entorno por precaución',
+        '  >> Revisa MongoDB Atlas → accesos recientes en Security → Audit Log',
+      ],
+    },
+    bot_scanner: {
+      titulo: '🤖 BOT / SCANNER DETECTADO',
+      donde: [
+        '  1. Vercel → Logs → filtra User-Agent: ' + (datos.agentes?.map(x => x._id?.substring(0,30)).join(' | ') || '?'),
+        '  2. Verifica si está leyendo datos sensibles (/api/pedidos, /api/domiciliarios)',
+        '  3. Comprueba si hay patrones en las horas (ataques nocturnos son automatizados)',
+      ],
+      pasos: [
+        '  >> Bloquea el User-Agent en Vercel Firewall o middleware',
+        '  >> Agrega robots.txt con: User-agent: * → Disallow: /api/',
+        '  >> Implementa honeypot: ruta falsa que al ser visitada bloquea la IP',
+        '  >> Si es nikto/sqlmap: reporta IP en abuseipdb.com',
+      ],
+    },
+    errores_500: {
+      titulo: '🔴 ERRORES 500 — FALLO INTERNO',
+      donde: [
+        '  1. Vercel → Functions → revisa logs de las últimas funciones',
+        '  2. Vercel → Deployments → mira si hay un deploy roto reciente',
+        '  3. MongoDB Atlas → revisa si la conexión está caída o hay timeout',
+      ],
+      pasos: [
+        '  >> Verifica variables de entorno en Vercel (MONGODB_URI, etc.)',
+        '  >> Revisa si MongoDB Atlas está en pausa (free tier se pausa)',
+        '  >> Haz un redeploy desde Vercel → Deployments → Redeploy',
+        '  >> Si persiste: npm run dev localmente y reproduce el error',
+      ],
+    },
+    sin_domiciliario: {
+      titulo: '⚠️ PEDIDOS SIN DOMICILIARIO',
+      donde: [
+        '  1. Panel WIL → tab "Pendientes" → columna Domiciliario vacía',
+        '  2. MongoDB → pedidos → { domiciliarioNombre: null, estado: "pendiente" }',
+      ],
+      pasos: [
+        '  >> Entra al panel y asigna manualmente desde el botón "Asignar"',
+        '  >> Notifica por WhatsApp a los domiciliarios disponibles',
+        '  >> Si es recurrente: revisa el flujo de asignación automática',
+      ],
+    },
+    cancelaciones: {
+      titulo: '❌ ALTO ÍNDICE DE CANCELACIONES',
+      donde: [
+        '  1. Panel WIL → tab "Cancelados" → revisa los motivos',
+        '  2. MongoDB → pedidos → { estado: "cancelado", createdAt: { $gte: hace24h } }',
+        '  3. Revisa si hay un comercio específico con muchas cancelaciones',
+      ],
+      pasos: [
+        '  >> Filtra por comercio en el panel para identificar el problemático',
+        '  >> Contacta al comercio para verificar disponibilidad de productos',
+        '  >> Si son pedidos sin domiciliario: hay escasez de domis activos',
+      ],
+    },
+    errores_404: {
+      titulo: '🔍 EXCESO DE ERRORES 404 — POSIBLE SCRAPING',
+      donde: [
+        '  1. Vercel → Logs → filtra status:404 en la última hora',
+        '  2. Identifica qué rutas están siendo buscadas',
+        '  3. Si buscan /wp-admin, /.env, /phpmyadmin → es un scanner automatizado',
+      ],
+      pasos: [
+        '  >> Si son rutas de CMS (WordPress, etc.): es un bot, bloquea IP',
+        '  >> Agrega middleware que retorne 410 Gone en vez de 404 para esas rutas',
+        '  >> Usa Cloudflare Bot Fight Mode (gratis) para filtrar bots',
+      ],
+    },
+    duplicados: {
+      titulo: '🔁 TELÉFONOS CON MÚLTIPLES PEDIDOS',
+      donde: [
+        '  1. MongoDB → pedidos → agrupa por telefono y filtra count > 3',
+        '  2. Panel WIL → busca el número de teléfono específico',
+        '  3. Verifica si son pedidos legítimos o intento de abuso',
+      ],
+      pasos: [
+        '  >> Contacta al cliente para verificar si los pedidos son reales',
+        '  >> Si es abuso: cancela los duplicados desde el panel',
+        '  >> Implementa límite de 2 pedidos activos por teléfono en el backend',
+      ],
+    },
+  };
+  return guias[tipo] || null;
+}
+
 const COLS = {
   pedidos:       'pedidos',
-  domiciliarios: 'Domiciliarios',
+  domiciliarios: 'domiciliarios',
   logs:          'logs',
   instalar:      'instalar_logs',
 };
@@ -69,8 +198,8 @@ export default async function handler(req, res) {
     const hoy     = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const proximo = new Date(now.getTime() + 60 * 60 * 1000);
 
+    // ── PEDIDOS ─────────────────────────────────────────────
     const colPed = db.collection(COLS.pedidos);
-
     const [
       totalPedidos, pedidosHoy, pedidosUltimaHora, pedidos6h,
       porEstado, sinAsignar, pedidosCancelados24h,
@@ -81,10 +210,7 @@ export default async function handler(req, res) {
       colPed.countDocuments({ createdAt: { $gte: hace1h } }),
       colPed.countDocuments({ createdAt: { $gte: hace6h } }),
       colPed.aggregate([{ $group: { _id: '$estado', count: { $sum: 1 } } },{ $sort: { count: -1 } }]).toArray(),
-      colPed.countDocuments({
-        $or: [{ domiciliarioNombre: { $exists: false } },{ domiciliarioNombre: null },{ domiciliarioNombre: '' }],
-        estado: { $nin: ['Entregado','Cancelado','entregado','cancelado'] },
-      }),
+      colPed.countDocuments({ $or: [{ domiciliarioNombre: { $exists: false } },{ domiciliarioNombre: null },{ domiciliarioNombre: '' }], estado: { $nin: ['Entregado','Cancelado','entregado','cancelado'] } }),
       colPed.countDocuments({ createdAt: { $gte: hace24h }, estado: { $in: ['Cancelado','cancelado'] } }),
       colPed.aggregate([{ $match: { createdAt: { $gte: hoy } } },{ $group: { _id: '$comercio', total: { $sum: 1 } } },{ $sort: { total: -1 } },{ $limit: 3 }]).toArray(),
       colPed.aggregate([{ $match: { createdAt: { $gte: hoy } } },{ $group: { _id: null, totalVentas: { $sum: { $toDouble: { $ifNull: ['$total',0] } } }, promedio: { $avg: { $toDouble: { $ifNull: ['$total',0] } } } } }]).toArray(),
@@ -109,6 +235,7 @@ export default async function handler(req, res) {
     }
     const maxPedHora = Math.max(...horasValues, 1);
 
+    // ── DOMICILIARIOS ────────────────────────────────────────
     const colDomi = db.collection(COLS.domiciliarios);
     const [totalDomis, activos, conPedidos] = await Promise.all([
       colDomi.countDocuments(),
@@ -121,14 +248,22 @@ export default async function handler(req, res) {
       ]).toArray(),
     ]);
 
+    // ── SEGURIDAD + TRÁFICO ──────────────────────────────────
     let accesosUltimaHora=0, accesos24h=0, errores404=0, errores500=0;
     let ipsSospechosas=[], ipsNuevas=[], agentesRaros=[];
     let peticionesRaras=[], pathsMasFrecuentes=[], trafficPorHora=[];
     let intentosBrute=0, descargasAPK=0;
 
+    // ── NUEVAS: rutas con detalle ok/fail + login por IP ────
+    let rutasDetalle=[], loginPorIP=[], loginOk=0, loginFail=0;
+
     try {
       const colLogs = db.collection(COLS.logs);
-      const [a1h,a24h,e404,e500,ips,ipN,agt,brute,paths,petR,trafH] = await Promise.all([
+      const [
+        a1h, a24h, e404, e500, ips, ipN, agt, brute,
+        paths, petR, trafH,
+        rutDet, logIP, logResumen,
+      ] = await Promise.all([
         colLogs.countDocuments({ ts: { $gte: hace1h } }),
         colLogs.countDocuments({ ts: { $gte: hace24h } }),
         colLogs.countDocuments({ ts: { $gte: hace1h }, status: 404 }),
@@ -140,10 +275,61 @@ export default async function handler(req, res) {
         colLogs.aggregate([{ $match: { ts: { $gte: hace24h } } },{ $group: { _id: '$path', count: { $sum: 1 } } },{ $sort: { count: -1 } },{ $limit: 5 }]).toArray(),
         colLogs.aggregate([{ $match: { ts: { $gte: hace24h }, path: { $regex: /\.env|\.git|wp-admin|phpmyadmin|eval\(|select\s+\*|union\s+select|<script|passwd|etc\/shadow|base64_decode/i } } },{ $group: { _id: '$path', count: { $sum: 1 }, ip: { $first: '$ip' } } },{ $sort: { count: -1 } },{ $limit: 5 }]).toArray(),
         colLogs.aggregate([{ $match: { ts: { $gte: hace6h } } },{ $group: { _id: { $hour: '$ts' }, count: { $sum: 1 } } },{ $sort: { _id: 1 } }]).toArray(),
+
+        // ── NUEVO: top rutas con conteo ok (2xx) y fail (4xx/5xx) ──
+        colLogs.aggregate([
+          { $match: { ts: { $gte: hace24h } } },
+          { $group: {
+            _id: '$path',
+            total:  { $sum: 1 },
+            ok:     { $sum: { $cond: [{ $and: [{ $gte: ['$status', 200] }, { $lt: ['$status', 400] }] }, 1, 0] } },
+            fail:   { $sum: { $cond: [{ $gte: ['$status', 400] }, 1, 0] } },
+            s500:   { $sum: { $cond: [{ $gte: ['$status', 500] }, 1, 0] } },
+          }},
+          { $sort: { total: -1 } },
+          { $limit: 8 },
+        ]).toArray(),
+
+        // ── NUEVO: intentos login fallidos agrupados por IP ──
+        colLogs.aggregate([
+          { $match: {
+            ts:     { $gte: hace24h },
+            method: 'POST',
+            path:   { $regex: /auth|login|signin/i },
+            status: { $gte: 400 },
+          }},
+          { $group: {
+            _id:       '$ip',
+            intentos:  { $sum: 1 },
+            ultimaVez: { $max: '$ts' },
+          }},
+          { $sort: { intentos: -1 } },
+          { $limit: 5 },
+        ]).toArray(),
+
+        // ── NUEVO: total login ok vs fail en 24h ──
+        colLogs.aggregate([
+          { $match: {
+            ts:     { $gte: hace24h },
+            method: 'POST',
+            path:   { $regex: /auth|login|signin/i },
+          }},
+          { $group: {
+            _id: null,
+            ok:   { $sum: { $cond: [{ $and: [{ $gte: ['$status', 200] }, { $lt: ['$status', 400] }] }, 1, 0] } },
+            fail: { $sum: { $cond: [{ $gte: ['$status', 400] }, 1, 0] } },
+          }},
+        ]).toArray(),
       ]);
+
       accesosUltimaHora=a1h; accesos24h=a24h; errores404=e404; errores500=e500;
       ipsSospechosas=ips; ipsNuevas=ipN; agentesRaros=agt;
       intentosBrute=brute; pathsMasFrecuentes=paths; peticionesRaras=petR; trafficPorHora=trafH;
+      rutasDetalle=rutDet;
+      loginPorIP=logIP;
+      loginOk   = logResumen[0]?.ok   || 0;
+      loginFail = logResumen[0]?.fail  || 0;
+
     } catch(_) {}
 
     try {
@@ -159,7 +345,7 @@ export default async function handler(req, res) {
       pedidosIncompletos = await colPed.countDocuments({ createdAt: { $gte: hace24h }, $or: [{ nombre: { $in: [null,'',undefined] } },{ direccion: { $in: [null,'',undefined] } }] });
     } catch(_) {}
 
-    // Tráfico por hora
+    // ── Tráfico por hora ─────────────────────────────────────
     const trafMap = {};
     for (const t of trafficPorHora) trafMap[t._id] = t.count;
     const trafficValues = horasLabels.map((_, i) => {
@@ -172,41 +358,97 @@ export default async function handler(req, res) {
     );
     const maxAttack = Math.max(...attackValues, 1);
 
-    // Alertas
-    const alertasStr = [];
-    if (sinAsignar > 0)         alertasStr.push(`  >> ${sinAsignar} pedido(s) SIN domiciliario asignado`);
-    if (errores500 > 0)         alertasStr.push(`  >> ${errores500} errores 500 en ultima hora`);
-    if (ipsSospechosas.length)  alertasStr.push(`  >> ${ipsSospechosas.length} IP(s) sospechosa(s) detectadas`);
-    if (peticionesRaras.length) alertasStr.push(`  >> ${peticionesRaras.length} intento(s) de exploit`);
-    if (intentosBrute > 10)     alertasStr.push(`  >> ${intentosBrute} intentos brute-force en login`);
-    if (agentesRaros.length)    alertasStr.push(`  >> ${agentesRaros.length} bot/scanner activo`);
-    if (duplicados > 0)         alertasStr.push(`  >> ${duplicados} telefono(s) con +3 pedidos/24h`);
-    if (pedidosIncompletos > 0) alertasStr.push(`  >> ${pedidosIncompletos} pedido(s) con datos incompletos`);
-    if (pedidosCancelados24h > 5) alertasStr.push(`  >> ${pedidosCancelados24h} cancelaciones en 24h`);
-    if (errores404 > 20)        alertasStr.push(`  >> ${errores404} errores 404 — posible scraping`);
+    // ── Alertas + Guías de respuesta ─────────────────────────
+    const alertasStr  = [];
+    const guiasBlocks = [];
 
-    const hayAlertas   = alertasStr.length > 0;
-    const nivelSeguridad = hayAlertas
-      ? Math.max(10, 100 - (alertasStr.length * 15))
-      : 100;
-    const barSeguridad = barChart(nivelSeguridad, 100, 12, hayAlertas);
+    if (ipsSospechosas.length > 0) {
+      alertasStr.push(`  >> ${ipsSospechosas.length} IP(s) sospechosa(s): ${ipsSospechosas.map(x => x._id + ' (' + x.count + ' reqs)').join(', ')}`);
+      const g = guiaAtaque('ip_sospechosa', { ips: ipsSospechosas });
+      if (g) guiasBlocks.push(g);
+    }
+    if (intentosBrute > 10) {
+      alertasStr.push(`  >> ${intentosBrute} intentos brute-force en login`);
+      const g = guiaAtaque('brute_force');
+      if (g) guiasBlocks.push(g);
+    }
+    if (peticionesRaras.length > 0) {
+      alertasStr.push(`  >> ${peticionesRaras.length} intento(s) de exploit detectados`);
+      const g = guiaAtaque('exploit', { paths: peticionesRaras });
+      if (g) guiasBlocks.push(g);
+    }
+    if (agentesRaros.length > 0) {
+      alertasStr.push(`  >> ${agentesRaros.length} bot/scanner activo: ${agentesRaros.map(x => x._id?.substring(0,20)).join(' | ')}`);
+      const g = guiaAtaque('bot_scanner', { agentes: agentesRaros });
+      if (g) guiasBlocks.push(g);
+    }
+    if (errores500 > 0) {
+      alertasStr.push(`  >> ${errores500} errores 500 en ultima hora`);
+      const g = guiaAtaque('errores_500');
+      if (g) guiasBlocks.push(g);
+    }
+    if (sinAsignar > 0) {
+      alertasStr.push(`  >> ${sinAsignar} pedido(s) SIN domiciliario asignado`);
+      const g = guiaAtaque('sin_domiciliario');
+      if (g) guiasBlocks.push(g);
+    }
+    if (pedidosCancelados24h > 5) {
+      alertasStr.push(`  >> ${pedidosCancelados24h} cancelaciones en 24h`);
+      const g = guiaAtaque('cancelaciones');
+      if (g) guiasBlocks.push(g);
+    }
+    if (errores404 > 20) {
+      alertasStr.push(`  >> ${errores404} errores 404 — posible scraping`);
+      const g = guiaAtaque('errores_404');
+      if (g) guiasBlocks.push(g);
+    }
+    if (duplicados > 0) {
+      alertasStr.push(`  >> ${duplicados} telefono(s) con +3 pedidos/24h`);
+      const g = guiaAtaque('duplicados');
+      if (g) guiasBlocks.push(g);
+    }
+    if (pedidosIncompletos > 0) {
+      alertasStr.push(`  >> ${pedidosIncompletos} pedido(s) con datos incompletos`);
+    }
+    if (loginFail > 20) {
+      alertasStr.push(`  >> ${loginFail} intentos de login fallidos en 24h`);
+      const g = guiaAtaque('brute_force');
+      if (g && !guiasBlocks.find(x => x.titulo === g.titulo)) guiasBlocks.push(g);
+    }
 
-    // Fechas formateadas
+    const hayAlertas = alertasStr.length > 0;
+    const nivelSeguridad = hayAlertas ? Math.max(10, 100 - (guiasBlocks.length * 18)) : 100;
+    const barSeguridad   = barChart(nivelSeguridad, 100, 12, hayAlertas);
+
+    // ── Construir bloque de guías ────────────────────────────
+    let guiasSection = '';
+    if (guiasBlocks.length > 0) {
+      guiasSection = guiasBlocks.map((g, idx) => `
+┌─[ INCIDENTE ${String(idx+1).padStart(2,'0')} ]──────────────────────
+  ${g.titulo}
+  ·
+  DONDE REVISAR:
+${g.donde.join('\n')}
+  ·
+  COMO DETENERLO:
+${g.pasos.join('\n')}`).join('\n');
+    }
+
+    // ── Fechas ───────────────────────────────────────────────
     const optsDate = { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Bogota' };
     const optsTime = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'America/Bogota' };
-    const fechaScan  = now.toLocaleDateString('es-CO', optsDate).replace(/\//g,'/');
-    const horaScan   = now.toLocaleTimeString('es-CO', optsTime);
-    const fechaProx  = proximo.toLocaleDateString('es-CO', optsDate).replace(/\//g,'/');
-    const horaProx   = proximo.toLocaleTimeString('es-CO', optsTime);
-    const fechaLarga = now.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Bogota' });
+    const fechaScan = now.toLocaleDateString('es-CO', optsDate);
+    const horaScan  = now.toLocaleTimeString('es-CO', optsTime);
+    const fechaProx = proximo.toLocaleDateString('es-CO', optsDate);
+    const horaProx  = proximo.toLocaleTimeString('es-CO', optsTime);
 
-    // Gráficas
-    const pedHoraLines     = horasLabels.map((l,i) => `  ${l} ${barChart(horasValues[i],   maxPedHora, 14)}  ${String(horasValues[i]).padStart(4,' ')}`).join('\n');
-    const trafficHoraLines = horasLabels.map((l,i) => `  ${l} ${barChart(trafficValues[i], maxTraffic, 14)}  ${String(trafficValues[i]).padStart(5,' ')}`).join('\n');
-    const attackHoraLines  = horasLabels.map((l,i) => `  ${l} ${barChart(attackValues[i],  maxAttack,  14, true)}  ${String(attackValues[i]).padStart(4,' ')}`).join('\n');
+    // ── Gráficas ─────────────────────────────────────────────
+    const pedHoraLines     = horasLabels.map((l,i) => `  ${l} ${barChart(horasValues[i],   maxPedHora,  14)}  ${String(horasValues[i]).padStart(4,' ')}`).join('\n');
+    const trafficHoraLines = horasLabels.map((l,i) => `  ${l} ${barChart(trafficValues[i], maxTraffic,  14)}  ${String(trafficValues[i]).padStart(5,' ')}`).join('\n');
+    const attackHoraLines  = horasLabels.map((l,i) => `  ${l} ${barChart(attackValues[i],  maxAttack,   14, true)}  ${String(attackValues[i]).padStart(4,' ')}`).join('\n');
 
-    const maxDomiPed    = Math.max(...conPedidos.map(d => d.pedidosHoy), 1);
-    const domiLines     = conPedidos.filter(d => d.pedidosHoy > 0)
+    const maxDomiPed = Math.max(...conPedidos.map(d => d.pedidosHoy), 1);
+    const domiLines  = conPedidos.filter(d => d.pedidosHoy > 0)
       .map((d,i) => `  #${String(i+1).padStart(2,'0')} ${d.nombre.substring(0,10).padEnd(10,' ')} ${barChart(d.pedidosHoy, maxDomiPed, 10)}  ${d.pedidosHoy}`)
       .join('\n') || '  >> sin movimiento hoy';
 
@@ -215,46 +457,63 @@ export default async function handler(req, res) {
       `  ${String(i+1).padStart(2,'0')} ${(c._id||'?').substring(0,10).padEnd(10,' ')} ${barChart(c.total, maxCom, 10)}  ${c.total}`
     ).join('\n') || '  >> sin datos';
 
-    const estadosOrden  = [['pendiente','PEND'],['asignado','ASIG'],['proceso','PROC'],['encamino','ENVO'],['entregado','ENTR'],['cancelado','CANC']];
-    const maxEst        = Math.max(...estadosOrden.map(([k]) => estadoMap[k]||0), 1);
-    const estadoLines   = estadosOrden.map(([k,label]) => {
+    const estadosOrden = [['pendiente','PEND'],['asignado','ASIG'],['proceso','PROC'],['encamino','ENVO'],['entregado','ENTR'],['cancelado','CANC']];
+    const maxEst       = Math.max(...estadosOrden.map(([k]) => estadoMap[k]||0), 1);
+    const estadoLines  = estadosOrden.map(([k,label]) => {
       const n = estadoMap[k]||0; if (!n) return null;
       return `  ${label} ${barChart(n, maxEst, 12, k==='cancelado')}  ${String(n).padStart(4,' ')}`;
     }).filter(Boolean).join('\n') || '  >> sin datos';
 
-    const ipsLines      = ipsSospechosas.length
+    const ipsLines = ipsSospechosas.length
       ? ipsSospechosas.map(x => `  ${x._id.padEnd(16,' ')} ${barChart(x.count, ipsSospechosas[0].count, 10, true)}  ${x.count} reqs`).join('\n')
       : '  >> ninguna detectada';
 
-    const botsLines     = agentesRaros.length
+    const botsLines = agentesRaros.length
       ? agentesRaros.map(x => `  [${x.count}x] ${x._id.substring(0,25)} :: ${x.ip||'?'}`).join('\n')
       : '  >> ninguno detectado';
 
-    const exploitLines  = peticionesRaras.length
+    const exploitLines = peticionesRaras.length
       ? peticionesRaras.map(x => `  [${x.count}x] ${(x._id||'?').substring(0,28)} >> ${x.ip||'?'}`).join('\n')
       : '  >> ninguno detectado';
 
-    const maxPath       = pathsMasFrecuentes[0]?.count || 1;
-    const pathLines     = pathsMasFrecuentes.length
-      ? pathsMasFrecuentes.map(p => `  ${barChart(p.count, maxPath, 8)}  ${(p._id||'/').substring(0,25)}  (${p.count})`).join('\n')
+    // ── NUEVO: rutas con ok/fail detallado ───────────────────
+    const maxRutTotal = rutasDetalle[0]?.total || 1;
+    const rutasLines  = rutasDetalle.length
+      ? rutasDetalle.map(r => {
+          const ruta  = (r._id || '/').substring(0, 22).padEnd(22, ' ');
+          const bar   = barChart(r.total, maxRutTotal, 8, r.fail > r.ok);
+          const okStr   = String(r.ok  ).padStart(4, ' ');
+          const failStr = String(r.fail).padStart(4, ' ');
+          const s5Str   = r.s500 > 0 ? ` 💀${r.s500}` : '';
+          return `  ${ruta} ${bar}  ✅${okStr} ❌${failStr}${s5Str}`;
+        }).join('\n')
       : '  >> sin datos';
 
-    const sparkPed      = spark(horasValues);
-    const sparkTraffic  = spark(trafficValues);
-    const sparkAttack   = spark(attackValues);
+    // ── NUEVO: login fallidos por IP ─────────────────────────
+    const loginIPLines = loginPorIP.length
+      ? loginPorIP.map(x => {
+          const ip  = (x._id || '?').padEnd(16, ' ');
+          const bar = barChart(x.intentos, loginPorIP[0].intentos, 10, true);
+          const hora = x.ultimaVez
+            ? new Date(x.ultimaVez).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Bogota' })
+            : '??:??';
+          return `  ${ip} ${bar}  ${x.intentos} intentos  última: ${hora}`;
+        }).join('\n')
+      : '  >> ningún intento fallido';
+
+    const sparkPed     = spark(horasValues);
+    const sparkTraffic = spark(trafficValues);
+    const sparkAttack  = spark(attackValues);
 
     // ── MENSAJE ──────────────────────────────────────────────
     const msg = `👋 <b>Hola Victor!</b> Aquí tu informe WIL.
 
 <pre>
 ╔══════════════════════════════════════╗
-║     /\_____/\                       ║
-║    /  o   o  \                      ║
-║   ( ==  ^  == )    MONITOR  v2.0    ║
-║    )         (                      ║
-║   (           )                     ║
-║  ( (  )   (  ) )                    ║
-║  (__(__)___(__)__)                   ║
+║    ,___,                            ║
+║    [O.O]    WIL MONITOR  v2.0       ║
+║    /)  (\\                           ║
+║   (__ __)                           ║
 ╚══════════════════════════════════════╝
 
 ┌─────────────────────────────────────┐
@@ -298,15 +557,11 @@ ${comercioLines}
 ${domiLines}
 
 ┌─────────────────────────────────────┐
-│  📱  A P P   A C T I V I D A D      │
-├─────────────────────────────────────┤
-  Descargas APK 24h  >>  ${fmt(descargasAPK)}
-
-┌─────────────────────────────────────┐
 │  🌐  T R A F I C O   W E B          │
 ├─────────────────────────────────────┤
   Requests 1h   >>  ${fmt(accesosUltimaHora)}
   Requests 24h  >>  ${fmt(accesos24h)}
+  Descargas APK >>  ${fmt(descargasAPK)}
   Errores 404   >>  ${fmt(errores404)}
   Errores 500   >>  ${fmt(errores500)}
 
@@ -315,8 +570,19 @@ ${domiLines}
   TRAFICO/HORA:
 ${trafficHoraLines}
 
-  RUTAS MAS VISITADAS:
-${pathLines}
+  RUTAS 24H  [ruta               ]  ✅ OK  ❌FAIL
+${rutasLines}
+
+┌─────────────────────────────────────┐
+│  🔑  L O G I N   A U D I T          │
+├─────────────────────────────────────┤
+  Intentos 24h  >>  ${fmt(loginOk + loginFail)}
+  Exitosos      >>  ✅ ${fmt(loginOk)}
+  Fallidos      >>  ❌ ${fmt(loginFail)}
+  Tasa exito    >>  ${(loginOk + loginFail > 0 ? (loginOk / (loginOk + loginFail) * 100).toFixed(1) : '0.0')}%
+
+  IPs CON FALLOS (24h):
+${loginIPLines}
 
 ┌─────────────────────────────────────┐
 │  🔒  S E G U R I D A D              │
@@ -344,12 +610,17 @@ ${exploitLines}
 │  🚨  A L E R T A S                  │
 ├─────────────────────────────────────┤
 ${alertasStr.length ? alertasStr.join('\n') : '  >> SIN ALERTAS ACTIVAS [OK]'}
+${guiasBlocks.length > 0 ? `
+╔══════════════════════════════════════╗
+║  ⚡ GUIA DE RESPUESTA A INCIDENTES   ║
+╚══════════════════════════════════════╝
+${guiasSection}` : ''}
 
 ╔══════════════════════════════════════╗
 ║  ESCANEO >>  ${fechaScan}  ${horaScan}  ║
 ║  PROXIMO >>  ${fechaProx}  ${horaProx}  ║
 ╠══════════════════════════════════════╣
-║  AMENAZAS  >>  ${hayAlertas ? '!! ' + alertasStr.length + ' DETECTADA(S) !!' : 'NINGUNA              '}  ║
+║  AMENAZAS  >>  ${hayAlertas ? '!! ' + guiasBlocks.length + ' INCIDENTE(S) !!' : 'NINGUNA              '}  ║
 ║  SEGURIDAD >>  ${barSeguridad}  ${String(nivelSeguridad).padStart(3,'0')}%  ║
 ║  SISTEMA   >>  ${hayAlertas ? '⚠ REVISAR AHORA      ' : '✓ TODO EN ORDEN      '}  ║
 ╠══════════════════════════════════════╣
@@ -358,11 +629,30 @@ ${alertasStr.length ? alertasStr.join('\n') : '  >> SIN ALERTAS ACTIVAS [OK]'}
 ╚══════════════════════════════════════╝
 </pre>`;
 
-    const msgFinal = msg.length > 4000
-      ? msg.substring(0, 3950) + '\n</pre>\n<i>...[truncado]</i>'
-      : msg;
+    // Si el mensaje supera 4000 chars, enviar en 2 partes
+    if (msg.length > 4000) {
+      const parte1 = msg.substring(0, 3900) + '\n\n<i>...continua en siguiente mensaje...</i>\n</pre>';
+      await sendTelegram(parte1);
 
-    const tgResult = await sendTelegram(msgFinal);
+      if (guiasBlocks.length > 0) {
+        const parte2 = `<pre>
+╔══════════════════════════════════════╗
+║  ⚡ GUIA DE RESPUESTA (continuacion) ║
+╚══════════════════════════════════════╝
+${guiasSection}
+
+╔══════════════════════════════════════╗
+║  >> Ing. Victor Henao                ║
+║  >> WIL MONITOR v2.0                 ║
+╚══════════════════════════════════════╝
+</pre>`;
+        await sendTelegram(parte2.length > 4000 ? parte2.substring(0,3950) + '\n</pre>' : parte2);
+      }
+
+      return res.status(200).json({ ok: true, ts: now.toISOString(), pedidosHoy, alertas: alertasStr.length, incidentes: guiasBlocks.length, telegram: true, split: true });
+    }
+
+    const tgResult = await sendTelegram(msg);
 
     return res.status(200).json({
       ok: true,
@@ -370,7 +660,10 @@ ${alertasStr.length ? alertasStr.join('\n') : '  >> SIN ALERTAS ACTIVAS [OK]'}
       pedidosHoy,
       pedidosUltimaHora,
       totalVentas,
+      descargasAPK,
+      login: { ok: loginOk, fail: loginFail },
       alertas: alertasStr.length,
+      incidentes: guiasBlocks.length,
       seguridad: {
         ipsSospechosas: ipsSospechosas.length,
         intentosBrute,
