@@ -266,37 +266,50 @@ html,body{min-height:100dvh;font-family:'Inter',sans-serif;background:#00b5b0;-w
 
 <script>
 const APK_URL = 'https://domicilios-wil.vercel.app/app-release.apk';
-
-function iniciarDescarga() {
+ 
+async function iniciarDescarga() {
   const btn = document.getElementById('btnDescargar');
   btn.disabled = true;
   btn.innerHTML = '⏳ Iniciando descarga...';
-
+ 
+  // ── 1. Registra la descarga en MongoDB (sin bloquear) ──
+  try {
+    await fetch('/api/import?recurso=track-download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: 'install_page', version: '1.0' }),
+    });
+  } catch (_) {
+    // Si falla el registro, la descarga sigue igual
+  }
+ 
+  // ── 2. Lanza el APK ────────────────────────────────────
   const a = document.createElement('a');
   a.href = APK_URL;
   a.download = 'DomiciliosWIL.apk';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-
+ 
+  // ── 3. Restaura el botón ───────────────────────────────
   setTimeout(() => {
     btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Descargar App Android`;
     btn.disabled = false;
   }, 3000);
 }
-
+ 
 function notificarLanzamiento() {
   toast('🔔 ¡Te avisaremos cuando llegue a las tiendas!');
 }
-
+ 
 const esStandalone = window.matchMedia('(display-mode: standalone)').matches
                    || window.navigator.standalone === true;
 if (esStandalone) window.location.replace('/splash.html');
-
+ 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
 }
-
+ 
 function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;

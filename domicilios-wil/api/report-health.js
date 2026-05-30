@@ -312,7 +312,7 @@ export default async function handler(req, res) {
 
     // ── Alertas + Guías de respuesta ─────────────────────────
     const alertasStr  = [];
-    const guiasBlocks = [];  // bloques de respuesta a incidentes
+    const guiasBlocks = [];
 
     if (ipsSospechosas.length > 0) {
       alertasStr.push(`  >> ${ipsSospechosas.length} IP(s) sospechosa(s): ${ipsSospechosas.map(x => x._id + ' (' + x.count + ' reqs)').join(', ')}`);
@@ -437,13 +437,10 @@ ${g.pasos.join('\n')}`).join('\n');
 
 <pre>
 ╔══════════════════════════════════════╗
-║     /\_____/\                       ║
-║    /  o   o  \                      ║
-║   ( ==  ^  == )    MONITOR  v2.0    ║
-║    )         (                      ║
-║   (           )                     ║
-║  ( (  )   (  ) )                    ║
-║  (__(__)___(__)__)                   ║
+║    ,___,                            ║
+║    [O.O]    WIL MONITOR  v2.0       ║
+║    /)  (\\                           ║
+║   (__ __)                           ║
 ╚══════════════════════════════════════╝
 
 ┌─────────────────────────────────────┐
@@ -491,6 +488,7 @@ ${domiLines}
 ├─────────────────────────────────────┤
   Requests 1h   >>  ${fmt(accesosUltimaHora)}
   Requests 24h  >>  ${fmt(accesos24h)}
+  Descargas APK >>  ${fmt(descargasAPK)}
   Errores 404   >>  ${fmt(errores404)}
   Errores 500   >>  ${fmt(errores500)}
 
@@ -552,7 +550,6 @@ ${guiasSection}` : ''}
       const parte1 = msg.substring(0, 3900) + '\n\n<i>...continua en siguiente mensaje...</i>\n</pre>';
       await sendTelegram(parte1);
 
-      // Segunda parte: solo las guías de respuesta
       if (guiasBlocks.length > 0) {
         const parte2 = `<pre>
 ╔══════════════════════════════════════╗
@@ -579,6 +576,7 @@ ${guiasSection}
       pedidosHoy,
       pedidosUltimaHora,
       totalVentas,
+      descargasAPK,
       alertas: alertasStr.length,
       incidentes: guiasBlocks.length,
       seguridad: {

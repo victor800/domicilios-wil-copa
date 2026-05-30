@@ -172,6 +172,34 @@ export default async function handler(req, res) {
     return handleContable(req, res);
   }
 
+  /* ── TRACK DOWNLOAD — registra descarga del APK en instalar_logs ── */
+  /* Llamar: POST /api/import?recurso=track-download                   */
+  if (recurso === 'track-download') {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ ok: false, error: 'Method not allowed' });
+    }
+    try {
+      const { MongoClient } = await import('mongodb');
+      const client = new MongoClient(process.env.MONGODB_URI);
+      await client.connect();
+      const col = client.db().collection('instalar_logs');
+      await col.insertOne({
+        ts:        new Date(),
+        ip:        req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+                   || req.socket?.remoteAddress
+                   || 'unknown',
+        userAgent: req.headers['user-agent'] || 'unknown',
+        referrer:  req.headers['referer'] || req.headers['referrer'] || null,
+        ...(req.body && typeof req.body === 'object' ? req.body : {}),
+      });
+      await client.close();
+    } catch (e) {
+      console.error('[track-download]', e.message);
+      // Responde 200 igual — no interrumpe la descarga
+    }
+    return res.status(200).json({ ok: true });
+  }
+
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
   try {
