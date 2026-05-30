@@ -394,6 +394,8 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .mn-item .material-symbols-rounded{font-size:22px;}
 .mn-item.active{color:var(--teal);}
 </style>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
 
@@ -1399,6 +1401,7 @@ function setPedTab(tab){
   document.getElementById('ptab-'+tab)?.classList.add('active');
   document.querySelectorAll('#view-pedidos .caja-ntab').forEach(b=>b.classList.remove('active'));
   document.getElementById('pn-'+tab)?.classList.add('active');
+  if (tab === 'rastreo') setTimeout(initMapaRastreo, 100);
 }
 
 function setCajaTab(tab){
@@ -2434,6 +2437,134 @@ function renderListaDomis(){
       <span style="font-size:8px;font-weight:800;padding:2px 8px;border-radius:99px;background:${d.activo!==false?'var(--green-l)':'var(--red-l)'};color:${d.activo!==false?'var(--green)':'var(--red)'};flex-shrink:0;">${d.activo!==false?'Activo':'Inactivo'}</span>
     </div>`;
   }).join('');
+}
+
+/* ════ MAPA RASTREO ════ */
+let _mapaRastreo = null;
+let _mapaMarkers = [];
+
+function initMapaRastreo() {
+  const contenedor = document.getElementById('mapa-rastreo');
+  if (!contenedor) return;
+
+  // Inicializar mapa si no existe
+  if (!_mapaRastreo) {
+    _mapaRastreo = L.map('mapa-rastreo', { zoomControl: true }).setView([6.2442, -75.5812], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap',
+      maxZoom: 19
+    }).addTo(_mapaRastreo);
+  }
+
+  // Limpiar marcadores anteriores
+  _mapaMarkers.forEach(m => m.remove());
+  _mapaMarkers = [];
+
+  const ts = document.getElementById('rastreo-mapa-ts');
+  if (ts) ts.textContent = 'Act: ' + new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+
+  // Pedidos activos agrupados por domi
+  const activos = allPedidos.filter(p => !['entregado', 'cancelado'].includes(p.estado));
+  const domiMap = {};
+  activos.forEach(p => {
+    const k = p.domi || 'Sin asignar';
+    if (!domiMap[k]) domiMap[k] = [];
+    domiMap[k].push(p);
+  });
+
+  // Render cards de domis activos
+  const cardsEl = document.getElementById('rastreo-domis-cards');
+  const listaEl = document.getElementById('rastreo-lista-activos');
+  const stColors = { pendiente: '#d97706', asignado: '#7c3aed', proceso: '#2563eb', encamino: '#7c3aed' };
+
+  if (cardsEl) {
+    cardsEl.innerHTML = Object.entries(domiMap).map(([nombre, peds]) => {
+      const driver = allDrivers.find(d => d.nombre === nombre);
+      const iniciales = nombre.split(' ').slice(0, 2).map(p => p[0]).join('').toUpperCase();
+      const fotoUrl = driver?.foto || '';
+      const avatarHTML = fotoUrl
+        ? `<img src="${fotoUrl}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid var(--teal);" onerror="this.style.display='none'">`
+        : `<div style="width:36px;height:36px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#071e22;">${iniciales}</div>`;
+      const enCamino = peds.filter(p => p.estado === 'encamino').length;
+      const pendientes = peds.filter(p => p.estado === 'pendiente').length;
+      return `<div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:9px;">
+        ${avatarHTML}
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:11px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nombre}</div>
+          <div style="font-size:9px;color:rgba(255,255,255,.5);margin-top:2px;">${peds.length} activos · ${enCamino} en camino · ${pendientes} pendientes</div>
+        </div>
+        <div style="width:8px;height:8px;border-radius:50%;background:${enCamino > 0 ? 'var(--green)' : 'var(--orange)'};animation:bk 1.4s infinite;flex-shrink:0;"></div>
+      </div>`;
+    }).join('') || '<div style="color:rgba(255,255,255,.3);font-size:11px;padding:8px;">Sin domiciliarios activos</div>';
+  }
+
+  // Lista de pedidos activos
+  if (listaEl) {
+    if (!activos.length) {
+      listaEl.innerHTML = '<div class="empty-state"><div class="es-ico">✅</div><p style="color:var(--text3);">Sin pedidos activos</p></div>';
+    } else {
+      listaEl.innerHTML = activos.slice(0, 15).map(p => {
+        const color = stColors[p.estado] || '#d97706';
+        const lblMap = { pendiente: 'Pendiente', asignado: 'Asignado', proceso: 'En proceso', encamino: '🛵 En camino' };
+        return `<div style="background:var(--white);border:1.5px solid var(--border);border-radius:11px;padding:9px 12px;margin-bottom:6px;display:flex;align-items:center;gap:9px;">
+          <div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:11px;font-weight:800;color:var(--text);">${p.cliente || '–'} <span style="font-size:8px;font-weight:700;color:${color};background:${color}22;padding:1px 6px;border-radius:99px;">${lblMap[p.estado] || p.estado}</span></div>
+            <div style="font-size:9px;color:var(--text2);margin-top:2px;">${p.domi ? '🛵 ' + p.domi : '⚠ Sin asignar'} · ${p.direccion ? '📍 ' + p.direccion.substring(0, 35) : 'Sin dirección'}</div>
+          </div>
+          <div style="font-size:10px;font-weight:800;font-family:'DM Mono',monospace;color:var(--teal-d);flex-shrink:0;">${p.total > 0 ? fmtMoney(parsePrecio(p.total)) : ''}</div>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  // Marcadores en el mapa — Medellín por defecto si no hay coords
+  // Como los pedidos no tienen coordenadas GPS, centramos el mapa y ponemos
+  // un marcador por domi con popup de sus pedidos activos
+  const MEDELLIN = [6.2442, -75.5812];
+  const bounds = [];
+
+  Object.entries(domiMap).forEach(([nombre, peds], idx) => {
+    // Distribuir marcadores visualmente alrededor del centro
+    const angle = (idx / Object.keys(domiMap).length) * 2 * Math.PI;
+    const lat = MEDELLIN[0] + Math.sin(angle) * 0.018;
+    const lng = MEDELLIN[1] + Math.cos(angle) * 0.018;
+    bounds.push([lat, lng]);
+
+    const color = PALETA[idx % PALETA.length];
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="background:${color};color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,.3);">${nombre.split(' ')[0][0]}</div>`,
+      iconSize: [36, 36],
+      iconAnchor: [18, 18]
+    });
+
+    const popupHTML = `<div style="font-family:sans-serif;min-width:180px;">
+      <div style="font-weight:800;font-size:13px;margin-bottom:6px;">🛵 ${nombre}</div>
+      <div style="font-size:11px;color:#555;margin-bottom:4px;">${peds.length} pedido${peds.length !== 1 ? 's' : ''} activo${peds.length !== 1 ? 's' : ''}</div>
+      ${peds.slice(0, 4).map(p => `<div style="font-size:10px;padding:3px 0;border-top:1px solid #eee;">
+        <b>#${p.id}</b> · ${p.cliente || '–'}<br>
+        <span style="color:#888;">${p.direccion ? p.direccion.substring(0, 30) : 'Sin dirección'}</span>
+      </div>`).join('')}
+    </div>`;
+
+    const marker = L.marker([lat, lng], { icon })
+      .addTo(_mapaRastreo)
+      .bindPopup(popupHTML);
+    _mapaMarkers.push(marker);
+  });
+
+  // Ajustar vista
+  if (bounds.length > 1) {
+    _mapaRastreo.fitBounds(bounds, { padding: [40, 40] });
+  } else if (bounds.length === 1) {
+    _mapaRastreo.setView(bounds[0], 14);
+  } else {
+    _mapaRastreo.setView(MEDELLIN, 12);
+  }
+
+  // Forzar resize por si el contenedor cambió de tamaño
+  setTimeout(() => _mapaRastreo.invalidateSize(), 200);
 }
 
 /* ═══ BOOT ═══ */
