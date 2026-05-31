@@ -415,6 +415,28 @@ export default async function handler(req, res) {
   }
 
   /* ════════════════════════════════════════
+   POST /api/foto?recurso=pedidos
+   Crea un nuevo pedido
+════════════════════════════════════════ */
+if (recurso === 'pedidos' && req.method === 'POST') {
+  try {
+    const body = req.body || {};
+
+    if (!body.idPedido)
+      return res.status(400).json({ ok: false, error: 'Falta idPedido' });
+
+    const nuevo = await Pedido.create(body);
+    return res.status(201).json({ ok: true, data: nuevo });
+
+  } catch (e) {
+    if (e.code === 11000)
+      return res.status(409).json({ ok: false, error: 'Pedido duplicado: ' + e.message });
+    console.error('[POST pedidos]', e.message);
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+}
+
+  /* ════════════════════════════════════════
      Recurso no reconocido
   ════════════════════════════════════════ */
   return res.status(400).json({
