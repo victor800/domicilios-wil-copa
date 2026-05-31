@@ -56,11 +56,9 @@ const Domiciliario = mongoose.models.Domiciliario || mongoose.model('Domiciliari
 );
 
 /* ── Foto ── colección: Fotos ── */
-// El _id de la foto parece ser el mismo _id del domiciliario
-// también guardamos idWil por si acaso
 const Foto = mongoose.models.Foto || mongoose.model('Foto',
   new mongoose.Schema({
-    data: mongoose.Schema.Types.Mixed,  // Binary / base64
+    data: mongoose.Schema.Types.Mixed,
     mime: String,
     ts:   Date,
   }),
@@ -70,7 +68,7 @@ const Foto = mongoose.models.Foto || mongoose.model('Foto',
 /* ══ CORS ══ */
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin',  '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, PATCH, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
@@ -120,11 +118,6 @@ export default async function handler(req, res) {
 
   /* ════════════════════════════════════════
      GET /api/foto?recurso=domiciliarios
-     Trae los domiciliarios de la colección
-     Domiciliarios e intenta adjuntar la foto
-     de la colección Fotos buscando por _id
-     del domiciliario.
-     Param opcional: activo=false → todos
   ════════════════════════════════════════ */
   if (recurso === 'domiciliarios' && req.method === 'GET') {
     try {
@@ -138,17 +131,13 @@ export default async function handler(req, res) {
         .sort({ nombre: 1 })
         .lean();
 
-      // Para cada domi, intentar buscar su foto en colección Fotos
-      // El _id de la foto coincide con el _id del domiciliario
       const data = await Promise.all(domis.map(async d => {
         let fotoUrl = d.foto || '';
 
-        // Si no tiene foto en el campo directo, buscar en colección Fotos
         if (!fotoUrl) {
           try {
             const fotoDoc = await Foto.findById(d._id).lean();
             if (fotoDoc?.data) {
-              // data viene como Buffer o como objeto con base64
               const b64 = fotoDoc.data?.buffer
                 ? Buffer.from(fotoDoc.data.buffer).toString('base64')
                 : (typeof fotoDoc.data === 'string'
@@ -156,9 +145,7 @@ export default async function handler(req, res) {
                     : Buffer.from(Object.values(fotoDoc.data)).toString('base64'));
               fotoUrl = `data:${fotoDoc.mime || 'image/jpeg'};base64,${b64}`;
             }
-          } catch (_) {
-            // sin foto, no pasa nada
-          }
+          } catch (_) {}
         }
 
         return {
@@ -181,9 +168,51 @@ export default async function handler(req, res) {
   }
 
   /* ════════════════════════════════════════
+     POST /api/foto?recurso=domiciliarios
+     Body: { idWil, nombre, password, tel, zona, foto, activo }
+  ════════════════════════════════════════ */
+  if (recurso === 'domiciliarios' && req.method === 'POST') {
+    try {
+      const { idWil, nombre, password, tel, zona, foto, activo } = req.body || {};
+
+      if (!idWil || !nombre || !password)
+        return res.status(400).json({ ok: false, error: 'Faltan campos requeridos: idWil, nombre, password' });
+
+      const bcrypt = await import('bcryptjs');
+      const hash   = await bcrypt.default.hash(password, 12);
+
+      const nuevo = await Domiciliario.create({
+        idWil:    idWil.toUpperCase().trim(),
+        nombre:   nombre.trim(),
+        password: hash,
+        tel:      tel    || '',
+        zona:     zona   || '',
+        foto:     foto   || '',
+        activo:   activo !== false,
+        rol:      'domiciliario',
+      });
+
+      return res.status(201).json({
+        ok:   true,
+        data: {
+          _id:    String(nuevo._id),
+          idWil:  nuevo.idWil,
+          nombre: nuevo.nombre,
+          tel:    nuevo.tel,
+          zona:   nuevo.zona,
+          activo: nuevo.activo,
+        }
+      });
+    } catch (e) {
+      if (e.code === 11000)
+        return res.status(409).json({ ok: false, error: 'Ya existe un domiciliario con ese ID.' });
+      console.error('[POST domiciliarios]', e.message);
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
+  /* ════════════════════════════════════════
      GET /api/foto?recurso=foto&id=<_id>
-     Sirve la foto de un domiciliario como
-     imagen directa (para usar en <img src>)
   ════════════════════════════════════════ */
   if (recurso === 'foto' && req.method === 'GET') {
     try {
