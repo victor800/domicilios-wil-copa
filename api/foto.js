@@ -36,7 +36,7 @@ const Pedido = mongoose.models.Pedido || mongoose.model('Pedido',
     destinatario:       mongoose.Schema.Types.Mixed,
     domiciliarioId:     String,
     domiciliarioNombre: String,
-    horaToma:           { type: String, default: '' },   // hora en que el domi tomó el pedido
+    horaToma:           { type: String, default: '' },
     /* ── Tracker GPS del domiciliario ── */
     domiCoords: {
       lat:           { type: Number, default: null },
@@ -93,13 +93,11 @@ function setCors(res) {
 async function resolverIdWil(valor) {
   if (!valor) return null;
 
-  // Si parece un ObjectId de Mongo (24 hex) → buscar por _id
   if (/^[a-f\d]{24}$/i.test(valor)) {
     const doc = await Domiciliario.findById(valor, { idWil: 1 }).lean();
     return doc?.idWil ?? null;
   }
 
-  // Si ya es idWil → devolverlo normalizado
   return valor.toUpperCase().trim();
 }
 
@@ -120,8 +118,29 @@ export default async function handler(req, res) {
   const { recurso } = req.query;
 
   /* ════════════════════════════════════════
+     POST /api/foto?recurso=pedidos
+     ⚠️ Debe ir ANTES del GET para que no lo intercepte
+  ════════════════════════════════════════ */
+  if (recurso === 'pedidos' && req.method === 'POST') {
+    try {
+      const body = req.body || {};
+
+      if (!body.idPedido)
+        return res.status(400).json({ ok: false, error: 'Falta idPedido en el body' });
+
+      const nuevo = await Pedido.create(body);
+      return res.status(201).json({ ok: true, data: nuevo });
+
+    } catch (e) {
+      if (e.code === 11000)
+        return res.status(409).json({ ok: false, error: 'Pedido duplicado: ' + e.message });
+      console.error('[POST pedidos]', e.message);
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
+  /* ════════════════════════════════════════
      GET /api/foto?recurso=pedidos
-     domiId puede llegar como idWil o _id → se normaliza a idWil
   ════════════════════════════════════════ */
   if (recurso === 'pedidos' && req.method === 'GET') {
     try {
@@ -129,7 +148,6 @@ export default async function handler(req, res) {
 
       const filtro = {};
       if (estado && estado !== 'todos') {
-        // Soporta múltiples estados separados por coma: "en ruta,en camino"
         const estadoList = estado.split(',').map(s => s.trim()).filter(Boolean);
         filtro.estado = estadoList.length === 1
           ? { $regex: new RegExp(`^${estadoList[0]}$`, 'i') }
@@ -138,7 +156,6 @@ export default async function handler(req, res) {
       if (domi)
         filtro.domiciliarioNombre = { $regex: new RegExp(domi, 'i') };
       if (domiId) {
-        // Normalizar a idWil para que siempre coincida con lo guardado en el pedido
         const idWilResuelto = await resolverIdWil(domiId);
         filtro.domiciliarioId = idWilResuelto ?? domiId;
       }
@@ -285,8 +302,6 @@ export default async function handler(req, res) {
 
   /* ════════════════════════════════════════
      PATCH /api/foto?recurso=asignar
-     Body: { pedidoId, domiciliarioId, domiciliarioNombre }
-     domiciliarioId puede llegar como _id o idWil → se normaliza a idWil
   ════════════════════════════════════════ */
   if (recurso === 'asignar' && req.method === 'PATCH') {
     try {
@@ -295,12 +310,10 @@ export default async function handler(req, res) {
       if (!pedidoId || !domiciliarioId)
         return res.status(400).json({ ok: false, error: 'Faltan pedidoId o domiciliarioId' });
 
-      // Normalizar a idWil — el panel admin envía el _id de Mongo
       const idWilResuelto = await resolverIdWil(domiciliarioId);
       if (!idWilResuelto)
         return res.status(404).json({ ok: false, error: 'Domiciliario no encontrado: ' + domiciliarioId });
 
-      // Si no viene nombre, buscarlo en la BD
       let nombreFinal = domiciliarioNombre || '';
       if (!nombreFinal) {
         const doc = await Domiciliario.findOne({ idWil: idWilResuelto }, { nombre: 1 }).lean();
@@ -329,9 +342,6 @@ export default async function handler(req, res) {
 
   /* ════════════════════════════════════════
      PATCH /api/foto?recurso=estado
-     Body: { pedidoId, estado, domiciliarioId?, domiciliarioNombre?, horaToma? }
-     domiciliarioId puede llegar como _id o idWil → se normaliza a idWil
-     Flujo APK: pendiente → en ruta → en camino → entregado
   ════════════════════════════════════════ */
   if (recurso === 'estado' && req.method === 'PATCH') {
     try {
@@ -342,15 +352,12 @@ export default async function handler(req, res) {
 
       const update = { estado };
 
-      // Guardar hora en que el domi tomó el pedido (solo cuando cambia a "en ruta")
       if (horaToma) update.horaToma = horaToma;
 
       if (domiciliarioId) {
-        // Normalizar a idWil — el APK envía idWil, el panel puede enviar _id
         const idWilResuelto = await resolverIdWil(domiciliarioId);
         update.domiciliarioId = idWilResuelto ?? domiciliarioId;
 
-        // Resolver nombre si no viene
         if (domiciliarioNombre) {
           update.domiciliarioNombre = domiciliarioNombre;
         } else if (idWilResuelto) {
@@ -377,11 +384,6 @@ export default async function handler(req, res) {
 
   /* ════════════════════════════════════════
      PATCH /api/foto?recurso=ubicacion-domi
-     Body: { domiId, lat, lng }
-     domiId = idWil (viene del APK)
-     Actualiza coordenadas cada ~10s en:
-     — Domiciliario.ubicacion
-     — Pedido.domiCoords del pedido "encamino" activo del domi
   ════════════════════════════════════════ */
   if (recurso === 'ubicacion-domi' && req.method === 'PATCH') {
     try {
@@ -394,14 +396,11 @@ export default async function handler(req, res) {
       const coords = { lat: Number(lat), lng: Number(lng), actualizadoEn: ahora };
       const idWil  = domiId.toUpperCase().trim();
 
-      // 1. Actualizar ubicación en el documento del domiciliario (busca por idWil)
       await Domiciliario.findOneAndUpdate(
         { idWil },
         { ubicacion: coords }
       );
 
-      // 2. Actualizar domiCoords en el pedido activo del domi
-      //    busca por estado "en ruta" o "en camino" (flujo actual del APK)
       await Pedido.findOneAndUpdate(
         { domiciliarioId: idWil, estado: { $in: [/^en ruta$/i, /^en camino$/i] } },
         { domiCoords: coords }
@@ -413,28 +412,6 @@ export default async function handler(req, res) {
       return res.status(500).json({ ok: false, error: e.message });
     }
   }
-
-  /* ════════════════════════════════════════
-   POST /api/foto?recurso=pedidos
-   Crea un nuevo pedido
-════════════════════════════════════════ */
-if (recurso === 'pedidos' && req.method === 'POST') {
-  try {
-    const body = req.body || {};
-
-    if (!body.idPedido)
-      return res.status(400).json({ ok: false, error: 'Falta idPedido' });
-
-    const nuevo = await Pedido.create(body);
-    return res.status(201).json({ ok: true, data: nuevo });
-
-  } catch (e) {
-    if (e.code === 11000)
-      return res.status(409).json({ ok: false, error: 'Pedido duplicado: ' + e.message });
-    console.error('[POST pedidos]', e.message);
-    return res.status(500).json({ ok: false, error: e.message });
-  }
-}
 
   /* ════════════════════════════════════════
      Recurso no reconocido
