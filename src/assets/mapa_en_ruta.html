@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>Mapa En Ruta</title>
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0f172a;
+    color: #f1f5f9;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  #mapa {
+    width: 100%;
+    height: 100vh;
+  }
+
+  /* Panel ETA flotante */
+  #panelEta {
+    position: absolute;
+    bottom: 16px;
+    left: 12px;
+    right: 12px;
+    background: rgba(15, 23, 42, 0.92);
+    backdrop-filter: blur(12px);
+    border-radius: 16px;
+    padding: 14px 16px;
+    z-index: 1000;
+    border: 1px solid rgba(255,255,255,0.08);
+    display: none;
+  }
+
+  #panelEta .eta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .eta-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+  }
+
+  .eta-valor {
+    font-size: 22px;
+    font-weight: 700;
+    color: #38bdf8;
+    line-height: 1.1;
+  }
+
+  .eta-label {
+    font-size: 10px;
+    color: #94a3b8;
+    margin-top: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .eta-sep {
+    width: 1px;
+    height: 36px;
+    background: rgba(255,255,255,0.1);
+  }
+
+  .eta-destino {
+    font-size: 12px;
+    color: #cbd5e1;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .eta-destino span {
+    color: #38bdf8;
+    font-weight: 600;
+  }
+
+  /* Badge estado GPS */
+  #badgeGps {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(15,23,42,0.85);
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 11px;
+    color: #94a3b8;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+
+  #puntoCps {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #94a3b8;
+    transition: background 0.3s;
+  }
+  #puntoCps.activo { background: #22c55e; }
+
+  /* Loader inicial */
+  #loader {
+    position: absolute;
+    inset: 0;
+    background: #0f172a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    gap: 12px;
+  }
+
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid rgba(56,189,248,0.2);
+    border-top-color: #38bdf8;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #loader p { color: #64748b; font-size: 13px; }
+
+  /* Iconos personalizados */
+  .icono-domi { font-size: 26px; }
+  .icono-dest { font-size: 26px; }
+
+  .leaflet-popup-content-wrapper {
+    background: #1e293b;
+    color: #f1f5f9;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .leaflet-popup-tip { background: #1e293b; }
+  .leaflet-popup-content { margin: 10px 14px; font-size: 13px; }
+  .popup-title { font-weight: 700; color: #38bdf8; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="spinner"></div>
+  <p>Cargando mapa…</p>
+</div>
+
+<div id="mapa"></div>
+
+<div id="badgeGps">
+  <div id="puntoCps"></div>
+  <span id="txtGps">Sin GPS</span>
+</div>
+
+<div id="panelEta">
+  <div class="eta-row">
+    <div class="eta-item">
+      <div class="eta-valor" id="etaMinutos">--</div>
+      <div class="eta-label">minutos</div>
+    </div>
+    <div class="eta-sep"></div>
+    <div class="eta-item">
+      <div class="eta-valor" id="etaKm">--</div>
+      <div class="eta-label">km</div>
+    </div>
+    <div class="eta-sep"></div>
+    <div class="eta-item">
+      <div class="eta-valor" id="etaLlegada">--</div>
+      <div class="eta-label">llegada</div>
+    </div>
+  </div>
+  <div class="eta-destino">📍 <span id="etaDireccion">Calculando ruta…</span></div>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+/* ══════════════════════════════════════════
+   CONFIGURACIÓN — reemplaza con tu key ORS
+══════════════════════════════════════════ */
+const ORS_API_KEY = 'TU_API_KEY_ORS_AQUI';
+
+/* ══════════════════════════════════════════
+   ESTADO GLOBAL
+══════════════════════════════════════════ */
+let mapa, marcadorDomi, marcadorDestino, polylineRuta;
+let destLat = null, destLng = null;
+let domiLat = null, domiLng = null;
+let watchId = null;
+let datosDestino = {};
+
+/* ══════════════════════════════════════════
+   INIT MAPA
+══════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  mapa = L.map('mapa', {
+    zoomControl: true,
+    attributionControl: false,
+  }).setView([6.2442, -75.5812], 13); // Medellín por defecto
+
+  // Tiles gratuitos OpenStreetMap
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+  }).addTo(mapa);
+
+  document.getElementById('loader').style.display = 'none';
+
+  // Avisar a Android que el mapa está listo
+  if (window.AndroidBridge) {
+    AndroidBridge.onMapaListo();
+  }
+
+  // Iniciar GPS del domi
+  iniciarGps();
+});
+
+/* ══════════════════════════════════════════
+   GPS — ubicación del domi en tiempo real
+══════════════════════════════════════════ */
+function iniciarGps() {
+  if (!navigator.geolocation) return;
+
+  watchId = navigator.geolocation.watchPosition(
+    pos => {
+      domiLat = pos.coords.latitude;
+      domiLng = pos.coords.longitude;
+      actualizarMarcadorDomi(domiLat, domiLng);
+
+      document.getElementById('puntoCps').classList.add('activo');
+      document.getElementById('txtGps').textContent = 'GPS activo';
+
+      // Recalcular ruta si tenemos destino
+      if (destLat !== null) calcularRuta();
+    },
+    err => {
+      document.getElementById('txtGps').textContent = 'Sin GPS';
+    },
+    { enableHighAccuracy: true, maximumAge: 8000, timeout: 15000 }
+  );
+}
+
+/* ══════════════════════════════════════════
+   MARCADOR DOMICILIARIO — moto animada
+══════════════════════════════════════════ */
+function actualizarMarcadorDomi(lat, lng) {
+  const iconoDomi = L.divIcon({
+    html: '<div class="icono-domi">🛵</div>',
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    className: '',
+  });
+
+  if (!marcadorDomi) {
+    marcadorDomi = L.marker([lat, lng], { icon: iconoDomi })
+      .addTo(mapa)
+      .bindPopup('<div class="popup-title">Tu ubicación</div>En camino al cliente');
+    mapa.setView([lat, lng], 15);
+  } else {
+    marcadorDomi.setLatLng([lat, lng]);
+  }
+}
+
+/* ══════════════════════════════════════════
+   MARCADOR DESTINO
+══════════════════════════════════════════ */
+function colocarDestino(lat, lng, direccion, cliente) {
+  const iconoDest = L.divIcon({
+    html: '<div class="icono-dest">📦</div>',
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+    className: '',
+  });
+
+  if (marcadorDestino) mapa.removeLayer(marcadorDestino);
+  marcadorDestino = L.marker([lat, lng], { icon: iconoDest })
+    .addTo(mapa)
+    .bindPopup(`<div class="popup-title">📦 ${cliente}</div>${direccion}`)
+    .openPopup();
+}
+
+/* ══════════════════════════════════════════
+   RUTA — OpenRouteService gratuito
+══════════════════════════════════════════ */
+async function calcularRuta() {
+  if (!domiLat || !destLat) return;
+
+  try {
+    const url = `https://api.openrouteservice.org/v2/directions/driving-car` +
+      `?api_key=${ORS_API_KEY}` +
+      `&start=${domiLng},${domiLat}` +
+      `&end=${destLng},${destLat}`;
+
+    const resp = await fetch(url);
+    const data = await resp.json();
+
+    if (!data.features || !data.features[0]) return;
+
+    const feature  = data.features[0];
+    const props    = feature.properties.segments[0];
+    const coords   = feature.geometry.coordinates; // [lng, lat]
+
+    // Dibujar polilínea
+    if (polylineRuta) mapa.removeLayer(polylineRuta);
+    const latLngs = coords.map(c => [c[1], c[0]]);
+    polylineRuta = L.polyline(latLngs, {
+      color: '#38bdf8',
+      weight: 5,
+      opacity: 0.85,
+      lineCap: 'round',
+      lineJoin: 'round',
+    }).addTo(mapa);
+
+    // Ajustar vista para mostrar ruta completa
+    mapa.fitBounds(polylineRuta.getBounds(), { padding: [40, 40] });
+
+    // ETA
+    const minutos  = Math.ceil(props.duration / 60);
+    const km       = (props.distance / 1000).toFixed(1);
+    const ahora    = new Date();
+    ahora.setMinutes(ahora.getMinutes() + minutos);
+    const llegada  = ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+
+    document.getElementById('etaMinutos').textContent = minutos;
+    document.getElementById('etaKm').textContent      = km;
+    document.getElementById('etaLlegada').textContent = llegada;
+    document.getElementById('etaDireccion').textContent = datosDestino.direccion || '';
+    document.getElementById('panelEta').style.display  = 'block';
+
+  } catch (e) {
+    // Sin key ORS o sin conexión — solo muestra línea recta
+    dibujarLineaRecta();
+  }
+}
+
+function dibujarLineaRecta() {
+  if (!domiLat || !destLat) return;
+  if (polylineRuta) mapa.removeLayer(polylineRuta);
+  polylineRuta = L.polyline(
+    [[domiLat, domiLng], [destLat, destLng]],
+    { color: '#38bdf8', weight: 3, opacity: 0.6, dashArray: '8 8' }
+  ).addTo(mapa);
+  mapa.fitBounds(polylineRuta.getBounds(), { padding: [40, 40] });
+}
+
+/* ══════════════════════════════════════════
+   FUNCIONES LLAMADAS DESDE ANDROID
+══════════════════════════════════════════ */
+function iniciarMapa(jsonStr) {
+  try {
+    const datos = JSON.parse(jsonStr);
+    destLat = datos.destLat;
+    destLng = datos.destLng;
+    datosDestino = datos;
+
+    colocarDestino(destLat, destLng, datos.direccion, datos.cliente);
+
+    document.getElementById('etaDireccion').textContent = datos.direccion;
+    document.getElementById('panelEta').style.display = 'block';
+
+    if (domiLat) calcularRuta();
+    else mapa.setView([destLat, destLng], 15);
+
+  } catch(e) {}
+}
+
+function iniciarMapaSinDestino() {
+  // Solo GPS del domi, sin destino
+  if (domiLat) mapa.setView([domiLat, domiLng], 15);
+}
+</script>
+</body>
+</html>
