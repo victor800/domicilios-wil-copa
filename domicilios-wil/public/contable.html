@@ -2197,53 +2197,80 @@ function ndOcultarError(){document.getElementById('nd-error').style.display='non
 
 async function crearDomiciliario(){
   ndOcultarError();
-  const idWil=document.getElementById('nd-id').value.trim().toUpperCase();
-  const nombre=document.getElementById('nd-nombre').value.trim();
-  const password=document.getElementById('nd-password').value.trim();
-  const tel=document.getElementById('nd-tel').value.trim();
-  const zona=document.getElementById('nd-zona').value.trim();
-  const rol=document.getElementById('nd-rol').value;
-  const activo=document.getElementById('nd-activo').value;
-  if(!idWil){ndError('El ID WIL es obligatorio');return;}
-  if(!nombre){ndError('El nombre es obligatorio');return;}
-  if(!password){ndError('La clave es obligatoria');return;}
-  if(password.length<6){ndError('La clave debe tener al menos 6 caracteres');return;}
-  const btn=document.getElementById('btn-crear-domi');
-  btn.disabled=true;btn.innerHTML='<span class="material-symbols-rounded spin-ico">progress_activity</span> Registrando…';
-  try{
-    let fotoUrl='';
-    const fotoFile=document.getElementById('nd-foto-input').files?.[0];
-    if(fotoFile){
-      const base64=await new Promise(res=>{
-        const img=new Image();const blobUrl=URL.createObjectURL(fotoFile);
-        img.onload=()=>{
-          const MAX=300;const scale=Math.min(1,MAX/Math.max(img.width,img.height));
-          const w=Math.round(img.width*scale);const h=Math.round(img.height*scale);
-          const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
-          canvas.getContext('2d').drawImage(img,0,0,w,h);URL.revokeObjectURL(blobUrl);
-          res(canvas.toDataURL('image/jpeg',0.75).split(',')[1]);
+  const idWil     = document.getElementById('nd-id').value.trim().toUpperCase();
+  const nombre    = document.getElementById('nd-nombre').value.trim();
+  const password  = document.getElementById('nd-password').value.trim();
+  const tel       = document.getElementById('nd-tel').value.trim();
+  const zona      = document.getElementById('nd-zona').value.trim();
+  const rol       = document.getElementById('nd-rol').value;
+  const activo    = document.getElementById('nd-activo').value;
+
+  if(!idWil)   { ndError('El ID WIL es obligatorio'); return; }
+  if(!nombre)  { ndError('El nombre es obligatorio'); return; }
+  if(!password){ ndError('La clave es obligatoria'); return; }
+  if(password.length < 6){ ndError('La clave debe tener al menos 6 caracteres'); return; }
+
+  const btn = document.getElementById('btn-crear-domi');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-symbols-rounded spin-ico">progress_activity</span> Registrando…';
+
+  try {
+    // ── Foto: redimensionar y convertir a base64 data URL ──
+    let fotoUrl = '';
+    const fotoFile = document.getElementById('nd-foto-input').files?.[0];
+    if (fotoFile) {
+      fotoUrl = await new Promise(res => {
+        const img     = new Image();
+        const blobUrl = URL.createObjectURL(fotoFile);
+        img.onload = () => {
+          const MAX    = 300;
+          const scale  = Math.min(1, MAX / Math.max(img.width, img.height));
+          const w      = Math.round(img.width  * scale);
+          const h      = Math.round(img.height * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width  = w;
+          canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          URL.revokeObjectURL(blobUrl);
+          res(canvas.toDataURL('image/jpeg', 0.75));
         };
-        img.src=blobUrl;
+        img.src = blobUrl;
       });
-      const r=await fetch('/api/foto',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({base64,mime:'image/jpeg'})});
-      const data=await r.json();if(!data.ok) throw new Error('Error subiendo foto: '+(data.error||'?'));
-      fotoUrl=data.url;
     }
-    const res=await fetch('/api/domiciliarios',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idWil,nombre,password,tel,zona,rol,activo,foto:fotoUrl})});
-    const data=await res.json();
-    if(!data.ok){ndError(data.error||'Error al registrar');return;}
-    showToast('s',`✓ ${nombre} registrado`,`${idWil} · ${rol}`);
-    allDrivers.push({id:idWil,nombre,tel,foto:data.data?.foto||fotoUrl,activo:activo==='true',rol});
-    ['nd-id','nd-nombre','nd-password','nd-tel','nd-zona'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-    document.getElementById('nd-foto-preview-wrap').style.display='none';
-    document.getElementById('nd-foto-ico').style.display='block';
-    document.getElementById('nd-foto-lbl').textContent='Arrastra o haz clic para subir foto';
-    document.getElementById('nd-foto-input').value='';
-    document.getElementById('nd-password').type='password';
-    document.getElementById('nd-eye').textContent='visibility';
-    renderListaDomis();sugerirIdWil();poblarDomis('b-domi');poblarDomis('m-domi');
-  }catch(e){ndError('Error: '+e.message);}
-  finally{btn.disabled=false;btn.innerHTML='<span class="material-symbols-rounded">person_add</span>Registrar domiciliario';}
+
+    // ── Crear domiciliario con foto en base64 directo ──
+    const res  = await fetch('/api/foto?recurso=domiciliarios', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ idWil, nombre, password, tel, zona, rol,
+                                activo: activo !== 'false', foto: fotoUrl })
+    });
+    const data = await res.json();
+    if (!data.ok) { ndError(data.error || 'Error al registrar'); return; }
+
+    showToast('s', `✓ ${nombre} registrado`, `${idWil} · ${rol}`);
+    allDrivers.push({ id: idWil, idWil, nombre, tel,
+                      foto: fotoUrl, activo: activo !== 'false', rol });
+
+    // ── Limpiar formulario ──
+    ['nd-id','nd-nombre','nd-password','nd-tel','nd-zona'].forEach(id => {
+      const el = document.getElementById(id); if(el) el.value = '';
+    });
+    document.getElementById('nd-foto-preview-wrap').style.display = 'none';
+    document.getElementById('nd-foto-ico').style.display          = 'block';
+    document.getElementById('nd-foto-lbl').textContent            = 'Arrastra o haz clic para subir foto';
+    document.getElementById('nd-foto-input').value                = '';
+    document.getElementById('nd-password').type                   = 'password';
+    document.getElementById('nd-eye').textContent                 = 'visibility';
+
+    renderListaDomis(); sugerirIdWil(); poblarDomis('b-domi'); poblarDomis('m-domi');
+
+  } catch(e) {
+    ndError('Error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-symbols-rounded">person_add</span>Registrar domiciliario';
+  }
 }
 
 function renderListaDomis(){
