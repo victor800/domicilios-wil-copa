@@ -3299,24 +3299,25 @@ function coNext(){
 }
 }
 
+
 async function coEnviarPedido(){
   var btn = document.getElementById('co-btn-next');
   btn.disabled = true;
   btn.innerHTML = '<span style="display:inline-block;width:16px;height:16px;border:2.5px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle"></span> Enviando…';
- 
+
   var nom = document.getElementById('co-nombre').value.trim();
   var tel = document.getElementById('co-telefono').value.trim();
   var dir = document.getElementById('co-direccion').value.trim();
   var ref = document.getElementById('co-referencia').value.trim();
   var dirCompleta = dir + (ref ? ' — Ref: ' + ref : '');
- 
+
   var now   = new Date();
   var hora  = now.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true});
   var fecha = now.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
   var idPedido = String(Math.floor(100 + Math.random() * 900));
- 
-  var items     = Object.values(cart);
-  var subtotal  = items.reduce(function(a,c){
+
+  var items    = Object.values(cart);
+  var subtotal = items.reduce(function(a,c){
     var p = c.it.precio > 0 ? c.it.precio : c.it.pUnit;
     return a + p * c.qty;
   }, 0);
@@ -3325,8 +3326,8 @@ async function coEnviarPedido(){
   var modoLabel   = modoEntrega === 'domi' ? 'DOMICILIO' : 'RECOGIDA_EN_TIENDA';
   var comercioLabel = tienda === 'central' ? 'Droguería Central' : 'Farma Expertos';
   var hojaStock   = tienda === 'central' ? 'STOCK_DROGUERIA_CENTRAL' : 'STOCK_DROGUERIA_EXPERTOS';
- 
-  // Construir rows igual que antes (para compatibilidad con el campo items del doc)
+
+  // Rows para compatibilidad Google Sheets
   var rows = [];
   items.forEach(function(c, i){
     var p      = c.it.precio > 0 ? c.it.precio : c.it.pUnit;
@@ -3342,68 +3343,73 @@ async function coEnviarPedido(){
         '','','','','','','','','','']);
     }
   });
- 
+
   var payload = {
     // Identificación
-     idPedido:    idPedido, 
-    sede:        tienda,
-    hojaStock:   hojaStock,
-    comercio:    comercioLabel,
- 
+    idPedido:   idPedido,
+    sede:       tienda,
+    hojaStock:  hojaStock,
+    comercio:   comercioLabel,
+
     // Cliente
-    nombre:      nom,
-    telefono:    tel,
-    direccion:   dirCompleta,
-    coords:      coCoords,
- 
+    nombre:    nom,
+    telefono:  tel,
+    direccion: dirCompleta,
+    coords:    coCoords,
+
     // Entrega
     modoEntrega: modoLabel,
     zona:        coZonaNombre || CO_DEFAULT_ZONA,
     domicilio:   domVal,
- 
+
     // Pago
-    metodoPago:  coPago,
+    metodoPago:        coPago,
     comprobanteBase64: (coPago === 'TRANSFERENCIA' && _comprobanteBase64)
       ? _comprobanteBase64
       : null,
- 
+
     // Totales
-    total:       totalFinal,
- 
-    // Rows (compatibilidad)
-    rows:        rows,
- 
+    total: totalFinal,
+
+    // Items para MongoDB ← FIX: antes llegaba items:[]
+    items: items.map(function(c){
+      var p = c.it.precio > 0 ? c.it.precio : c.it.pUnit;
+      return {
+        producto:    c.it.desc,
+        laboratorio: c.it.lab || '',
+        cantidad:    c.qty,
+        precio:      p,
+        subtotal:    p * c.qty
+      };
+    }),
+
+    // Rows para compatibilidad Sheets
+    rows: rows,
+
     // Fecha/hora
-    fecha:       fecha,
-    hora:        hora,
+    fecha: fecha,
+    hora:  hora,
   };
- 
-  // ── URL de tu API en Vercel ──────────────────────────────────
-  // Si el HTML vive en el mismo proyecto Vercel: '/api/pedido'
-  // Si es otro dominio: 'https://tu-proyecto.vercel.app/api/pedido'
-  var GAS_URL = '/api/foto?tipo=pedido';
 
-  // ─────────────────────────────────────────────────────────────
- 
   try {
-  var res = await fetch('https://domicilios-wil.vercel.app/api/foto?recurso=pedidos', {
-
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify(payload),
-  });
-  var data = await res.json();
-  if (data.ok) {
-    _coExito(idPedido, tel);
-  } else {
-    throw new Error(data.error || 'Error del servidor');
+    var res = await fetch('https://domicilios-wil.vercel.app/api/foto?recurso=pedidos', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
+    });
+    var data = await res.json();
+    if (data.ok) {
+      _coExito(idPedido, tel);
+    } else {
+      throw new Error(data.error || 'Error del servidor');
+    }
+  } catch(e) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="sym symf" style="font-size:18px">check_circle</span> Confirmar pedido';
+    alert('No se pudo enviar el pedido: ' + e.message);
   }
-} catch(e) {
-  btn.disabled = false;
-  btn.innerHTML = '<span class="sym symf" style="font-size:18px">check_circle</span> Confirmar pedido';
-  alert('No se pudo enviar el pedido: ' + e.message);
 }
-}
+
 
 
 function _coExito(idPedido, tel){
