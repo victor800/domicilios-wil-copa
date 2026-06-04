@@ -1,11 +1,18 @@
 import { dbConnect } from '../lib/db.js'
 import Admin         from '../lib/Admin.js'
 import Domiciliario  from '../lib/Domiciliario.js'
-import Cliente       from '../lib/Cliente.js'       // ← NUEVO
+import Cliente       from '../lib/Cliente.js'
 import mongoose      from 'mongoose'
 
+/* ══ CORS ══ */
+function setCors(res) {
+  res.setHeader('Access-Control-Allow-Origin',  '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+}
+
 /* ══════════════════════════════════════════════════════════
-   NUEVO — Registro de cliente
+   Registro de cliente
    POST /api/auth?recurso=register
 ══════════════════════════════════════════════════════════ */
 async function registerCliente(req, res) {
@@ -24,7 +31,6 @@ async function registerCliente(req, res) {
   if (existe)
     return res.status(409).json({ error: 'Ya existe una cuenta con ese correo.' })
 
-  // El pre-save hook hashea el password automáticamente
   const nuevo = await Cliente.create({
     nombre:   nombre.trim(),
     email:    email.toLowerCase().trim(),
@@ -42,7 +48,7 @@ async function registerCliente(req, res) {
 }
 
 /* ══════════════════════════════════════════════════════════
-   NUEVO — Login de cliente por email
+   Login de cliente por email
    POST /api/auth?recurso=login-cliente
 ══════════════════════════════════════════════════════════ */
 async function loginCliente(req, res) {
@@ -84,13 +90,18 @@ async function loginCliente(req, res) {
    HANDLER PRINCIPAL — lógica original intacta
 ══════════════════════════════════════════════════════════ */
 export default async function handler(req, res) {
+  setCors(res)
+
+  /* Preflight OPTIONS — el navegador lo envía antes del POST */
+  if (req.method === 'OPTIONS') return res.status(200).end()
+
   if (req.method !== 'POST')
     return res.status(405).json({ error: 'Método no permitido' })
 
   try {
     await dbConnect()
 
-    /* ── NUEVOS: registro y login de cliente ── */
+    /* ── registro y login de cliente ── */
     if (req.query.recurso === 'register')
       return await registerCliente(req, res)
 
