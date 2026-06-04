@@ -9,8 +9,8 @@
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --orange: #0ceac9;
-    --orange-light: #0fe4f3;
+    --teal: #0ceac9;
+    --teal-light: #0fe4f3;
     --dark: #1c1917;
     --text: #292524;
     --muted: #78716c;
@@ -21,7 +21,6 @@
   }
   html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Nunito', sans-serif; background: #f5f5f4; }
 
-  /* HEADER */
   .header {
     position: fixed; top: 0; left: 0; right: 0; z-index: 900;
     height: var(--header-h);
@@ -33,12 +32,12 @@
   .header-brand { display: flex; align-items: center; gap: 10px; }
   .header-logo {
     width: 38px; height: 38px;
-    background: linear-gradient(135deg, var(--orange), var(--orange-light));
+    background: linear-gradient(135deg, var(--teal), var(--teal-light));
     border-radius: 12px;
     display: flex; align-items: center; justify-content: center;
     font-size: 20px;
   }
-  .header-title { font-size: 20px; font-weight: 900; color: var(--orange); letter-spacing: -0.5px; }
+  .header-title { font-size: 20px; font-weight: 900; color: var(--teal); letter-spacing: -0.5px; }
   .header-badge {
     display: flex; align-items: center; gap: 6px;
     background: #dcfce7; color: #15803d;
@@ -48,7 +47,6 @@
   .dot-live { width: 7px; height: 7px; background: #22c55e; border-radius: 50%; animation: blink 1.3s ease-in-out infinite; }
   @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.2;} }
 
-  /* MAP */
   #map {
     position: fixed;
     top: var(--header-h); left: 0; right: 0;
@@ -56,7 +54,6 @@
     z-index: 1;
   }
 
-  /* SEARCH PANEL */
   .search-overlay {
     position: fixed;
     bottom: var(--nav-h); left: 0; right: 0;
@@ -77,11 +74,11 @@
     transition: border-color 0.2s, background 0.2s;
     letter-spacing: 1px;
   }
-  .search-input:focus { border-color: var(--orange); background: var(--white); }
+  .search-input:focus { border-color: var(--teal); background: var(--white); }
   .search-input::placeholder { color: #c4b5aa; font-weight: 600; letter-spacing: 0; font-size: 13px; }
   .btn-buscar {
     height: 46px; min-width: 46px;
-    background: linear-gradient(135deg, var(--orange), var(--orange-light));
+    background: linear-gradient(135deg, var(--teal), var(--teal-light));
     border: none; border-radius: 14px;
     color: #fff; font-size: 13px; font-weight: 800;
     font-family: 'Nunito', sans-serif;
@@ -93,7 +90,147 @@
   .btn-buscar:active { transform: scale(0.97); }
   .btn-buscar:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 
-  /* TOAST */
+  /* ── MODAL OVERLAY ── */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 2000;
+    background: rgba(0,0,0,0.45);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: var(--nav-h);
+    animation: fadeIn 0.2s ease;
+  }
+  .modal-overlay.open { display: flex; }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+
+  .modal-sheet {
+    background: var(--white);
+    border-radius: 28px 28px 0 0;
+    width: 100%; max-width: 520px;
+    padding: 0 0 8px;
+    box-shadow: 0 -20px 60px rgba(0,0,0,0.25);
+    animation: sheetUp 0.35s cubic-bezier(.22,1,.36,1);
+    max-height: 88vh;
+    overflow-y: auto;
+  }
+  @keyframes sheetUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+
+  .sheet-handle {
+    width: 42px; height: 5px;
+    background: #d1ccc8; border-radius: 3px;
+    margin: 12px auto 0;
+  }
+
+  .sheet-header {
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: flex-start; justify-content: space-between;
+  }
+  .sheet-header-left { display: flex; flex-direction: column; gap: 4px; }
+  .sheet-badge-row { display: flex; align-items: center; gap: 8px; }
+  .badge-estado {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 12px; border-radius: 20px;
+    font-size: 11px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase;
+  }
+  .badge-estado.encamino { background: #dcfce7; color: #15803d; }
+  .badge-estado.pendiente { background: #fef9c3; color: #a16207; }
+  .badge-estado.entregado { background: #dbeafe; color: #1d4ed8; }
+  .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: blink 1.3s infinite; }
+  .sheet-id { font-size: 22px; font-weight: 900; color: var(--text); letter-spacing: -0.5px; }
+  .sheet-comercio { font-size: 13px; font-weight: 700; color: var(--muted); }
+  .sheet-close {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: #f5f5f4; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; color: var(--muted);
+    transition: background 0.15s, color 0.15s;
+  }
+  .sheet-close:hover { background: #ebe9e7; color: var(--text); }
+
+  .sheet-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+
+  .info-card {
+    background: #fafaf9;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .info-row { display: flex; align-items: flex-start; gap: 10px; }
+  .info-icon {
+    width: 30px; height: 30px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--teal), var(--teal-light));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; flex-shrink: 0;
+  }
+  .info-content { flex: 1; }
+  .info-label { font-size: 10px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+  .info-value { font-size: 13px; font-weight: 700; color: var(--text); margin-top: 1px; line-height: 1.35; }
+
+  .domi-card {
+    background: linear-gradient(135deg, #0ceac920, #0fe4f315);
+    border: 1.5px solid #0ceac940;
+    border-radius: 16px;
+    padding: 14px 16px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .domi-avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--teal), var(--teal-light));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
+  }
+  .domi-info { flex: 1; }
+  .domi-label { font-size: 10px; font-weight: 800; color: #0a8f7a; text-transform: uppercase; letter-spacing: 0.6px; }
+  .domi-name { font-size: 15px; font-weight: 900; color: var(--text); }
+  .domi-id { font-size: 11px; font-weight: 700; color: var(--muted); }
+
+  .items-section { }
+  .items-title { font-size: 11px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px; }
+  .item-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .item-row:last-child { border-bottom: none; }
+  .item-left { display: flex; align-items: flex-start; gap: 10px; }
+  .item-qty {
+    min-width: 24px; height: 24px; border-radius: 8px;
+    background: #f0fdfb; border: 1.5px solid #0ceac940;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 900; color: #0a8f7a;
+    flex-shrink: 0; margin-top: 1px;
+  }
+  .item-name { font-size: 12px; font-weight: 700; color: var(--text); line-height: 1.35; max-width: 180px; }
+  .item-lab { font-size: 10px; font-weight: 600; color: var(--muted); margin-top: 1px; }
+  .item-price { font-size: 13px; font-weight: 800; color: var(--text); white-space: nowrap; }
+
+  .total-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, var(--teal), var(--teal-light));
+    border-radius: 16px;
+    margin-top: 2px;
+  }
+  .total-label { font-size: 13px; font-weight: 800; color: rgba(255,255,255,0.85); }
+  .total-value { font-size: 20px; font-weight: 900; color: #fff; }
+
+  .btn-ver-detalle {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; height: 52px;
+    background: var(--dark);
+    border: none; border-radius: 16px;
+    color: #fff; font-size: 15px; font-weight: 800;
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer;
+    transition: transform 0.15s, opacity 0.15s;
+    margin-top: 4px;
+  }
+  .btn-ver-detalle:hover { opacity: 0.88; transform: scale(1.01); }
+  .btn-ver-detalle:active { transform: scale(0.97); }
+
   .result-toast {
     position: fixed;
     bottom: calc(var(--nav-h) + 90px);
@@ -103,35 +240,18 @@
     border-radius: 18px;
     padding: 16px 18px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.18);
-    border-left: 5px solid var(--orange);
+    border-left: 5px solid #dc2626;
     display: none;
     animation: slideUp 0.3s cubic-bezier(.22,1,.36,1);
   }
   @keyframes slideUp { from{opacity:0;transform:translateY(16px);} to{opacity:1;transform:translateY(0);} }
-  .toast-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+  .toast-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
   .toast-code { font-size: 11px; font-weight: 800; color: var(--muted); letter-spacing: 0.8px; text-transform: uppercase; }
   .toast-close { font-size: 22px; color: #c4b5aa; cursor: pointer; line-height: 1; font-weight: 700; }
-  .toast-close:hover { color: var(--orange); }
-  .toast-title { font-size: 17px; font-weight: 900; margin-bottom: 4px; }
-  .toast-sub { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 14px; }
-  .btn-ver-detalle {
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-    width: 100%; height: 44px;
-    background: linear-gradient(135deg, var(--orange), var(--orange-light));
-    border: none; border-radius: 12px;
-    color: #fff; font-size: 14px; font-weight: 800;
-    font-family: 'Nunito', sans-serif;
-    cursor: pointer;
-    transition: transform 0.15s, opacity 0.15s;
-  }
-  .btn-ver-detalle:hover { opacity: 0.9; transform: scale(1.01); }
-  .btn-ver-detalle:active { transform: scale(0.97); }
+  .toast-close:hover { color: #dc2626; }
+  .toast-title { font-size: 17px; font-weight: 900; color: #dc2626; margin-bottom: 4px; }
+  .toast-sub { font-size: 13px; font-weight: 600; color: var(--muted); }
 
-  /* TOAST ERROR */
-  .toast-error { border-left-color: #dc2626 !important; }
-  .toast-error .toast-title { color: #dc2626; }
-
-  /* BOTTOM NAV */
   .bottom-nav {
     position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000;
     height: var(--nav-h);
@@ -148,15 +268,16 @@
     transition: color 0.2s;
     -webkit-tap-highlight-color: transparent;
   }
-  .nav-tab.active { color: var(--orange); }
+  .nav-tab.active { color: var(--teal); }
   .nav-tab svg { width: 24px; height: 24px; stroke-width: 2; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
   .nav-dot { width: 5px; height: 5px; border-radius: 50%; margin-top: 1px; }
-  .nav-tab.active .nav-dot { background: var(--orange); }
+  .nav-tab.active .nav-dot { background: var(--teal); }
 
   @keyframes pulsate {
     0% { transform: translate(-50%,-50%) scale(0.4); opacity: 1; }
     100% { transform: translate(-50%,-50%) scale(2.8); opacity: 0; }
   }
+  @keyframes spin { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
 </style>
 </head>
 <body>
@@ -177,7 +298,7 @@
 <div class="search-overlay">
   <div class="search-label">🔍 Rastrear pedido</div>
   <div class="search-row">
-    <input class="search-input" id="codigoInput" type="text" placeholder="Ej: WIL-2841" maxlength="30"
+    <input class="search-input" id="codigoInput" type="text" placeholder="Ej: 718" maxlength="30"
       autocomplete="off" autocorrect="off" spellcheck="false"/>
     <button class="btn-buscar" id="btnBuscar" onclick="buscarPedido()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
@@ -187,26 +308,92 @@
   </div>
 </div>
 
-<!-- TOAST: pedido encontrado -->
-<div class="result-toast" id="toastOk">
-  <div class="toast-header">
-    <span class="toast-code">Pedido #<span id="okCodigo"></span></span>
-    <span class="toast-close" onclick="cerrarToast('toastOk')">×</span>
+<!-- MODAL PEDIDO ENCONTRADO -->
+<div class="modal-overlay" id="modalOk" onclick="handleOverlayClick(event)">
+  <div class="modal-sheet" id="modalSheet">
+    <div class="sheet-handle"></div>
+
+    <div class="sheet-header">
+      <div class="sheet-header-left">
+        <div class="sheet-badge-row">
+          <span class="badge-estado encamino" id="sheetBadge">
+            <span class="badge-dot"></span>
+            <span id="sheetEstado">En camino</span>
+          </span>
+        </div>
+        <div class="sheet-id">Pedido #<span id="sheetId">—</span></div>
+        <div class="sheet-comercio" id="sheetComercio">—</div>
+      </div>
+      <button class="sheet-close" onclick="cerrarModal()">✕</button>
+    </div>
+
+    <div class="sheet-body">
+
+      <div class="domi-card">
+        <div class="domi-avatar">🛵</div>
+        <div class="domi-info">
+          <div class="domi-label">Domiciliario asignado</div>
+          <div class="domi-name" id="sheetDomiNombre">—</div>
+          <div class="domi-id" id="sheetDomiId">—</div>
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-row">
+          <div class="info-icon">📍</div>
+          <div class="info-content">
+            <div class="info-label">Dirección de entrega</div>
+            <div class="info-value" id="sheetDir">—</div>
+          </div>
+        </div>
+        <div class="info-row">
+          <div class="info-icon">👤</div>
+          <div class="info-content">
+            <div class="info-label">Cliente</div>
+            <div class="info-value" id="sheetCliente">—</div>
+          </div>
+        </div>
+        <div class="info-row">
+          <div class="info-icon">💳</div>
+          <div class="info-content">
+            <div class="info-label">Método de pago · Domicilio</div>
+            <div class="info-value" id="sheetPago">—</div>
+          </div>
+        </div>
+        <div class="info-row">
+          <div class="info-icon">🕐</div>
+          <div class="info-content">
+            <div class="info-label">Fecha · Hora</div>
+            <div class="info-value" id="sheetFecha">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="items-section">
+        <div class="items-title">🛒 Productos del pedido</div>
+        <div id="sheetItems"></div>
+      </div>
+
+      <div class="total-row">
+        <span class="total-label">Total a pagar</span>
+        <span class="total-value" id="sheetTotal">—</span>
+      </div>
+
+      <button class="btn-ver-detalle" id="btnDetalle">
+        Ver detalle completo
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </button>
+
+    </div>
   </div>
-  <div class="toast-title">🟢 Pedido activo</div>
-  <div class="toast-sub">Tu pedido está en curso. Toca para ver el detalle.</div>
-  <button class="btn-ver-detalle" id="btnDetalle">
-    Ver detalle del pedido
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-      stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-  </button>
 </div>
 
-<!-- TOAST: pedido no encontrado -->
-<div class="result-toast toast-error" id="toastErr">
+<!-- TOAST ERROR -->
+<div class="result-toast" id="toastErr">
   <div class="toast-header">
     <span class="toast-code">Código: <span id="errCodigo"></span></span>
-    <span class="toast-close" onclick="cerrarToast('toastErr')">×</span>
+    <span class="toast-close" onclick="cerrarToast()">×</span>
   </div>
   <div class="toast-title">❌ Pedido no encontrado</div>
   <div class="toast-sub">Verifica el código e intenta de nuevo.</div>
@@ -241,7 +428,6 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 L.control.zoom({ position: 'topright' }).addTo(map);
 
-// ── MOTOS (solo posición y movimiento, sin lógica de estado) ──────────────────
 const motosData = [
   { id: 'M01', waypoints: [[6.3515,-75.5040],[6.3518,-75.5032],[6.3521,-75.5025],[6.3516,-75.5018],[6.3510,-75.5012],[6.3505,-75.5020],[6.3500,-75.5030],[6.3495,-75.5038],[6.3490,-75.5045],[6.3495,-75.5052],[6.3502,-75.5058]] },
   { id: 'M02', waypoints: [[6.3480,-75.5010],[6.3475,-75.5005],[6.3470,-75.5000],[6.3465,-75.5008],[6.3460,-75.5015],[6.3455,-75.5022],[6.3460,-75.5030],[6.3468,-75.5035],[6.3475,-75.5028],[6.3480,-75.5020],[6.3485,-75.5012]] },
@@ -251,10 +437,6 @@ const motosData = [
   { id: 'M06', waypoints: [[6.3445,-75.5035],[6.3450,-75.5028],[6.3455,-75.5020],[6.3460,-75.5012],[6.3465,-75.5005],[6.3470,-75.4998],[6.3475,-75.5005],[6.3470,-75.5012],[6.3465,-75.5020],[6.3460,-75.5028],[6.3455,-75.5035]] },
   { id: 'M07', waypoints: [[6.3490,-75.4980],[6.3495,-75.4988],[6.3500,-75.4995],[6.3505,-75.5002],[6.3510,-75.5010],[6.3515,-75.5017],[6.3520,-75.5025],[6.3525,-75.5032],[6.3530,-75.5040],[6.3535,-75.5048],[6.3540,-75.5055]] },
   { id: 'M08', waypoints: [[6.3555,-75.5020],[6.3550,-75.5028],[6.3545,-75.5035],[6.3540,-75.5042],[6.3535,-75.5050],[6.3530,-75.5057],[6.3525,-75.5065],[6.3520,-75.5072],[6.3515,-75.5078],[6.3510,-75.5070],[6.3505,-75.5062]] },
-  { id: 'M09', waypoints: [[6.3435,-75.5010],[6.3440,-75.5018],[6.3445,-75.5025],[6.3450,-75.5032],[6.3455,-75.5040],[6.3460,-75.5048],[6.3455,-75.5055],[6.3448,-75.5050],[6.3442,-75.5043],[6.3436,-75.5036],[6.3430,-75.5028]] },
-  { id: 'M10', waypoints: [[6.3560,-75.5045],[6.3555,-75.5038],[6.3550,-75.5030],[6.3545,-75.5022],[6.3540,-75.5015],[6.3535,-75.5008],[6.3530,-75.5000],[6.3525,-75.4993],[6.3520,-75.4985],[6.3515,-75.4978],[6.3510,-75.4970]] },
-  { id: 'M11', waypoints: [[6.3472,-75.5075],[6.3478,-75.5068],[6.3484,-75.5060],[6.3490,-75.5053],[6.3496,-75.5045],[6.3502,-75.5038],[6.3508,-75.5030],[6.3514,-75.5023],[6.3520,-75.5015],[6.3526,-75.5008],[6.3532,-75.5000]] },
-  { id: 'M12', waypoints: [[6.3425,-75.5060],[6.3430,-75.5052],[6.3435,-75.5044],[6.3440,-75.5037],[6.3445,-75.5030],[6.3450,-75.5022],[6.3455,-75.5015],[6.3460,-75.5008],[6.3465,-75.5000],[6.3470,-75.4993],[6.3475,-75.4985]] },
 ];
 
 function motoHTML(id) {
@@ -268,7 +450,6 @@ function motoHTML(id) {
 
 const motoState = {};
 const markers = {};
-
 motosData.forEach(m => {
   const startIdx = Math.floor(Math.random() * m.waypoints.length);
   motoState[m.id] = { wpIdx: startIdx, dir: 1, progress: Math.random(), speed: 0.008 + Math.random() * 0.012 };
@@ -296,15 +477,49 @@ function animateMotos() {
 }
 animateMotos();
 
-// ── BÚSQUEDA CON API ──────────────────────────────────────────────────────────
-let codigoActivo = '';
+// ── MARCADOR DESTINO ──────────────────────────────────────────────────────────
+let destinoMarker = null;
 
+function mostrarDestinoEnMapa(lat, lng, nombre) {
+  if (destinoMarker) { map.removeLayer(destinoMarker); }
+  const icon = L.divIcon({
+    className: '',
+    html: `<div style="display:flex;flex-direction:column;align-items:center;">
+      <div style="background:linear-gradient(135deg,#0ceac9,#0fe4f3);width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 14px rgba(12,234,201,0.5);">📦</div>
+      <div style="background:#1c1917;color:#fff;font-size:10px;font-weight:800;padding:3px 8px;border-radius:8px;margin-top:4px;white-space:nowrap;font-family:Nunito,sans-serif;">${nombre}</div>
+    </div>`,
+    iconSize: [80, 60], iconAnchor: [40, 30]
+  });
+  destinoMarker = L.marker([lat, lng], { icon }).addTo(map);
+  map.flyTo([lat, lng], 15, { animate: true, duration: 1.2 });
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function formatCOP(v) {
+  return '$ ' + Number(v).toLocaleString('es-CO');
+}
+function estadoClass(estado) {
+  if (!estado) return 'encamino';
+  const e = estado.toLowerCase();
+  if (e.includes('camino') || e.includes('curso')) return 'encamino';
+  if (e.includes('entregado')) return 'entregado';
+  return 'pendiente';
+}
+function estadoLabel(estado) {
+  if (!estado) return 'En proceso';
+  const e = estado.toLowerCase();
+  if (e.includes('camino')) return '🟢 En camino';
+  if (e.includes('entregado')) return '✅ Entregado';
+  return '🟡 ' + estado;
+}
+
+// ── BÚSQUEDA ──────────────────────────────────────────────────────────────────
 async function buscarPedido() {
-  const codigo = document.getElementById('codigoInput').value.trim().toUpperCase();
-  if (!codigo) { document.getElementById('codigoInput').focus(); return; }
+  const rawVal = document.getElementById('codigoInput').value.trim();
+  if (!rawVal) { document.getElementById('codigoInput').focus(); return; }
 
-  cerrarToast('toastOk');
-  cerrarToast('toastErr');
+  cerrarModal();
+  cerrarToast();
 
   const btn = document.getElementById('btnBuscar');
   btn.disabled = true;
@@ -313,28 +528,20 @@ async function buscarPedido() {
     <path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Buscando…`;
 
   try {
-    // ── Reemplaza esta URL con tu endpoint real ──────────────────────────────
-    // El endpoint debe responder con { existe: true } si el pedido existe,
-    // o { existe: false } / 404 si no existe.
-    const res = await fetch(`/api/pedidos/${encodeURIComponent(codigo)}`);
+    const res = await fetch(`/api/foto/pedidos/${encodeURIComponent(rawVal)}`);
 
     if (res.ok) {
-      // Pedido encontrado → mostrar toast y preparar redirección
-      codigoActivo = codigo;
-      document.getElementById('okCodigo').textContent = codigo;
-      document.getElementById('toastOk').style.display = 'block';
-
-      document.getElementById('btnDetalle').onclick = () => {
-        window.location.href = `detallePedido.html?id=${encodeURIComponent(codigo)}`;
-      };
+      const pedido = await res.json();
+      mostrarModalPedido(pedido);
+      if (pedido.coords?.lat && pedido.coords?.lng) {
+        mostrarDestinoEnMapa(pedido.coords.lat, pedido.coords.lng, pedido.nombre || 'Cliente');
+      }
     } else {
-      // 404 u otro error → pedido no existe
-      document.getElementById('errCodigo').textContent = codigo;
+      document.getElementById('errCodigo').textContent = rawVal;
       document.getElementById('toastErr').style.display = 'block';
     }
   } catch (e) {
-    // Error de red
-    document.getElementById('errCodigo').textContent = codigo;
+    document.getElementById('errCodigo').textContent = rawVal;
     document.getElementById('toastErr').style.display = 'block';
   } finally {
     btn.disabled = false;
@@ -343,17 +550,64 @@ async function buscarPedido() {
   }
 }
 
-function cerrarToast(id) {
-  document.getElementById(id).style.display = 'none';
+function mostrarModalPedido(p) {
+  document.getElementById('sheetId').textContent = p.idPedido || '—';
+  document.getElementById('sheetComercio').textContent = p.comercio || p.sede || '—';
+
+  const badge = document.getElementById('sheetBadge');
+  badge.className = 'badge-estado ' + estadoClass(p.estado);
+  document.getElementById('sheetEstado').textContent = estadoLabel(p.estado);
+
+  document.getElementById('sheetDomiNombre').textContent = p.domiciliarioNombre || 'Asignado';
+  document.getElementById('sheetDomiId').textContent = p.domiciliarioId || '';
+
+  document.getElementById('sheetDir').textContent = p.direccion || '—';
+  document.getElementById('sheetCliente').textContent = `${p.nombre || '—'} · ${p.telefono || ''}`;
+  document.getElementById('sheetPago').textContent = `${p.metodoPago || '—'} · Domicilio: ${formatCOP(p.domicilio || 0)}`;
+  document.getElementById('sheetFecha').textContent = `${p.fecha || '—'} · ${p.hora || '—'}`;
+
+  const itemsEl = document.getElementById('sheetItems');
+  if (p.items && p.items.length) {
+    itemsEl.innerHTML = p.items.map(item => `
+      <div class="item-row">
+        <div class="item-left">
+          <div class="item-qty">${item.cantidad}</div>
+          <div>
+            <div class="item-name">${item.producto}</div>
+            <div class="item-lab">${item.laboratorio}</div>
+          </div>
+        </div>
+        <div class="item-price">${formatCOP(item.subtotal)}</div>
+      </div>
+    `).join('');
+  } else {
+    itemsEl.innerHTML = '<div style="font-size:13px;color:var(--muted);padding:8px 0;">Sin productos registrados</div>';
+  }
+
+  document.getElementById('sheetTotal').textContent = formatCOP(p.total || 0);
+
+  document.getElementById('btnDetalle').onclick = () => {
+    window.location.href = `detallePedido.html?id=${encodeURIComponent(p.idPedido)}`;
+  };
+
+  document.getElementById('modalOk').classList.add('open');
+}
+
+function cerrarModal() {
+  document.getElementById('modalOk').classList.remove('open');
+}
+
+function handleOverlayClick(e) {
+  if (e.target === document.getElementById('modalOk')) cerrarModal();
+}
+
+function cerrarToast() {
+  document.getElementById('toastErr').style.display = 'none';
 }
 
 document.getElementById('codigoInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') buscarPedido();
 });
 </script>
-
-<style>
-@keyframes spin { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
-</style>
 </body>
 </html>
