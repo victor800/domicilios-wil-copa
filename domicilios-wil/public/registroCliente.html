@@ -290,18 +290,15 @@
 </div>
 
 <script>
-/* ══════════════════════════════════════
-   CONFIG — cambia la URL base de tu API
-══════════════════════════════════════ */
-const API_BASE = 'https://domicilios-wil-git-main-victor-henaos-projects.vercel.app/api'; // ← reemplaza con tu URL real
+const API_BASE = 'https://domicilios-wil-git-main-victor-henaos-projects.vercel.app/api';
 
 /* ══ Tab switcher ══ */
 function switchTab(tab) {
-  const loginForm   = document.getElementById('loginForm');
+  const loginForm    = document.getElementById('loginForm');
   const registerForm = document.getElementById('registerForm');
-  const highlight   = document.getElementById('tabHighlight');
-  const loginBtn    = document.getElementById('loginBtn');
-  const registerBtn = document.getElementById('registerBtn');
+  const highlight    = document.getElementById('tabHighlight');
+  const loginBtn     = document.getElementById('loginBtn');
+  const registerBtn  = document.getElementById('registerBtn');
   hideError('login'); hideError('register');
 
   if (tab === 'login') {
@@ -354,9 +351,7 @@ function setLoading(form, on) {
     : (form === 'login' ? 'Entrar' : 'Crear Cuenta');
 }
 
-/* ══════════════════════════════════════
-   REGISTRO — POST /api/auth?recurso=register
-══════════════════════════════════════ */
+/* ══ REGISTRO ══ */
 async function handleRegister(e) {
   e.preventDefault();
   hideError('register');
@@ -394,9 +389,7 @@ async function handleRegister(e) {
   }
 }
 
-/* ══════════════════════════════════════
-   LOGIN — POST /api/auth?recurso=login-cliente
-══════════════════════════════════════ */
+/* ══ LOGIN ══ */
 async function handleLogin(e) {
   e.preventDefault();
   hideError('login');
@@ -416,8 +409,15 @@ async function handleLogin(e) {
     if (!res.ok || !data.ok) {
       showError('login', data.error || 'Correo o contraseña incorrectos.');
     } else {
+      /* ── ÚNICO CAMBIO: guardar sesión y redirigir al perfil ── */
+      sessionStorage.setItem('wil_cliente', JSON.stringify({
+        nombre: data.nombre,
+        email:  data.email,
+        tel:    data.tel  || '',
+        rol:    data.rol  || 'cliente',
+      }));
       showToast('¡Bienvenido, ' + (data.nombre || 'usuario') + '!', 'success');
-      setTimeout(() => { window.location.href = '/dashboard'; }, 1200);
+      setTimeout(() => { window.location.href = 'perfilCliente.html'; }, 1200);
     }
   } catch (err) {
     showError('login', 'No se pudo conectar con el servidor.');
