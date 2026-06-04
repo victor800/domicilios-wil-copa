@@ -501,22 +501,36 @@ function formatCOP(v) {
 function estadoClass(estado) {
   if (!estado) return 'encamino';
   const e = estado.toLowerCase();
-  if (e.includes('camino') || e.includes('curso')) return 'encamino';
+  if (e.includes('camino') || e.includes('curso') || e.includes('asignado') || e.includes('ruta')) return 'encamino';
   if (e.includes('entregado')) return 'entregado';
   return 'pendiente';
 }
 function estadoLabel(estado) {
   if (!estado) return 'En proceso';
   const e = estado.toLowerCase();
-  if (e.includes('camino')) return '🟢 En camino';
+  if (e.includes('camino') || e.includes('ruta')) return '🟢 En camino';
+  if (e.includes('asignado')) return '🟢 Asignado';
   if (e.includes('entregado')) return '✅ Entregado';
   return '🟡 ' + estado;
+}
+
+// ── Sanitizar input en frontend ───────────────────────────────────────────────
+function sanitizarCodigo(val) {
+  // Solo permite alfanuméricos, guiones y espacios — máximo 30 chars
+  return val.replace(/[^a-zA-Z0-9\-\s]/g, '').trim().slice(0, 30);
 }
 
 // ── BÚSQUEDA ──────────────────────────────────────────────────────────────────
 async function buscarPedido() {
   const rawVal = document.getElementById('codigoInput').value.trim();
   if (!rawVal) { document.getElementById('codigoInput').focus(); return; }
+
+  // Sanitizar antes de enviar
+  const codigo = sanitizarCodigo(rawVal);
+  if (!codigo) {
+    mostrarToastError('Código inválido');
+    return;
+  }
 
   cerrarModal();
   cerrarToast();
@@ -528,26 +542,42 @@ async function buscarPedido() {
     <path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Buscando…`;
 
   try {
-    const res = await fetch(`/api/foto/pedidos/${encodeURIComponent(rawVal)}`);
+    // ✅ URL correcta con query param idPedido
+    const url = `/api/foto?recurso=pedidos&idPedido=${encodeURIComponent(codigo)}`;
+    const res = await fetch(url);
 
-    if (res.ok) {
-      const pedido = await res.json();
+    if (!res.ok) {
+      mostrarToastError(codigo);
+      return;
+    }
+
+    const json = await res.json();
+
+    // La API devuelve { ok: true, data: [...] }
+    const pedido = json.data?.[0] ?? null;
+
+    if (pedido) {
       mostrarModalPedido(pedido);
       if (pedido.coords?.lat && pedido.coords?.lng) {
         mostrarDestinoEnMapa(pedido.coords.lat, pedido.coords.lng, pedido.nombre || 'Cliente');
       }
     } else {
-      document.getElementById('errCodigo').textContent = rawVal;
-      document.getElementById('toastErr').style.display = 'block';
+      mostrarToastError(codigo);
     }
+
   } catch (e) {
-    document.getElementById('errCodigo').textContent = rawVal;
-    document.getElementById('toastErr').style.display = 'block';
+    console.error('[buscarPedido]', e);
+    mostrarToastError(codigo);
   } finally {
     btn.disabled = false;
     btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
       stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> Buscar`;
   }
+}
+
+function mostrarToastError(codigo) {
+  document.getElementById('errCodigo').textContent = codigo;
+  document.getElementById('toastErr').style.display = 'block';
 }
 
 function mostrarModalPedido(p) {
@@ -574,7 +604,7 @@ function mostrarModalPedido(p) {
           <div class="item-qty">${item.cantidad}</div>
           <div>
             <div class="item-name">${item.producto}</div>
-            <div class="item-lab">${item.laboratorio}</div>
+            <div class="item-lab">${item.laboratorio || ''}</div>
           </div>
         </div>
         <div class="item-price">${formatCOP(item.subtotal)}</div>

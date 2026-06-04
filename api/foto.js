@@ -5,13 +5,11 @@ import mongoose from 'mongoose';
    MODELOS
 ══════════════════════════════════════════════════════════════ */
 
-/* ── Item (sub-documento) ── */
 const ItemSchema = new mongoose.Schema({
   producto: String, laboratorio: String,
   cantidad: Number, precioUnit: Number, subtotal: Number,
 }, { _id: false });
 
-/* ── Pedido ── colección: pedidos ── */
 const Pedido = mongoose.models.Pedido || mongoose.model('Pedido',
   new mongoose.Schema({
     creadoEn:           { type: Date, default: Date.now },
@@ -37,7 +35,6 @@ const Pedido = mongoose.models.Pedido || mongoose.model('Pedido',
     domiciliarioId:     String,
     domiciliarioNombre: String,
     horaToma:           { type: String, default: '' },
-    /* ── Tracker GPS del domiciliario ── */
     domiCoords: {
       lat:           { type: Number, default: null },
       lng:           { type: Number, default: null },
@@ -46,7 +43,6 @@ const Pedido = mongoose.models.Pedido || mongoose.model('Pedido',
   }), 'pedidos'
 );
 
-/* ── Domiciliario ── colección: Domiciliarios (D mayúscula) ── */
 const Domiciliario = mongoose.models.Domiciliario || mongoose.model('Domiciliario',
   new mongoose.Schema({
     idWil:        { type: String, uppercase: true, trim: true },
@@ -58,7 +54,6 @@ const Domiciliario = mongoose.models.Domiciliario || mongoose.model('Domiciliari
     zona:         { type: String, default: '' },
     activo:       { type: Boolean, default: true },
     ultimoAcceso: Date,
-    /* ── Ubicación en tiempo real ── */
     ubicacion: {
       lat:           { type: Number, default: null },
       lng:           { type: Number, default: null },
@@ -68,7 +63,6 @@ const Domiciliario = mongoose.models.Domiciliario || mongoose.model('Domiciliari
   'Domiciliarios'
 );
 
-/* ── Foto ── colección: Fotos ── */
 const Foto = mongoose.models.Foto || mongoose.model('Foto',
   new mongoose.Schema({
     data: mongoose.Schema.Types.Mixed,
@@ -85,19 +79,20 @@ function setCors(res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
-/* ══════════════════════════════════════════════════════════════
-   HELPER — resuelve idWil a partir de un valor que puede ser
-   idWil ("WIL-001") o _id de Mongo ("6a1482a7…").
-   Siempre devuelve el idWil en mayúsculas, o null si no existe.
-══════════════════════════════════════════════════════════════ */
+/* ══ Sanitizar string — evita inyección RegEx / NoSQL ══ */
+function sanitizeStr(val) {
+  if (val == null) return null;
+  // Elimina caracteres especiales de RegEx y operadores Mongo ($)
+  return String(val).replace(/[${}()|[\]\\^*+?./]/g, '').trim().slice(0, 100);
+}
+
+/* ══ Resolver idWil ══ */
 async function resolverIdWil(valor) {
   if (!valor) return null;
-
   if (/^[a-f\d]{24}$/i.test(valor)) {
     const doc = await Domiciliario.findById(valor, { idWil: 1 }).lean();
     return doc?.idWil ?? null;
   }
-
   return valor.toUpperCase().trim();
 }
 
@@ -112,28 +107,25 @@ export default async function handler(req, res) {
     await dbConnect();
   } catch (e) {
     console.error('[foto] dbConnect falló:', e.message);
-    return res.status(500).json({ ok: false, error: 'DB connection failed: ' + e.message });
+    return res.status(500).json({ ok: false, error: 'DB connection failed' });
   }
 
   const { recurso } = req.query;
 
   /* ════════════════════════════════════════
      POST /api/foto?recurso=pedidos
-     ⚠️ Debe ir ANTES del GET para que no lo intercepte
   ════════════════════════════════════════ */
   if (recurso === 'pedidos' && req.method === 'POST') {
     try {
       const body = req.body || {};
-
       if (!body.idPedido)
         return res.status(400).json({ ok: false, error: 'Falta idPedido en el body' });
 
       const nuevo = await Pedido.create(body);
       return res.status(201).json({ ok: true, data: nuevo });
-
     } catch (e) {
       if (e.code === 11000)
-        return res.status(409).json({ ok: false, error: 'Pedido duplicado: ' + e.message });
+        return res.status(409).json({ ok: false, error: 'Pedido duplicado' });
       console.error('[POST pedidos]', e.message);
       return res.status(500).json({ ok: false, error: e.message });
     }
@@ -141,31 +133,72 @@ export default async function handler(req, res) {
 
   /* ════════════════════════════════════════
      GET /api/foto?recurso=pedidos
+     Parámetros opcionales:
+       - idPedido : busca UNO por código exacto  ← NUEVO
+       - estado   : filtra por estado (o "todos")
+       - domi     : filtra por nombre domiciliario (regex)
+       - domiId   : filtra por idWil
+       - tipo     : filtra por modoEntrega
+       - limit    : máximo de resultados (default 300)
   ════════════════════════════════════════ */
   if (recurso === 'pedidos' && req.method === 'GET') {
     try {
-      const { estado, domi, domiId, tipo, limit = 300 } = req.query;
+      const {
+        estado,
+        domi,
+        domiId,
+        tipo,
+        limit = 300,
+        idPedido,           // ← nuevo parámetro
+      } = req.query;
 
       const filtro = {};
+
+      /* ── Búsqueda directa por idPedido ── */
+      if (idPedido) {
+        const idLimpio = sanitizeStr(idPedido);
+        if (!idLimpio)
+          return res.status(400).json({ ok: false, error: 'idPedido inválido' });
+
+        // Búsqueda exacta (case-insensitive por seguridad)
+        filtro.idPedido = { $regex: new RegExp(`^${idLimpio}$`, 'i') };
+      }
+
+      /* ── Filtro estado ── */
       if (estado && estado !== 'todos') {
-        const estadoList = estado.split(',').map(s => s.trim()).filter(Boolean);
+        const estadoList = estado.split(',').map(s => sanitizeStr(s)).filter(Boolean);
         filtro.estado = estadoList.length === 1
           ? { $regex: new RegExp(`^${estadoList[0]}$`, 'i') }
           : { $in: estadoList.map(s => new RegExp(`^${s}$`, 'i')) };
       }
-      if (domi)
-        filtro.domiciliarioNombre = { $regex: new RegExp(domi, 'i') };
+
+      /* ── Filtro domiciliario por nombre ── */
+      if (domi) {
+        const domiLimpio = sanitizeStr(domi);
+        if (domiLimpio)
+          filtro.domiciliarioNombre = { $regex: new RegExp(domiLimpio, 'i') };
+      }
+
+      /* ── Filtro domiciliario por ID ── */
       if (domiId) {
         const idWilResuelto = await resolverIdWil(domiId);
         filtro.domiciliarioId = idWilResuelto ?? domiId;
       }
-      if (tipo)
-        filtro.modoEntrega = { $regex: new RegExp(tipo, 'i') };
+
+      /* ── Filtro tipo entrega ── */
+      if (tipo) {
+        const tipoLimpio = sanitizeStr(tipo);
+        if (tipoLimpio)
+          filtro.modoEntrega = { $regex: new RegExp(tipoLimpio, 'i') };
+      }
+
+      /* ── Límite seguro: entre 1 y 500 ── */
+      const limitSeguro = Math.min(Math.max(Number(limit) || 300, 1), 500);
 
       const pedidos = await Pedido
         .find(filtro)
         .sort({ creadoEn: -1 })
-        .limit(Number(limit))
+        .limit(limitSeguro)
         .lean();
 
       return res.status(200).json({ ok: true, data: pedidos });
@@ -181,7 +214,6 @@ export default async function handler(req, res) {
   if (recurso === 'domiciliarios' && req.method === 'GET') {
     try {
       const soloActivos = req.query.activo !== 'false';
-
       const filtro = {};
       if (soloActivos) filtro.activo = true;
 
@@ -252,7 +284,7 @@ export default async function handler(req, res) {
       });
 
       return res.status(201).json({
-        ok:   true,
+        ok: true,
         data: {
           _id:    String(nuevo._id),
           idWil:  nuevo.idWil,
@@ -351,7 +383,6 @@ export default async function handler(req, res) {
         return res.status(400).json({ ok: false, error: 'Faltan pedidoId o estado' });
 
       const update = { estado };
-
       if (horaToma) update.horaToma = horaToma;
 
       if (domiciliarioId) {
@@ -396,11 +427,7 @@ export default async function handler(req, res) {
       const coords = { lat: Number(lat), lng: Number(lng), actualizadoEn: ahora };
       const idWil  = domiId.toUpperCase().trim();
 
-      await Domiciliario.findOneAndUpdate(
-        { idWil },
-        { ubicacion: coords }
-      );
-
+      await Domiciliario.findOneAndUpdate({ idWil }, { ubicacion: coords });
       await Pedido.findOneAndUpdate(
         { domiciliarioId: idWil, estado: { $in: [/^en ruta$/i, /^en camino$/i] } },
         { domiCoords: coords }
@@ -413,9 +440,6 @@ export default async function handler(req, res) {
     }
   }
 
-  /* ════════════════════════════════════════
-     Recurso no reconocido
-  ════════════════════════════════════════ */
   return res.status(400).json({
     ok: false,
     error: `Recurso no válido: "${recurso}". Usa: pedidos | domiciliarios | asignar | estado | foto | ubicacion-domi`,
