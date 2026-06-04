@@ -367,6 +367,27 @@
             <div class="info-value" id="sheetFecha">—</div>
           </div>
         </div>
+
+        <!-- NOTA COMPRA (solo visible si tipo_servicio === 'compra') -->
+        <div class="info-row" id="rowNotaComercio" style="display:none">
+          <div class="info-icon">🧾</div>
+          <div class="info-content">
+            <div class="info-label">Nota de compra</div>
+            <div class="info-value" id="sheetNotaComercio" style="font-size:12px;font-weight:600;color:#78716c;line-height:1.5"></div>
+          </div>
+        </div>
+
+        <!-- NOTA TARDANZA (siempre visible) -->
+        <div class="info-row">
+          <div class="info-icon">⏱️</div>
+          <div class="info-content">
+            <div class="info-label">Tardanza</div>
+            <div class="info-value" style="font-size:12px;font-weight:600;color:#78716c;line-height:1.5">
+              Cada 15 min de espera en comercio o fila tiene un costo adicional de <strong style="color:#292524">$2.000</strong>. El tiempo empieza a contar cuando el domiciliario adjunta la foto del comprobante.
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <div class="items-section">
@@ -516,7 +537,6 @@ function estadoLabel(estado) {
 
 // ── Sanitizar input en frontend ───────────────────────────────────────────────
 function sanitizarCodigo(val) {
-  // Solo permite alfanuméricos, guiones y espacios — máximo 30 chars
   return val.replace(/[^a-zA-Z0-9\-\s]/g, '').trim().slice(0, 30);
 }
 
@@ -525,7 +545,6 @@ async function buscarPedido() {
   const rawVal = document.getElementById('codigoInput').value.trim();
   if (!rawVal) { document.getElementById('codigoInput').focus(); return; }
 
-  // Sanitizar antes de enviar
   const codigo = sanitizarCodigo(rawVal);
   if (!codigo) {
     mostrarToastError('Código inválido');
@@ -542,7 +561,6 @@ async function buscarPedido() {
     <path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Buscando…`;
 
   try {
-    // ✅ URL correcta con query param idPedido
     const url = `/api/foto?recurso=pedidos&idPedido=${encodeURIComponent(codigo)}`;
     const res = await fetch(url);
 
@@ -552,8 +570,6 @@ async function buscarPedido() {
     }
 
     const json = await res.json();
-
-    // La API devuelve { ok: true, data: [...] }
     const pedido = json.data?.[0] ?? null;
 
     if (pedido) {
@@ -595,6 +611,18 @@ function mostrarModalPedido(p) {
   document.getElementById('sheetCliente').textContent = `${p.nombre || '—'} · ${p.telefono || ''}`;
   document.getElementById('sheetPago').textContent = `${p.metodoPago || '—'} · Domicilio: ${formatCOP(p.domicilio || 0)}`;
   document.getElementById('sheetFecha').textContent = `${p.fecha || '—'} · ${p.hora || '—'}`;
+
+  // ── NOTA DINÁMICA COMPRA ──────────────────────────────────────────────────
+  const esCompra = (p.destinatario?.tipo_servicio === 'compra');
+  const rowNota  = document.getElementById('rowNotaComercio');
+  const txtNota  = document.getElementById('sheetNotaComercio');
+  if (esCompra) {
+    const comercioNombre = p.comercio || 'el comercio';
+    txtNota.innerHTML = `Por ahora solo ves el valor del domicilio (<strong style="color:#292524">${formatCOP(p.domicilio || 0)}</strong>). Al momento de la compra en <strong style="color:#292524">${comercioNombre}</strong>, el domiciliario te adjuntará la factura <em>si el comercio la emite</em>. Si no, te confirmará el total directamente.`;
+    rowNota.style.display = 'flex';
+  } else {
+    rowNota.style.display = 'none';
+  }
 
   const itemsEl = document.getElementById('sheetItems');
   if (p.items && p.items.length) {
@@ -649,7 +677,6 @@ document.getElementById('codigoInput').addEventListener('keydown', e => {
     if(auto === '1') buscarPedido();
   }
 })();
-
 </script>
 </body>
 </html>
