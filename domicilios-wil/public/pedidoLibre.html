@@ -703,9 +703,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
         <div class="card-title">Resumen de entrega</div>
         <div class="summary-section" id="summaryContent"></div>
         <!-- FIX 3: mensaje actualizado con info de factura del domi -->
-        <div class="tip-box" style="font-size:11px;margin-top:8px" id="tipBoxTardanza">
-          ⚠️ Demoras en recogida o entrega: <strong>$2.000 cada 15 minutos</strong>. El tiempo inicia cuando el domiciliario envía foto del comprobante de tardanza. En compras, el domiciliario adjuntará la factura al momento de realizar la compra.
-        </div>
+        <div class="tip-box" style="font-size:11px;margin-top:8px" id="tipBoxTardanza"></div>
+
       </div>
 
       <div class="card">
@@ -740,7 +739,15 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
       <button class="tracking-copy-btn" id="copyTrackBtn" onclick="copyOrderId()">📋 Copiar código</button>
     </div>
     <!-- FIX 4: "Hacer otro pedido" vuelve a la ruta correcta -->
-    <a href="https://domicilios-wil.vercel.app/pedido-wil.html" class="btn-primary" style="max-width:280px;text-decoration:none">🛍️ Hacer otro pedido</a>
+   <div style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:280px">
+  <button class="btn-primary" id="btnRastrear" onclick="irARastreo()" style="background:linear-gradient(135deg,var(--accent2),var(--accent))">
+    🔍 Rastrear mi pedido
+  </button>
+  <a href="https://domicilios-wil.vercel.app/pedido-wil.html" class="btn-primary" style="text-decoration:none;background:var(--surface2);border:1px solid var(--border);color:var(--text)">
+    🛍️ Hacer otro pedido
+  </a>
+</div>
+
   </div>
 
 </div>
@@ -1032,7 +1039,6 @@ function copyAccount(){
 function buildSummary(){
   const r = st.barrio.recogida, e = st.barrio.entrega, ec = st.svc==='compra';
 
-  // FIX 2: tarifa correcta — compra usa solo precio de entrega; recoger usa el mayor
   const tarifa = ec
     ? (e ? e.price : 0)
     : (r && e ? Math.max(r.price, e.price) : (e ? e.price : 0));
@@ -1041,7 +1047,7 @@ function buildSummary(){
   if(!ec) rows.push(['Recogida', r?r.name:'—'], ['Comercio', v('comercio')||'—']);
   rows.push(
     ['Entrega', e?e.name:'—'],
-    ['Tarifa domicilio', fmt(tarifa)],   // ← tarifa mostrada en resumen
+    ['Tarifa domicilio', fmt(tarifa)],
     ['Dirección', v('direccion')]
   );
   if(v('referencia')) rows.push(['Referencia', v('referencia')]);
@@ -1059,6 +1065,11 @@ function buildSummary(){
           <span class="spc-qty">x${p.qty}</span>
         </div>`).join('')
     : '<div style="font-size:12px;color:var(--muted);padding:6px 0">Sin productos</div>';
+
+  // Nota dinámica según tipo de servicio  ← ADENTRO de la función
+  document.getElementById('tipBoxTardanza').innerHTML = ec
+    ? `🛒 <strong>Nota:</strong> Por ahora solo conoces el valor del domicilio (<strong>${fmt(tarifa)}</strong>). En cuanto el domiciliario realice la compra, te adjuntará la factura con el costo exacto de los productos. El pago total se confirma al momento de la entrega.<br><br>⚠️ Demoras: <strong>$2.000 cada 15 min</strong> desde que el domi envía foto del comprobante.`
+    : `⚠️ Demoras en recogida o entrega: <strong>$2.000 cada 15 minutos</strong>. El tiempo inicia cuando el domiciliario envía foto del comprobante de tardanza.`;
 }
 
 /* ── ENVÍO ── */
@@ -1146,6 +1157,11 @@ async function submitPedido(){
       showToast('❌ '+err.message, 'error');
     }
   }
+}
+
+function irARastreo(){
+  const code = document.getElementById('orderId').textContent.trim();
+  window.location.href = `pedidoRastreo.html?codigo=${encodeURIComponent(code)}&autobus=1`;
 }
 
 function showSuccess(id){
