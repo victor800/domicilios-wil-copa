@@ -125,15 +125,35 @@
     margin-bottom: 10px; padding-left: 4px;
   }
 
+  /* PESTAÑA PEDIDOS COLAPSABLE */
+  .pedidos-tab-header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 15px 18px; cursor: pointer; transition: background 0.15s;
+    border-bottom: 1px solid var(--border); user-select: none;
+  }
+  .pedidos-tab-header:hover { background: #fafaf9; }
+  .pedidos-tab-header.open { background: #fafaf9; }
+  .tab-arrow {
+    font-size: 18px; font-weight: 700; color: #c4b5aa;
+    transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
+    display: inline-block;
+  }
+  .pedidos-tab-header.open .tab-arrow { transform: rotate(90deg); }
+  .pedidos-panel {
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1);
+  }
+  .pedidos-panel.open { max-height: 2000px; }
+  .pedidos-inner { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+
   /* PEDIDOS */
-  .pedidos-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
   .pedido-card {
-    background: var(--white); border-radius: 16px;
-    border: 1px solid var(--border); padding: 14px 16px;
+    background: var(--bg); border-radius: 14px;
+    border: 1px solid var(--border); padding: 13px 14px;
     cursor: pointer; transition: box-shadow 0.15s;
   }
-  .pedido-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
-  .pedido-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .pedido-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.07); }
+  .pedido-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
   .pedido-id { font-size: 13px; font-weight: 900; color: var(--dark); }
   .pedido-estado {
     font-size: 11px; font-weight: 800; padding: 3px 10px;
@@ -146,12 +166,12 @@
   .estado-cancelado  { background: #fee2e2; color: #b91c1c; }
   .estado-default    { background: #f3f4f6; color: #374151; }
   .pedido-comercio { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 3px; }
-  .pedido-meta { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+  .pedido-meta { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 5px; }
   .pedido-footer { display: flex; justify-content: space-between; align-items: center; }
   .pedido-total { font-size: 15px; font-weight: 900; color: var(--orange-dark); }
   .pedido-fecha { font-size: 11px; font-weight: 600; color: var(--muted); }
 
-  /* DETALLE PEDIDO (expandible) */
+  /* DETALLE de cada pedido (expandible al tocar) */
   .pedido-detalle {
     display: none; margin-top: 10px;
     border-top: 1px solid var(--border); padding-top: 10px;
@@ -331,17 +351,27 @@
     </div>
   </div>
 
-  <!-- HISTORIAL PEDIDOS -->
-  <div class="section-title">Mis pedidos</div>
-  <div id="pedidosContainer">
-    <div class="skeleton sk-card"></div>
-    <div class="skeleton sk-card"></div>
-    <div class="skeleton sk-card"></div>
-  </div>
-
-  <!-- CONFIGURACIÓN -->
-  <div class="section-title" style="margin-top:6px;">Configuración</div>
+  <!-- MI CUENTA (con pedidos colapsables dentro) -->
+  <div class="section-title">Mi cuenta</div>
   <div class="menu-card">
+
+    <!-- PESTAÑA MIS PEDIDOS COLAPSABLE -->
+    <div class="pedidos-tab-header" id="pedidosTabHeader" onclick="togglePedidosPanel()">
+      <div class="menu-icon orange">📋</div>
+      <div class="menu-text">
+        <div class="menu-label">Mis pedidos</div>
+        <div class="menu-desc" id="pedidosDesc">Ver historial completo</div>
+      </div>
+      <span class="tab-arrow">›</span>
+    </div>
+    <div class="pedidos-panel" id="pedidosPanel">
+      <div class="pedidos-inner" id="pedidosContainer">
+        <div class="skeleton sk-card"></div>
+        <div class="skeleton sk-card"></div>
+        <div class="skeleton sk-card"></div>
+      </div>
+    </div>
+
     <div class="menu-item" onclick="abrirModal()">
       <div class="menu-icon orange">✏️</div>
       <div class="menu-text">
@@ -358,7 +388,7 @@
       </div>
       <span class="menu-arrow">›</span>
     </div>
-    <div class="menu-item">
+    <div class="menu-item" onclick="window.location.href='soporte.html'">
       <div class="menu-icon green">❓</div>
       <div class="menu-text">
         <div class="menu-label">Ayuda y soporte</div>
@@ -484,6 +514,14 @@ function toggleDetalle(id) {
   el.classList.toggle('open');
 }
 
+/* ── Toggle panel pedidos ── */
+function togglePedidosPanel() {
+  const header = document.getElementById('pedidosTabHeader');
+  const panel  = document.getElementById('pedidosPanel');
+  const open   = panel.classList.toggle('open');
+  header.classList.toggle('open', open);
+}
+
 /* ── Cargar pedidos ── */
 async function cargarPedidos() {
   const container = document.getElementById('pedidosContainer');
@@ -507,6 +545,11 @@ async function cargarPedidos() {
 
     /* Stats */
     document.getElementById('statPedidos').textContent = pedidos.length;
+    document.getElementById('pedidosDesc').textContent =
+      pedidos.length === 0 ? 'Sin pedidos aún' :
+      pedidos.length === 1 ? '1 pedido registrado' :
+      `${pedidos.length} pedidos registrados`;
+
     if (pedidos.length > 0) {
       const totalGastado = pedidos.reduce((acc, p) => acc + (p.total || 0), 0);
       document.getElementById('statTotal').textContent = fmt(totalGastado);
@@ -529,7 +572,9 @@ async function cargarPedidos() {
 
     container.innerHTML = '';
     const lista = document.createElement('div');
-    lista.className = 'pedidos-list';
+    lista.style.display = 'flex';
+    lista.style.flexDirection = 'column';
+    lista.style.gap = '10px';
 
     pedidos.forEach((p, i) => {
       const id = p._id || i;
