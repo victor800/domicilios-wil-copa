@@ -265,7 +265,7 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
 
   <!-- NOTAS -->
   <div class="notas-card" id="notasCard">
-    <div class="notas-tag">📝 Nota del domiciliario</div>
+    <div class="notas-tag">📝 Nota Cliente</div>
     <div class="notas-text" id="notasText"></div>
   </div>
 
@@ -480,7 +480,9 @@ async function calcularRutaOSRM(fromLat, fromLng, toLat, toLng) {
 function actualizarMapa(p) {
   if (!mapInstance) return;
 
-  // Marcador destino (solo crear 1 vez)
+  const entregado = estadoIndex(p.estado) === 3;
+
+  // Marcador destino
   if (p.coords?.lat && p.coords?.lng) {
     const pos = [p.coords.lat, p.coords.lng];
     if (!destinoMarker) {
@@ -489,28 +491,37 @@ function actualizarMapa(p) {
     }
   }
 
-  // GPS real del domiciliario
+  if (entregado) {
+    // Ocultar marcador domi
+    if (domiMarker) { mapInstance.removeLayer(domiMarker); domiMarker = null; }
+    // Quitar ruta
+    if (rutaLayer) { mapInstance.removeLayer(rutaLayer); rutaLayer = null; }
+    // ETA badge = entregado
+    document.getElementById('etaTime').textContent = '✓ Entregado';
+    document.getElementById('etaDist').textContent = '';
+    document.getElementById('etaBadge').classList.add('visible');
+    document.getElementById('etaRow').style.display = 'flex';
+    document.getElementById('etaRowVal').textContent = '✓ Pedido entregado';
+    return;
+  }
+
+  // GPS domi
   const dc = p.domiCoords;
   if (dc?.lat && dc?.lng) {
     if (!domiMarker) {
       domiMarker = L.marker([dc.lat, dc.lng], { icon: mkDomiIcon(p.domiciliarioNombre || 'Domi') }).addTo(mapInstance);
       domiCurrentPos = { lat: dc.lat, lng: dc.lng };
-      // Encuadrar ambos marcadores
       if (p.coords?.lat) {
         const bounds = L.latLngBounds([[dc.lat, dc.lng], [p.coords.lat, p.coords.lng]]);
         mapInstance.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
       }
     } else {
-      // Animar suavemente hacia la nueva posición
       animarDomiHacia(dc.lat, dc.lng);
     }
-
-    // Calcular ruta OSRM si hay destino
     if (p.coords?.lat && p.coords?.lng) {
       calcularRutaOSRM(dc.lat, dc.lng, p.coords.lat, p.coords.lng);
     }
   } else if (p.coords?.lat) {
-    // Sin GPS del domi: solo centrar en destino
     mapInstance.setView([p.coords.lat, p.coords.lng], 15);
   }
 }
@@ -534,7 +545,11 @@ function renderSteps(p) {
   const track = document.getElementById('stepsTrack');
   track.innerHTML = STEPS_DEF.map((s, i) => {
     const cls = i < idx ? 'done' : (i === idx ? 'active' : '');
-    const timeLabel = i === 0 ? (p.hora || '') : (i === 1 ? (p.horaToma || '') : '');
+    const timeLabel = i === 0 ? (p.hora || '') 
+                : i === 1 ? (p.horaToma || '') 
+                : i === 2 ? (p.horaEnCamino || '') 
+                : i === 3 ? (p.horaEntregado || '') 
+                : '';
     return `<div class="step ${cls}">
       <div class="step-circle">${i < idx ? '✓' : s.icon}</div>
       <div class="step-line"></div>
