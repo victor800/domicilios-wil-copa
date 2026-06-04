@@ -3,6 +3,7 @@ import Admin         from '../lib/Admin.js'
 import Domiciliario  from '../lib/Domiciliario.js'
 import Cliente       from '../lib/Cliente.js'
 import mongoose      from 'mongoose'
+import bcrypt        from 'bcryptjs'
 
 /* ══ CORS ══ */
 function setCors(res) {
@@ -31,11 +32,13 @@ async function registerCliente(req, res) {
   if (existe)
     return res.status(409).json({ error: 'Ya existe una cuenta con ese correo.' })
 
+  /* Hash explícito — sin depender del pre-save hook */
+  const hash  = await bcrypt.hash(password, 12)
   const nuevo = await Cliente.create({
     nombre:   nombre.trim(),
     email:    email.toLowerCase().trim(),
     tel:      tel.trim(),
-    password,
+    password: hash,
   })
 
   return res.status(201).json({
@@ -92,7 +95,6 @@ async function loginCliente(req, res) {
 export default async function handler(req, res) {
   setCors(res)
 
-  /* Preflight OPTIONS — el navegador lo envía antes del POST */
   if (req.method === 'OPTIONS') return res.status(200).end()
 
   if (req.method !== 'POST')
@@ -101,7 +103,6 @@ export default async function handler(req, res) {
   try {
     await dbConnect()
 
-    /* ── registro y login de cliente ── */
     if (req.query.recurso === 'register')
       return await registerCliente(req, res)
 
