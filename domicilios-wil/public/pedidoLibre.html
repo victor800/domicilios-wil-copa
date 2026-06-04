@@ -337,6 +337,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 }
 .sum-row:last-child{border-bottom:none}
 .sum-row .k{color:var(--muted);font-size:12px;flex-shrink:0}
+.sum-row .v{font-weight:700;text-align:right;word-break:break-word;color:var(--accent)}
 .sum-row .v{font-weight:600;text-align:right;word-break:break-word}
 .sum-prod-chip{
   background:var(--surface2);border:1px solid var(--border);
@@ -753,7 +754,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 </div>
 
 <script>
-const API_URL = '/api/foto?tipo=pedido';
+const API_URL = '/api/foto?recurso=pedidos';
+
 
 const BARRIOS=[
   ["ASUNCION",5000],["FÁTIMA",5000],["MIRADOR AZUL",5000],["AZULITA PARTE BAJA",5000],
@@ -1077,7 +1079,7 @@ async function submitPedido(){
       ? (e ? e.price : 0)
       : (r && e ? Math.max(r.price, e.price) : (e ? e.price : 0));
 
-    const idPedido = 'WIL-' + Date.now().toString().slice(-6);
+    const idPedido = 'WIL-' + Date.now().toString().slice(-2);
 
     let comprobanteBase64 = null;
     if(st.file) comprobanteBase64 = 'data:'+st.file.type+';base64,' + await toBase64(st.file);
@@ -1087,7 +1089,7 @@ async function submitPedido(){
     const hora  = now.toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'});
 
     const payload = {
-      id:              idPedido,
+      idPedido:        idPedido,
       sede:            'wil-domicilios',
       nombre:          v('nombre'),
       telefono:        v('tel-cliente'),
@@ -1140,7 +1142,7 @@ async function submitPedido(){
     hideLoader();
     btn.disabled = false;
     if(err.message.includes('Failed to fetch') || err.message.includes('NetworkError')){
-      showSuccess('WIL-' + Date.now().toString().slice(-6));
+      showSuccess('WIL-' + Date.now().toString().slice(-2));
     } else {
       showToast('❌ '+err.message, 'error');
     }
