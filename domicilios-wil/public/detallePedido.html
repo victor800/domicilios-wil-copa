@@ -652,12 +652,16 @@ async function confirmarCancelacion() {
   btn.disabled    = true;
 
   try {
-    const res = await fetch('/api/foto?recurso=estado', {
+    console.log('[cancelar] idPedido:', pedidoData?.idPedido);
+    const res     = await fetch('/api/foto?recurso=estado', {
       method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ pedidoId: pedidoData.idPedido, estado: 'Cancelado' }),
     });
-    if (!res.ok) throw new Error('error al cancelar');
+    const resJson = await res.json().catch(() => null);
+    console.log('[cancelar] status:', res.status, '| respuesta:', JSON.stringify(resJson));
+
+    if (!res.ok) throw new Error(resJson?.error || 'HTTP ' + res.status);
 
     if (pollInterval)  clearInterval(pollInterval);
     if (domiAnimFrame) cancelAnimationFrame(domiAnimFrame);
@@ -667,9 +671,10 @@ async function confirmarCancelacion() {
     renderSteps(pedidoData);
 
   } catch(e) {
+    console.error('[cancelar] error:', e.message);
     btn.textContent = 'Sí, cancelar';
     btn.disabled    = false;
-    alert('No se pudo cancelar. Por favor intenta de nuevo.');
+    alert('No se pudo cancelar: ' + e.message);
   }
 }
 
