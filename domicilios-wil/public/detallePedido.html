@@ -81,6 +81,40 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
 .progress-pct { font-size:11px; font-weight:800; color:var(--teal-d); }
 .progress-txt { font-size:11px; font-weight:700; color:var(--muted); }
 
+/* BOTÓN CANCELAR */
+.btn-cancelar-wrap { display:none; margin-top:14px; }
+.btn-cancelar {
+  width:100%; height:44px; background:var(--white);
+  border:2px solid #dc2626; border-radius:14px;
+  color:#dc2626; font-size:13px; font-weight:800;
+  font-family:'Nunito',sans-serif; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  transition:background .2s, color .2s;
+}
+.btn-cancelar:hover { background:#fef2f2; }
+.confirm-cancelar-box {
+  display:none; margin-top:12px;
+  background:#fef2f2; border:1.5px solid #fca5a5;
+  border-radius:14px; padding:14px 16px;
+}
+.confirm-cancelar-title { font-size:13px; font-weight:800; color:#991b1b; margin-bottom:4px; }
+.confirm-cancelar-sub { font-size:12px; font-weight:600; color:#b91c1c; margin-bottom:12px; }
+.confirm-cancelar-btns { display:flex; gap:8px; }
+.btn-confirm-volver {
+  flex:1; height:38px; background:var(--white);
+  border:1.5px solid var(--border); border-radius:10px;
+  font-size:12px; font-weight:800; font-family:'Nunito',sans-serif;
+  cursor:pointer; color:var(--muted);
+}
+.btn-confirm-si {
+  flex:1; height:38px; background:#dc2626;
+  border:none; border-radius:10px;
+  font-size:12px; font-weight:800; font-family:'Nunito',sans-serif;
+  cursor:pointer; color:#fff;
+  transition:opacity .15s;
+}
+.btn-confirm-si:disabled { opacity:.6; cursor:not-allowed; }
+
 /* DOMI CARD */
 .domi-card { background:var(--white); border-radius:20px; border:1px solid var(--border); overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.04); }
 .domi-header { background:linear-gradient(135deg,#0ceac915,#0fe4f310); padding:14px 16px; border-bottom:1px solid #0ceac925; display:flex; align-items:center; gap:12px; }
@@ -234,6 +268,21 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
       <span class="progress-pct" id="progressPct">0%</span>
       <span class="progress-txt" id="progressTxt">Confirmado</span>
     </div>
+
+    <!-- BOTÓN CANCELAR — solo visible cuando estado = pendiente -->
+    <div class="btn-cancelar-wrap" id="btnCancelarWrap">
+      <button class="btn-cancelar" id="btnCancelar" onclick="mostrarConfirmCancelar()">
+        <span style="font-size:16px;">✕</span> Cancelar pedido
+      </button>
+      <div class="confirm-cancelar-box" id="confirmCancelarBox">
+        <div class="confirm-cancelar-title">¿Seguro que deseas cancelar?</div>
+        <div class="confirm-cancelar-sub">Esta acción no se puede deshacer.</div>
+        <div class="confirm-cancelar-btns">
+          <button class="btn-confirm-volver" onclick="ocultarConfirmCancelar()">Volver</button>
+          <button class="btn-confirm-si" id="btnConfirmarCancelar" onclick="confirmarCancelacion()">Sí, cancelar</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- DOMI -->
@@ -272,10 +321,34 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
   <!-- INFO ENTREGA -->
   <div class="info-card" id="infoCard" style="display:none">
     <div class="info-card-title">📋 Información de entrega</div>
-    <div class="info-row"><div class="info-icon">📍</div><div class="info-content"><div class="info-label">Dirección</div><div class="info-value" id="infoDir">—</div></div></div>
-    <div class="info-row"><div class="info-icon">👤</div><div class="info-content"><div class="info-label">Cliente</div><div class="info-value" id="infoCliente">—</div></div></div>
-    <div class="info-row"><div class="info-icon">💳</div><div class="info-content"><div class="info-label">Método de pago · Domicilio</div><div class="info-value" id="infoPago">—</div></div></div>
-    <div class="info-row"><div class="info-icon">🕐</div><div class="info-content"><div class="info-label">Fecha · Hora</div><div class="info-value" id="infoFecha">—</div></div></div>
+    <div class="info-row">
+      <div class="info-icon">📍</div>
+      <div class="info-content">
+        <div class="info-label">Dirección</div>
+        <div class="info-value" id="infoDir">—</div>
+      </div>
+    </div>
+    <div class="info-row">
+      <div class="info-icon">👤</div>
+      <div class="info-content">
+        <div class="info-label">Cliente</div>
+        <div class="info-value" id="infoCliente">—</div>
+      </div>
+    </div>
+    <div class="info-row">
+      <div class="info-icon">💳</div>
+      <div class="info-content">
+        <div class="info-label">Método de pago · Domicilio</div>
+        <div class="info-value" id="infoPago">—</div>
+      </div>
+    </div>
+    <div class="info-row">
+      <div class="info-icon">🕐</div>
+      <div class="info-content">
+        <div class="info-label">Fecha · Hora registro · Hora pedido</div>
+        <div class="info-value" id="infoFecha">—</div>
+      </div>
+    </div>
   </div>
 
   <!-- FACTURA -->
@@ -319,28 +392,28 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
 //  GLOBALS
 // ════════════════════════════════════════════════════════════
 const STEPS_DEF = [
-  { key:'pendiente',   label:'Pendiente',           icon:'🕐' },
+  { key:'pendiente',   label:'Pendiente',            icon:'🕐' },
   { key:'confirmado',  label:'Confirmado · Asignado', icon:'✅' },
-  { key:'en_ruta',     label:'En ruta',              icon:'🚀' },
-  { key:'entregado',   label:'Entregado',            icon:'🎉' },
+  { key:'en_ruta',     label:'En ruta',               icon:'🚀' },
+  { key:'entregado',   label:'Entregado',             icon:'🎉' },
 ];
 
-let pedidoData   = null;
-let mapInstance  = null;
-let domiMarker   = null;
-let destinoMarker= null;
-let rutaLayer    = null;
-let pollInterval = null;
-let mensajes     = [];
-let unreadCount  = 0;
-let chatOpen     = false;
+let pedidoData    = null;
+let mapInstance   = null;
+let domiMarker    = null;
+let destinoMarker = null;
+let rutaLayer     = null;
+let pollInterval  = null;
+let mensajes      = [];
+let unreadCount   = 0;
+let chatOpen      = false;
 
 // Interpolación suave del marcador domi
-let domiCurrentPos = null; // {lat,lng}
-let domiTargetPos  = null; // {lat,lng}
+let domiCurrentPos = null;
+let domiTargetPos  = null;
 let domiAnimFrame  = null;
 let domiAnimStart  = null;
-const ANIM_DURATION = 2500; // ms — interpola suavemente en 2.5s
+const ANIM_DURATION = 2500;
 
 // ════════════════════════════════════════════════════════════
 //  MAPA
@@ -349,7 +422,7 @@ function initMapa() {
   mapInstance = L.map('map-detail', {
     center: [6.3499, -75.5025],
     zoom: 15,
-    zoomControl: false,       // usamos los botones custom
+    zoomControl: false,
     scrollWheelZoom: true,
     dragging: true,
   });
@@ -388,7 +461,6 @@ function lerp(a, b, t) { return a + (b - a) * t; }
 function easeInOut(t) { return t < .5 ? 2*t*t : -1+(4-2*t)*t; }
 
 function animarDomiHacia(lat, lng) {
-  // Si no hay cambio real, no animar
   if (domiCurrentPos &&
       Math.abs(domiCurrentPos.lat - lat) < 0.000005 &&
       Math.abs(domiCurrentPos.lng - lng) < 0.000005) return;
@@ -423,7 +495,7 @@ function animarDomiHacia(lat, lng) {
 //  OSRM — Ruta + ETA
 // ════════════════════════════════════════════════════════════
 let lastOsrmCall = 0;
-const OSRM_COOLDOWN = 12000; // no llamar OSRM más de 1 vez cada 12s
+const OSRM_COOLDOWN = 12000;
 
 async function calcularRutaOSRM(fromLat, fromLng, toLat, toLng) {
   const now = Date.now();
@@ -431,7 +503,6 @@ async function calcularRutaOSRM(fromLat, fromLng, toLat, toLng) {
   lastOsrmCall = now;
 
   try {
-    // OSRM demo server — perfil driving
     const url = `https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson&steps=false`;
     const res = await fetch(url);
     if (!res.ok) throw new Error('osrm error');
@@ -439,34 +510,26 @@ async function calcularRutaOSRM(fromLat, fromLng, toLat, toLng) {
 
     if (data.code !== 'Ok' || !data.routes?.length) throw new Error('no route');
 
-    const route = data.routes[0];
-    const distKm  = (route.distance / 1000).toFixed(1);
-    const durMin  = Math.ceil(route.duration / 60);
-    const coords  = route.geometry.coordinates.map(c => [c[1], c[0]]);
+    const route  = data.routes[0];
+    const distKm = (route.distance / 1000).toFixed(1);
+    const durMin = Math.ceil(route.duration / 60);
+    const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
 
-    // Dibujar línea en el mapa
     if (rutaLayer) mapInstance.removeLayer(rutaLayer);
     rutaLayer = L.polyline(coords, {
-      color: '#0ceac9',
-      weight: 4,
-      opacity: 0.85,
-      lineCap: 'round',
-      lineJoin: 'round',
-      dashArray: null,
+      color: '#0ceac9', weight: 4, opacity: 0.85,
+      lineCap: 'round', lineJoin: 'round',
     }).addTo(mapInstance);
 
-    // ETA badge en mapa
     const etaText = durMin < 1 ? 'Llegando' : `~${durMin} min`;
     document.getElementById('etaTime').textContent = etaText;
     document.getElementById('etaDist').textContent = `${distKm} km`;
     document.getElementById('etaBadge').classList.add('visible');
 
-    // ETA en domi card
     document.getElementById('etaRowVal').textContent = `${etaText} · ${distKm} km`;
     document.getElementById('etaRow').style.display = 'flex';
 
   } catch(e) {
-    // Si OSRM falla, dibujar línea recta simple como fallback
     if (rutaLayer) mapInstance.removeLayer(rutaLayer);
     rutaLayer = L.polyline([[fromLat,fromLng],[toLat,toLng]], {
       color: '#0ceac9', weight: 3, opacity: 0.6, dashArray: '8 6',
@@ -475,14 +538,13 @@ async function calcularRutaOSRM(fromLat, fromLng, toLat, toLng) {
 }
 
 // ════════════════════════════════════════════════════════════
-//  ACTUALIZAR MAPA con pedido fresco
+//  ACTUALIZAR MAPA
 // ════════════════════════════════════════════════════════════
 function actualizarMapa(p) {
   if (!mapInstance) return;
 
   const entregado = estadoIndex(p.estado) === 3;
 
-  // Marcador destino
   if (p.coords?.lat && p.coords?.lng) {
     const pos = [p.coords.lat, p.coords.lng];
     if (!destinoMarker) {
@@ -492,11 +554,8 @@ function actualizarMapa(p) {
   }
 
   if (entregado) {
-    // Ocultar marcador domi
     if (domiMarker) { mapInstance.removeLayer(domiMarker); domiMarker = null; }
-    // Quitar ruta
-    if (rutaLayer) { mapInstance.removeLayer(rutaLayer); rutaLayer = null; }
-    // ETA badge = entregado
+    if (rutaLayer)  { mapInstance.removeLayer(rutaLayer);  rutaLayer  = null; }
     document.getElementById('etaTime').textContent = '✓ Entregado';
     document.getElementById('etaDist').textContent = '';
     document.getElementById('etaBadge').classList.add('visible');
@@ -505,7 +564,6 @@ function actualizarMapa(p) {
     return;
   }
 
-  // GPS domi
   const dc = p.domiCoords;
   if (dc?.lat && dc?.lng) {
     if (!domiMarker) {
@@ -532,10 +590,9 @@ function actualizarMapa(p) {
 function estadoIndex(estado) {
   if (!estado) return 0;
   const e = estado.toLowerCase();
-  if (e.includes('entregado'))                                    return 3;
-  if (e.includes('ruta') || e.includes('camino'))                 return 2;
-  if (e.includes('confirmado') || e.includes('asignado') || e.includes('curso')) return 1;
-  // 'pendiente' o cualquier otro = 0
+  if (e.includes('entregado'))                                                    return 3;
+  if (e.includes('ruta') || e.includes('camino'))                                 return 2;
+  if (e.includes('confirmado') || e.includes('asignado') || e.includes('curso'))  return 1;
   return 0;
 }
 
@@ -545,11 +602,11 @@ function renderSteps(p) {
   const track = document.getElementById('stepsTrack');
   track.innerHTML = STEPS_DEF.map((s, i) => {
     const cls = i < idx ? 'done' : (i === idx ? 'active' : '');
-    const timeLabel = i === 0 ? (p.hora || '') 
-                : i === 1 ? (p.horaToma || '') 
-                : i === 2 ? (p.horaEnCamino || '') 
-                : i === 3 ? (p.horaEntregado || '') 
-                : '';
+    const timeLabel = i === 0 ? (p.hora || '')
+                    : i === 1 ? (p.horaToma || '')
+                    : i === 2 ? (p.horaEnCamino || '')
+                    : i === 3 ? (p.horaEntregado || '')
+                    : '';
     return `<div class="step ${cls}">
       <div class="step-circle">${i < idx ? '✓' : s.icon}</div>
       <div class="step-line"></div>
@@ -557,18 +614,71 @@ function renderSteps(p) {
       ${timeLabel ? `<div class="step-time">${timeLabel}</div>` : ''}
     </div>`;
   }).join('');
+
   setTimeout(() => {
-    document.getElementById('progressFill').style.width = pct + '%';
-    document.getElementById('progressPct').textContent = pct + '%';
-    document.getElementById('progressTxt').textContent = STEPS_DEF[idx]?.label || '';
+    document.getElementById('progressFill').style.width  = pct + '%';
+    document.getElementById('progressPct').textContent   = pct + '%';
+    document.getElementById('progressTxt').textContent   = STEPS_DEF[idx]?.label || '';
   }, 200);
+
   document.getElementById('stepsCard').style.display = 'block';
+
+  // Mostrar botón cancelar SOLO si está en estado pendiente (idx === 0)
+  const wrap = document.getElementById('btnCancelarWrap');
+  if (wrap) {
+    wrap.style.display = idx === 0 ? 'block' : 'none';
+    // Resetear el sub-panel de confirmación por si quedó abierto
+    document.getElementById('confirmCancelarBox').style.display = 'none';
+    document.getElementById('btnCancelar').style.display        = 'flex';
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  CANCELAR PEDIDO
+// ════════════════════════════════════════════════════════════
+function mostrarConfirmCancelar() {
+  document.getElementById('confirmCancelarBox').style.display = 'block';
+  document.getElementById('btnCancelar').style.display        = 'none';
+}
+
+function ocultarConfirmCancelar() {
+  document.getElementById('confirmCancelarBox').style.display = 'none';
+  document.getElementById('btnCancelar').style.display        = 'flex';
+}
+
+async function confirmarCancelacion() {
+  const btn = document.getElementById('btnConfirmarCancelar');
+  btn.textContent = 'Cancelando…';
+  btn.disabled    = true;
+
+  try {
+    const res = await fetch(`/api/foto?recurso=pedidos&idPedido=${encodeURIComponent(pedidoData.idPedido)}`, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ estado: 'cancelado' }),
+    });
+    if (!res.ok) throw new Error('error al cancelar');
+
+    // Detener polling
+    if (pollInterval)  clearInterval(pollInterval);
+    if (domiAnimFrame) cancelAnimationFrame(domiAnimFrame);
+
+    // Ocultar botón y reflejar nuevo estado
+    document.getElementById('btnCancelarWrap').style.display = 'none';
+    pedidoData.estado = 'cancelado';
+    renderSteps(pedidoData);
+
+  } catch(e) {
+    btn.textContent = 'Sí, cancelar';
+    btn.disabled    = false;
+    alert('No se pudo cancelar. Por favor intenta de nuevo.');
+  }
 }
 
 // ════════════════════════════════════════════════════════════
 //  RENDER PEDIDO COMPLETO
 // ════════════════════════════════════════════════════════════
-function formatCOP(v) { return '$ ' + Number(v||0).toLocaleString('es-CO'); }
+function formatCOP(v) { return '$ ' + Number(v || 0).toLocaleString('es-CO'); }
 
 function renderPedido(p) {
   pedidoData = p;
@@ -584,11 +694,11 @@ function renderPedido(p) {
     if (p._domiFoto) document.getElementById('domiFoto').innerHTML = `<img src="${p._domiFoto}" alt="foto"/>`;
     if (p._domiTel) {
       document.getElementById('btnLlamar').onclick = () => window.open(`tel:${p._domiTel}`);
-      document.getElementById('btnLlamar').title = p._domiTel;
+      document.getElementById('btnLlamar').title   = p._domiTel;
     }
-    document.getElementById('domiCard').style.display = 'block';
-    document.getElementById('chatSubtitle').textContent = p.domiciliarioNombre || 'Domiciliario';
-    document.getElementById('chatFab').style.display = 'flex';
+    document.getElementById('domiCard').style.display    = 'block';
+    document.getElementById('chatSubtitle').textContent  = p.domiciliarioNombre || 'Domiciliario';
+    document.getElementById('chatFab').style.display     = 'flex';
     if (mensajes.length === 0) {
       agregarMensaje('domi', `¡Hola! Soy ${p.domiciliarioNombre || 'tu domiciliario'}. Ya voy en camino con tu pedido 🛵`, '');
       unreadCount = 1; actualizarBadge();
@@ -601,15 +711,21 @@ function renderPedido(p) {
   }
 
   document.getElementById('infoDir').textContent     = p.direccion || '—';
-  document.getElementById('infoCliente').textContent = `${p.nombre||'—'}${p.telefono ? ' · '+p.telefono : ''}`;
-  document.getElementById('infoPago').textContent    = `${p.metodoPago||'—'} · Domicilio: ${formatCOP(p.domicilio)}`;
-  document.getElementById('infoFecha').textContent   = `${p.fecha||'—'} · ${p.hora||'—'}`;
+  document.getElementById('infoCliente').textContent = `${p.nombre || '—'}${p.telefono ? ' · ' + p.telefono : ''}`;
+  document.getElementById('infoPago').textContent    = `${p.metodoPago || '—'} · Domicilio: ${formatCOP(p.domicilio)}`;
+
+  // ── Fecha · Hora de registro · Hora del pedido ──
+  // p.fecha          → fecha del pedido (ej: "2025-06-04")
+  // p.horaRegistro   → hora en que se registró en el sistema (ej: "10:32 a.m.")
+  // p.hora           → hora que ingresó el cliente al pedir (ej: "10:30 a.m.")
+  const partesFecha = [p.fecha || null, p.horaRegistro ? `Registro: ${p.horaRegistro}` : null, p.hora ? `Pedido: ${p.hora}` : null];
+  document.getElementById('infoFecha').textContent   = partesFecha.filter(Boolean).join(' · ') || '—';
   document.getElementById('infoCard').style.display  = 'block';
 
   document.getElementById('factComercio').textContent = p.comercio || p.sede || '—';
   if (p.comprobanteId) {
     const img = document.getElementById('factFotoImg');
-    img.src = `/api/foto?recurso=foto&id=${p.comprobanteId}`;
+    img.src    = `/api/foto?recurso=foto&id=${p.comprobanteId}`;
     img.onerror = () => { document.getElementById('factFotoWrap').style.display = 'none'; };
     document.getElementById('factFotoWrap').classList.add('visible');
   }
@@ -641,18 +757,16 @@ async function cargarPedido(idPedido) {
     const p    = json.data?.[0] ?? null;
     if (!p) throw new Error('empty');
 
-    // Cargar datos del domi (foto + tel) solo en la primera carga
     if (p.domiciliarioId && !pedidoData) {
       try {
         const dres  = await fetch(`/api/foto?recurso=domiciliarios`);
         if (dres.ok) {
           const djson = await dres.json();
           const domi  = djson.data?.find(d => d.idWil === p.domiciliarioId || d._id === p.domiciliarioId);
-          if (domi) { p._domiFoto = domi.foto||''; p._domiTel = domi.tel||''; }
+          if (domi) { p._domiFoto = domi.foto || ''; p._domiTel = domi.tel || ''; }
         }
       } catch(_) {}
     } else if (pedidoData) {
-      // Reusar foto/tel del pedido anterior
       p._domiFoto = pedidoData._domiFoto || '';
       p._domiTel  = pedidoData._domiTel  || '';
     }
@@ -674,15 +788,12 @@ async function init() {
   if (!p) { document.getElementById('errorState').classList.add('visible'); return; }
   renderPedido(p);
 
-  // ── POLLING CADA 10 SEGUNDOS ──
   pollInterval = setInterval(async () => {
     const fresh = await cargarPedido(id);
     if (!fresh) return;
 
-    // Mover marcador domi con animación suave
     actualizarMapa(fresh);
 
-    // Actualizar steps si cambió el estado
     if (fresh.estado !== pedidoData?.estado) {
       pedidoData = fresh;
       renderSteps(fresh);
@@ -736,19 +847,19 @@ function enviarMensaje() {
   input.value = '';
   setTimeout(() => {
     const rs = ['¡Ya voy llegando! 🛵','Estoy en la vía, en unos minutos.','¿Me confirmas el número de casa?','Perfecto, ya casi llego.','Listo, ya tengo el pedido 👍'];
-    agregarMensaje('domi', rs[Math.floor(Math.random()*rs.length)], '');
+    agregarMensaje('domi', rs[Math.floor(Math.random() * rs.length)], '');
     if (!chatOpen) { unreadCount++; actualizarBadge(); }
-  }, 1200 + Math.random()*800);
+  }, 1200 + Math.random() * 800);
 }
 
 function nuevaConsulta() {
-  if (pollInterval) clearInterval(pollInterval);
+  if (pollInterval)  clearInterval(pollInterval);
   if (domiAnimFrame) cancelAnimationFrame(domiAnimFrame);
   window.location.href = 'pedidoRastreo.html';
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('chatInput').addEventListener('keydown', e => { if (e.key==='Enter') enviarMensaje(); });
+  document.getElementById('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter') enviarMensaje(); });
   init();
 });
 </script>
