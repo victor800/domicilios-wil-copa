@@ -590,14 +590,33 @@ function actualizarMapa(p) {
 function estadoIndex(estado) {
   if (!estado) return 0;
   const e = estado.toLowerCase();
-  if (e.includes('entregado'))                                                    return 3;
-  if (e.includes('ruta') || e.includes('camino'))                                 return 2;
-  if (e.includes('confirmado') || e.includes('asignado') || e.includes('curso'))  return 1;
+  if (e.includes('cancelado'))                                                     return -1;
+  if (e.includes('entregado'))                                                     return 3;
+  if (e.includes('ruta') || e.includes('camino'))                                  return 2;
+  if (e.includes('confirmado') || e.includes('asignado') || e.includes('curso'))   return 1;
   return 0;
 }
 
 function renderSteps(p) {
   const idx = estadoIndex(p.estado);
+
+  // Estado cancelado: mostrar banner y salir
+  if (idx === -1) {
+    document.getElementById('stepsCard').style.display = 'block';
+    document.getElementById('stepsTrack').innerHTML = `
+      <div style="width:100%;text-align:center;padding:10px 0;">
+        <div style="display:inline-flex;align-items:center;gap:8px;background:#fef2f2;border:1.5px solid #fca5a5;border-radius:14px;padding:10px 18px;">
+          <span style="font-size:20px;">❌</span>
+          <span style="font-size:13px;font-weight:800;color:#991b1b;">Pedido cancelado</span>
+        </div>
+      </div>`;
+    document.getElementById('progressFill').style.width = '0%';
+    document.getElementById('progressPct').textContent  = '—';
+    document.getElementById('progressTxt').textContent  = 'Cancelado';
+    document.getElementById('btnCancelarWrap').style.display = 'none';
+    return;
+  }
+
   const pct = Math.round((idx / (STEPS_DEF.length - 1)) * 100);
   const track = document.getElementById('stepsTrack');
   track.innerHTML = STEPS_DEF.map((s, i) => {
@@ -652,26 +671,33 @@ async function confirmarCancelacion() {
   btn.disabled    = true;
 
   try {
-    console.log('[cancelar] idPedido:', pedidoData?.idPedido);
-    const res     = await fetch('/api/foto?recurso=estado', {
+    const res = await fetch('/api/foto?recurso=estado', {
       method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ pedidoId: pedidoData.idPedido, estado: 'Cancelado' }),
     });
-    const resJson = await res.json().catch(() => null);
-    console.log('[cancelar] status:', res.status, '| respuesta:', JSON.stringify(resJson));
 
-    if (!res.ok) throw new Error(resJson?.error || 'HTTP ' + res.status);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'HTTP ' + res.status);
+    }
 
+    // Detener polling y animacion
     if (pollInterval)  clearInterval(pollInterval);
     if (domiAnimFrame) cancelAnimationFrame(domiAnimFrame);
 
+    // Ocultar boton cancelar
     document.getElementById('btnCancelarWrap').style.display = 'none';
+
+    // Mostrar banner cancelado directo sin pasar por renderSteps completo
+    document.getElementById('stepsTrack').innerHTML = '<div style="width:100%;text-align:center;padding:10px 0;"><div style="display:inline-flex;align-items:center;gap:8px;background:#fef2f2;border:1.5px solid #fca5a5;border-radius:14px;padding:10px 18px;"><span style="font-size:20px;">❌</span><span style="font-size:13px;font-weight:800;color:#991b1b;">Pedido cancelado</span></div></div>';
+    document.getElementById('progressFill').style.width = '0%';
+    document.getElementById('progressPct').textContent  = '0%';
+    document.getElementById('progressTxt').textContent  = 'Cancelado';
+
     pedidoData.estado = 'Cancelado';
-    renderSteps(pedidoData);
 
   } catch(e) {
-    console.error('[cancelar] error:', e.message);
     btn.textContent = 'Sí, cancelar';
     btn.disabled    = false;
     alert('No se pudo cancelar: ' + e.message);
