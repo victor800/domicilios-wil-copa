@@ -1759,36 +1759,36 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
         </select>
       </div>
 
-      <div class="om-field">
+     <!-- REEMPLAZA el bloque del toggle de fórmula en el modal OFERTA -->
+<div class="om-field">
   <div class="om-label">
-    <span class="material-symbols-rounded">vaccines</span>Requiere fórmula médica
+    <span class="material-symbols-rounded">vaccines</span>
+    Requiere fórmula médica
   </div>
-  <div style="display:flex; align-items:center; gap:12px; margin-top:4px;">
-    <div id="pm-formula-toggle"
-         onclick="toggleProdFormula()"
-         style="
-           width:48px; height:26px; border-radius:13px;
-           background:#ccc;
-           position:relative; cursor:pointer;
-           transition:background 0.25s;
-           flex-shrink:0;
-         ">
-      <div id="pm-formula-knob" style="
-        width:20px; height:20px; border-radius:50%;
-        background:#fff;
-        position:absolute; top:3px; left:3px;
-        transition:left 0.25s;
-        box-shadow:0 1px 3px rgba(0,0,0,0.2);
-      "></div>
+  <div style="display:flex;align-items:center;gap:12px;margin-top:4px;">
+    <div id="om-formula-toggle"
+         onclick="toggleFormula()"
+         style="width:48px;height:26px;border-radius:13px;background:#ccc;
+                position:relative;cursor:pointer;transition:background 0.25s;flex-shrink:0;">
+      <div id="om-formula-knob"
+           style="width:20px;height:20px;border-radius:50%;background:#fff;
+                  position:absolute;top:3px;left:3px;transition:left 0.25s;
+                  box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>
     </div>
-    <span id="pm-formula-label"
-          style="font-size:13px; color:var(--color-text-secondary); font-weight:500;">
-      No
-    </span>
+    <span id="om-formula-label"
+          style="font-size:13px;color:#666;font-weight:500;">No</span>
+    <input type="hidden" id="om-formula" value="no">
   </div>
-  <input type="hidden" id="pm-formula" value="no">
-</div>
+</div>  <!-- ← este cierre es el que faltaba -->
 
+<div class="om-footer">
+  <button class="om-btn-cancel" onclick="closeOfertModal()">
+    <span class="material-symbols-rounded" style="font-size:15px;">close</span>Cancelar
+  </button>
+  <button class="om-btn-save" onclick="saveOferta()">
+    <span class="material-symbols-rounded">save</span>Guardar oferta
+  </button>
+</div>
 
 
 
@@ -10949,56 +10949,35 @@ function filterPed(estado, tabEl) {
 }
 
 function toggleFormula() {
+  const inp = document.getElementById('om-formula');
+  const isOn = inp.value === 'si';
+  const nuevoValor = isOn ? 'no' : 'si';
+  inp.value = nuevoValor;
+
   const toggle = document.getElementById('om-formula-toggle');
   const knob   = document.getElementById('om-formula-knob');
   const label  = document.getElementById('om-formula-label');
-  const input  = document.getElementById('om-formula');
-  
-  // Leer estado ACTUAL del input (fuente de verdad)
-  const isOn = input.value === 'si';
 
-  if (isOn) {
-    // Estaba en Sí → pasar a No
-    toggle.style.background = '#ccc';
-    knob.style.left = '3px';
-    label.textContent = 'No';
-    label.style.color = '#666';
-    input.value = 'no';
-  } else {
-    // Estaba en No → pasar a Sí
-    toggle.style.background = '#0f6e56';
-    knob.style.left = '25px';
-    label.textContent = 'Sí';
-    label.style.color = '#0f6e56';
-    input.value = 'si';
-  }
-  
-  console.log('[toggleFormula] nuevo valor:', input.value);
+  toggle.style.background = nuevoValor === 'si' ? '#0f6e56' : '#ccc';
+  knob.style.left  = nuevoValor === 'si' ? '25px' : '3px';
+  label.textContent = nuevoValor === 'si' ? 'Sí' : 'No';
+  label.style.color = nuevoValor === 'si' ? '#0f6e56' : '#666';
 }
 
 function toggleProdFormula() {
+  const inp = document.getElementById('pm-formula');
+  const isOn = inp.value === 'si';
+  const nuevoValor = isOn ? 'no' : 'si';
+  inp.value = nuevoValor;
+
   const toggle = document.getElementById('pm-formula-toggle');
   const knob   = document.getElementById('pm-formula-knob');
   const label  = document.getElementById('pm-formula-label');
-  const input  = document.getElementById('pm-formula');
-  
-  const isOn = input.value === 'si';
 
-  if (isOn) {
-    toggle.style.background = '#ccc';
-    knob.style.left = '3px';
-    label.textContent = 'No';
-    label.style.color = '#666';
-    input.value = 'no';
-  } else {
-    toggle.style.background = '#7c3aed';
-    knob.style.left = '25px';
-    label.textContent = 'Sí';
-    label.style.color = '#7c3aed';
-    input.value = 'si';
-  }
-
-  console.log('[toggleProdFormula] nuevo valor:', input.value);
+  toggle.style.background = nuevoValor === 'si' ? '#7c3aed' : '#ccc';
+  knob.style.left  = nuevoValor === 'si' ? '25px' : '3px';
+  label.textContent = nuevoValor === 'si' ? 'Sí' : 'No';
+  label.style.color = nuevoValor === 'si' ? '#7c3aed' : '#666';
 }
 
 
