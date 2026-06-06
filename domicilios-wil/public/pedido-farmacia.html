@@ -10,6 +10,7 @@
  <script src="wil-farmacia-envio-tercero.js"></script>
  <script src="wil-fix-dedup-unitprice.js"></script>
  <script src="wil-chat-checkout-patch.js"></script>
+ <script src="wil-formula-medica.js"></script>
 
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -251,6 +252,31 @@ mark{background:#dbeafe;color:#1e40af;border-radius:3px;padding:0 2px}
   text-decoration: none;
 }
 .fm-link:hover { text-decoration: underline; }
+
+
+/* ── BADGE FÓRMULA MÉDICA ── */
+.wil-fm-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(220, 38, 38, 0.92);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  padding: 3px 8px 3px 5px;
+  border-radius: 99px;
+  box-shadow: 0 2px 8px rgba(220,38,38,.45);
+  white-space: nowrap;
+  pointer-events: none;
+  line-height: 1;
+}
+.wil-fm-badge .sym { font-size: 11px; }
 
 </style>
 </head>
@@ -1450,6 +1476,7 @@ async function loadNuevoProducto(){
       var seccion = col(6);
       var fecha   = col(7);
       var imagen  = col(8);
+      var formula = col(9); 
 
       if(!nombre) return; // fila vacía
 
@@ -1463,7 +1490,7 @@ async function loadNuevoProducto(){
       if(!scrollId) return;
       grupos[scrollId].push({
         id:id, nombre:nombre, laboratorio:lab,
-        precio:precio, descripcion:desc, imagen:imagen
+        precio:precio, descripcion:desc, imagen:imagen, formula: formula  
       });
             _searchAllData.push({
 
@@ -1532,7 +1559,8 @@ async function loadOfertasCarrusel() {
         precio: col(3),
         desc:   col(4),
         estado: col(5) || 'activa',
-        img:    col(7)
+        img:    col(7),
+        formula: col(8) 
       };
   
     }).filter(o => o.id && o.estado === 'activa').reverse();
@@ -1754,6 +1782,16 @@ renderOfertasCarrusel = function(ofertas) {
               'padding:2px 8px;border-radius:99px;' +
               'box-shadow:0 2px 6px rgba(239,68,68,.4);white-space:nowrap;">' + desc + '</div>'
             : '') +
+
+            /* Badge fórmula médica */
+(o.formula && /^(s[ií]|yes|1|true)$/i.test(o.formula.trim())
+  ? '<div style="position:absolute;bottom:8px;left:8px;z-index:6;' +
+    'display:flex;align-items:center;gap:4px;' +
+    'background:rgba(220,38,38,.92);color:#fff;font-size:7.5px;font-weight:900;' +
+    'text-transform:uppercase;letter-spacing:.05em;padding:3px 8px;border-radius:99px;' +
+    'box-shadow:0 2px 8px rgba(220,38,38,.45);white-space:nowrap;pointer-events:none;line-height:1;">' +
+    '💊 Venta bajo fórmula médica</div>'
+  : '') +
 
           /* Lab badge */
           '<div style="position:absolute;top:7px;right:8px;' +
@@ -2257,6 +2295,8 @@ function loadSheet(){
         else if(hn === 'precio')                                  IDX.precio = i;
         else if(hn.includes('stock') || hn.includes('cant'))     IDX.stock  = i;
         else if(hn.includes('imagen') || hn.includes('foto') || hn.includes('url')) IDX.imagen = i;
+        else if(hn.includes('formula') || hn.includes('fórmula')) IDX.formula = i;
+
       });
       if(IDX.nombre < 0) IDX.nombre = 0;
       if(IDX.lab    < 0) IDX.lab    = 1;
@@ -2288,15 +2328,16 @@ function loadSheet(){
         if(!nombre) return;
 
         var it = {
-          desc:   nombre,
-          lab:    lab,
-          unidad: unidad,
-          precio: precioV || precioU,
-          pUnit:  precioU || precioV,
-          imagen: imagen,
-          stock:  stock,
-          key:    nombre + '|||' + lab
-        };
+  desc:   nombre,
+  lab:    lab,
+  unidad: unidad,
+  precio: precioV || precioU,
+  pUnit:  precioU || precioV,
+  imagen: imagen,
+  stock:  stock,
+  formula: col(IDX.formula || 7),   // ← agregar
+  key:    nombre + '|||' + lab
+};
 
         var dk = nrm(nombre) + '|||' + nrm(lab);
 if(seen[dk] !== undefined){
@@ -2678,6 +2719,16 @@ function renderResults(items,q){
             'padding:4px 13px;border-radius:99px;z-index:4;white-space:nowrap;'+
             'box-shadow:0 2px 8px rgba(220,38,38,.4);">AGOTADO</div>'
           : '')+
+
+          /* badge fórmula */
++ (it.formula && /^(s[ií]|yes|1|true)$/i.test(String(it.formula).trim())
+  ? '<div style="position:absolute;bottom:6px;left:8px;z-index:6;' +
+    'display:flex;align-items:center;gap:4px;' +
+    'background:rgba(220,38,38,.92);color:#fff;font-size:7px;font-weight:900;' +
+    'text-transform:uppercase;letter-spacing:.04em;padding:3px 7px;border-radius:99px;' +
+    'box-shadow:0 2px 6px rgba(220,38,38,.4);white-space:nowrap;pointer-events:none;line-height:1;">' +
+    '💊 Fórmula médica</div>'
+  : '')
 
         /* badge laboratorio */
         '<div style="position:absolute;top:7px;right:8px;background:'+(agotado?'#9ca3af':c1orig)+';color:#fff;'+
@@ -5788,7 +5839,755 @@ console.log('[WIL] v6 ✅ — búsqueda estricta por substring, sin falsos posit
 
   console.log('[WIL] ✅ patch v2 OK');
 }(window));
+
     </script>
+
+
+
+
+
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   WIL — FÓRMULA MÉDICA v2
+   Columna I (índice 8)  → Ofertas
+   Columna J (índice 9)  → Nuevo_Producto
+   Flujo: badge rojo en card → Agregar → Popup → foto/PDF → Guardar → carrito
+   Campo enviado al backend: urlFormula + formulaFileName
+══════════════════════════════════════════════════════════════════ */
+
+/* ── Estado global ── */
+window._wilFormulaMap      = {};   // key → true/false
+window._wilFormulaAdjuntada = null; // { base64, fileName } al confirmar pedido
+var _fmPendiente            = null; // { key, desc, lab, precio } mientras popup abierto
+var _fmBase64               = null; // base64 del archivo seleccionado
+var _fmFileName             = '';
+
+/* ── Normaliza "si/sí/yes/1/true" → true ── */
+function _wilEsFormula(v) {
+  return /^(s[ií]|yes|1|true)$/i.test((v || '').trim());
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   1. PATCH loadNuevoProducto — lee columna J (índice 9)
+══════════════════════════════════════════════════════════════════ */
+(function patchNP() {
+  function doPatch() {
+    if (typeof window.loadNuevoProducto !== 'function') return false;
+    if (window.loadNuevoProducto._fmv2) return true;
+
+    window.loadNuevoProducto = async function () {
+      try {
+        var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID_OFERTAS +
+          '/gviz/tq?tqx=out:csv&sheet=Nuevo_Producto&cachebust=' + Date.now();
+        var r = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(12000) });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        var text = await r.text();
+        if (!text || text.trim().length < 5) throw new Error('Empty');
+
+        var lines = text.trim().split('\n').slice(1).filter(Boolean);
+
+        var grupos = {
+          'pop-scroll':[],'dermo-scroll':[],'vit-scroll':[],'ped-scroll':[],
+          'hig-scroll':[],'buc-scroll':[],'int-scroll':[],'bel-scroll':[],
+          'var-scroll':[],'ins-scroll':[],'otc-scroll':[],'leches-scroll':[],
+          'derm-scroll':[],'gen-scroll':[]
+        };
+
+        lines.forEach(function(line) {
+          var cols = _parseCsvLineNP(line);
+          var col  = function(i){ return (cols[i]||'').replace(/^"|"$/g,'').trim(); };
+
+          var id      = col(0);
+          var nombre  = col(1);
+          var lab     = col(2);
+          var precio  = col(3);
+          var desc    = col(4);
+          var estado  = _nrmSec(col(5));
+          var seccion = col(6);
+          var imagen  = col(8);
+          var formula = col(9); // ← columna J
+
+          if (!nombre) return;
+          if (estado && estado !== 'activo' && estado !== 'activa' && estado !== 'active' &&
+              estado !== 'si' && estado !== 'yes' && estado !== '1') return;
+
+          var scrollId = _SECCION_MAP[_nrmSec(seccion)];
+          if (!scrollId) return;
+
+          var cacheKey       = 'np_raw_np_' + id.replace(/[^a-z0-9]/gi,'_');
+          var reqFormula     = _wilEsFormula(formula);
+          window._wilFormulaMap[cacheKey] = reqFormula;
+
+          var precioNum = _parsePrecioNP(precio);
+          cache[cacheKey] = {
+            desc: nombre, lab: lab, unidad: desc,
+            precio: precioNum, pUnit: precioNum,
+            imagen: imagen, key: cacheKey, formula: reqFormula
+          };
+
+          grupos[scrollId].push({
+            id: id, nombre: nombre, laboratorio: lab,
+            precio: precio, descripcion: desc, imagen: imagen,
+            formula: reqFormula
+          });
+
+          _searchAllData.push({
+            desc: nombre, lab: lab, unidad: desc,
+            precio: precioNum, pUnit: precioNum,
+            imagen: imagen, key: cacheKey, formula: reqFormula
+          });
+        });
+
+        var offsets = {
+          'pop-scroll':0,'dermo-scroll':3,'vit-scroll':6,'ped-scroll':9,
+          'hig-scroll':2,'buc-scroll':5,'int-scroll':8,'bel-scroll':1,
+          'var-scroll':4,'ins-scroll':7,'otc-scroll':10,'leches-scroll':11,
+          'derm-scroll':2,'gen-scroll':4
+        };
+
+        Object.keys(grupos).forEach(function(sid){
+          if (grupos[sid].length) _wilRenderScroll(sid, grupos[sid].reverse(), offsets[sid]||0);
+        });
+
+      } catch(e) {
+        console.warn('[FM-NP]', e.message);
+      }
+    };
+
+    window.loadNuevoProducto._fmv2 = true;
+    return true;
+  }
+
+  if (!doPatch()) {
+    var t = setInterval(function(){ if(doPatch()) clearInterval(t); }, 150);
+  }
+})();
+
+/* ══════════════════════════════════════════════════════════════════
+   2. PATCH loadOfertasCarrusel — lee columna I (índice 8)
+══════════════════════════════════════════════════════════════════ */
+(function patchOfertas() {
+  function doPatch() {
+    if (typeof window.loadOfertasCarrusel !== 'function') return false;
+    if (window.loadOfertasCarrusel._fmv2) return true;
+
+    window.loadOfertasCarrusel = async function () {
+      var wrap    = document.getElementById('promos-wrap');
+      var loading = document.getElementById('promos-loading');
+
+      if (wrap) wrap.querySelectorAll('.promo-track').forEach(function(t){ t.remove(); });
+      if (loading) loading.style.display = 'flex';
+
+      try {
+        var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID_OFERTAS +
+          '/gviz/tq?tqx=out:csv&sheet=Ofertas&cachebust=' + Date.now();
+        var r = await fetch(url, { cache:'no-store', signal:AbortSignal.timeout(12000) });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        var text = await r.text();
+        if (!text || text.trim().length < 5) throw new Error('Empty');
+
+        var lines = text.trim().split('\n').slice(1).filter(Boolean);
+
+        var ofertas = lines.map(function(line){
+          var cols=[], cur='', inQ=false;
+          for(var i=0;i<line.length;i++){
+            var ch=line[i];
+            if(ch==='"'){ inQ=!inQ; }
+            else if(ch===','&&!inQ){ cols.push(cur.trim()); cur=''; }
+            else{ cur+=ch; }
+          }
+          cols.push(cur.trim());
+          var col = function(i){ return (cols[i]||'').replace(/^"|"$/g,'').trim(); };
+          return {
+            id:     col(0), nombre: col(1), lab:    col(2),
+            precio: col(3), desc:   col(4), estado: col(5)||'activa',
+            img:    col(7), formula: col(8) // ← columna I
+          };
+        }).filter(function(o){ return o.id && o.estado==='activa'; }).reverse();
+
+        // Registrar en mapa y marcar objeto
+        ofertas.forEach(function(o){
+          var uid = 'of_' + (o.id||'').toString().replace(/[^a-z0-9]/gi,'_');
+          var fm  = _wilEsFormula(o.formula);
+          window._wilFormulaMap['oferta_' + uid] = fm;
+          o._requiresFormula = fm;
+        });
+
+        if (loading) loading.style.display = 'none';
+        renderOfertasCarrusel(ofertas);
+
+      } catch(e) {
+        console.warn('[FM-Ofertas]', e.message);
+        if (loading) loading.style.display = 'none';
+        var hayTracks = wrap ? wrap.querySelectorAll('.promo-track').length > 0 : false;
+        if (!hayTracks) {
+          var fallback = document.getElementById('promos-fallback');
+          if (fallback) fallback.style.display = 'block';
+        }
+      }
+    };
+
+    window.loadOfertasCarrusel._fmv2 = true;
+    return true;
+  }
+
+  if (!doPatch()) {
+    var t = setInterval(function(){ if(doPatch()) clearInterval(t); }, 150);
+  }
+})();
+
+/* ══════════════════════════════════════════════════════════════════
+   3. PATCH renderOfertasCarrusel — badge fórmula + botón correcto
+══════════════════════════════════════════════════════════════════ */
+(function patchRenderOfertas() {
+  function doPatch() {
+    if (typeof window.renderOfertasCarrusel !== 'function') return false;
+    if (window.renderOfertasCarrusel._fmv2) return true;
+
+    var _orig = window.renderOfertasCarrusel;
+
+    window.renderOfertasCarrusel = function(ofertas) {
+      // Llamar al original primero
+      _orig.call(this, ofertas);
+
+      // Post-proceso: inyectar badges y parchear botones Agregar
+      setTimeout(function(){
+        var track = document.getElementById('promos-track');
+        if (!track) return;
+
+        // Las cards están en orden — iterar por índice
+        var cardEls = track.children; // divs de cada oferta
+        ofertas.forEach(function(o, i){
+          if (!o._requiresFormula) return;
+          var card = cardEls[i];
+          if (!card) return;
+
+          var uid     = 'of_' + (o.id||i).toString().replace(/[^a-z0-9]/gi,'_');
+          var addKey  = 'oferta_' + uid;
+          var precio  = _parseCOP ? _parseCOP(o.precio) : parseFloat((o.precio||'').replace(/[^0-9]/g,''))||0;
+
+          // Badge fórmula en zona imagen
+          var imgZone = card.querySelector('div[style*="height:180px"]');
+          if (imgZone && !imgZone.querySelector('.wil-fm-badge')) {
+            imgZone.style.position = 'relative';
+            var badge = document.createElement('div');
+            badge.className = 'wil-fm-badge';
+            badge.style.cssText =
+              'position:absolute;bottom:8px;left:8px;z-index:6;' +
+              'display:flex;align-items:center;gap:4px;' +
+              'background:rgba(220,38,38,.92);color:#fff;font-size:7px;font-weight:900;' +
+              'text-transform:uppercase;letter-spacing:.05em;padding:3px 8px;' +
+              'border-radius:99px;box-shadow:0 2px 8px rgba(220,38,38,.45);' +
+              'white-space:nowrap;pointer-events:none;line-height:1;';
+            badge.innerHTML = '💊 Venta bajo fórmula médica';
+            imgZone.appendChild(badge);
+          }
+
+          // Parchear botón Agregar
+          var btn = card.querySelector('button[onclick*="sadd"]');
+          if (btn) {
+            btn.setAttribute('onclick',
+              'wilSaddConFormula(\'' + _escJSN(addKey) + '\',\'' +
+              _escJSN(o.nombre) + '\',\'' + _escJSN(o.lab||'') + '\',' +
+              precio + ',true)'
+            );
+          }
+        });
+      }, 80);
+    };
+
+    window.renderOfertasCarrusel._fmv2 = true;
+    return true;
+  }
+
+  if (!doPatch()) {
+    var t = setInterval(function(){ if(doPatch()) clearInterval(t); }, 150);
+    setTimeout(function(){ clearInterval(t); }, 10000);
+  }
+})();
+
+/* ══════════════════════════════════════════════════════════════════
+   4. PATCH renderResults (búsqueda) — badge + botón con popup
+══════════════════════════════════════════════════════════════════ */
+(function patchResults() {
+  function doPatch() {
+    if (typeof window.renderResults !== 'function') return false;
+    if (window.renderResults._fmv2) return true;
+
+    var _orig = window.renderResults;
+    window.renderResults = function(items, q) {
+      // Marcar formula en items antes de renderizar
+      items.forEach(function(it){
+        if (it.formula === undefined)
+          it.formula = !!window._wilFormulaMap[it.key];
+      });
+      _orig.call(this, items, q);
+      // Post-proceso badges y botones
+      setTimeout(function(){ _wilPatchGrid(items); }, 80);
+    };
+    window.renderResults._fmv2 = true;
+    return true;
+  }
+
+  if (!doPatch()) {
+    var t = setInterval(function(){ if(doPatch()) clearInterval(t); }, 150);
+  }
+})();
+
+function _wilPatchGrid(items) {
+  var grid = document.getElementById('res-grid');
+  if (!grid) return;
+
+  // Construir mapa key → item para acceso rápido
+  var itemMap = {};
+  (items||[]).forEach(function(it){ if(it.key) itemMap[it.key] = it; });
+
+  grid.querySelectorAll('article').forEach(function(art){
+    // Extraer key del botón agregar
+    var btn = art.querySelector('button[onclick*="addToCart"], button[onclick*="sadd"], button[onclick*="wilSadd"]');
+    if (!btn) return;
+    var oc  = btn.getAttribute('onclick') || '';
+    var m   = oc.match(/['"]([^'"]+)['"]/);
+    var key = m ? m[1] : null;
+    if (!key) return;
+
+    var it = itemMap[key] || cache[key];
+    var fm = it ? (it.formula || window._wilFormulaMap[key]) : window._wilFormulaMap[key];
+    if (!fm) return;
+
+    // Badge en zona imagen
+    var imgZone = art.querySelector('div[style*="height:130px"], div[style*="height:180px"], div[style*="height:110px"]');
+    if (imgZone && !imgZone.querySelector('.wil-fm-badge')) {
+      imgZone.style.position = 'relative';
+      var badge = document.createElement('div');
+      badge.className = 'wil-fm-badge';
+      badge.style.cssText =
+        'position:absolute;bottom:6px;left:8px;z-index:6;' +
+        'display:flex;align-items:center;gap:4px;' +
+        'background:rgba(220,38,38,.92);color:#fff;font-size:7px;font-weight:900;' +
+        'text-transform:uppercase;letter-spacing:.04em;padding:3px 7px;' +
+        'border-radius:99px;box-shadow:0 2px 6px rgba(220,38,38,.4);' +
+        'white-space:nowrap;pointer-events:none;line-height:1;';
+      badge.innerHTML = '💊 Fórmula médica';
+      imgZone.appendChild(badge);
+    }
+
+    // Parchear botón
+    var desc  = it ? it.desc  : '';
+    var lab   = it ? it.lab   : '';
+    var pr    = it ? (it.precio||it.pUnit||0) : 0;
+    btn.setAttribute('onclick',
+      'wilSaddConFormula(\'' + _escJSN(key) + '\',\'' +
+      _escJSN(desc) + '\',\'' + _escJSN(lab) + '\',' + pr + ',true)'
+    );
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   5. _wilRenderScroll — render de secciones con badge fórmula
+══════════════════════════════════════════════════════════════════ */
+function _wilRenderScroll(scrollId, productos, colorOffset) {
+  var container = document.getElementById(scrollId);
+  if (!container || !productos.length) return;
+  var html = '';
+
+  productos.forEach(function(p, i) {
+    var gi      = (i + (colorOffset||0)) % _PROD_GRADS.length;
+    var c1      = _PROD_GRADS[gi][0];
+    var icon    = _PROD_ICONS[(i + (colorOffset||0)) % _PROD_ICONS.length];
+    var hasImg  = p.imagen && p.imagen.startsWith('http');
+    var precio  = _parsePrecioNP(p.precio);
+    var addKey  = 'np_' + (p.id||i).toString().replace(/[^a-z0-9]/gi,'_');
+    var cacheKey= 'np_raw_' + addKey;
+    var reqFM   = p.formula === true;
+
+    cache[cacheKey] = {
+      desc: p.nombre, lab: p.laboratorio||'', unidad: p.descripcion||'',
+      precio: precio, pUnit: precio, imagen: p.imagen||'',
+      key: cacheKey, formula: reqFM
+    };
+    window._wilFormulaMap[cacheKey] = reqFM;
+
+    var fmBadge = reqFM
+      ? '<div style="position:absolute;bottom:8px;left:8px;z-index:6;' +
+        'display:flex;align-items:center;gap:4px;' +
+        'background:rgba(220,38,38,.92);color:#fff;font-size:7px;font-weight:900;' +
+        'text-transform:uppercase;letter-spacing:.05em;padding:3px 8px;border-radius:99px;' +
+        'box-shadow:0 2px 8px rgba(220,38,38,.45);white-space:nowrap;pointer-events:none;line-height:1;">' +
+        '💊 Venta bajo fórmula médica</div>'
+      : '';
+
+    var btnOnclick = reqFM
+      ? 'wilSaddConFormula(\'' + _escJSN(cacheKey) + '\',\'' + _escJSN(p.nombre) +
+        '\',\'' + _escJSN(p.laboratorio||'') + '\',' + precio + ',true)'
+      : 'sadd(\'' + _escJSN(cacheKey) + '\',\'' + _escJSN(p.nombre) +
+        '\',\'' + _escJSN(p.laboratorio||'') + '\',' + precio + ',null)';
+
+    html +=
+      '<div class="ocard">' +
+        '<div class="ocard-img" style="position:relative;">' +
+          (hasImg
+            ? '<img src="' + _escHTML(p.imagen) + '" alt="' + _escHTML(p.nombre) + '"' +
+              ' style="width:100%;height:145px;object-fit:contain;object-position:center;padding:6px;"' +
+              ' onerror="this.style.display=\'none\';var x=document.getElementById(\'ifb_' + addKey + '\');if(x)x.style.display=\'flex\'">' +
+              '<span id="ifb_' + addKey + '" class="sym symf"' +
+              ' style="font-size:80px;color:' + c1 + ';opacity:.85;display:none;' +
+              'align-items:center;justify-content:center;width:100%;height:100%">' + icon + '</span>'
+            : '<span class="sym symf" style="font-size:80px;color:' + c1 + ';opacity:.85">' + icon + '</span>'
+          ) +
+          '<div style="position:absolute;top:7px;right:8px;background:' + c1 + ';color:#fff;' +
+            'font-size:7.5px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;' +
+            'padding:2px 7px;border-radius:99px;max-width:90px;overflow:hidden;' +
+            'text-overflow:ellipsis;white-space:nowrap;">' +
+            _escHTML(p.laboratorio||'Genérico') +
+          '</div>' +
+          '<button onclick="abrirPopupSheet(\'' + _escJSN(cacheKey) + '\')"' +
+            ' style="position:absolute;bottom:7px;right:8px;width:26px;height:26px;' +
+            'border-radius:50%;border:none;cursor:pointer;background:' + c1 + ';' +
+            'display:flex;align-items:center;justify-content:center;' +
+            'box-shadow:0 2px 8px rgba(0,0,0,.25);">' +
+            '<span class="sym" style="font-size:14px;color:#fff">zoom_in</span>' +
+          '</button>' +
+          fmBadge +
+        '</div>' +
+        '<div class="ocard-body">' +
+          '<div class="ocard-name">' + _escHTML(p.nombre) + '</div>' +
+          (p.descripcion ? '<div class="ocard-desc">' + _escHTML(p.descripcion) + '</div>' : '') +
+          '<div class="ocard-footer">' +
+            '<div><div class="ocard-price" style="color:' + c1 + '">' + _fpNP(precio) + '</div></div>' +
+            '<button class="ocard-add"' +
+              ' style="background:' + c1 + ';box-shadow:0 2px 8px ' + c1 + '44;"' +
+              ' onclick="' + btnOnclick + '">' +
+              '<span class="sym symf" style="font-size:13px">add</span>Agregar' +
+            '</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+  });
+
+  html += '<div style="flex-shrink:0;width:4px"></div>';
+  container.innerHTML = html;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   6. wilSaddConFormula — intercepta Agregar
+══════════════════════════════════════════════════════════════════ */
+function wilSaddConFormula(key, desc, lab, precio, requiresFormula) {
+  if (!requiresFormula) {
+    sadd(key, desc, lab, precio, null);
+    return;
+  }
+  // Guardar producto pendiente y abrir popup
+  _fmPendiente = { key: key, desc: desc, lab: lab, precio: precio };
+  _wilAbrirPopupFM();
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   7. POPUP FÓRMULA MÉDICA
+══════════════════════════════════════════════════════════════════ */
+function _wilAbrirPopupFM() {
+  _fmBase64   = null;
+  _fmFileName = '';
+
+  var ov = document.getElementById('wil-fm-ov');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'wil-fm-ov';
+    ov.onclick = function(e){ if(e.target===ov) _wilCerrarFM(); };
+    document.body.appendChild(ov);
+  }
+
+  ov.style.cssText =
+    'position:fixed;inset:0;z-index:99999;' +
+    'background:rgba(0,0,0,.65);backdrop-filter:blur(7px);' +
+    'display:flex;align-items:center;justify-content:center;' +
+    'padding:20px;animation:fadeScaleIn .22s ease';
+
+  ov.innerHTML =
+    '<div style="background:#fff;border-radius:24px;width:100%;max-width:360px;' +
+    'box-shadow:0 24px 64px rgba(0,0,0,.35);overflow:hidden;position:relative;">' +
+
+      /* ── HEADER ── */
+      '<div style="background:linear-gradient(135deg,#b91c1c,#dc2626,#ef4444);' +
+      'padding:22px 20px 18px;position:relative;overflow:hidden;">' +
+        '<div style="position:absolute;width:110px;height:110px;border-radius:50%;' +
+        'background:rgba(255,255,255,.07);right:-25px;top:-35px;pointer-events:none"></div>' +
+        '<div style="position:absolute;width:65px;height:65px;border-radius:50%;' +
+        'background:rgba(255,255,255,.06);left:-15px;bottom:-22px;pointer-events:none"></div>' +
+
+        '<button onclick="_wilCerrarFM()" style="position:absolute;top:12px;right:12px;' +
+        'width:30px;height:30px;border-radius:50%;border:none;' +
+        'background:rgba(255,255,255,.2);cursor:pointer;' +
+        'display:flex;align-items:center;justify-content:center;z-index:2;">' +
+          '<span class="sym" style="font-size:16px;color:#fff">close</span>' +
+        '</button>' +
+
+        '<div style="display:flex;align-items:center;gap:13px;position:relative;z-index:1;">' +
+          '<div style="width:50px;height:50px;border-radius:16px;' +
+          'background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.3);' +
+          'display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
+            '<span class="sym symf" style="font-size:26px;color:#fff">vaccines</span>' +
+          '</div>' +
+          '<div>' +
+            '<div style="font-family:\'Manrope\',sans-serif;font-size:16px;font-weight:900;' +
+            'color:#fff;line-height:1.2;">Fórmula médica</div>' +
+            '<div style="font-size:11px;color:rgba(255,255,255,.78);font-weight:600;' +
+            'margin-top:3px;">Requerida por INVIMA</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+
+      /* ── BODY ── */
+      '<div style="padding:18px 20px 20px;">' +
+
+        /* Aviso */
+        '<div style="background:#fff5f5;border:1.5px solid #fecaca;border-radius:13px;' +
+        'padding:12px 13px;margin-bottom:16px;' +
+        'display:flex;align-items:flex-start;gap:9px;">' +
+          '<span class="sym symf" style="font-size:19px;color:#dc2626;flex-shrink:0;margin-top:1px">info</span>' +
+          '<div style="font-size:12px;color:#7f1d1d;line-height:1.55;font-weight:500;">' +
+            'Este medicamento se vende <strong>únicamente con fórmula médica vigente</strong>. ' +
+            'Adjunta una foto legible o PDF de la receta para continuar.' +
+          '</div>' +
+        '</div>' +
+
+        /* Zona de carga */
+        '<div id="wil-fm-zone" onclick="document.getElementById(\'wil-fm-inp\').click()"' +
+        ' style="border:2px dashed #fca5a5;border-radius:14px;' +
+        'padding:22px 14px;background:#fff5f5;cursor:pointer;text-align:center;' +
+        'position:relative;overflow:hidden;margin-bottom:16px;' +
+        'transition:border-color .2s,background .2s;">' +
+
+          '<input id="wil-fm-inp" type="file" accept="image/*,application/pdf"' +
+          ' style="position:absolute;inset:0;width:100%;height:100%;' +
+          'opacity:0;cursor:pointer;z-index:4;font-size:0;"' +
+          ' onchange="wilOnFMFile(this)">' +
+
+          /* idle */
+          '<div id="wil-fm-idle">' +
+            '<span class="sym symf" style="font-size:44px;color:#fca5a5;' +
+            'display:block;margin-bottom:8px;">upload_file</span>' +
+            '<div style="font-family:\'Manrope\',sans-serif;font-size:13px;font-weight:800;' +
+            'color:#dc2626;margin-bottom:4px;">Adjuntar receta médica</div>' +
+            '<div style="font-size:11px;color:#9ca3af;">Foto legible o PDF · máx 8 MB</div>' +
+          '</div>' +
+
+          /* spinner */
+          '<div id="wil-fm-spin" style="display:none;padding:6px 0;">' +
+            '<div style="display:flex;flex-direction:column;align-items:center;gap:8px;">' +
+              '<div style="width:26px;height:26px;border:3px solid #fecaca;' +
+              'border-top-color:#dc2626;border-radius:50%;' +
+              'animation:spin .7s linear infinite;"></div>' +
+              '<div style="font-size:12px;font-weight:700;color:#dc2626;">Procesando…</div>' +
+            '</div>' +
+          '</div>' +
+
+          /* resultado */
+          '<div id="wil-fm-ok" style="display:none;">' +
+            '<div style="display:flex;align-items:center;gap:11px;text-align:left;">' +
+
+              '<div id="wil-fm-ico" style="width:58px;height:58px;border-radius:12px;' +
+              'overflow:hidden;flex-shrink:0;border:2px solid #86efac;' +
+              'background:#f0fdf4;display:flex;align-items:center;justify-content:center;">' +
+                '<span class="sym symf" style="font-size:28px;color:#15803d;">description</span>' +
+              '</div>' +
+
+              '<div style="flex:1;min-width:0;">' +
+                '<div style="font-size:10px;font-weight:800;color:#15803d;' +
+                'background:#dcfce7;display:inline-flex;align-items:center;gap:4px;' +
+                'padding:2px 9px;border-radius:99px;margin-bottom:6px;">' +
+                  '<span class="sym symf" style="font-size:12px;">check_circle</span>' +
+                  'Fórmula adjuntada' +
+                '</div>' +
+                '<div id="wil-fm-name" style="font-size:11.5px;font-weight:700;' +
+                'color:#111827;line-height:1.35;word-break:break-all;"></div>' +
+                '<button onclick="wilResetFM()" style="margin-top:6px;border:none;' +
+                'background:none;cursor:pointer;font-size:10.5px;font-weight:700;' +
+                'color:#6b7280;display:flex;align-items:center;gap:3px;' +
+                'padding:0;position:relative;z-index:5;">' +
+                  '<span class="sym" style="font-size:13px;">refresh</span> Cambiar archivo' +
+                '</button>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+
+        '</div>' + /* /zone */
+
+        /* Botones */
+        '<div style="display:flex;gap:8px;">' +
+          '<button onclick="_wilCerrarFM()" style="flex:1;background:#f3f4f6;color:#6b7280;' +
+          'border:none;border-radius:13px;padding:13px;' +
+          'font-family:\'Manrope\',sans-serif;font-size:13px;font-weight:700;cursor:pointer;">' +
+            'Cancelar' +
+          '</button>' +
+          '<button id="wil-fm-guardar" onclick="wilGuardarConFormula()" disabled' +
+          ' style="flex:2;background:#dc2626;color:#fff;border:none;border-radius:13px;' +
+          'padding:13px;font-family:\'Manrope\',sans-serif;font-size:13px;font-weight:800;' +
+          'cursor:pointer;opacity:.4;transition:opacity .2s;' +
+          'display:flex;align-items:center;justify-content:center;gap:7px;">' +
+            '<span class="sym symf" style="font-size:16px;">add_shopping_cart</span>' +
+            'Guardar y agregar' +
+          '</button>' +
+        '</div>' +
+
+      '</div>' + /* /body */
+    '</div>';
+
+  document.body.style.overflow = 'hidden';
+}
+
+function _wilCerrarFM() {
+  var ov = document.getElementById('wil-fm-ov');
+  if (ov) ov.style.display = 'none';
+  document.body.style.overflow = '';
+  _fmPendiente = null;
+  _fmBase64    = null;
+}
+
+/* ── Archivo seleccionado ── */
+function wilOnFMFile(input) {
+  var file = input.files[0];
+  if (!file) return;
+  if (file.size > 8 * 1024 * 1024) {
+    alert('El archivo no puede pesar más de 8 MB.');
+    return;
+  }
+
+  document.getElementById('wil-fm-idle').style.display = 'none';
+  document.getElementById('wil-fm-spin').style.display = 'block';
+  document.getElementById('wil-fm-ok').style.display   = 'none';
+  _fmFileName = file.name;
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    _fmBase64 = e.target.result;
+
+    document.getElementById('wil-fm-spin').style.display = 'none';
+    document.getElementById('wil-fm-ok').style.display   = 'block';
+    document.getElementById('wil-fm-name').textContent   = file.name;
+
+    /* Miniatura */
+    var ico = document.getElementById('wil-fm-ico');
+    if (file.type.startsWith('image/')) {
+      ico.innerHTML = '<img src="' + e.target.result + '" ' +
+        'style="width:100%;height:100%;object-fit:cover;">';
+    } else {
+      ico.innerHTML = '<span class="sym symf" ' +
+        'style="font-size:28px;color:#dc2626;">picture_as_pdf</span>';
+    }
+
+    /* Zona verde */
+    var zone = document.getElementById('wil-fm-zone');
+    zone.style.borderColor = '#86efac';
+    zone.style.background  = '#f0fdf4';
+
+    /* Activar botón */
+    var btn = document.getElementById('wil-fm-guardar');
+    btn.disabled      = false;
+    btn.style.opacity = '1';
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ── Reset archivo ── */
+function wilResetFM() {
+  _fmBase64 = null;
+  var inp = document.getElementById('wil-fm-inp');
+  if (inp) inp.value = '';
+
+  document.getElementById('wil-fm-idle').style.display = 'block';
+  document.getElementById('wil-fm-ok').style.display   = 'none';
+
+  var zone = document.getElementById('wil-fm-zone');
+  zone.style.borderColor = '#fca5a5';
+  zone.style.background  = '#fff5f5';
+
+  var btn = document.getElementById('wil-fm-guardar');
+  btn.disabled = true; btn.style.opacity = '.4';
+}
+
+/* ── Guardar → carrito ── */
+function wilGuardarConFormula() {
+  if (!_fmBase64 || !_fmPendiente) return;
+
+  /* Guardar fórmula para enviarla con el pedido */
+  window._wilFormulaAdjuntada = {
+    base64:   _fmBase64,
+    fileName: _fmFileName || 'formula.jpg'
+  };
+
+  /* Cerrar popup */
+  var ov = document.getElementById('wil-fm-ov');
+  if (ov) ov.style.display = 'none';
+  document.body.style.overflow = '';
+
+  /* Agregar al carrito */
+  var p = _fmPendiente;
+  _fmPendiente = null;
+  sadd(p.key, p.desc, p.lab, p.precio, null);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   8. PATCH coEnviarPedido — inyecta urlFormula en el payload
+══════════════════════════════════════════════════════════════════ */
+(function patchEnvio() {
+  function doPatch() {
+    if (typeof window.coEnviarPedido !== 'function') return false;
+    if (window.coEnviarPedido._fmv2) return true;
+
+    var _orig = window.coEnviarPedido;
+
+    window.coEnviarPedido = async function() {
+      var _origFetch = window.fetch;
+      window.fetch = async function(url, opts) {
+        if (typeof url === 'string' && url.includes('domicilios-wil') &&
+            opts && opts.body && window._wilFormulaAdjuntada) {
+          try {
+            var payload = JSON.parse(opts.body);
+            payload.urlFormula      = window._wilFormulaAdjuntada.base64;
+            payload.formulaFileName = window._wilFormulaAdjuntada.fileName;
+            opts = Object.assign({}, opts, { body: JSON.stringify(payload) });
+            window._wilFormulaAdjuntada = null;
+          } catch(e) { /* no romper */ }
+        }
+        return _origFetch.apply(this, arguments);
+      };
+
+      try {
+        var result = await _orig.apply(this, arguments);
+        return result;
+      } finally {
+        window.fetch = _origFetch;
+      }
+    };
+
+    window.coEnviarPedido._fmv2 = true;
+    return true;
+  }
+
+  if (!doPatch()) {
+    var t = setInterval(function(){ if(doPatch()) clearInterval(t); }, 300);
+  }
+})();
+
+/* ══════════════════════════════════════════════════════════════════
+   9. HELPERS internos
+══════════════════════════════════════════════════════════════════ */
+function _escHTML(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function _escJSN(s) {
+  return (s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"');
+}
+function _parseCOP(v) {
+  var s = String(v||'').replace(/[^0-9.,]/g,'');
+  if(!s) return 0;
+  var n = parseFloat(s.replace(/\./g,'').replace(',','.'));
+  return isNaN(n) ? 0 : n;
+}
+
+console.log('[WIL] ✅ wil-formula-medica.js v2 cargado — badge + popup + carrito + payload OK');
+</script>
 
 
 
