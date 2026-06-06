@@ -2528,15 +2528,14 @@ async function sendOfertaToSheet(oferta, accion) {
   try {
     const payload = {
       accion,
-      id:     String(oferta.id || '').trim(),
-      nombre: oferta.nombre || '',
-      lab:    oferta.lab    || '',
-      precio: oferta.precio || '',
-      desc:   oferta.desc   || '',
-      estado: oferta.estado || 'activa',
-      formula: document.getElementById('om-formula')?.value || 'no',
-
-      ts:     oferta.ts     || '',
+      id:      String(oferta.id || '').trim(),
+      nombre:  oferta.nombre  || '',
+      lab:     oferta.lab     || '',
+      precio:  oferta.precio  || '',
+      desc:    oferta.desc    || '',
+      estado:  oferta.estado  || 'activa',
+      formula: oferta.formula || 'no',
+      ts:      oferta.ts      || '',
       // ✅ Enviar imagen:
       // - Si es base64 nuevo → script lo sube a Drive y devuelve URL
       // - Si es URL de Drive existente → enviar tal cual
@@ -2594,13 +2593,13 @@ async function saveOferta() {
       imgPayload = (prev && prev.img && prev.img.startsWith('https://')) ? prev.img : '';
     }
  
+    const formulaVal = document.getElementById('om-formula')?.value || 'no';
     const ofertaData = {
-      id:     ofertaId,
+      id:      ofertaId,
       nombre, lab, precio, desc, estado,
-      formula: document.getElementById('om-formula')?.value || 'no',
-
+      formula: formulaVal,
       ts,
-      img:    imgPayload.startsWith('https://') ? imgPayload : null // para guardado local
+      img:    imgPayload.startsWith('https://') ? imgPayload : null
     };
  
     // Actualizar memoria local primero (UI optimista)
@@ -2629,8 +2628,7 @@ async function saveOferta() {
   accion,
   id:       ofertaId,
   nombre,   lab, precio, desc, estado,
-  formula: document.getElementById('pm-formula')?.value || 'no',
-
+  formula:  document.getElementById('om-formula')?.value || 'no',
   ts,
   imagen:   imgPayload,
   imgNombre: (window._imgNombrePendiente || nombre.replace(/[^a-zA-Z0-9áéíóúñ_]/g,'_').substring(0,40)) + '_' + ofertaId
@@ -4237,7 +4235,8 @@ async function saveProducto() {
     if (prev && prev.img) imgFinal = prev.img;
   }
 
-  const prodData = { id: pid, nombre, lab, precio, desc, estado, seccion, fecha, img: imgFinal };
+ const formulaProd = document.getElementById('pm-formula')?.value || 'no';
+    const prodData = { id: pid, nombre, lab, precio, desc, estado, seccion, fecha, img: imgFinal, formula: formulaProd };
   // ✅ Guardar base64 en campo separado para que sendProductoToSheet lo use
   prodData._imgBase64 = imgCaptura && imgCaptura.startsWith('data:image') ? imgCaptura : null;
 
