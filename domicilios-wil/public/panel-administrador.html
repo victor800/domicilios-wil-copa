@@ -1562,6 +1562,8 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
   </div>
 </div>
 
+
+
 <!-- MODAL OFERTA -->
 <div class="modal-overlay" id="modal-ofert" onclick="if(event.target===this)closeOfertModal()">
   <div class="ofert-modal">
@@ -1629,6 +1631,38 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
           <option value="inactiva">⏸ Inactiva — oculta por ahora</option>
         </select>
       </div>
+
+      <div class="om-field">
+  <div class="om-label">
+    <span class="material-symbols-rounded">vaccines</span>Requiere fórmula médica
+  </div>
+  <div style="display:flex; align-items:center; gap:12px; margin-top:4px;">
+    <div id="om-formula-toggle"
+         onclick="toggleFormula()"
+         style="
+           width:48px; height:26px; border-radius:13px;
+           background:var(--toggle-bg, #ccc);
+           position:relative; cursor:pointer;
+           transition:background 0.25s;
+           flex-shrink:0;
+         ">
+      <div style="
+        width:20px; height:20px; border-radius:50%;
+        background:#fff;
+        position:absolute; top:3px;
+        left:var(--toggle-x, 3px);
+        transition:left 0.25s;
+        box-shadow:0 1px 3px rgba(0,0,0,0.2);
+      " id="om-formula-knob"></div>
+    </div>
+    <span id="om-formula-label"
+          style="font-size:13px; color:var(--color-text-secondary); font-weight:500;">
+      No
+    </span>
+  </div>
+  <input type="hidden" id="om-formula" value="no">
+</div>
+
       <div class="om-footer">
         <button class="om-btn-cancel" onclick="closeOfertModal()">
           <span class="material-symbols-rounded" style="font-size:15px;">close</span>Cancelar
@@ -1640,6 +1674,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
     </div>
   </div>
 </div>
+
 
 <div class="modal-overlay" id="modal-prod" onclick="if(event.target===this)closeProdModal()">
   <div class="ofert-modal" style="--teal:#7c3aed;--teal-d:#6d28d9;--teal-m:rgba(124,58,237,.13);--teal-l:#ede9fe;--teal-ll:#faf5ff;--border2:rgba(124,58,237,.22);">
@@ -1720,6 +1755,41 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
           <option value="inactivo">⏸ Inactivo — oculto por ahora</option>
         </select>
       </div>
+
+      <div class="om-field">
+  <div class="om-label">
+    <span class="material-symbols-rounded">vaccines</span>Requiere fórmula médica
+  </div>
+  <div style="display:flex; align-items:center; gap:12px; margin-top:4px;">
+    <div id="pm-formula-toggle"
+         onclick="toggleProdFormula()"
+         style="
+           width:48px; height:26px; border-radius:13px;
+           background:#ccc;
+           position:relative; cursor:pointer;
+           transition:background 0.25s;
+           flex-shrink:0;
+         ">
+      <div id="pm-formula-knob" style="
+        width:20px; height:20px; border-radius:50%;
+        background:#fff;
+        position:absolute; top:3px; left:3px;
+        transition:left 0.25s;
+        box-shadow:0 1px 3px rgba(0,0,0,0.2);
+      "></div>
+    </div>
+    <span id="pm-formula-label"
+          style="font-size:13px; color:var(--color-text-secondary); font-weight:500;">
+      No
+    </span>
+  </div>
+  <input type="hidden" id="pm-formula" value="no">
+</div>
+
+
+
+
+
       <div class="om-footer">
         <button class="om-btn-cancel" onclick="closeProdModal()">
           <span class="material-symbols-rounded" style="font-size:15px;">close</span>Cancelar
@@ -2419,6 +2489,8 @@ async function loadOfertasFromSheet() {
         estado: col(c, 5) || 'activa',
         ts:     col(c, 6),
         img:    imgSrc
+        , formula: col(c, 8) || 'no'
+
       };
     
     }).filter(Boolean);
@@ -2462,6 +2534,8 @@ async function sendOfertaToSheet(oferta, accion) {
       precio: oferta.precio || '',
       desc:   oferta.desc   || '',
       estado: oferta.estado || 'activa',
+      formula: document.getElementById('om-formula')?.value || 'no',
+
       ts:     oferta.ts     || '',
       // ✅ Enviar imagen:
       // - Si es base64 nuevo → script lo sube a Drive y devuelve URL
@@ -2523,6 +2597,8 @@ async function saveOferta() {
     const ofertaData = {
       id:     ofertaId,
       nombre, lab, precio, desc, estado,
+      formula: document.getElementById('om-formula')?.value || 'no',
+
       ts,
       img:    imgPayload.startsWith('https://') ? imgPayload : null // para guardado local
     };
@@ -2553,6 +2629,8 @@ async function saveOferta() {
   accion,
   id:       ofertaId,
   nombre,   lab, precio, desc, estado,
+  formula: document.getElementById('pm-formula')?.value || 'no',
+
   ts,
   imagen:   imgPayload,
   imgNombre: (window._imgNombrePendiente || nombre.replace(/[^a-zA-Z0-9áéíóúñ_]/g,'_').substring(0,40)) + '_' + ofertaId
@@ -2680,6 +2758,16 @@ function openOfertModal(id) {
     document.getElementById('om-precio').value = o.precio || '';
     document.getElementById('om-desc').value   = o.desc   || '';
     document.getElementById('om-estado').value = o.estado || 'activa';
+    const fTgl = document.getElementById('om-formula-toggle');
+const fKnob = document.getElementById('om-formula-knob');
+const fLbl  = document.getElementById('om-formula-label');
+const fInp  = document.getElementById('om-formula');
+const fVal  = o.formula === 'si';
+fTgl.style.setProperty('--toggle-bg', fVal ? '#0f6e56' : '#ccc');
+fKnob.style.left  = fVal ? '25px' : '3px';
+fLbl.textContent  = fVal ? 'Sí' : 'No';
+fLbl.style.color  = fVal ? '#0f6e56' : 'var(--color-text-secondary)';
+fInp.value        = fVal ? 'si' : 'no';
     if (o.img) {
       document.getElementById('om-img-preview').src = o.img;
       document.getElementById('om-img-preview').style.display = 'block';
@@ -3883,7 +3971,7 @@ async function loadProductosFromSheet() {
         estado:  (col(c, 5) || 'activo').toLowerCase().trim(),
         seccion: col(c, 6),
         fecha:   col(c, 7),
-        img:     imgSrc        // ← URL Drive o null, nunca base64 del modal
+        img:     imgSrc , formula: col(c, 9) || 'no'       // ← URL Drive o null, nunca base64 del modal
       };
     }).filter(Boolean);
 
@@ -4092,6 +4180,16 @@ function openProdModal(id) {
     document.getElementById('pm-precio').value  = p.precio  || '';
     document.getElementById('pm-desc').value    = p.desc    || '';
     document.getElementById('pm-estado').value  = p.estado  || 'activo';
+    const pfTgl = document.getElementById('pm-formula-toggle');
+const pfKnob = document.getElementById('pm-formula-knob');
+const pfLbl  = document.getElementById('pm-formula-label');
+const pfInp  = document.getElementById('pm-formula');
+const pfVal  = p.formula === 'si';
+pfTgl.style.background = pfVal ? '#7c3aed' : '#ccc';
+pfKnob.style.left  = pfVal ? '25px' : '3px';
+pfLbl.textContent  = pfVal ? 'Sí' : 'No';
+pfLbl.style.color  = pfVal ? '#7c3aed' : 'var(--color-text-secondary)';
+pfInp.value        = pfVal ? 'si' : 'no';
     document.getElementById('pm-seccion').value = p.seccion || 'Medicamentos';
     if (p.img) {
       document.getElementById('pm-img-preview').src = p.img;
@@ -4167,7 +4265,7 @@ const res = await sendProductoToSheet(prodData, accion, imgCaptura);
       const local = productos.find(o => o.id === pid);
       if (local) { local.img = res.imagen; }
       window._prodUrlResguardada = res.imagen;
-      showToast('s', '¡Producto guardado!', 'Imagen en Drive ✓');
+      showToast('s', '¡Producto guardado!', 'Imagen almacenada ✓');
     } else if (res && res.ok !== false) {
       window._prodUrlResguardada = null;
       showToast('s', 'Producto guardado', 'Sincronizado ✓');
@@ -5896,6 +5994,8 @@ async function sendProductoToSheet(producto, accion, imgOverride) {
       precio:    producto.precio  || '',
       desc:      producto.desc    || '',
       estado:    producto.estado  || 'activo',
+      formula:   producto.formula || 'no',
+
       seccion:   producto.seccion || '',
       fecha:     producto.fecha   || '',
       imagen:    imgPayload,
@@ -10834,6 +10934,28 @@ function filterPed(estado, tabEl) {
   const domiId = (document.getElementById('ped-domi-filter')?.value || '').trim();
   const tipo   = (document.getElementById('ped-tipo-filter')?.value || '').trim();
   renderPedidosTable(estado, domiId, tipo);
+}
+
+function toggleFormula() {
+  const toggle = document.getElementById('om-formula-toggle');
+  const knob   = document.getElementById('om-formula-knob');
+  const label  = document.getElementById('om-formula-label');
+  const input  = document.getElementById('om-formula');
+  const isOn   = input.value === 'si';
+
+  if (isOn) {
+    toggle.style.setProperty('--toggle-bg', '#ccc');
+    knob.style.left = '3px';
+    label.textContent = 'No';
+    label.style.color = 'var(--color-text-secondary)';
+    input.value = 'no';
+  } else {
+    toggle.style.setProperty('--toggle-bg', '#0f6e56');
+    knob.style.left = '25px';
+    label.textContent = 'Sí';
+    label.style.color = '#0f6e56';
+    input.value = 'si';
+  }
 }
 
 

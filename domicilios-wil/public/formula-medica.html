@@ -53,6 +53,103 @@ html,body{height:100%;background:var(--surface);font-family:'Nunito',sans-serif;
 /* ── DIVIDER ── */
 .divider{height:6px;background:var(--surface)}
 
+/* ── MEDICAMENTOS CON FÓRMULA ── */
+.med-section{padding:20px 16px}
+.med-grid{display:flex;flex-direction:column;gap:10px}
+.med-card{background:var(--white);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;display:flex;gap:12px;align-items:center}
+.med-img{width:64px;height:64px;border-radius:10px;object-fit:cover;background:var(--surface);flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.med-img img{width:100%;height:100%;object-fit:cover}
+.med-img-placeholder{font-size:26px}
+.med-info{flex:1;min-width:0}
+.med-info h3{font-size:13px;font-weight:800;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.med-info .med-sub{font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:4px}
+.med-info .med-price{font-size:15px;font-weight:900;color:var(--brand)}
+.med-info .med-price-old{font-size:11px;font-weight:600;color:var(--text-3);text-decoration:line-through;margin-left:4px}
+.med-badge-rx{display:inline-flex;align-items:center;gap:4px;background:var(--amber-light);color:var(--amber);border-radius:20px;padding:2px 8px;font-size:10px;font-weight:800;margin-bottom:5px}
+.btn-agregar-rx{display:flex;align-items:center;gap:6px;background:var(--brand);color:#fff;border:none;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:800;font-family:'Nunito',sans-serif;cursor:pointer;white-space:nowrap;transition:background .15s;flex-shrink:0}
+.btn-agregar-rx:hover{background:var(--brand-mid)}
+.btn-agregar-rx svg{width:15px;height:15px;fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ── POPUP OVERLAY ── */
+.popup-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:200;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s}
+.popup-overlay.open{opacity:1;pointer-events:all}
+.popup-sheet{background:var(--white);border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:0 0 32px;transform:translateY(100%);transition:transform .3s cubic-bezier(.32,.72,0,1);max-height:92vh;overflow-y:auto}
+.popup-overlay.open .popup-sheet{transform:translateY(0)}
+
+.popup-handle{width:40px;height:4px;background:#ddd;border-radius:4px;margin:12px auto 0}
+.popup-header{display:flex;align-items:center;justify-content:space-between;padding:18px 18px 0}
+.popup-header h2{font-size:17px;font-weight:900}
+.popup-close{width:32px;height:32px;border-radius:50%;border:0.5px solid var(--border);background:none;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.popup-close svg{width:16px;height:16px;stroke:var(--text);fill:none;stroke-width:2.2;stroke-linecap:round}
+
+.popup-med-info{display:flex;align-items:center;gap:12px;margin:16px 18px 0;background:var(--brand-light);border-radius:12px;padding:12px}
+.popup-med-img{width:48px;height:48px;border-radius:8px;background:var(--white);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.popup-med-name{font-size:13px;font-weight:800;margin-bottom:2px}
+.popup-med-rx{display:inline-flex;align-items:center;gap:4px;background:var(--amber-light);color:var(--amber);border-radius:20px;padding:2px 8px;font-size:10px;font-weight:800}
+
+.popup-steps{display:flex;align-items:center;gap:0;margin:20px 18px 0}
+.step-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;flex-shrink:0;transition:background .2s,color .2s}
+.step-dot.active{background:var(--brand);color:#fff}
+.step-dot.done{background:var(--brand-light);color:var(--brand)}
+.step-dot.inactive{background:var(--surface);color:var(--text-3)}
+.step-line{flex:1;height:2px;background:var(--border)}
+.step-line.done{background:var(--brand-light)}
+.steps-labels{display:flex;justify-content:space-between;padding:4px 18px 0;margin-bottom:0}
+.steps-labels span{font-size:10px;font-weight:700;color:var(--text-3);text-align:center;width:28px}
+.steps-labels span.active{color:var(--brand)}
+
+/* ── STEP PANELS ── */
+.step-panel{display:none;padding:18px 18px 0}
+.step-panel.active{display:block}
+
+/* Step 1: upload */
+.upload-zone{border:2px dashed var(--border);border-radius:14px;padding:28px 20px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--brand);background:var(--brand-light)}
+.upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.upload-zone-icon{font-size:36px;margin-bottom:10px}
+.upload-zone h3{font-size:14px;font-weight:800;margin-bottom:4px}
+.upload-zone p{font-size:12px;font-weight:600;color:var(--text-3)}
+.upload-types{display:flex;justify-content:center;gap:8px;margin-top:12px}
+.upload-type-badge{display:flex;align-items:center;gap:4px;background:var(--surface);border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;color:var(--text-2)}
+
+.preview-container{display:none;position:relative;border-radius:14px;overflow:hidden;background:var(--surface);min-height:140px}
+.preview-container img{width:100%;display:block;max-height:260px;object-fit:contain}
+.preview-container .preview-pdf{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 20px;gap:8px}
+.preview-container .preview-pdf span{font-size:36px}
+.preview-container .preview-pdf p{font-size:13px;font-weight:700;color:var(--text-2);text-align:center;word-break:break-all}
+.preview-remove{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.55);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.preview-remove svg{width:14px;height:14px;stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round}
+
+/* Step 2: review */
+.review-img-wrap{border-radius:14px;overflow:hidden;background:var(--surface);margin-bottom:14px;min-height:160px;display:flex;align-items:center;justify-content:center}
+.review-img-wrap img{width:100%;max-height:280px;object-fit:contain;display:block}
+.review-pdf-wrap{border-radius:14px;background:var(--surface);padding:20px;text-align:center;margin-bottom:14px}
+.review-pdf-wrap span{font-size:40px;display:block;margin-bottom:8px}
+.review-pdf-wrap p{font-size:13px;font-weight:700;color:var(--text-2);word-break:break-all}
+.review-note{background:var(--amber-light);border-radius:10px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start;margin-bottom:4px}
+.review-note-icon{font-size:18px;flex-shrink:0;margin-top:1px}
+.review-note p{font-size:12px;font-weight:700;color:var(--amber);line-height:1.5}
+
+/* Step 3: confirm */
+.confirm-icon{text-align:center;padding:10px 0 6px}
+.confirm-icon span{font-size:52px}
+.confirm-title{font-size:17px;font-weight:900;text-align:center;margin-bottom:6px}
+.confirm-sub{font-size:13px;font-weight:600;color:var(--text-2);text-align:center;line-height:1.55;margin-bottom:18px}
+.confirm-detail{background:var(--brand-light);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+.confirm-row{display:flex;justify-content:space-between;align-items:center}
+.confirm-row span{font-size:12px;font-weight:700;color:var(--text-3)}
+.confirm-row strong{font-size:13px;font-weight:800;color:var(--text)}
+
+/* ── NAV BUTTONS ── */
+.popup-nav{display:flex;gap:10px;padding:20px 18px 0}
+.btn-nav-back{flex:1;padding:13px;border:1.5px solid var(--border);background:var(--white);border-radius:var(--radius);font-size:14px;font-weight:800;font-family:'Nunito',sans-serif;cursor:pointer;color:var(--text);transition:background .15s}
+.btn-nav-back:hover{background:var(--surface)}
+.btn-nav-next{flex:2;padding:13px;border:none;background:var(--brand);color:#fff;border-radius:var(--radius);font-size:14px;font-weight:800;font-family:'Nunito',sans-serif;cursor:pointer;transition:background .15s}
+.btn-nav-next:hover{background:var(--brand-mid)}
+.btn-nav-next:disabled{background:#ccc;cursor:not-allowed}
+.btn-nav-single{width:100%;padding:14px;border:none;background:var(--brand);color:#fff;border-radius:var(--radius);font-size:15px;font-weight:800;font-family:'Nunito',sans-serif;cursor:pointer;transition:background .15s}
+.btn-nav-single:hover{background:var(--brand-mid)}
+
 /* ── ESPECIALISTA WHATSAPP ── */
 .especialista-section{padding:20px 16px 28px}
 .especialista-card{background:var(--white);border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
@@ -68,13 +165,43 @@ html,body{height:100%;background:var(--surface);font-family:'Nunito',sans-serif;
 .btn-whatsapp{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:15px;background:#25D366;color:#fff;border:none;border-radius:var(--radius);font-size:15px;font-weight:800;font-family:'Nunito',sans-serif;cursor:pointer;text-decoration:none;transition:background .15s;margin-top:4px}
 .btn-whatsapp:hover{background:#1ebe5c}
 .btn-whatsapp svg{width:22px;height:22px;fill:#fff;flex-shrink:0}
+
+/* ── BUSCADOR ── */
+.med-search-wrap{display:flex;align-items:center;gap:8px;background:var(--white);border:1.5px solid var(--border);border-radius:var(--radius);padding:0 12px;margin-bottom:14px;transition:border-color .2s}
+.med-search-wrap:focus-within{border-color:var(--brand)}
+.med-search-wrap svg{width:16px;height:16px;flex-shrink:0;color:var(--text-3)}
+.med-search-wrap input{flex:1;border:none;outline:none;font-family:'Nunito',sans-serif;font-size:14px;font-weight:600;color:var(--text);background:transparent;padding:12px 0}
+.med-search-wrap input::placeholder{color:var(--text-3)}
+#medSearchClear{background:none;border:none;cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+#medSearchClear svg{width:14px;height:14px;color:var(--text-3)}
+
+/* ── GRID 2 COLUMNAS ── */
+.med-grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.med-card2{background:var(--white);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:12px 10px;display:flex;flex-direction:column;gap:6px;position:relative}
+.med-card2-img{font-size:30px;text-align:center;padding:6px 0 2px}
+.med-card2-body{flex:1}
+.med-card2-body h3{font-size:12px;font-weight:800;line-height:1.35;margin-bottom:2px}
+.med-card2-sub{font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:4px}
+.med-card2-prices{display:flex;align-items:baseline;gap:4px;flex-wrap:wrap}
+.med-card2-price{font-size:14px;font-weight:900;color:var(--brand)}
+.med-card2-old{font-size:10px;font-weight:600;color:var(--text-3);text-decoration:line-through}
+.btn-agregar-rx2{display:flex;align-items:center;justify-content:center;gap:5px;width:100%;padding:9px 6px;background:var(--brand);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:800;font-family:'Nunito',sans-serif;cursor:pointer;transition:background .15s;margin-top:2px}
+.btn-agregar-rx2:hover{background:var(--brand-mid)}
+.btn-agregar-rx2 svg{width:13px;height:13px}
+
+/* empty state ocupa las 2 columnas */
+.med-empty{grid-column:1/-1;text-align:center;padding:28px 20px;color:var(--text-3)}
+.med-empty span{font-size:32px;display:block;margin-bottom:8px}
+.med-empty p{font-size:13px;font-weight:700}
+
+
 </style>
 </head>
 <body>
 
 <!-- HEADER -->
 <header class="header">
-  <button class="back-btn" onclick="history.back()" aria-label="Volver">
+  <button class="back-btn" onclick="window.location.href='pedido-farmacia.html'" aria-label="Volver">
     <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
   </button>
   <div class="header-title">
@@ -97,7 +224,6 @@ html,body{height:100%;background:var(--surface);font-family:'Nunito',sans-serif;
 <section class="section">
   <p class="section-label">Marco normativo</p>
   <div class="norma-grid">
-
     <div class="norma-card">
       <div class="norma-icon" style="background:#E8F5EE">
         <svg viewBox="0 0 24 24" stroke="#1D6B4A"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
@@ -107,7 +233,6 @@ html,body{height:100%;background:var(--surface);font-family:'Nunito',sans-serif;
         <p>Reglamenta la profesión de química farmacéutica y establece que los medicamentos de control especial solo pueden dispensarse con prescripción médica.</p>
       </div>
     </div>
-
     <div class="norma-card">
       <div class="norma-icon" style="background:#FDF3E3">
         <svg viewBox="0 0 24 24" stroke="#BA7517"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -117,7 +242,6 @@ html,body{height:100%;background:var(--surface);font-family:'Nunito',sans-serif;
         <p>Define el Modelo de Gestión del Servicio Farmacéutico y los requisitos para dispensar medicamentos que requieren prescripción facultativa.</p>
       </div>
     </div>
-
     <div class="norma-card">
       <div class="norma-icon" style="background:#FCEAEA">
         <svg viewBox="0 0 24 24" stroke="#A32D2D"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -127,7 +251,6 @@ html,body{height:100%;background:var(--surface);font-family:'Nunito',sans-serif;
         <p>Compila las normas del sector salud. Prohíbe la venta de medicamentos de venta bajo fórmula sin la presentación de la prescripción médica original.</p>
       </div>
     </div>
-
     <div class="norma-card">
       <div class="norma-icon" style="background:#E8F5EE">
         <svg viewBox="0 0 24 24" stroke="#1D6B4A"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
@@ -137,11 +260,12 @@ html,body{height:100%;background:var(--surface);font-family:'Nunito',sans-serif;
         <p>La farmacia está legalmente obligada a negar la venta. El incumplimiento puede acarrear sanciones al establecimiento por parte del ente territorial de salud.</p>
       </div>
     </div>
-
   </div>
 </section>
 
-<div class="divider"></div>
+
+
+
 
 <!-- ESPECIALISTA WHATSAPP -->
 <section class="especialista-section">
@@ -174,5 +298,240 @@ html,body{height:100%;background:var(--surface);font-family:'Nunito',sans-serif;
   </div>
 </section>
 
+<!-- ── POPUP ADJUNTAR FÓRMULA ── -->
+<div class="popup-overlay" id="popupOverlay" onclick="cerrarPopupSiOverlay(event)">
+  <div class="popup-sheet" id="popupSheet">
+    <div class="popup-handle"></div>
+
+    <div class="popup-header">
+      <h2 id="popupTitle">Adjuntar fórmula médica</h2>
+      <button class="popup-close" onclick="cerrarPopup()">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <!-- Medicamento seleccionado -->
+    <div class="popup-med-info">
+      <div class="popup-med-img" id="popupMedEmoji">💊</div>
+      <div>
+        <div class="popup-med-name" id="popupMedNombre">—</div>
+        <div class="popup-med-rx">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Requiere receta médica vigente
+        </div>
+      </div>
+    </div>
+
+    <!-- Stepper -->
+    <div class="popup-steps">
+      <div class="step-dot active" id="dot1">1</div>
+      <div class="step-line" id="line1"></div>
+      <div class="step-dot inactive" id="dot2">2</div>
+      <div class="step-line" id="line2"></div>
+      <div class="step-dot inactive" id="dot3">3</div>
+    </div>
+    <div class="steps-labels">
+      <span class="active" id="lbl1">Subir</span>
+      <span id="lbl2">Revisar</span>
+      <span id="lbl3">Listo</span>
+    </div>
+
+    <!-- STEP 1: UPLOAD -->
+    <div class="step-panel active" id="step1">
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" accept="image/*,application/pdf" onchange="onFileSelected(event)"/>
+        <div class="upload-zone-icon">📎</div>
+        <h3>Sube tu fórmula médica</h3>
+        <p>Toca aquí o arrastra tu archivo</p>
+        <div class="upload-types">
+          <div class="upload-type-badge">📄 PDF</div>
+          <div class="upload-type-badge">🖼️ JPG / PNG</div>
+        </div>
+      </div>
+      <div class="preview-container" id="previewContainer">
+        <img id="previewImg" src="" alt="Vista previa"/>
+        <div class="preview-pdf" id="previewPdf" style="display:none">
+          <span>📄</span>
+          <p id="previewPdfName"></p>
+        </div>
+        <button class="preview-remove" onclick="quitarArchivo()">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="popup-nav">
+        <button class="btn-nav-back" onclick="cerrarPopup()">Cancelar</button>
+        <button class="btn-nav-next" id="btnSiguiente1" disabled onclick="irPaso(2)">Siguiente →</button>
+      </div>
+    </div>
+
+    <!-- STEP 2: REVIEW -->
+    <div class="step-panel" id="step2">
+      <div class="review-img-wrap" id="reviewImgWrap" style="display:none">
+        <img id="reviewImg" src="" alt="Fórmula"/>
+      </div>
+      <div class="review-pdf-wrap" id="reviewPdfWrap" style="display:none">
+        <span>📄</span>
+        <p id="reviewPdfName"></p>
+      </div>
+      <div class="review-note">
+        <div class="review-note-icon">⚠️</div>
+        <p>Verifica que la fórmula sea <strong>legible</strong>, esté <strong>vigente</strong> y muestre nombre del paciente, médico, sello y fecha de expedición.</p>
+      </div>
+      <div class="popup-nav">
+        <button class="btn-nav-back" onclick="irPaso(1)">← Atrás</button>
+        <button class="btn-nav-next" onclick="irPaso(3)">Confirmar →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: CONFIRM -->
+    <div class="step-panel" id="step3">
+      <div class="confirm-icon"><span>✅</span></div>
+      <p class="confirm-title">¡Fórmula adjuntada!</p>
+      <p class="confirm-sub">Tu receta médica fue adjuntada correctamente. El farmacéutico la validará antes de despachar tu pedido.</p>
+      <div class="confirm-detail">
+        <div class="confirm-row">
+          <span>Medicamento</span>
+          <strong id="confirmNombre">—</strong>
+        </div>
+        <div class="confirm-row">
+          <span>Precio</span>
+          <strong id="confirmPrecio">—</strong>
+        </div>
+        <div class="confirm-row">
+          <span>Fórmula</span>
+          <strong id="confirmArchivo">—</strong>
+        </div>
+        <div class="confirm-row">
+          <span>Estado</span>
+          <strong style="color:var(--brand)">Pendiente validación</strong>
+        </div>
+      </div>
+      <div style="padding:20px 0 0">
+        <button class="btn-nav-single" onclick="finalizarAgregar()">Agregar al carrito 🛒</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let medActual = {};
+let archivoActual = null;
+let pasoActual = 1;
+
+function abrirPopup(med) {
+  medActual = med;
+  archivoActual = null;
+  document.getElementById('popupMedEmoji').textContent = med.emoji;
+  document.getElementById('popupMedNombre').textContent = med.nombre;
+  document.getElementById('confirmNombre').textContent = med.nombre;
+  document.getElementById('confirmPrecio').textContent = med.precio;
+  irPaso(1);
+  quitarArchivo();
+  document.getElementById('popupOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function cerrarPopup() {
+  document.getElementById('popupOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function cerrarPopupSiOverlay(e) {
+  if (e.target === document.getElementById('popupOverlay')) cerrarPopup();
+}
+
+function irPaso(paso) {
+  pasoActual = paso;
+  [1,2,3].forEach(i => {
+    document.getElementById('step'+i).classList.toggle('active', i === paso);
+    const dot = document.getElementById('dot'+i);
+    dot.className = 'step-dot ' + (i < paso ? 'done' : i === paso ? 'active' : 'inactive');
+    const lbl = document.getElementById('lbl'+i);
+    lbl.className = i === paso ? 'active' : '';
+  });
+  ['line1','line2'].forEach((id,idx) => {
+    document.getElementById(id).className = 'step-line' + (paso > idx+1 ? ' done' : '');
+  });
+
+  if (paso === 2) {
+    const esImg = archivoActual && archivoActual.type.startsWith('image/');
+    const esPdf = archivoActual && archivoActual.type === 'application/pdf';
+    document.getElementById('reviewImgWrap').style.display = esImg ? 'flex' : 'none';
+    document.getElementById('reviewPdfWrap').style.display = esPdf ? 'block' : 'none';
+    if (esImg) document.getElementById('reviewImg').src = document.getElementById('previewImg').src;
+    if (esPdf) document.getElementById('reviewPdfName').textContent = archivoActual.name;
+  }
+
+  if (paso === 3) {
+    document.getElementById('confirmArchivo').textContent = archivoActual ? archivoActual.name : '—';
+  }
+
+  document.getElementById('popupSheet').scrollTop = 0;
+}
+
+function onFileSelected(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  archivoActual = file;
+  const esImg = file.type.startsWith('image/');
+  const esPdf = file.type === 'application/pdf';
+
+  const previewContainer = document.getElementById('previewContainer');
+  const uploadZone = document.getElementById('uploadZone');
+  const previewImg = document.getElementById('previewImg');
+  const previewPdf = document.getElementById('previewPdf');
+  const previewPdfName = document.getElementById('previewPdfName');
+
+  previewContainer.style.display = 'block';
+  uploadZone.style.display = 'none';
+
+  if (esImg) {
+    const reader = new FileReader();
+    reader.onload = ev => { previewImg.src = ev.target.result; previewImg.style.display = 'block'; };
+    reader.readAsDataURL(file);
+    previewPdf.style.display = 'none';
+  } else if (esPdf) {
+    previewImg.style.display = 'none';
+    previewPdf.style.display = 'flex';
+    previewPdfName.textContent = file.name;
+  }
+
+  document.getElementById('btnSiguiente1').disabled = false;
+}
+
+function quitarArchivo() {
+  archivoActual = null;
+  document.getElementById('previewContainer').style.display = 'none';
+  document.getElementById('uploadZone').style.display = 'block';
+  document.getElementById('previewImg').src = '';
+  document.getElementById('previewImg').style.display = 'none';
+  document.getElementById('previewPdf').style.display = 'none';
+  document.getElementById('fileInput').value = '';
+  document.getElementById('btnSiguiente1').disabled = true;
+}
+
+function finalizarAgregar() {
+  cerrarPopup();
+  // Aquí conectas con tu lógica de carrito
+  alert('✅ ' + medActual.nombre + ' agregado al carrito con fórmula adjunta.');
+}
+
+// Drag & drop
+const zone = document.getElementById('uploadZone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+zone.addEventListener('drop', e => {
+  e.preventDefault();
+  zone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    document.getElementById('fileInput').files = dt.files;
+    onFileSelected({ target: { files: [file] } });
+  }
+});
+</script>
 </body>
 </html>
