@@ -16,7 +16,7 @@ const Pedido = mongoose.models.Pedido || mongoose.model('Pedido',
     idPedido:           String,
     estado:             { type: String, default: 'Pendiente' },
     sede:               String,
-    notas:  { type: String, default: '' },
+    notas:              { type: String, default: '' },
     comercio:           String,
     nombre:             String,
     telefono:           String,
@@ -40,6 +40,12 @@ const Pedido = mongoose.models.Pedido || mongoose.model('Pedido',
       lat:           { type: Number, default: null },
       lng:           { type: Number, default: null },
       actualizadoEn: { type: Date,   default: null },
+    },
+    /* ── FÓRMULA MÉDICA ── */
+    formulaMedica: {
+      url:       { type: String, default: null }, // URL pública: /api/foto?recurso=formula&id=<_id>
+      mime:      { type: String, default: null }, // ej: image/jpeg, application/pdf
+      data:      { type: Buffer, default: null }, // bytes del archivo
     },
   }), 'pedidos'
 );
@@ -80,10 +86,9 @@ function setCors(res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
-/* ══ Sanitizar string — evita inyección RegEx / NoSQL ══ */
+/* ══ Sanitizar string ══ */
 function sanitizeStr(val) {
   if (val == null) return null;
-  // Elimina caracteres especiales de RegEx y operadores Mongo ($)
   return String(val).replace(/[${}()|[\]\\^*+?./]/g, '').trim().slice(0, 100);
 }
 
@@ -129,17 +134,70 @@ export default async function handler(req, res) {
 
   /* ════════════════════════════════════════
      POST /api/foto?recurso=pedidos
+     ─────────────────────────────────────
+     Si el body trae `formulaMedica` (string base64 "data:<mime>;base64,<bytes>"):
+       1. Se extrae mime + buffer.
+       2. Se crea el pedido SIN el base64 en texto (se guarda como Buffer).
+       3. Se construye la URL pública con el _id del pedido recién creado.
+       4. Se escribe esa URL en pedido.formulaMedica.url con findByIdAndUpdate.
+       5. Se retorna el pedido con la URL ya incluida.
   ════════════════════════════════════════ */
   if (recurso === 'pedidos' && req.method === 'POST') {
     try {
-      const body = req.body || {};
+      const body = { ...(req.body || {}) };
       if (!body.idPedido)
-        return res.status(400).json({ ok: false, error: 'Falta idPedido en el body' });
-      body.idPedido = await siguienteId();
+        body.idPedido = await siguienteId();
 
+      /* ── Procesar fórmula médica si viene en el payload ── */
+      let formulaBuffer = null;
+      let formulaMime   = null;
 
+      if (body.formulaMedica && typeof body.formulaMedica === 'string') {
+        // Formato esperado: "data:image/jpeg;base64,/9j/4AAQ..."
+        const match = body.formulaMedica.match(/^data:([^;]+);base64,(.+)$/);
+        if (match) {
+          formulaMime   = match[1];                              // ej: "image/jpeg"
+          formulaBuffer = Buffer.from(match[2], 'base64');       // bytes binarios
+        }
+        // Quitar el base64 del body para no duplicarlo como string
+        delete body.formulaMedica;
+      }
+
+      /* Inyectar los bytes en el pedido (url se rellena después) */
+      if (formulaBuffer) {
+        body.formulaMedica = {
+          data: formulaBuffer,
+          mime: formulaMime,
+          url:  null,          // se actualiza justo después del create
+        };
+      }
+
+      /* Crear el pedido */
       const nuevo = await Pedido.create(body);
-      return res.status(201).json({ ok: true, data: nuevo });
+
+      /* ── Si había fórmula, construir URL y escribirla en el documento ── */
+      if (formulaBuffer) {
+        // La URL pública apunta al GET que sirve el buffer como imagen/pdf
+        const formulaUrl = `/api/foto?recurso=formula&id=${nuevo._id}`;
+
+        await Pedido.findByIdAndUpdate(nuevo._id, {
+          'formulaMedica.url': formulaUrl,
+        });
+
+        nuevo.formulaMedica = {
+          url:  formulaUrl,
+          mime: formulaMime,
+          // no devolvemos el buffer en la respuesta JSON
+        };
+      }
+
+      /* Respuesta: omitir el buffer binario para no saturar la red */
+      const respuesta = nuevo.toObject();
+      if (respuesta.formulaMedica?.data) {
+        delete respuesta.formulaMedica.data;
+      }
+
+      return res.status(201).json({ ok: true, data: respuesta });
     } catch (e) {
       if (e.code === 11000)
         return res.status(409).json({ ok: false, error: 'Pedido duplicado' });
@@ -149,39 +207,58 @@ export default async function handler(req, res) {
   }
 
   /* ════════════════════════════════════════
+     GET /api/foto?recurso=formula&id=<_id>
+     Sirve el archivo (imagen o PDF) de la fórmula médica
+     almacenada dentro del documento del pedido.
+  ════════════════════════════════════════ */
+  if (recurso === 'formula' && req.method === 'GET') {
+    try {
+      const { id } = req.query;
+      if (!id || !/^[a-f\d]{24}$/i.test(id))
+        return res.status(400).json({ ok: false, error: 'id inválido' });
+
+      const pedido = await Pedido.findById(id, { formulaMedica: 1 }).lean();
+      if (!pedido?.formulaMedica?.data)
+        return res.status(404).json({ ok: false, error: 'Fórmula no encontrada' });
+
+      const mime = pedido.formulaMedica.mime || 'image/jpeg';
+      let buf;
+      if (Buffer.isBuffer(pedido.formulaMedica.data)) {
+        buf = pedido.formulaMedica.data;
+      } else if (pedido.formulaMedica.data?.buffer) {
+        buf = Buffer.from(pedido.formulaMedica.data.buffer);
+      } else {
+        buf = Buffer.from(Object.values(pedido.formulaMedica.data));
+      }
+
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.status(200).send(buf);
+    } catch (e) {
+      console.error('[GET formula]', e.message);
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
+  /* ════════════════════════════════════════
      GET /api/foto?recurso=pedidos
-     Parámetros opcionales:
-       - idPedido : busca UNO por código exacto  ← NUEVO
-       - estado   : filtra por estado (o "todos")
-       - domi     : filtra por nombre domiciliario (regex)
-       - domiId   : filtra por idWil
-       - tipo     : filtra por modoEntrega
-       - limit    : máximo de resultados (default 300)
   ════════════════════════════════════════ */
   if (recurso === 'pedidos' && req.method === 'GET') {
     try {
       const {
-        estado,
-        domi,
-        domiId,
-        tipo,
-        limit = 300,
-        idPedido,           // ← nuevo parámetro
+        estado, domi, domiId, tipo,
+        limit = 300, idPedido,
       } = req.query;
 
       const filtro = {};
 
-      /* ── Búsqueda directa por idPedido ── */
       if (idPedido) {
         const idLimpio = sanitizeStr(idPedido);
         if (!idLimpio)
           return res.status(400).json({ ok: false, error: 'idPedido inválido' });
-
-        // Búsqueda exacta (case-insensitive por seguridad)
         filtro.idPedido = { $regex: new RegExp(`^${idLimpio}$`, 'i') };
       }
 
-      /* ── Filtro estado ── */
       if (estado && estado !== 'todos') {
         const estadoList = estado.split(',').map(s => sanitizeStr(s)).filter(Boolean);
         filtro.estado = estadoList.length === 1
@@ -189,45 +266,34 @@ export default async function handler(req, res) {
           : { $in: estadoList.map(s => new RegExp(`^${s}$`, 'i')) };
       }
 
-      /* ── Filtro domiciliario por nombre ── */
       if (domi) {
         const domiLimpio = sanitizeStr(domi);
         if (domiLimpio)
           filtro.domiciliarioNombre = { $regex: new RegExp(domiLimpio, 'i') };
       }
 
-      /* ── Filtro domiciliario por ID ── */
       if (domiId) {
         const idWilResuelto = await resolverIdWil(domiId);
         filtro.domiciliarioId = idWilResuelto ?? domiId;
       }
 
-      /* ── Filtro tipo entrega ── */
       if (tipo) {
         const tipoLimpio = sanitizeStr(tipo);
         if (tipoLimpio)
           filtro.modoEntrega = { $regex: new RegExp(tipoLimpio, 'i') };
       }
 
-      /* ── Filtro tipo entrega ── */
-if (tipo) {
-  const tipoLimpio = sanitizeStr(tipo);
-  if (tipoLimpio)
-    filtro.modoEntrega = { $regex: new RegExp(tipoLimpio, 'i') };
-}
+      if (req.query.sede) {
+        const sedeLimpia = sanitizeStr(req.query.sede);
+        if (sedeLimpia)
+          filtro.sede = { $regex: new RegExp(`^${sedeLimpia}$`, 'i') };
+      }
 
-/* ── Filtro por sede ── */   // ← NUEVO
-if (req.query.sede) {
-  const sedeLimpia = sanitizeStr(req.query.sede);
-  if (sedeLimpia)
-    filtro.sede = { $regex: new RegExp(`^${sedeLimpia}$`, 'i') };
-}
-
-      /* ── Límite seguro: entre 1 y 500 ── */
       const limitSeguro = Math.min(Math.max(Number(limit) || 300, 1), 500);
 
+      // Excluir el buffer binario de la fórmula en los listados
       const pedidos = await Pedido
-        .find(filtro)
+        .find(filtro, { 'formulaMedica.data': 0 })
         .sort({ creadoEn: -1 })
         .limit(limitSeguro)
         .lean();
@@ -390,7 +456,7 @@ if (req.query.sede) {
           domiciliarioId:     idWilResuelto,
           domiciliarioNombre: nombreFinal,
         },
-        { new: true }
+        { new: true, projection: { 'formulaMedica.data': 0 } }
       );
 
       if (!pedido)
@@ -431,7 +497,7 @@ if (req.query.sede) {
       const pedido = await Pedido.findOneAndUpdate(
         { idPedido: pedidoId },
         update,
-        { new: true }
+        { new: true, projection: { 'formulaMedica.data': 0 } }
       );
 
       if (!pedido)
@@ -473,6 +539,6 @@ if (req.query.sede) {
 
   return res.status(400).json({
     ok: false,
-    error: `Recurso no válido: "${recurso}". Usa: pedidos | domiciliarios | asignar | estado | foto | ubicacion-domi`,
+    error: `Recurso no válido: "${recurso}". Usa: pedidos | domiciliarios | asignar | estado | foto | formula | ubicacion-domi`,
   });
 }

@@ -5847,19 +5847,27 @@ console.log('[WIL] v6 ✅ — búsqueda estricta por substring, sin falsos posit
 
 
 <script>
-/* ══════════════════════════════════════════════════════════════════
-   WIL — FÓRMULA MÉDICA v2
-   Columna I (índice 8)  → Ofertas
-   Columna J (índice 9)  → Nuevo_Producto
-   Flujo: badge rojo en card → Agregar → Popup → foto/PDF → Guardar → carrito
-   Campo enviado al backend: urlFormula + formulaFileName
+ /* ══════════════════════════════════════════════════════════════════
+   WIL — FÓRMULA MÉDICA  v4
+   ───────────────────────────────────────────────────────────────
+   Cambios respecto a v3:
+   ① La receta YA NO se agrega como ítem ($0) al carrito.
+   ② Se muestra como un banner visual debajo del título "Mi pedido"
+      mediante wilMostrarBannerFormula() que inyecta/actualiza
+      un div #wil-fm-banner justo después del header del carrito.
+   ③ El campo en el payload BD cambia de urlFormula → formulaMedica
+      (y se elimina formulaFileName; el nombre va dentro del mismo
+      campo o se puede conservar opcionalmente).
+   ④ El filtro de rows/items en patchEnvio se simplifica porque
+      ya no hay ítem __formula_medica__ que limpiar.
+   ⑤ Resto de funciones idénticas a v3.
 ══════════════════════════════════════════════════════════════════ */
 
 /* ── Estado global ── */
-window._wilFormulaMap      = {};   // key → true/false
-window._wilFormulaAdjuntada = null; // { base64, fileName } al confirmar pedido
-var _fmPendiente            = null; // { key, desc, lab, precio } mientras popup abierto
-var _fmBase64               = null; // base64 del archivo seleccionado
+window._wilFormulaMap       = window._wilFormulaMap || {};
+window._wilFormulaAdjuntada = null;
+var _fmPendiente            = null;
+var _fmBase64               = null;
 var _fmFileName             = '';
 
 /* ── Normaliza "si/sí/yes/1/true" → true ── */
@@ -5868,12 +5876,12 @@ function _wilEsFormula(v) {
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   1. PATCH loadNuevoProducto — lee columna J (índice 9)
+   1. PATCH loadNuevoProducto — columna J (índice 9) = fórmula
 ══════════════════════════════════════════════════════════════════ */
 (function patchNP() {
   function doPatch() {
     if (typeof window.loadNuevoProducto !== 'function') return false;
-    if (window.loadNuevoProducto._fmv2) return true;
+    if (window.loadNuevoProducto._fmv4) return true;
 
     window.loadNuevoProducto = async function () {
       try {
@@ -5885,7 +5893,6 @@ function _wilEsFormula(v) {
         if (!text || text.trim().length < 5) throw new Error('Empty');
 
         var lines = text.trim().split('\n').slice(1).filter(Boolean);
-
         var grupos = {
           'pop-scroll':[],'dermo-scroll':[],'vit-scroll':[],'ped-scroll':[],
           'hig-scroll':[],'buc-scroll':[],'int-scroll':[],'bel-scroll':[],
@@ -5896,45 +5903,39 @@ function _wilEsFormula(v) {
         lines.forEach(function(line) {
           var cols = _parseCsvLineNP(line);
           var col  = function(i){ return (cols[i]||'').replace(/^"|"$/g,'').trim(); };
-
-          var id      = col(0);
-          var nombre  = col(1);
-          var lab     = col(2);
-          var precio  = col(3);
-          var desc    = col(4);
+          var id      = col(0), nombre = col(1), lab   = col(2);
+          var precio  = col(3), desc   = col(4);
           var estado  = _nrmSec(col(5));
           var seccion = col(6);
           var imagen  = col(8);
-          var formula = col(9); // ← columna J
+          var formula = col(9);
 
           if (!nombre) return;
-          if (estado && estado !== 'activo' && estado !== 'activa' && estado !== 'active' &&
-              estado !== 'si' && estado !== 'yes' && estado !== '1') return;
+          if (estado && !['activo','activa','active','si','yes','1'].includes(estado)) return;
 
           var scrollId = _SECCION_MAP[_nrmSec(seccion)];
           if (!scrollId) return;
 
-          var cacheKey       = 'np_raw_np_' + id.replace(/[^a-z0-9]/gi,'_');
-          var reqFormula     = _wilEsFormula(formula);
-          window._wilFormulaMap[cacheKey] = reqFormula;
-
+          var cacheKey  = 'np_raw_np_' + id.replace(/[^a-z0-9]/gi,'_');
+          var reqFM     = _wilEsFormula(formula);
+          window._wilFormulaMap[cacheKey] = reqFM;
           var precioNum = _parsePrecioNP(precio);
+
           cache[cacheKey] = {
             desc: nombre, lab: lab, unidad: desc,
             precio: precioNum, pUnit: precioNum,
-            imagen: imagen, key: cacheKey, formula: reqFormula
+            imagen: imagen, key: cacheKey, formula: reqFM
           };
 
           grupos[scrollId].push({
             id: id, nombre: nombre, laboratorio: lab,
-            precio: precio, descripcion: desc, imagen: imagen,
-            formula: reqFormula
+            precio: precio, descripcion: desc, imagen: imagen, formula: reqFM
           });
 
           _searchAllData.push({
             desc: nombre, lab: lab, unidad: desc,
             precio: precioNum, pUnit: precioNum,
-            imagen: imagen, key: cacheKey, formula: reqFormula
+            imagen: imagen, key: cacheKey, formula: reqFM
           });
         });
 
@@ -5944,37 +5945,34 @@ function _wilEsFormula(v) {
           'var-scroll':4,'ins-scroll':7,'otc-scroll':10,'leches-scroll':11,
           'derm-scroll':2,'gen-scroll':4
         };
-
         Object.keys(grupos).forEach(function(sid){
           if (grupos[sid].length) _wilRenderScroll(sid, grupos[sid].reverse(), offsets[sid]||0);
         });
 
-      } catch(e) {
-        console.warn('[FM-NP]', e.message);
-      }
+      } catch(e) { console.warn('[FM-NP v4]', e.message); }
     };
 
-    window.loadNuevoProducto._fmv2 = true;
+    window.loadNuevoProducto._fmv4 = true;
     return true;
   }
 
   if (!doPatch()) {
     var t = setInterval(function(){ if(doPatch()) clearInterval(t); }, 150);
+    setTimeout(function(){ clearInterval(t); }, 15000);
   }
 })();
 
 /* ══════════════════════════════════════════════════════════════════
-   2. PATCH loadOfertasCarrusel — lee columna I (índice 8)
+   2. PATCH loadOfertasCarrusel — columna I (índice 8) = fórmula
 ══════════════════════════════════════════════════════════════════ */
 (function patchOfertas() {
   function doPatch() {
     if (typeof window.loadOfertasCarrusel !== 'function') return false;
-    if (window.loadOfertasCarrusel._fmv2) return true;
+    if (window.loadOfertasCarrusel._fmv4) return true;
 
     window.loadOfertasCarrusel = async function () {
       var wrap    = document.getElementById('promos-wrap');
       var loading = document.getElementById('promos-loading');
-
       if (wrap) wrap.querySelectorAll('.promo-track').forEach(function(t){ t.remove(); });
       if (loading) loading.style.display = 'flex';
 
@@ -5987,7 +5985,6 @@ function _wilEsFormula(v) {
         if (!text || text.trim().length < 5) throw new Error('Empty');
 
         var lines = text.trim().split('\n').slice(1).filter(Boolean);
-
         var ofertas = lines.map(function(line){
           var cols=[], cur='', inQ=false;
           for(var i=0;i<line.length;i++){
@@ -6001,11 +5998,10 @@ function _wilEsFormula(v) {
           return {
             id:     col(0), nombre: col(1), lab:    col(2),
             precio: col(3), desc:   col(4), estado: col(5)||'activa',
-            img:    col(7), formula: col(8) // ← columna I
+            img:    col(7), formula: col(8)
           };
         }).filter(function(o){ return o.id && o.estado==='activa'; }).reverse();
 
-        // Registrar en mapa y marcar objeto
         ofertas.forEach(function(o){
           var uid = 'of_' + (o.id||'').toString().replace(/[^a-z0-9]/gi,'_');
           var fm  = _wilEsFormula(o.formula);
@@ -6017,7 +6013,7 @@ function _wilEsFormula(v) {
         renderOfertasCarrusel(ofertas);
 
       } catch(e) {
-        console.warn('[FM-Ofertas]', e.message);
+        console.warn('[FM-Ofertas v4]', e.message);
         if (loading) loading.style.display = 'none';
         var hayTracks = wrap ? wrap.querySelectorAll('.promo-track').length > 0 : false;
         if (!hayTracks) {
@@ -6027,12 +6023,13 @@ function _wilEsFormula(v) {
       }
     };
 
-    window.loadOfertasCarrusel._fmv2 = true;
+    window.loadOfertasCarrusel._fmv4 = true;
     return true;
   }
 
   if (!doPatch()) {
     var t = setInterval(function(){ if(doPatch()) clearInterval(t); }, 150);
+    setTimeout(function(){ clearInterval(t); }, 15000);
   }
 })();
 
@@ -6042,93 +6039,78 @@ function _wilEsFormula(v) {
 (function patchRenderOfertas() {
   function doPatch() {
     if (typeof window.renderOfertasCarrusel !== 'function') return false;
-    if (window.renderOfertasCarrusel._fmv2) return true;
+    if (window.renderOfertasCarrusel._fmv4) return true;
 
     var _orig = window.renderOfertasCarrusel;
-
     window.renderOfertasCarrusel = function(ofertas) {
-      // Llamar al original primero
       _orig.call(this, ofertas);
-
-      // Post-proceso: inyectar badges y parchear botones Agregar
       setTimeout(function(){
         var track = document.getElementById('promos-track');
         if (!track) return;
-
-        // Las cards están en orden — iterar por índice
-        var cardEls = track.children; // divs de cada oferta
+        var cardEls = track.children;
         ofertas.forEach(function(o, i){
           if (!o._requiresFormula) return;
           var card = cardEls[i];
           if (!card) return;
+          var uid    = 'of_' + (o.id||i).toString().replace(/[^a-z0-9]/gi,'_');
+          var addKey = 'oferta_' + uid;
+          var precio = typeof _parseCOP === 'function' ? _parseCOP(o.precio)
+            : parseFloat((o.precio||'').replace(/[^0-9]/g,''))||0;
 
-          var uid     = 'of_' + (o.id||i).toString().replace(/[^a-z0-9]/gi,'_');
-          var addKey  = 'oferta_' + uid;
-          var precio  = _parseCOP ? _parseCOP(o.precio) : parseFloat((o.precio||'').replace(/[^0-9]/g,''))||0;
-
-          // Badge fórmula en zona imagen
           var imgZone = card.querySelector('div[style*="height:180px"]');
           if (imgZone && !imgZone.querySelector('.wil-fm-badge')) {
             imgZone.style.position = 'relative';
             var badge = document.createElement('div');
             badge.className = 'wil-fm-badge';
-            badge.style.cssText =
-              'position:absolute;bottom:8px;left:8px;z-index:6;' +
-              'display:flex;align-items:center;gap:4px;' +
-              'background:rgba(220,38,38,.92);color:#fff;font-size:7px;font-weight:900;' +
-              'text-transform:uppercase;letter-spacing:.05em;padding:3px 8px;' +
-              'border-radius:99px;box-shadow:0 2px 8px rgba(220,38,38,.45);' +
-              'white-space:nowrap;pointer-events:none;line-height:1;';
+            badge.style.cssText = 'position:absolute;bottom:8px;left:8px;z-index:6;' +
+              'display:flex;align-items:center;gap:4px;background:rgba(220,38,38,.92);' +
+              'color:#fff;font-size:7px;font-weight:900;text-transform:uppercase;' +
+              'letter-spacing:.05em;padding:3px 8px;border-radius:99px;' +
+              'box-shadow:0 2px 8px rgba(220,38,38,.45);white-space:nowrap;' +
+              'pointer-events:none;line-height:1;';
             badge.innerHTML = '💊 Venta bajo fórmula médica';
             imgZone.appendChild(badge);
           }
 
-          // Parchear botón Agregar
           var btn = card.querySelector('button[onclick*="sadd"]');
           if (btn) {
             btn.setAttribute('onclick',
               'wilSaddConFormula(\'' + _escJSN(addKey) + '\',\'' +
               _escJSN(o.nombre) + '\',\'' + _escJSN(o.lab||'') + '\',' +
-              precio + ',true)'
-            );
+              precio + ',true)');
           }
         });
       }, 80);
     };
-
-    window.renderOfertasCarrusel._fmv2 = true;
+    window.renderOfertasCarrusel._fmv4 = true;
     return true;
   }
 
   if (!doPatch()) {
     var t = setInterval(function(){ if(doPatch()) clearInterval(t); }, 150);
-    setTimeout(function(){ clearInterval(t); }, 10000);
+    setTimeout(function(){ clearInterval(t); }, 15000);
   }
 })();
 
 /* ══════════════════════════════════════════════════════════════════
-   4. PATCH renderResults (búsqueda) — badge + botón con popup
+   4. PATCH renderResults — badge + botón con popup
 ══════════════════════════════════════════════════════════════════ */
 (function patchResults() {
   function doPatch() {
     if (typeof window.renderResults !== 'function') return false;
-    if (window.renderResults._fmv2) return true;
-
+    if (window.renderResults._fmv4) return true;
     var _orig = window.renderResults;
     window.renderResults = function(items, q) {
-      // Marcar formula en items antes de renderizar
       items.forEach(function(it){
         if (it.formula === undefined)
           it.formula = !!window._wilFormulaMap[it.key];
       });
       _orig.call(this, items, q);
-      // Post-proceso badges y botones
       setTimeout(function(){ _wilPatchGrid(items); }, 80);
     };
-    window.renderResults._fmv2 = true;
+    window.renderResults._fmv4 = true;
     return true;
   }
-
   if (!doPatch()) {
     var t = setInterval(function(){ if(doPatch()) clearInterval(t); }, 150);
   }
@@ -6137,17 +6119,14 @@ function _wilEsFormula(v) {
 function _wilPatchGrid(items) {
   var grid = document.getElementById('res-grid');
   if (!grid) return;
-
-  // Construir mapa key → item para acceso rápido
   var itemMap = {};
   (items||[]).forEach(function(it){ if(it.key) itemMap[it.key] = it; });
 
   grid.querySelectorAll('article').forEach(function(art){
-    // Extraer key del botón agregar
     var btn = art.querySelector('button[onclick*="addToCart"], button[onclick*="sadd"], button[onclick*="wilSadd"]');
     if (!btn) return;
-    var oc  = btn.getAttribute('onclick') || '';
-    var m   = oc.match(/['"]([^'"]+)['"]/);
+    var oc = btn.getAttribute('onclick') || '';
+    var m  = oc.match(/['"]([^'"]+)['"]/);
     var key = m ? m[1] : null;
     if (!key) return;
 
@@ -6155,36 +6134,32 @@ function _wilPatchGrid(items) {
     var fm = it ? (it.formula || window._wilFormulaMap[key]) : window._wilFormulaMap[key];
     if (!fm) return;
 
-    // Badge en zona imagen
     var imgZone = art.querySelector('div[style*="height:130px"], div[style*="height:180px"], div[style*="height:110px"]');
     if (imgZone && !imgZone.querySelector('.wil-fm-badge')) {
       imgZone.style.position = 'relative';
       var badge = document.createElement('div');
       badge.className = 'wil-fm-badge';
-      badge.style.cssText =
-        'position:absolute;bottom:6px;left:8px;z-index:6;' +
-        'display:flex;align-items:center;gap:4px;' +
-        'background:rgba(220,38,38,.92);color:#fff;font-size:7px;font-weight:900;' +
-        'text-transform:uppercase;letter-spacing:.04em;padding:3px 7px;' +
-        'border-radius:99px;box-shadow:0 2px 6px rgba(220,38,38,.4);' +
-        'white-space:nowrap;pointer-events:none;line-height:1;';
+      badge.style.cssText = 'position:absolute;bottom:6px;left:8px;z-index:6;' +
+        'display:flex;align-items:center;gap:4px;background:rgba(220,38,38,.92);' +
+        'color:#fff;font-size:7px;font-weight:900;text-transform:uppercase;' +
+        'letter-spacing:.04em;padding:3px 7px;border-radius:99px;' +
+        'box-shadow:0 2px 6px rgba(220,38,38,.4);white-space:nowrap;' +
+        'pointer-events:none;line-height:1;';
       badge.innerHTML = '💊 Fórmula médica';
       imgZone.appendChild(badge);
     }
 
-    // Parchear botón
-    var desc  = it ? it.desc  : '';
-    var lab   = it ? it.lab   : '';
-    var pr    = it ? (it.precio||it.pUnit||0) : 0;
+    var desc = it ? it.desc  : '';
+    var lab  = it ? it.lab   : '';
+    var pr   = it ? (it.precio||it.pUnit||0) : 0;
     btn.setAttribute('onclick',
       'wilSaddConFormula(\'' + _escJSN(key) + '\',\'' +
-      _escJSN(desc) + '\',\'' + _escJSN(lab) + '\',' + pr + ',true)'
-    );
+      _escJSN(desc) + '\',\'' + _escJSN(lab) + '\',' + pr + ',true)');
   });
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   5. _wilRenderScroll — render de secciones con badge fórmula
+   5. _wilRenderScroll — secciones con badge fórmula
 ══════════════════════════════════════════════════════════════════ */
 function _wilRenderScroll(scrollId, productos, colorOffset) {
   var container = document.getElementById(scrollId);
@@ -6210,11 +6185,11 @@ function _wilRenderScroll(scrollId, productos, colorOffset) {
 
     var fmBadge = reqFM
       ? '<div style="position:absolute;bottom:8px;left:8px;z-index:6;' +
-        'display:flex;align-items:center;gap:4px;' +
-        'background:rgba(220,38,38,.92);color:#fff;font-size:7px;font-weight:900;' +
-        'text-transform:uppercase;letter-spacing:.05em;padding:3px 8px;border-radius:99px;' +
-        'box-shadow:0 2px 8px rgba(220,38,38,.45);white-space:nowrap;pointer-events:none;line-height:1;">' +
-        '💊 Venta bajo fórmula médica</div>'
+        'display:flex;align-items:center;gap:4px;background:rgba(220,38,38,.92);' +
+        'color:#fff;font-size:7px;font-weight:900;text-transform:uppercase;' +
+        'letter-spacing:.05em;padding:3px 8px;border-radius:99px;' +
+        'box-shadow:0 2px 8px rgba(220,38,38,.45);white-space:nowrap;' +
+        'pointer-events:none;line-height:1;">💊 Venta bajo fórmula médica</div>'
       : '';
 
     var btnOnclick = reqFM
@@ -6239,15 +6214,13 @@ function _wilRenderScroll(scrollId, productos, colorOffset) {
             'font-size:7.5px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;' +
             'padding:2px 7px;border-radius:99px;max-width:90px;overflow:hidden;' +
             'text-overflow:ellipsis;white-space:nowrap;">' +
-            _escHTML(p.laboratorio||'Genérico') +
-          '</div>' +
+            _escHTML(p.laboratorio||'Genérico') + '</div>' +
           '<button onclick="abrirPopupSheet(\'' + _escJSN(cacheKey) + '\')"' +
             ' style="position:absolute;bottom:7px;right:8px;width:26px;height:26px;' +
             'border-radius:50%;border:none;cursor:pointer;background:' + c1 + ';' +
             'display:flex;align-items:center;justify-content:center;' +
             'box-shadow:0 2px 8px rgba(0,0,0,.25);">' +
-            '<span class="sym" style="font-size:14px;color:#fff">zoom_in</span>' +
-          '</button>' +
+            '<span class="sym" style="font-size:14px;color:#fff">zoom_in</span></button>' +
           fmBadge +
         '</div>' +
         '<div class="ocard-body">' +
@@ -6258,8 +6231,7 @@ function _wilRenderScroll(scrollId, productos, colorOffset) {
             '<button class="ocard-add"' +
               ' style="background:' + c1 + ';box-shadow:0 2px 8px ' + c1 + '44;"' +
               ' onclick="' + btnOnclick + '">' +
-              '<span class="sym symf" style="font-size:13px">add</span>Agregar' +
-            '</button>' +
+              '<span class="sym symf" style="font-size:13px">add</span>Agregar</button>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -6270,64 +6242,73 @@ function _wilRenderScroll(scrollId, productos, colorOffset) {
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   6. wilSaddConFormula — intercepta Agregar
+   6. wilSaddConFormula — intercepta el Agregar
 ══════════════════════════════════════════════════════════════════ */
 function wilSaddConFormula(key, desc, lab, precio, requiresFormula) {
   if (!requiresFormula) {
     sadd(key, desc, lab, precio, null);
     return;
   }
-  // Guardar producto pendiente y abrir popup
   _fmPendiente = { key: key, desc: desc, lab: lab, precio: precio };
   _wilAbrirPopupFM();
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   7. POPUP FÓRMULA MÉDICA
+   7. POPUP FÓRMULA MÉDICA  v4  (sin cambios respecto a v3)
 ══════════════════════════════════════════════════════════════════ */
 function _wilAbrirPopupFM() {
   _fmBase64   = null;
   _fmFileName = '';
 
+  if (!document.getElementById('wil-fm-style')) {
+    var s = document.createElement('style');
+    s.id = 'wil-fm-style';
+    s.textContent =
+      '#wil-fm-ov{position:fixed;inset:0;z-index:99999;' +
+      'background:rgba(0,0,0,.65);backdrop-filter:blur(7px);' +
+      'display:flex;align-items:center;justify-content:center;' +
+      'padding:20px;}' +
+      '#wil-fm-label{display:block;cursor:pointer;' +
+      'border:2px dashed #fca5a5;border-radius:14px;' +
+      'padding:22px 14px;background:#fff5f5;text-align:center;' +
+      'position:relative;overflow:hidden;' +
+      'transition:border-color .2s,background .2s;}' +
+      '#wil-fm-label.ok{border-color:#86efac;background:#f0fdf4;}' +
+      '#wil-fm-inp{position:absolute;inset:0;width:100%;height:100%;' +
+      'opacity:0;cursor:pointer;z-index:5;font-size:16px;}' +
+      '#wil-fm-guardar:not([disabled]){opacity:1!important;cursor:pointer!important;}';
+    document.head.appendChild(s);
+  }
+
   var ov = document.getElementById('wil-fm-ov');
   if (!ov) {
     ov = document.createElement('div');
     ov.id = 'wil-fm-ov';
-    ov.onclick = function(e){ if(e.target===ov) _wilCerrarFM(); };
+    ov.addEventListener('click', function(e){
+      if (e.target === ov) _wilCerrarFM();
+    });
     document.body.appendChild(ov);
   }
-
-  ov.style.cssText =
-    'position:fixed;inset:0;z-index:99999;' +
-    'background:rgba(0,0,0,.65);backdrop-filter:blur(7px);' +
-    'display:flex;align-items:center;justify-content:center;' +
-    'padding:20px;animation:fadeScaleIn .22s ease';
+  ov.style.display = 'flex';
 
   ov.innerHTML =
     '<div style="background:#fff;border-radius:24px;width:100%;max-width:360px;' +
     'box-shadow:0 24px 64px rgba(0,0,0,.35);overflow:hidden;position:relative;">' +
 
-      /* ── HEADER ── */
       '<div style="background:linear-gradient(135deg,#b91c1c,#dc2626,#ef4444);' +
       'padding:22px 20px 18px;position:relative;overflow:hidden;">' +
         '<div style="position:absolute;width:110px;height:110px;border-radius:50%;' +
         'background:rgba(255,255,255,.07);right:-25px;top:-35px;pointer-events:none"></div>' +
-        '<div style="position:absolute;width:65px;height:65px;border-radius:50%;' +
-        'background:rgba(255,255,255,.06);left:-15px;bottom:-22px;pointer-events:none"></div>' +
-
         '<button onclick="_wilCerrarFM()" style="position:absolute;top:12px;right:12px;' +
         'width:30px;height:30px;border-radius:50%;border:none;' +
         'background:rgba(255,255,255,.2);cursor:pointer;' +
         'display:flex;align-items:center;justify-content:center;z-index:2;">' +
-          '<span class="sym" style="font-size:16px;color:#fff">close</span>' +
-        '</button>' +
-
+          '<span class="sym" style="font-size:16px;color:#fff">close</span></button>' +
         '<div style="display:flex;align-items:center;gap:13px;position:relative;z-index:1;">' +
           '<div style="width:50px;height:50px;border-radius:16px;' +
           'background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.3);' +
           'display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
-            '<span class="sym symf" style="font-size:26px;color:#fff">vaccines</span>' +
-          '</div>' +
+            '<span class="sym symf" style="font-size:26px;color:#fff">vaccines</span></div>' +
           '<div>' +
             '<div style="font-family:\'Manrope\',sans-serif;font-size:16px;font-weight:900;' +
             'color:#fff;line-height:1.2;">Fórmula médica</div>' +
@@ -6337,33 +6318,24 @@ function _wilAbrirPopupFM() {
         '</div>' +
       '</div>' +
 
-      /* ── BODY ── */
       '<div style="padding:18px 20px 20px;">' +
 
-        /* Aviso */
         '<div style="background:#fff5f5;border:1.5px solid #fecaca;border-radius:13px;' +
         'padding:12px 13px;margin-bottom:16px;' +
         'display:flex;align-items:flex-start;gap:9px;">' +
-          '<span class="sym symf" style="font-size:19px;color:#dc2626;flex-shrink:0;margin-top:1px">info</span>' +
+          '<span class="sym symf" style="font-size:19px;color:#dc2626;flex-shrink:0;' +
+          'margin-top:1px">info</span>' +
           '<div style="font-size:12px;color:#7f1d1d;line-height:1.55;font-weight:500;">' +
             'Este medicamento se vende <strong>únicamente con fórmula médica vigente</strong>. ' +
             'Adjunta una foto legible o PDF de la receta para continuar.' +
           '</div>' +
         '</div>' +
 
-        /* Zona de carga */
-        '<div id="wil-fm-zone" onclick="document.getElementById(\'wil-fm-inp\').click()"' +
-        ' style="border:2px dashed #fca5a5;border-radius:14px;' +
-        'padding:22px 14px;background:#fff5f5;cursor:pointer;text-align:center;' +
-        'position:relative;overflow:hidden;margin-bottom:16px;' +
-        'transition:border-color .2s,background .2s;">' +
+        '<label id="wil-fm-label" for="wil-fm-inp" style="margin-bottom:16px;">' +
+          '<input type="file" id="wil-fm-inp"' +
+          '  accept="image/*,application/pdf"' +
+          '  onchange="wilOnFMFile(this)">' +
 
-          '<input id="wil-fm-inp" type="file" accept="image/*,application/pdf"' +
-          ' style="position:absolute;inset:0;width:100%;height:100%;' +
-          'opacity:0;cursor:pointer;z-index:4;font-size:0;"' +
-          ' onchange="wilOnFMFile(this)">' +
-
-          /* idle */
           '<div id="wil-fm-idle">' +
             '<span class="sym symf" style="font-size:44px;color:#fca5a5;' +
             'display:block;margin-bottom:8px;">upload_file</span>' +
@@ -6372,7 +6344,6 @@ function _wilAbrirPopupFM() {
             '<div style="font-size:11px;color:#9ca3af;">Foto legible o PDF · máx 8 MB</div>' +
           '</div>' +
 
-          /* spinner */
           '<div id="wil-fm-spin" style="display:none;padding:6px 0;">' +
             '<div style="display:flex;flex-direction:column;align-items:center;gap:8px;">' +
               '<div style="width:26px;height:26px;border:3px solid #fecaca;' +
@@ -6382,55 +6353,51 @@ function _wilAbrirPopupFM() {
             '</div>' +
           '</div>' +
 
-          /* resultado */
           '<div id="wil-fm-ok" style="display:none;">' +
             '<div style="display:flex;align-items:center;gap:11px;text-align:left;">' +
-
               '<div id="wil-fm-ico" style="width:58px;height:58px;border-radius:12px;' +
               'overflow:hidden;flex-shrink:0;border:2px solid #86efac;' +
               'background:#f0fdf4;display:flex;align-items:center;justify-content:center;">' +
                 '<span class="sym symf" style="font-size:28px;color:#15803d;">description</span>' +
               '</div>' +
-
               '<div style="flex:1;min-width:0;">' +
-                '<div style="font-size:10px;font-weight:800;color:#15803d;' +
-                'background:#dcfce7;display:inline-flex;align-items:center;gap:4px;' +
-                'padding:2px 9px;border-radius:99px;margin-bottom:6px;">' +
+                '<div style="font-size:10px;font-weight:800;color:#15803d;background:#dcfce7;' +
+                'display:inline-flex;align-items:center;gap:4px;padding:2px 9px;' +
+                'border-radius:99px;margin-bottom:6px;">' +
                   '<span class="sym symf" style="font-size:12px;">check_circle</span>' +
                   'Fórmula adjuntada' +
                 '</div>' +
                 '<div id="wil-fm-name" style="font-size:11.5px;font-weight:700;' +
                 'color:#111827;line-height:1.35;word-break:break-all;"></div>' +
-                '<button onclick="wilResetFM()" style="margin-top:6px;border:none;' +
-                'background:none;cursor:pointer;font-size:10.5px;font-weight:700;' +
-                'color:#6b7280;display:flex;align-items:center;gap:3px;' +
-                'padding:0;position:relative;z-index:5;">' +
+                '<button type="button" onclick="event.preventDefault();event.stopPropagation();wilResetFM()"' +
+                '  style="margin-top:6px;border:none;background:none;cursor:pointer;' +
+                '  font-size:10.5px;font-weight:700;color:#6b7280;' +
+                '  display:flex;align-items:center;gap:3px;padding:0;' +
+                '  position:relative;z-index:10;">' +
                   '<span class="sym" style="font-size:13px;">refresh</span> Cambiar archivo' +
                 '</button>' +
               '</div>' +
             '</div>' +
           '</div>' +
 
-        '</div>' + /* /zone */
+        '</label>' +
 
-        /* Botones */
         '<div style="display:flex;gap:8px;">' +
-          '<button onclick="_wilCerrarFM()" style="flex:1;background:#f3f4f6;color:#6b7280;' +
-          'border:none;border-radius:13px;padding:13px;' +
-          'font-family:\'Manrope\',sans-serif;font-size:13px;font-weight:700;cursor:pointer;">' +
-            'Cancelar' +
-          '</button>' +
-          '<button id="wil-fm-guardar" onclick="wilGuardarConFormula()" disabled' +
-          ' style="flex:2;background:#dc2626;color:#fff;border:none;border-radius:13px;' +
-          'padding:13px;font-family:\'Manrope\',sans-serif;font-size:13px;font-weight:800;' +
-          'cursor:pointer;opacity:.4;transition:opacity .2s;' +
-          'display:flex;align-items:center;justify-content:center;gap:7px;">' +
+          '<button type="button" onclick="_wilCerrarFM()"' +
+          '  style="flex:1;background:#f3f4f6;color:#6b7280;border:none;border-radius:13px;' +
+          '  padding:13px;font-family:\'Manrope\',sans-serif;font-size:13px;' +
+          '  font-weight:700;cursor:pointer;">Cancelar</button>' +
+          '<button type="button" id="wil-fm-guardar" onclick="wilGuardarConFormula()" disabled' +
+          '  style="flex:2;background:#dc2626;color:#fff;border:none;border-radius:13px;' +
+          '  padding:13px;font-family:\'Manrope\',sans-serif;font-size:13px;font-weight:800;' +
+          '  cursor:pointer;opacity:.4;transition:opacity .2s;' +
+          '  display:flex;align-items:center;justify-content:center;gap:7px;">' +
             '<span class="sym symf" style="font-size:16px;">add_shopping_cart</span>' +
             'Guardar y agregar' +
           '</button>' +
         '</div>' +
 
-      '</div>' + /* /body */
+      '</div>' +
     '</div>';
 
   document.body.style.overflow = 'hidden';
@@ -6444,7 +6411,6 @@ function _wilCerrarFM() {
   _fmBase64    = null;
 }
 
-/* ── Archivo seleccionado ── */
 function wilOnFMFile(input) {
   var file = input.files[0];
   if (!file) return;
@@ -6453,90 +6419,522 @@ function wilOnFMFile(input) {
     return;
   }
 
-  document.getElementById('wil-fm-idle').style.display = 'none';
-  document.getElementById('wil-fm-spin').style.display = 'block';
-  document.getElementById('wil-fm-ok').style.display   = 'none';
   _fmFileName = file.name;
+
+  var idle = document.getElementById('wil-fm-idle');
+  var spin = document.getElementById('wil-fm-spin');
+  var ok   = document.getElementById('wil-fm-ok');
+  if (idle) idle.style.display = 'none';
+  if (spin) spin.style.display = 'block';
+  if (ok)   ok.style.display   = 'none';
 
   var reader = new FileReader();
   reader.onload = function(e) {
     _fmBase64 = e.target.result;
 
-    document.getElementById('wil-fm-spin').style.display = 'none';
-    document.getElementById('wil-fm-ok').style.display   = 'block';
-    document.getElementById('wil-fm-name').textContent   = file.name;
+    if (spin) spin.style.display = 'none';
+    if (ok)   ok.style.display   = 'block';
 
-    /* Miniatura */
+    var nameEl = document.getElementById('wil-fm-name');
+    if (nameEl) nameEl.textContent = file.name;
+
     var ico = document.getElementById('wil-fm-ico');
-    if (file.type.startsWith('image/')) {
-      ico.innerHTML = '<img src="' + e.target.result + '" ' +
-        'style="width:100%;height:100%;object-fit:cover;">';
-    } else {
-      ico.innerHTML = '<span class="sym symf" ' +
-        'style="font-size:28px;color:#dc2626;">picture_as_pdf</span>';
+    if (ico) {
+      ico.innerHTML = file.type.startsWith('image/')
+        ? '<img src="' + e.target.result + '" style="width:100%;height:100%;object-fit:cover;">'
+        : '<span class="sym symf" style="font-size:28px;color:#dc2626;">picture_as_pdf</span>';
     }
 
-    /* Zona verde */
-    var zone = document.getElementById('wil-fm-zone');
-    zone.style.borderColor = '#86efac';
-    zone.style.background  = '#f0fdf4';
+    var label = document.getElementById('wil-fm-label');
+    if (label) label.classList.add('ok');
 
-    /* Activar botón */
     var btn = document.getElementById('wil-fm-guardar');
-    btn.disabled      = false;
-    btn.style.opacity = '1';
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
   };
   reader.readAsDataURL(file);
 }
 
-/* ── Reset archivo ── */
 function wilResetFM() {
   _fmBase64 = null;
   var inp = document.getElementById('wil-fm-inp');
   if (inp) inp.value = '';
 
-  document.getElementById('wil-fm-idle').style.display = 'block';
-  document.getElementById('wil-fm-ok').style.display   = 'none';
+  var idle = document.getElementById('wil-fm-idle');
+  var ok   = document.getElementById('wil-fm-ok');
+  if (idle) idle.style.display = 'block';
+  if (ok)   ok.style.display   = 'none';
 
-  var zone = document.getElementById('wil-fm-zone');
-  zone.style.borderColor = '#fca5a5';
-  zone.style.background  = '#fff5f5';
+  var label = document.getElementById('wil-fm-label');
+  if (label) label.classList.remove('ok');
 
   var btn = document.getElementById('wil-fm-guardar');
-  btn.disabled = true; btn.style.opacity = '.4';
+  if (btn) { btn.disabled = true; btn.style.opacity = '.4'; }
 }
 
-/* ── Guardar → carrito ── */
+/* ══════════════════════════════════════════════════════════════════
+   8. wilGuardarConFormula — agrega al carrito + banner en "Mi pedido"
+   CAMBIO v4:
+   · Ya NO se inserta el ítem __formula_medica__ en cart{}.
+   · Se llama a wilMostrarBannerFormula() para mostrar la receta
+     como banner visual debajo del header del panel de carrito.
+══════════════════════════════════════════════════════════════════ */
 function wilGuardarConFormula() {
   if (!_fmBase64 || !_fmPendiente) return;
 
-  /* Guardar fórmula para enviarla con el pedido */
+  /* Guardar en global para que coEnviarPedido lo envíe */
   window._wilFormulaAdjuntada = {
     base64:   _fmBase64,
     fileName: _fmFileName || 'formula.jpg'
   };
+  /* Globals que usa el checkout de transferencia */
+  window._comprobanteBase64  = _fmBase64;
+  window._comprobanteVerif   = true;
 
   /* Cerrar popup */
   var ov = document.getElementById('wil-fm-ov');
   if (ov) ov.style.display = 'none';
   document.body.style.overflow = '';
 
-  /* Agregar al carrito */
   var p = _fmPendiente;
   _fmPendiente = null;
+
+  /* Agregar el producto al carrito */
   sadd(p.key, p.desc, p.lab, p.precio, null);
+
+  /* Mostrar banner de receta en el panel del carrito */
+  wilMostrarBannerFormula(_fmFileName || 'formula.jpg', _fmBase64);
+
+  /* Reset local */
+  _fmBase64   = null;
+  _fmFileName = '';
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   8. PATCH coEnviarPedido — inyecta urlFormula en el payload
+   8b. wilMostrarBannerFormula
+   Inyecta (o actualiza) el banner de fórmula adjunta justo debajo
+   del header "Mi pedido" dentro del panel lateral del carrito.
+   Incluye botón "Ver" que abre un visor lightbox profesional con
+   zoom (+/-), pan con drag y botón cerrar.
+══════════════════════════════════════════════════════════════════ */
+
+/* ── Estilos del banner + visor (se inyectan una sola vez) ── */
+(function _wilInjectViewerStyles() {
+  if (document.getElementById('wil-viewer-style')) return;
+  var s = document.createElement('style');
+  s.id = 'wil-viewer-style';
+  s.textContent = [
+    /* ── Banner ── */
+    '#wil-fm-banner {',
+    '  margin: 0 12px 12px;',
+    '  border-radius: 16px;',
+    '  overflow: hidden;',
+    '  box-shadow: 0 2px 12px rgba(220,38,38,.10);',
+    '  border: 1.5px solid #fecaca;',
+    '  background: #fff;',
+    '  animation: wilBannerIn .35s cubic-bezier(.34,1.56,.64,1) both;',
+    '}',
+    '@keyframes wilBannerIn {',
+    '  from { opacity:0; transform:translateY(-8px) scale(.97); }',
+    '  to   { opacity:1; transform:translateY(0)    scale(1);   }',
+    '}',
+    '#wil-fm-banner .wfb-header {',
+    '  display: flex; align-items: center; gap: 10px;',
+    '  padding: 10px 12px 9px;',
+    '  background: linear-gradient(135deg,#fff5f5 0%,#fff 100%);',
+    '  border-bottom: 1px solid #fee2e2;',
+    '}',
+    '#wil-fm-banner .wfb-thumb {',
+    '  width: 44px; height: 44px; border-radius: 10px;',
+    '  object-fit: cover; flex-shrink: 0;',
+    '  border: 2px solid #fca5a5;',
+    '  background: #fee2e2;',
+    '  display: flex; align-items: center; justify-content: center;',
+    '  overflow: hidden;',
+    '}',
+    '#wil-fm-banner .wfb-thumb img { width:100%; height:100%; object-fit:cover; display:block; }',
+    '#wil-fm-banner .wfb-info { flex:1; min-width:0; }',
+    '#wil-fm-banner .wfb-pill {',
+    '  display: inline-flex; align-items: center; gap: 4px;',
+    '  font-size: 9.5px; font-weight: 800; color: #dc2626;',
+    '  background: #fee2e2; padding: 2px 8px; border-radius: 99px;',
+    '  text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px;',
+    '  line-height: 1.4;',
+    '}',
+    '#wil-fm-banner .wfb-name {',
+    '  font-size: 11px; font-weight: 600; color: #374151;',
+    '  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;',
+    '}',
+    '#wil-fm-banner .wfb-actions {',
+    '  display: flex; align-items: center; gap: 6px;',
+    '  padding: 8px 12px;',
+    '  background: #fafafa;',
+    '}',
+    '#wil-fm-banner .wfb-btn-ver {',
+    '  flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;',
+    '  background: linear-gradient(135deg,#dc2626,#ef4444);',
+    '  color: #fff; border: none; border-radius: 10px;',
+    '  padding: 8px 0; font-size: 12px; font-weight: 800;',
+    '  cursor: pointer; letter-spacing: .01em;',
+    '  box-shadow: 0 2px 8px rgba(220,38,38,.3);',
+    '  transition: transform .15s, box-shadow .15s;',
+    '}',
+    '#wil-fm-banner .wfb-btn-ver:active { transform:scale(.97); box-shadow:0 1px 4px rgba(220,38,38,.2); }',
+    '#wil-fm-banner .wfb-btn-del {',
+    '  width: 34px; height: 34px; border-radius: 10px;',
+    '  border: 1.5px solid #fecaca; background: #fff; cursor: pointer;',
+    '  display: flex; align-items: center; justify-content: center;',
+    '  color: #9ca3af; transition: background .15s, color .15s;',
+    '}',
+    '#wil-fm-banner .wfb-btn-del:hover { background:#fee2e2; color:#dc2626; }',
+
+    /* ── Visor / Lightbox ── */
+    '#wil-fm-visor {',
+    '  position: fixed; inset: 0; z-index: 999999;',
+    '  background: rgba(0,0,0,.88);',
+    '  backdrop-filter: blur(12px);',
+    '  display: flex; flex-direction: column;',
+    '  animation: wilVisorIn .22s ease both;',
+    '}',
+    '@keyframes wilVisorIn {',
+    '  from { opacity:0; } to { opacity:1; }',
+    '}',
+    '#wil-fm-visor .wfv-bar {',
+    '  display: flex; align-items: center; justify-content: space-between;',
+    '  padding: 14px 16px 10px;',
+    '  flex-shrink: 0;',
+    '}',
+    '#wil-fm-visor .wfv-title {',
+    '  display: flex; align-items: center; gap: 8px;',
+    '}',
+    '#wil-fm-visor .wfv-title-pill {',
+    '  display: inline-flex; align-items: center; gap: 5px;',
+    '  background: rgba(220,38,38,.18); border: 1px solid rgba(220,38,38,.35);',
+    '  color: #fca5a5; font-size: 10px; font-weight: 800;',
+    '  text-transform: uppercase; letter-spacing: .06em;',
+    '  padding: 3px 10px; border-radius: 99px;',
+    '}',
+    '#wil-fm-visor .wfv-filename {',
+    '  font-size: 12px; color: rgba(255,255,255,.55); font-weight: 500;',
+    '  max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;',
+    '}',
+    '#wil-fm-visor .wfv-controls {',
+    '  display: flex; align-items: center; gap: 6px;',
+    '}',
+    '#wil-fm-visor .wfv-cbtn {',
+    '  width: 36px; height: 36px; border-radius: 10px;',
+    '  border: 1px solid rgba(255,255,255,.15);',
+    '  background: rgba(255,255,255,.08);',
+    '  color: #fff; cursor: pointer;',
+    '  display: flex; align-items: center; justify-content: center;',
+    '  font-size: 16px; transition: background .15s;',
+    '  user-select: none; -webkit-user-select: none;',
+    '}',
+    '#wil-fm-visor .wfv-cbtn:hover { background: rgba(255,255,255,.18); }',
+    '#wil-fm-visor .wfv-cbtn:active { background: rgba(255,255,255,.25); }',
+    '#wil-fm-visor .wfv-cbtn-close {',
+    '  background: rgba(220,38,38,.25); border-color: rgba(220,38,38,.4);',
+    '}',
+    '#wil-fm-visor .wfv-cbtn-close:hover { background: rgba(220,38,38,.5); }',
+    '#wil-fm-visor .wfv-zoom-pct {',
+    '  font-size: 11px; font-weight: 700; color: rgba(255,255,255,.7);',
+    '  min-width: 36px; text-align: center;',
+    '}',
+    '#wil-fm-visor .wfv-stage {',
+    '  flex: 1; overflow: hidden; position: relative;',
+    '  display: flex; align-items: center; justify-content: center;',
+    '  cursor: grab;',
+    '}',
+    '#wil-fm-visor .wfv-stage.dragging { cursor: grabbing; }',
+    '#wil-fm-visor .wfv-img {',
+    '  max-width: 100%; max-height: 100%;',
+    '  object-fit: contain;',
+    '  border-radius: 4px;',
+    '  transform-origin: center center;',
+    '  transition: transform .18s ease;',
+    '  pointer-events: none; user-select: none;',
+    '  box-shadow: 0 8px 40px rgba(0,0,0,.6);',
+    '}',
+    '#wil-fm-visor .wfv-pdf-frame {',
+    '  width: 100%; height: 100%; border: none;',
+    '}',
+    '#wil-fm-visor .wfv-hint {',
+    '  text-align: center; padding: 10px 0 14px;',
+    '  font-size: 10.5px; color: rgba(255,255,255,.3);',
+    '  flex-shrink: 0; letter-spacing: .02em;',
+    '}',
+  ].join('\n');
+  document.head.appendChild(s);
+})();
+
+/* ── Estado del visor ── */
+var _wilVisor = { scale: 1, tx: 0, ty: 0, dragging: false, startX: 0, startY: 0, lastTx: 0, lastTy: 0 };
+
+function wilMostrarBannerFormula(fileName, base64) {
+  var CART_PANEL_SELECTOR = '#cart-panel, .cart-panel, .cart-drawer, [id*="cart"][class*="panel"], [id*="pedido"]';
+  var panel = document.querySelector(CART_PANEL_SELECTOR);
+
+  if (!panel) {
+    var allEls = document.querySelectorAll('*');
+    for (var i = 0; i < allEls.length; i++) {
+      var el = allEls[i];
+      if (el.childElementCount === 0 && (el.textContent||'').trim() === 'Mi pedido') {
+        panel = el.closest('div[style*="overflow"], aside, section') || el.parentElement;
+        break;
+      }
+    }
+  }
+  if (!panel) { console.warn('[FM v4] Panel del carrito no encontrado.'); return; }
+
+  /* Eliminar banner anterior */
+  var old = panel.querySelector('#wil-fm-banner');
+  if (old) old.remove();
+
+  var esPDF  = base64 && base64.startsWith('data:application/pdf');
+  var esImag = base64 && base64.startsWith('data:image/');
+
+  /* Miniatura */
+  var thumbInner = esPDF
+    ? '<span class="sym symf" style="font-size:22px;color:#dc2626;">picture_as_pdf</span>'
+    : (esImag ? '<img src="' + base64 + '" alt="receta">' : '<span class="sym symf" style="font-size:22px;color:#dc2626;">description</span>');
+
+  var banner = document.createElement('div');
+  banner.id = 'wil-fm-banner';
+  banner.innerHTML =
+    /* ── Header ── */
+    '<div class="wfb-header">' +
+      '<div class="wfb-thumb">' + thumbInner + '</div>' +
+      '<div class="wfb-info">' +
+        '<div class="wfb-pill">' +
+          '<span class="sym symf" style="font-size:11px;">vaccines</span>' +
+          '💊 Receta médica adjuntada' +
+        '</div>' +
+        '<div class="wfb-name">' + _escHTML(fileName) + '</div>' +
+      '</div>' +
+    '</div>' +
+    /* ── Acciones ── */
+    '<div class="wfb-actions">' +
+      '<button type="button" class="wfb-btn-ver" onclick="wilAbrirVisorFormula()">' +
+        '<span class="sym symf" style="font-size:15px;">visibility</span>' +
+        'Ver receta' +
+      '</button>' +
+      '<button type="button" class="wfb-btn-del" onclick="wilQuitarBannerFormula()" title="Quitar receta">' +
+        '<span class="sym" style="font-size:16px;">delete_outline</span>' +
+      '</button>' +
+    '</div>';
+
+  var firstChild = panel.firstChild;
+  if (firstChild && firstChild.nextSibling) {
+    panel.insertBefore(banner, firstChild.nextSibling);
+  } else {
+    panel.appendChild(banner);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   VISOR LIGHTBOX — zoom, pan, cerrar
+══════════════════════════════════════════════════════════════════ */
+function wilAbrirVisorFormula() {
+  var adj = window._wilFormulaAdjuntada;
+  /* Puede que ya se haya reseteado _fmBase64, usar el global */
+  var base64 = (adj && adj.base64) || window._comprobanteBase64 || '';
+  var fileName = (adj && adj.fileName) || 'formula';
+
+  if (!base64) { alert('No hay receta adjuntada.'); return; }
+
+  /* Limpiar visor anterior */
+  var old = document.getElementById('wil-fm-visor');
+  if (old) old.remove();
+
+  _wilVisor = { scale: 1, tx: 0, ty: 0, dragging: false, startX: 0, startY: 0, lastTx: 0, lastTy: 0 };
+
+  var esPDF  = base64.startsWith('data:application/pdf');
+  var visor  = document.createElement('div');
+  visor.id   = 'wil-fm-visor';
+
+  visor.innerHTML =
+    /* ── Barra superior ── */
+    '<div class="wfv-bar">' +
+      '<div class="wfv-title">' +
+        '<div class="wfv-title-pill">' +
+          '<span class="sym symf" style="font-size:12px;">vaccines</span>' +
+          'Fórmula médica' +
+        '</div>' +
+        '<div class="wfv-filename">' + _escHTML(fileName) + '</div>' +
+      '</div>' +
+      '<div class="wfv-controls">' +
+        (esPDF ? '' :
+          '<button class="wfv-cbtn" onclick="wilVisorZoom(-0.25)" title="Alejar">'+
+            '<span class="sym" style="font-size:18px;">remove</span></button>' +
+          '<div class="wfv-zoom-pct" id="wfv-pct">100%</div>' +
+          '<button class="wfv-cbtn" onclick="wilVisorZoom(+0.25)" title="Acercar">'+
+            '<span class="sym" style="font-size:18px;">add</span></button>' +
+          '<button class="wfv-cbtn" onclick="wilVisorReset()" title="Restablecer">'+
+            '<span class="sym" style="font-size:16px;">fit_screen</span></button>'
+        ) +
+        '<button class="wfv-cbtn wfv-cbtn-close" onclick="wilCerrarVisorFormula()" title="Cerrar">' +
+          '<span class="sym" style="font-size:18px;">close</span>' +
+        '</button>' +
+      '</div>' +
+    '</div>' +
+
+    /* ── Contenido ── */
+    '<div class="wfv-stage" id="wfv-stage">' +
+      (esPDF
+        ? '<iframe class="wfv-pdf-frame" src="' + base64 + '"></iframe>'
+        : '<img class="wfv-img" id="wfv-img" src="' + base64 + '" alt="Fórmula médica" draggable="false">'
+      ) +
+    '</div>' +
+
+    /* ── Hint ── */
+    (esPDF ? '' : '<div class="wfv-hint">Pellizca o usa los botones para zoom · Arrastra para mover</div>');
+
+  document.body.appendChild(visor);
+  document.body.style.overflow = 'hidden';
+
+  /* Cerrar al hacer clic en el fondo */
+  visor.addEventListener('click', function(e) {
+    if (e.target === visor || e.target.id === 'wfv-stage') wilCerrarVisorFormula();
+  });
+
+  /* Eventos de drag (pan) */
+  if (!esPDF) {
+    var stage = document.getElementById('wfv-stage');
+    stage.addEventListener('mousedown',  _wilVisorDragStart);
+    stage.addEventListener('mousemove',  _wilVisorDragMove);
+    stage.addEventListener('mouseup',    _wilVisorDragEnd);
+    stage.addEventListener('mouseleave', _wilVisorDragEnd);
+    /* Touch */
+    stage.addEventListener('touchstart', _wilVisorTouchStart, { passive: true });
+    stage.addEventListener('touchmove',  _wilVisorTouchMove,  { passive: false });
+    stage.addEventListener('touchend',   _wilVisorDragEnd);
+    /* Wheel zoom */
+    stage.addEventListener('wheel', function(e) {
+      e.preventDefault();
+      wilVisorZoom(e.deltaY < 0 ? 0.15 : -0.15);
+    }, { passive: false });
+  }
+
+  /* Tecla Escape */
+  document.addEventListener('keydown', _wilVisorKeyDown);
+}
+
+function wilCerrarVisorFormula() {
+  var v = document.getElementById('wil-fm-visor');
+  if (v) {
+    v.style.animation = 'wilVisorIn .18s ease reverse both';
+    setTimeout(function(){ if(v.parentNode) v.parentNode.removeChild(v); }, 160);
+  }
+  document.body.style.overflow = '';
+  document.removeEventListener('keydown', _wilVisorKeyDown);
+}
+
+function _wilVisorKeyDown(e) {
+  if (e.key === 'Escape') wilCerrarVisorFormula();
+  if (e.key === '+' || e.key === '=') wilVisorZoom(+0.25);
+  if (e.key === '-') wilVisorZoom(-0.25);
+  if (e.key === '0') wilVisorReset();
+}
+
+function wilVisorZoom(delta) {
+  _wilVisor.scale = Math.min(5, Math.max(0.3, _wilVisor.scale + delta));
+  _wilVisorApplyTransform();
+}
+
+function wilVisorReset() {
+  _wilVisor.scale = 1; _wilVisor.tx = 0; _wilVisor.ty = 0;
+  _wilVisorApplyTransform();
+}
+
+function _wilVisorApplyTransform() {
+  var img = document.getElementById('wfv-img');
+  if (!img) return;
+  img.style.transform =
+    'translate(' + _wilVisor.tx + 'px,' + _wilVisor.ty + 'px) scale(' + _wilVisor.scale + ')';
+  var pct = document.getElementById('wfv-pct');
+  if (pct) pct.textContent = Math.round(_wilVisor.scale * 100) + '%';
+}
+
+/* ── Drag mouse ── */
+function _wilVisorDragStart(e) {
+  _wilVisor.dragging = true;
+  _wilVisor.startX = e.clientX - _wilVisor.tx;
+  _wilVisor.startY = e.clientY - _wilVisor.ty;
+  var stage = document.getElementById('wfv-stage');
+  if (stage) stage.classList.add('dragging');
+}
+function _wilVisorDragMove(e) {
+  if (!_wilVisor.dragging) return;
+  _wilVisor.tx = e.clientX - _wilVisor.startX;
+  _wilVisor.ty = e.clientY - _wilVisor.startY;
+  var img = document.getElementById('wfv-img');
+  if (img) img.style.transition = 'none';
+  _wilVisorApplyTransform();
+}
+function _wilVisorDragEnd() {
+  _wilVisor.dragging = false;
+  var stage = document.getElementById('wfv-stage');
+  if (stage) stage.classList.remove('dragging');
+  var img = document.getElementById('wfv-img');
+  if (img) img.style.transition = 'transform .18s ease';
+}
+
+/* ── Drag touch ── */
+var _wilTouchLast = null;
+function _wilVisorTouchStart(e) {
+  if (e.touches.length === 1) {
+    _wilVisor.dragging = true;
+    _wilVisor.startX = e.touches[0].clientX - _wilVisor.tx;
+    _wilVisor.startY = e.touches[0].clientY - _wilVisor.ty;
+    _wilTouchLast = null;
+  } else if (e.touches.length === 2) {
+    _wilVisor.dragging = false;
+    _wilTouchLast = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+  }
+}
+function _wilVisorTouchMove(e) {
+  e.preventDefault();
+  if (e.touches.length === 1 && _wilVisor.dragging) {
+    _wilVisor.tx = e.touches[0].clientX - _wilVisor.startX;
+    _wilVisor.ty = e.touches[0].clientY - _wilVisor.startY;
+    var img = document.getElementById('wfv-img');
+    if (img) img.style.transition = 'none';
+    _wilVisorApplyTransform();
+  } else if (e.touches.length === 2 && _wilTouchLast) {
+    var dist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    wilVisorZoom((dist - _wilTouchLast) * 0.005);
+    _wilTouchLast = dist;
+  }
+}
+
+/* Quita el banner y limpia el global de la fórmula */
+function wilQuitarBannerFormula() {
+  var banner = document.getElementById('wil-fm-banner');
+  if (banner) banner.remove();
+  wilCerrarVisorFormula();
+  window._wilFormulaAdjuntada = null;
+  window._comprobanteBase64   = null;
+  window._comprobanteVerif    = false;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   9. PATCH coEnviarPedido — inyecta formulaMedica en el payload
+   CAMBIO v4:
+   · El campo ahora se llama  formulaMedica  (era urlFormula).
+   · Se elimina formulaFileName como campo separado.
+   · Ya no hay ítem __formula_medica__ que filtrar en rows/items.
 ══════════════════════════════════════════════════════════════════ */
 (function patchEnvio() {
   function doPatch() {
     if (typeof window.coEnviarPedido !== 'function') return false;
-    if (window.coEnviarPedido._fmv2) return true;
+    if (window.coEnviarPedido._fmv4) return true;
 
     var _orig = window.coEnviarPedido;
-
     window.coEnviarPedido = async function() {
       var _origFetch = window.fetch;
       window.fetch = async function(url, opts) {
@@ -6544,34 +6942,36 @@ function wilGuardarConFormula() {
             opts && opts.body && window._wilFormulaAdjuntada) {
           try {
             var payload = JSON.parse(opts.body);
-            payload.urlFormula      = window._wilFormulaAdjuntada.base64;
-            payload.formulaFileName = window._wilFormulaAdjuntada.fileName;
+
+            /* ── CAMPO NUEVO: formulaMedica ── */
+            payload.formulaMedica = window._wilFormulaAdjuntada.base64;
+
             opts = Object.assign({}, opts, { body: JSON.stringify(payload) });
             window._wilFormulaAdjuntada = null;
-          } catch(e) { /* no romper */ }
+          } catch(e) { /* no romper el flujo */ }
         }
         return _origFetch.apply(this, arguments);
       };
 
       try {
-        var result = await _orig.apply(this, arguments);
-        return result;
+        return await _orig.apply(this, arguments);
       } finally {
         window.fetch = _origFetch;
       }
     };
 
-    window.coEnviarPedido._fmv2 = true;
+    window.coEnviarPedido._fmv4 = true;
     return true;
   }
 
   if (!doPatch()) {
     var t = setInterval(function(){ if(doPatch()) clearInterval(t); }, 300);
+    setTimeout(function(){ clearInterval(t); }, 15000);
   }
 })();
 
 /* ══════════════════════════════════════════════════════════════════
-   9. HELPERS internos
+   10. HELPERS internos
 ══════════════════════════════════════════════════════════════════ */
 function _escHTML(s) {
   return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -6579,14 +6979,8 @@ function _escHTML(s) {
 function _escJSN(s) {
   return (s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"');
 }
-function _parseCOP(v) {
-  var s = String(v||'').replace(/[^0-9.,]/g,'');
-  if(!s) return 0;
-  var n = parseFloat(s.replace(/\./g,'').replace(',','.'));
-  return isNaN(n) ? 0 : n;
-}
 
-console.log('[WIL] ✅ wil-formula-medica.js v2 cargado — badge + popup + carrito + payload OK');
+console.log('[WIL] ✅ wil-formula-medica.js v4.1 — banner + visor lightbox zoom/pan + campo formulaMedica OK');
 </script>
 
 
