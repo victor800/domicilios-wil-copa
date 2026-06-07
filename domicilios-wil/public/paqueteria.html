@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-<meta name="theme-color" content="#006970"/>
+<meta name="theme-color" content="#1e2d4a"/>
 <title>Paquetería — Domicilios WIL</title>
 <link rel="manifest" href="manifest.json"/>
 <link rel="apple-touch-icon" href="icons/icon-192.png"/>
@@ -12,260 +12,280 @@
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
-  --p:#006970;--p2:#00a3b4;--p3:#00bcc9;
-  --pl:rgba(0,105,112,.09);--plb:rgba(0,105,112,.18);
-  --surf:#f0f4f7;--w:#ffffff;--w2:#f8fafb;
+  --p:#1e2d4a;--p2:#2d4070;--p3:#3d5490;
+  --pl:rgba(30,45,74,.09);--plb:rgba(30,45,74,.18);
+  --surf:#f0f4f7;--w:#ffffff;--w2:#f8fafb;--w3:#eef1f5;
   --on:#18222e;--on2:#3d5068;--on3:#7a8fa6;
   --gr:#16a34a;--rd:#dc2626;--am:#d97706;
   --r-2xl:22px;--r-xl:17px;--r-lg:13px;--r-md:10px;
-  --sh:0 2px 10px rgba(0,60,80,.07);
-  --sh2:0 6px 24px rgba(0,60,80,.11);
+  --sh:0 2px 10px rgba(0,30,80,.07);
+  --sh2:0 6px 24px rgba(0,30,80,.11);
+  --sh3:0 12px 40px rgba(0,30,80,.15);
 }
 html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(--surf);color:var(--on);overflow-x:hidden;-webkit-font-smoothing:antialiased}
 .sym{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;font-size:22px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;direction:ltr;-webkit-font-smoothing:antialiased;font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24}
 .sym.f{font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24}
 .hidden{display:none!important}
-@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-@keyframes rot{to{transform:rotate(360deg)}}
-@keyframes slideUp{from{transform:translateY(60px);opacity:0}to{transform:translateY(0);opacity:1}}
-@keyframes ping{0%{transform:scale(1);opacity:.7}70%{transform:scale(2.2);opacity:0}100%{opacity:0}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 @keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pingPulse{0%{transform:scale(1);opacity:.8}70%{transform:scale(2.2);opacity:0}100%{opacity:0}}
 
-/* HEADER */
-.hdr{position:fixed;top:0;left:0;right:0;z-index:200;height:52px;padding:0 12px;padding-top:env(safe-area-inset-top);display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.94);backdrop-filter:blur(24px);border-bottom:1px solid rgba(0,105,112,.08);box-shadow:0 1px 8px rgba(0,60,80,.06)}
-.hdr-back{width:32px;height:32px;border-radius:50%;border:none;background:var(--pl);color:var(--p);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s}
+/* ── TOAST ── */
+.toast{position:fixed;bottom:calc(84px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(20px);z-index:3000;background:#18222e;color:#fff;border-radius:14px;padding:12px 18px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;box-shadow:0 8px 28px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;white-space:nowrap;max-width:calc(100vw - 40px)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast .sym{font-size:16px;color:#60a5fa}
+
+/* ── HEADER ── */
+.hdr{position:fixed;top:0;left:0;right:0;z-index:200;height:56px;padding:0 14px;padding-top:env(safe-area-inset-top);display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.94);backdrop-filter:blur(24px);border-bottom:1px solid rgba(30,45,74,.08);box-shadow:0 1px 8px rgba(0,30,80,.06)}
+.hdr-back{width:34px;height:34px;border-radius:50%;border:none;background:var(--pl);color:var(--p);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s}
 .hdr-back:active{transform:scale(.88)}
-.hdr-logo{width:30px;height:30px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid rgba(0,105,112,.18)}
-.hdr-title{font-weight:800;font-size:14px;color:var(--on);flex:1;letter-spacing:-.01em}
+.hdr-logo{width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid rgba(30,45,74,.18)}
+.hdr-title{font-weight:800;font-size:15px;color:var(--on);flex:1;letter-spacing:-.01em}
 
-/* BOTTOM NAV */
-.bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;z-index:200;background:rgba(255,255,255,.97);backdrop-filter:blur(20px);border-top:1px solid rgba(0,105,112,.07);border-radius:20px 20px 0 0;display:flex;padding:6px 8px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -4px 24px rgba(0,60,80,.08)}
-.bi{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px;border-radius:12px;cursor:pointer;border:none;background:transparent;color:var(--on3);transition:.18s}
+/* ── BOTTOM NAV ── */
+.bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;z-index:200;background:rgba(255,255,255,.97);backdrop-filter:blur(20px);border-top:1px solid rgba(30,45,74,.07);border-radius:20px 20px 0 0;display:flex;padding:6px 8px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -4px 24px rgba(0,30,80,.08)}
+.bi{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 4px;border-radius:12px;cursor:pointer;border:none;background:transparent;color:var(--on3);transition:.18s}
 .bi.active{background:var(--pl);color:var(--p)}
-.bi .sym{font-size:20px}
+.bi .sym{font-size:21px}
 .bi-lbl{font-size:9px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
 
-/* MAIN */
-.main{padding-top:calc(52px + env(safe-area-inset-top));padding-bottom:calc(72px + env(safe-area-inset-bottom));max-width:480px;margin:0 auto}
+/* ── MAIN ── */
+.main{padding-top:calc(56px + env(safe-area-inset-top));padding-bottom:calc(88px + env(safe-area-inset-bottom));max-width:480px;margin:0 auto;display:flex;flex-direction:column;gap:12px;padding-left:0;padding-right:0}
 
-/* TOAST */
-.toast{position:fixed;bottom:calc(84px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(20px);z-index:3000;background:#18222e;color:#fff;border-radius:14px;padding:11px 16px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;box-shadow:0 8px 28px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;white-space:nowrap;max-width:calc(100vw - 40px)}
-.toast.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
-.toast .sym{font-size:15px;color:var(--p3)}
-
-/* ══ HERO ══ */
-.hero{padding:14px 14px 0;position:relative}
-.hero-card{border-radius:22px;background:linear-gradient(145deg,#0d1b2a 0%,#1e2d4a 45%,#2d4070 100%);padding:20px 18px 18px;position:relative;overflow:hidden}
-.hero-card::before{content:'';position:absolute;right:-40px;top:-40px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.04);pointer-events:none}
-.hero-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;position:relative;z-index:1}
-.hero-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);border-radius:99px;padding:4px 10px;font-size:10px;font-weight:700;color:rgba(255,255,255,.85)}
-.hero-live{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:rgba(255,255,255,.7)}
-.hero-live-dot{width:7px;height:7px;border-radius:50%;background:#22c55e;position:relative;flex-shrink:0}
-.hero-live-dot::after{content:'';position:absolute;inset:-3px;border-radius:50%;background:rgba(34,197,94,.3);animation:ping 2s ease-in-out infinite}
-.hero-h1{font-size:20px;font-weight:900;color:#fff;line-height:1.15;letter-spacing:-.02em;margin-bottom:6px;position:relative;z-index:1}
-.hero-sub{font-size:11px;color:rgba(255,255,255,.55);font-weight:500;line-height:1.5;margin-bottom:16px;position:relative;z-index:1}
-.hero-stats{display:flex;gap:10px;position:relative;z-index:1}
-.hero-stat{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:7px 10px;flex:1}
-.hero-stat-val{font-size:14px;font-weight:900;color:#fff}
-.hero-stat-lbl{font-size:8.5px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.05em;margin-top:1px}
-
-/* ══ BÚSQUEDA ══ */
-.search-wrap{padding:12px 14px 0}
-.search-box{display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #dde6ed;border-radius:14px;padding:11px 12px;box-shadow:var(--sh);transition:border-color .18s,box-shadow .18s}
-.search-box:focus-within{border-color:var(--p);box-shadow:0 0 0 3px rgba(0,105,112,.1),var(--sh)}
-.search-box .sym{font-size:18px;color:var(--on3);flex-shrink:0}
-.search-input{flex:1;border:none;outline:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;color:var(--on);background:transparent}
-.search-input::placeholder{color:var(--on3)}
-.search-clear{width:24px;height:24px;border-radius:50%;background:var(--pl);border:none;color:var(--p);cursor:pointer;display:none;align-items:center;justify-content:center}
-.search-clear .sym{font-size:13px}
-.search-clear.show{display:flex}
-.search-results-count{padding:8px 14px 0;font-size:11px;color:var(--on3);font-weight:600}
-
-/* ══ ZONAS CHIPS ══ */
-.zones-bar{overflow-x:auto;scrollbar-width:none;padding:10px 14px 0}
-.zones-bar::-webkit-scrollbar{display:none}
-.zones-track{display:flex;gap:7px;width:max-content}
-.zone-pill{flex-shrink:0;border-radius:99px;padding:6px 12px;border:1.5px solid #dde6ed;background:#fff;display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;font-weight:700;color:var(--on2);transition:.15s;white-space:nowrap;box-shadow:var(--sh)}
-.zone-pill:active{transform:scale(.95)}
-.zone-pill.active{border-color:var(--p);background:var(--pl);color:var(--p)}
-
-/* ══ GRID BARRIOS ══ */
-.sec-hdr{padding:14px 14px 8px;display:flex;align-items:center;justify-content:space-between}
-.sec-tit{font-size:13px;font-weight:800;color:var(--on)}
-.sec-sub{font-size:10px;font-weight:600;color:var(--on3);background:#eef1f5;border-radius:99px;padding:2px 8px}
-
-.barrios-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 14px 14px}
-
-.barrio-card{border-radius:16px;background:#fff;border:1.5px solid #e8eef3;overflow:hidden;cursor:pointer;box-shadow:0 1px 6px rgba(0,60,80,.06);transition:transform .15s,box-shadow .15s;display:flex;flex-direction:column}
-.barrio-card:active{transform:scale(.96);box-shadow:none}
-.barrio-card-accent{height:3px;flex-shrink:0}
-.barrio-card-body{padding:10px 11px 11px;flex:1;display:flex;flex-direction:column}
-.barrio-zone-tag{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;opacity:.7}
-.barrio-name{font-size:12px;font-weight:900;color:var(--on);line-height:1.25;margin-bottom:8px;flex:1}
-.barrio-price-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-.barrio-price{font-size:15px;font-weight:900}
-.barrio-price-lbl{font-size:8.5px;font-weight:700;color:var(--on3);text-transform:uppercase;letter-spacing:.04em}
-.barrio-btn{display:flex;align-items:center;justify-content:center;gap:4px;width:100%;padding:7px 8px;border-radius:9px;border:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:800;color:#fff;cursor:pointer;transition:.15s}
-.barrio-btn .sym{font-size:11px}
-
-/* Barrio WA cotizar (externo) */
-.barrio-card.ext-card{border-style:dashed;border-color:#c7d9e8;background:#f8fbfd}
-.barrio-btn.wa-btn-ext{background:linear-gradient(135deg,#16a34a,#22c55e)!important}
-
-/* Empty */
-.empty-state{padding:36px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:9px}
-.empty-icon{width:56px;height:56px;border-radius:50%;background:var(--pl);display:flex;align-items:center;justify-content:center;font-size:26px}
-.empty-tit{font-size:15px;font-weight:800;color:var(--on)}
-.empty-sub{font-size:12px;color:var(--on3);font-weight:500;line-height:1.6;max-width:220px}
-.empty-btn{display:flex;align-items:center;gap:5px;padding:9px 18px;border-radius:11px;border:none;background:var(--p);color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:800;cursor:pointer;margin-top:2px;box-shadow:0 4px 14px rgba(0,105,112,.3)}
-
-/* Nota */
-.nota-info{margin:0 14px 10px;padding:10px 12px;background:#fffbeb;border:1px solid rgba(217,119,6,.18);border-radius:11px;font-size:11px;color:#92400e;line-height:1.5;display:flex;align-items:flex-start;gap:7px}
-
-/* ══ Sección externa WA al final ══ */
-.ext-section{padding:0 14px 14px}
-.ext-banner{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1.5px solid #86efac;border-radius:18px;padding:14px 14px 16px;display:flex;flex-direction:column;gap:12px}
-.ext-banner-hdr{display:flex;align-items:center;gap:10px}
-.ext-banner-ico{width:40px;height:40px;border-radius:13px;background:linear-gradient(135deg,#16a34a,#22c55e);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 12px rgba(22,163,74,.3)}
-.ext-banner-ico svg{display:block}
-.ext-banner-tit{font-size:13px;font-weight:900;color:#14532d}
-.ext-banner-sub{font-size:11px;color:#166534;font-weight:500;margin-top:2px;line-height:1.45}
-.ext-tags{display:flex;flex-wrap:wrap;gap:6px}
-.ext-tag{font-size:10px;font-weight:700;color:#166534;background:rgba(22,163,74,.1);border:1px solid rgba(22,163,74,.2);border-radius:99px;padding:3px 9px}
-.ext-wa-btn{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;padding:13px 16px;border-radius:13px;background:linear-gradient(135deg,#16a34a 0%,#22c55e 50%,#25D366 100%);color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:900;cursor:pointer;transition:all .18s;box-shadow:0 5px 20px rgba(37,211,102,.38);border:none;position:relative;overflow:hidden}
-.ext-wa-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.12) 0%,transparent 60%);pointer-events:none}
-.ext-wa-btn:active{transform:scale(.97);box-shadow:0 3px 10px rgba(37,211,102,.3)}
-.ext-wa-note{text-align:center;font-size:10px;color:#4b7c4b;font-weight:600}
-
-/* ══ OVERLAY SHEET ══ */
-#paq-overlay{
-  position:fixed;inset:0;z-index:1200;
-  background:rgba(0,0,0,.55);
-  backdrop-filter:blur(5px);
-  -webkit-backdrop-filter:blur(5px);
-  display:none;align-items:flex-end;justify-content:center;
-  padding-bottom:env(safe-area-inset-bottom,0px);
+/* ══════════════════════════════════════════
+   HERO BANNER
+══════════════════════════════════════════ */
+.hero-banner{
+  margin:16px 16px 0;
+  border-radius:var(--r-2xl);
+  background:linear-gradient(135deg,#1a2640 0%,#1e2d4a 45%,#2d4070 80%,#3d5490 100%);
+  padding:22px 20px 20px;
+  position:relative;overflow:hidden;
+  box-shadow:var(--sh3);
 }
-#paq-overlay.open{display:flex}
+.hero-banner::before{
+  content:'';position:absolute;top:-40px;right:-40px;
+  width:180px;height:180px;border-radius:50%;
+  background:rgba(255,255,255,.05);pointer-events:none;
+}
+.hero-banner::after{
+  content:'';position:absolute;bottom:-30px;left:20px;
+  width:120px;height:120px;border-radius:50%;
+  background:rgba(255,255,255,.04);pointer-events:none;
+}
+.hero-dots{
+  position:absolute;inset:0;pointer-events:none;
+  background-image:radial-gradient(circle,rgba(255,255,255,.045) 1px,transparent 1px);
+  background-size:18px 18px;
+}
+.hero-body{position:relative;z-index:1;display:flex;align-items:center;gap:16px}
+.hero-emo{font-size:56px;line-height:1;flex-shrink:0;filter:drop-shadow(0 4px 16px rgba(0,0,0,.3))}
+.hero-txt{}
+.hero-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.2);
+  border-radius:99px;padding:3px 11px;
+  font-size:10px;font-weight:700;color:rgba(255,255,255,.88);
+  margin-bottom:8px;letter-spacing:.02em;
+}
+.hero-badge .sym{font-size:11px}
+.hero-tit{font-size:19px;font-weight:900;color:#fff;line-height:1.2;letter-spacing:-.015em;margin-bottom:5px}
+.hero-sub{font-size:11.5px;color:rgba(255,255,255,.62);line-height:1.55;font-weight:500}
 
-#paq-sheet{
-  width:100%;max-width:480px;
-  background:#f3f6f9;
-  border-radius:24px 24px 0 0;
-  max-height:90dvh;height:auto;
-  display:flex;flex-direction:column;
-  box-shadow:0 -10px 50px rgba(0,0,0,.28);
-  animation:slideUp .3s cubic-bezier(.22,1,.36,1) both;
+/* ══════════════════════════════════════════
+   STEP INDICATOR
+══════════════════════════════════════════ */
+.steps-row{
+  display:flex;align-items:center;
+  padding:0 16px;gap:0;
+}
+.step-item{
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;
+  position:relative;
+}
+.step-item:not(:last-child)::after{
+  content:'';
+  position:absolute;top:14px;left:calc(50% + 14px);right:calc(-50% + 14px);
+  height:2px;background:#dde4ed;z-index:0;
+}
+.step-item.done:not(:last-child)::after,
+.step-item.active:not(:last-child)::after{
+  background:linear-gradient(90deg,#1e2d4a,#dde4ed);
+}
+.step-dot{
+  width:28px;height:28px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:900;z-index:1;
+  border:2px solid #dde4ed;background:#fff;color:#9aa5ae;
+  transition:all .3s;flex-shrink:0;
+}
+.step-item.done .step-dot{background:var(--p);border-color:var(--p);color:#fff}
+.step-item.active .step-dot{background:#fff;border-color:var(--p);color:var(--p);box-shadow:0 0 0 4px rgba(30,45,74,.12)}
+.step-lbl{font-size:9px;font-weight:700;color:#9aa5ae;text-align:center;letter-spacing:.02em}
+.step-item.done .step-lbl,.step-item.active .step-lbl{color:var(--p)}
+
+/* ══════════════════════════════════════════
+   TARJETAS DE PASO
+══════════════════════════════════════════ */
+.paso-card{
+  margin:0 16px;
+  background:#fff;border-radius:var(--r-xl);
+  border:1.5px solid #e2e8f0;
+  box-shadow:var(--sh);
   overflow:hidden;
+  animation:fadeUp .24s cubic-bezier(.22,1,.36,1) both;
 }
 
-.pq-handle{width:36px;height:4px;background:rgba(0,0,0,.14);border-radius:4px;margin:12px auto 0;flex-shrink:0}
-
-/* Sheet header compacto */
-.pq-sheet-hdr{
-  padding:12px 14px 14px;
+/* GPS CARD */
+.gps-card-hdr{
+  padding:13px 15px;
+  background:linear-gradient(135deg,#f0fdf4,#dcfce7);
+  border-bottom:1px solid #bbf7d0;
   display:flex;align-items:center;gap:10px;
-  flex-shrink:0;position:relative;overflow:hidden;
 }
-.pq-sheet-hdr::before{content:'';position:absolute;right:-24px;top:-24px;width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,.06);pointer-events:none}
-.pq-hdr-ico{width:40px;height:40px;border-radius:13px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;position:relative;z-index:1}
-.pq-hdr-texts{flex:1;min-width:0;z-index:1}
-.pq-hdr-tit{font-size:14px;font-weight:900;color:#fff;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pq-hdr-sub{font-size:10px;color:rgba(255,255,255,.65);margin-top:2px;font-weight:500}
-.pq-hdr-close{margin-left:auto;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.22);color:#fff;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;z-index:1;transition:background .15s,transform .12s;line-height:1}
-.pq-hdr-close:active{transform:scale(.88);background:rgba(255,255,255,.25)}
-
-/* Body scroll compacto */
-.pq-sheet-body{
-  overflow-y:auto;-webkit-overflow-scrolling:touch;
-  overscroll-behavior:contain;flex:1;min-height:0;
-  padding:12px 12px 24px;
-  display:flex;flex-direction:column;gap:10px;
+.gps-hdr-ico{
+  width:36px;height:36px;border-radius:11px;
+  background:rgba(22,163,74,.15);
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;flex-shrink:0;
 }
-.pq-sheet-body::-webkit-scrollbar{width:3px}
-.pq-sheet-body::-webkit-scrollbar-thumb{background:rgba(0,0,0,.14);border-radius:3px}
+.gps-hdr-lbl{font-size:13px;font-weight:800;color:#14532d}
+.gps-hdr-sub{font-size:10.5px;color:#166534;font-weight:500;margin-top:1px;line-height:1.4}
+.gps-body{padding:13px 15px}
 
-/* Step label */
-.pq-step{display:flex;align-items:center;gap:7px}
-.pq-step-num{width:20px;height:20px;border-radius:50%;color:#fff;font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.pq-step-txt{font-size:12px;font-weight:800;color:#1e2d4a}
+.gps-btn{
+  width:100%;padding:13px 16px;border-radius:13px;border:none;
+  background:linear-gradient(135deg,#16a34a 0%,#15803d 100%);
+  color:#fff;font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:14px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  cursor:pointer;transition:all .18s;
+  box-shadow:0 4px 18px rgba(22,163,74,.38);
+  letter-spacing:.01em;
+}
+.gps-btn:active{transform:scale(.97);box-shadow:0 2px 8px rgba(22,163,74,.25)}
+.gps-btn:disabled{opacity:.65;cursor:default}
+.gps-btn .sym{font-size:19px}
 
-/* Zona info compacta */
-.pq-zona-card{background:#fff;border:1.5px solid #dde6ec;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(30,45,74,.06)}
-.pq-zona-card-hdr{padding:10px 12px;background:linear-gradient(135deg,#e8f4fd,#ddeef8);border-bottom:1px solid #c7d9e8;display:flex;align-items:center;gap:8px}
-.pq-zona-card-hdr-ico{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
-.pq-zona-card-hdr-lbl{font-size:12px;font-weight:800;color:#1e3a5f}
-.pq-zona-card-hdr-sub{font-size:9.5px;color:#2d5070;font-weight:500;margin-top:1px}
-.pq-zona-card-body{padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px}
-.pq-precio-badge{display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,#15803d,#16a34a);color:#fff;border-radius:99px;padding:6px 12px;font-size:14px;font-weight:900;box-shadow:0 3px 10px rgba(21,128,61,.28)}
-.pq-precio-nota{font-size:9.5px;color:#166534;font-weight:600;line-height:1.45;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:6px 9px;flex:1}
+.gps-result{
+  display:none;margin-top:11px;
+  border:1.5px solid #86efac;border-radius:13px;
+  background:#f0fdf4;padding:12px 14px;
+}
+.gps-result.show{display:block;animation:fadeIn .25s ease}
+.gps-result-row{
+  display:flex;align-items:flex-start;gap:8px;
+  font-size:12px;font-weight:600;color:#14532d;
+  margin-bottom:6px;line-height:1.55;
+}
+.gps-result-row:last-of-type{margin-bottom:0}
+.gps-result-ico{font-size:15px;flex-shrink:0;margin-top:1px}
+.dist-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  background:linear-gradient(135deg,#1e2d4a,#2d4070);
+  color:#fff;border-radius:20px;padding:4px 12px;
+  font-size:12px;font-weight:900;margin-top:8px;
+  box-shadow:0 2px 10px rgba(30,45,74,.3);
+}
+.dist-badge .sym{font-size:13px}
 
-/* Form cards compactas */
-.pq-form-card{background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.04)}
-.pq-form-card-hdr{padding:9px 12px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px;background:linear-gradient(90deg,#f8fafc,#fff)}
-.pq-form-card-hdr-ico{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
-.pq-form-card-hdr-lbl{font-size:12px;font-weight:800;color:#1e293b}
-.pq-form-card-body{padding:12px;display:flex;flex-direction:column;gap:10px}
+/* FORM CARD */
+.form-card-hdr{
+  padding:12px 15px;border-bottom:1px solid #f1f5f9;
+  display:flex;align-items:center;gap:9px;
+  background:linear-gradient(90deg,#f8fafc,#fff);
+}
+.form-hdr-ico{
+  width:34px;height:34px;border-radius:10px;
+  background:rgba(30,45,74,.1);
+  display:flex;align-items:center;justify-content:center;
+  font-size:17px;flex-shrink:0;
+}
+.form-hdr-lbl{font-size:13px;font-weight:800;color:#1e293b}
+.form-body{padding:15px;display:flex;flex-direction:column;gap:12px}
 
-/* Fields compactos */
-.pq-field label{display:block;font-size:9.5px;font-weight:700;color:#64748b;margin-bottom:4px;letter-spacing:.055em;text-transform:uppercase}
-.pq-field input,.pq-field textarea,.pq-field select{
-  width:100%;border:1.5px solid #e2e8f0;border-radius:10px;
-  padding:9px 11px;font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;
+.wf{display:flex;flex-direction:column;gap:5px}
+.wf label{font-size:10.5px;font-weight:700;color:#64748b;letter-spacing:.055em;text-transform:uppercase}
+.wf input,.wf textarea{
+  border:1.5px solid #e2e8f0;border-radius:12px;
+  padding:11px 14px;font-size:14px;
+  font-family:'Plus Jakarta Sans',sans-serif;
   color:#1e293b;background:#f8fafc;outline:none;
   transition:border-color .18s,background .18s,box-shadow .18s;
   box-sizing:border-box;resize:none;-webkit-appearance:none;
 }
-.pq-field input:focus,.pq-field textarea:focus{border-color:#2d4070;background:#fff;box-shadow:0 0 0 3px rgba(45,64,112,.1)}
-.pq-field input::placeholder,.pq-field textarea::placeholder{color:#94a3b8;font-size:12px}
-.pq-field-note{font-size:9.5px;color:#94a3b8;font-weight:500;margin-top:4px;line-height:1.4}
+.wf input:focus,.wf textarea:focus{
+  border-color:#1e2d4a;background:#fff;
+  box-shadow:0 0 0 3.5px rgba(30,45,74,.1);
+}
+.wf input::placeholder,.wf textarea::placeholder{color:#94a3b8}
+.wf-note{font-size:10.5px;color:#94a3b8;font-weight:500;line-height:1.45;padding-left:2px}
 
-/* Tamaño */
-.pq-tam-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-.pq-tam-opt{border:1.5px solid #e2e8f0;border-radius:11px;padding:10px 4px;cursor:pointer;text-align:center;background:#f8fafb;transition:.18s;position:relative}
-.pq-tam-opt:active{transform:scale(.95)}
-.pq-tam-opt.sel{border-color:#2d4070;background:rgba(45,64,112,.08)}
-.pq-tam-emo{font-size:22px;display:block;margin-bottom:3px}
-.pq-tam-nom{font-size:11px;font-weight:800;color:#1e293b}
-.pq-tam-sub{font-size:8.5px;color:#64748b;margin-top:1px}
-.pq-tam-opt.sel .pq-tam-nom{color:#2d4070}
+.divider-label{
+  display:flex;align-items:center;gap:8px;
+  font-size:10px;font-weight:800;text-transform:uppercase;
+  letter-spacing:.07em;color:#94a3b8;margin:2px 0;
+}
+.divider-label::before,.divider-label::after{
+  content:'';flex:1;height:1px;background:#e2e8f0;
+}
 
-/* Max warning */
-.pq-max-warning{background:#fef2f2;border:1px solid rgba(220,38,38,.18);border-radius:8px;padding:7px 10px;font-size:10px;font-weight:700;color:#dc2626;display:flex;align-items:center;gap:5px}
-.pq-max-warning .sym{font-size:13px}
+/* NOTA COTIZACIÓN */
+.cotiza-nota{
+  margin:0 16px;
+  background:linear-gradient(135deg,#fffbeb,#fef9c3);
+  border:1.5px solid rgba(217,119,6,.22);
+  border-radius:15px;padding:13px 15px;
+  display:flex;align-items:flex-start;gap:10px;
+  box-shadow:0 2px 10px rgba(217,119,6,.07);
+}
+.cotiza-nota-ico{font-size:20px;flex-shrink:0;margin-top:1px}
+.cotiza-nota p{font-size:12px;font-weight:600;color:#92400e;line-height:1.65}
+.cotiza-nota strong{font-weight:900;color:#78350f}
 
-/* Nota */
-.pq-nota{background:linear-gradient(135deg,#fffbeb,#fef9c3);border:1.5px solid rgba(217,119,6,.2);border-radius:12px;padding:10px 12px;display:flex;align-items:flex-start;gap:8px}
-.pq-nota p{font-size:11px;font-weight:600;color:#92400e;line-height:1.6}
-.pq-nota strong{font-weight:900;color:#78350f}
-
-/* Botón confirmar BD */
-.pq-confirmar-btn{
-  display:flex;align-items:center;justify-content:center;gap:9px;
-  width:100%;padding:14px 16px;border-radius:14px;
+/* BOTÓN WHATSAPP */
+.wa-wrap{padding:0 16px;display:flex;flex-direction:column;gap:7px}
+.wa-btn{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  width:100%;padding:16px 20px;border-radius:16px;border:none;
+  background:linear-gradient(135deg,#16a34a 0%,#22c55e 50%,#25D366 100%);
   color:#fff;font-family:'Plus Jakarta Sans',sans-serif;
-  font-size:14px;font-weight:900;cursor:pointer;
-  transition:all .18s;border:none;
+  font-size:15px;font-weight:900;letter-spacing:.01em;
+  cursor:pointer;transition:all .18s;
+  box-shadow:0 6px 28px rgba(37,211,102,.42);
   position:relative;overflow:hidden;
 }
-.pq-confirmar-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.12) 0%,transparent 60%);pointer-events:none}
-.pq-confirmar-btn:active{transform:scale(.97)}
-.pq-confirmar-btn.loading{opacity:.7;pointer-events:none}
-.pq-confirmar-btn .btn-spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none}
-.pq-confirmar-btn.loading .btn-spinner{display:block}
-.pq-confirmar-btn.loading .btn-text{display:none}
+.wa-btn::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,.12) 0%,transparent 60%);
+  pointer-events:none;
+}
+.wa-btn:active{transform:scale(.97);box-shadow:0 3px 14px rgba(37,211,102,.3)}
+.wa-note{text-align:center;font-size:10.5px;color:#94a3b8;font-weight:600}
 
-.pq-btn-note{text-align:center;font-size:9.5px;color:#94a3b8;font-weight:600;padding-bottom:2px}
+/* SPINNER */
+.spin-el{
+  display:none;width:18px;height:18px;border-radius:50%;
+  border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;
+  animation:spin .7s linear infinite;flex-shrink:0;
+}
+.gps-btn.loading .spin-el{display:block}
+.gps-btn.loading .btn-ico,.gps-btn.loading .btn-txt{display:none}
 
-/* Success overlay */
-.success-overlay{position:absolute;inset:0;background:rgba(240,253,244,.97);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:10;animation:fadeIn .3s ease}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
-.success-ico{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#16a34a,#22c55e);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(22,163,74,.35)}
-.success-ico .sym{font-size:32px;color:#fff}
-.success-tit{font-size:17px;font-weight:900;color:#14532d;text-align:center}
-.success-sub{font-size:12px;color:#166534;font-weight:500;text-align:center;line-height:1.55;max-width:240px}
-.success-id{font-size:11px;font-weight:700;color:#16a34a;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:5px 12px}
-.success-close{padding:11px 24px;border-radius:12px;background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:800;border:none;cursor:pointer;box-shadow:0 4px 14px rgba(22,163,74,.3)}
+/* SPACER */
+.spacer{height:16px}
+
+/* PULSE en GPS */
+.gps-live-dot{
+  width:9px;height:9px;border-radius:50%;background:#16a34a;
+  position:relative;flex-shrink:0;
+}
+.gps-live-dot::after{
+  content:'';position:absolute;inset:-4px;border-radius:50%;
+  background:rgba(22,163,74,.25);animation:pingPulse 1.6s ease-in-out infinite;
+}
+
 </style>
 </head>
 <body>
@@ -276,743 +296,485 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
   <span id="globalToastMsg">Mensaje</span>
 </div>
 
-<!-- OVERLAY PAQUETERÍA -->
-<div id="paq-overlay" onclick="if(event.target===this)paqCerrar()">
-  <div id="paq-sheet" style="position:relative">
-
-    <!-- Success state -->
-    <div class="success-overlay hidden" id="paqSuccess">
-      <div class="success-ico"><span class="sym f">check_circle</span></div>
-      <div class="success-tit">¡Solicitud enviada!</div>
-      <div class="success-sub">Tu solicitud fue registrada. El domi WIL se pondrá en contacto contigo pronto.</div>
-      <div class="success-id" id="paqSuccessId">ID: —</div>
-      <button class="success-close" onclick="paqCerrar()">Cerrar</button>
-    </div>
-
-    <div class="pq-handle"></div>
-
-    <!-- Header dinámico -->
-    <div class="pq-sheet-hdr" id="paqSheetHdr">
-      <div class="pq-hdr-ico" id="paqHdrIco">📦</div>
-      <div class="pq-hdr-texts">
-        <div class="pq-hdr-tit" id="paqHdrTit">Envío de Paquete</div>
-        <div class="pq-hdr-sub" id="paqHdrSub">Completa los datos del envío</div>
-      </div>
-      <button class="pq-hdr-close" onclick="paqCerrar()">✕</button>
-    </div>
-
-    <div class="pq-sheet-body">
-
-      <!-- PASO 1 -->
-      <div class="pq-step">
-        <div class="pq-step-num pq-sn">1</div>
-        <div class="pq-step-txt">Zona de entrega</div>
-      </div>
-      <div class="pq-zona-card">
-        <div class="pq-zona-card-hdr">
-          <div class="pq-zona-card-hdr-ico" id="paqZonaIco">📍</div>
-          <div>
-            <div class="pq-zona-card-hdr-lbl" id="paqZonaNombre">—</div>
-            <div class="pq-zona-card-hdr-sub" id="paqZonaDesc">Zona de cobertura</div>
-          </div>
-        </div>
-        <div class="pq-zona-card-body">
-          <div class="pq-precio-badge">
-            <span class="sym f" style="font-size:14px">delivery_dining</span>
-            <span id="paqPrecioVal">$0</span>
-          </div>
-          <div class="pq-precio-nota">Tarifa base · puede variar según peso y tamaño</div>
-        </div>
-      </div>
-
-      <!-- PASO 2 -->
-      <div class="pq-step">
-        <div class="pq-step-num pq-sn">2</div>
-        <div class="pq-step-txt">Tamaño del paquete</div>
-      </div>
-      <div class="pq-form-card">
-        <div class="pq-form-card-hdr">
-          <div class="pq-form-card-hdr-ico" style="background:rgba(45,64,112,.1)">📦</div>
-          <div class="pq-form-card-hdr-lbl">¿Qué tan grande es?</div>
-        </div>
-        <div class="pq-form-card-body">
-          <div class="pq-max-warning">
-            <span class="sym f">warning</span>Máximo permitido: 30 kg
-          </div>
-          <div class="pq-tam-grid">
-            <button class="pq-tam-opt" data-sz="pequeno" onclick="paqSelTam(this)">
-              <span class="pq-tam-emo">📦</span>
-              <div class="pq-tam-nom">Pequeño</div>
-              <div class="pq-tam-sub">Hasta 5 kg</div>
-            </button>
-            <button class="pq-tam-opt" data-sz="mediano" onclick="paqSelTam(this)">
-              <span class="pq-tam-emo">🧳</span>
-              <div class="pq-tam-nom">Mediano</div>
-              <div class="pq-tam-sub">5 – 15 kg</div>
-            </button>
-            <button class="pq-tam-opt" data-sz="grande" onclick="paqSelTam(this)">
-              <span class="pq-tam-emo">📫</span>
-              <div class="pq-tam-nom">Grande</div>
-              <div class="pq-tam-sub">15 – 30 kg</div>
-            </button>
-          </div>
-          <div class="pq-field">
-            <label>Descripción del paquete</label>
-            <textarea id="paqDescripcion" rows="2" placeholder="Ropa, documentos, mercancía, regalo…"></textarea>
-          </div>
-        </div>
-      </div>
-
-      <!-- PASO 3 -->
-      <div class="pq-step">
-        <div class="pq-step-num pq-sn">3</div>
-        <div class="pq-step-txt">Punto de recogida</div>
-      </div>
-      <div class="pq-form-card">
-        <div class="pq-form-card-hdr">
-          <div class="pq-form-card-hdr-ico" style="background:rgba(22,163,74,.1)">🏪</div>
-          <div class="pq-form-card-hdr-lbl">¿Dónde recogemos?</div>
-        </div>
-        <div class="pq-form-card-body">
-          <div class="pq-field">
-            <label>Barrio de recogida *</label>
-            <input type="text" id="paqBarrioRec" placeholder="Parque Copacabana, Tablazo…"/>
-          </div>
-          <div class="pq-field">
-            <label>Dirección de recogida *</label>
-            <input type="text" id="paqDirRec" placeholder="Calle 52 #48-09, frente al parque…"/>
-          </div>
-          <div class="pq-field">
-            <label>Teléfono de quien entrega <span style="font-weight:500;opacity:.6">(opcional)</span></label>
-            <input type="tel" id="paqTelRec" placeholder="310 123 4567"/>
-          </div>
-        </div>
-      </div>
-
-      <!-- PASO 4 -->
-      <div class="pq-step">
-        <div class="pq-step-num pq-sn">4</div>
-        <div class="pq-step-txt">Quien recibe</div>
-      </div>
-      <div class="pq-form-card">
-        <div class="pq-form-card-hdr">
-          <div class="pq-form-card-hdr-ico" style="background:rgba(45,64,112,.1)">👤</div>
-          <div class="pq-form-card-hdr-lbl">Datos del destinatario</div>
-        </div>
-        <div class="pq-form-card-body">
-          <div class="pq-field">
-            <label>Nombre completo *</label>
-            <input type="text" id="paqNombreRec" placeholder="Nombre del destinatario"/>
-          </div>
-          <div class="pq-field">
-            <label>Teléfono *</label>
-            <input type="tel" id="paqTelRec2" placeholder="310 987 6543"/>
-          </div>
-          <div class="pq-field">
-            <label>Dirección de entrega *</label>
-            <input type="text" id="paqDirEnt" placeholder="Cra 43 #18-20, Barrio…"/>
-          </div>
-          <div class="pq-field">
-            <label>Punto de referencia</label>
-            <input type="text" id="paqRefEnt" placeholder="Casa azul, piso 2…"/>
-          </div>
-        </div>
-      </div>
-
-      <!-- PASO 5 -->
-      <div class="pq-step">
-        <div class="pq-step-num pq-sn">5</div>
-        <div class="pq-step-txt">Quien envía (tú)</div>
-      </div>
-      <div class="pq-form-card">
-        <div class="pq-form-card-hdr">
-          <div class="pq-form-card-hdr-ico" style="background:rgba(45,64,112,.1)">📤</div>
-          <div class="pq-form-card-hdr-lbl">Tus datos como remitente</div>
-        </div>
-        <div class="pq-form-card-body">
-          <div class="pq-field">
-            <label>Tu nombre *</label>
-            <input type="text" id="paqNombreEnv" placeholder="Tu nombre completo"/>
-          </div>
-          <div class="pq-field">
-            <label>Tu teléfono *</label>
-            <input type="tel" id="paqTelEnv" placeholder="310 123 4567"/>
-          </div>
-        </div>
-      </div>
-
-      <!-- Nota -->
-      <div class="pq-nota">
-        <span style="font-size:18px">💡</span>
-        <p>El <strong>domiciliario WIL</strong> recibirá tu solicitud y te contactará para confirmar el <strong>servicio y la tarifa</strong> antes de salir.</p>
-      </div>
-
-      <!-- Botón principal -->
-      <button class="pq-confirmar-btn" id="paqConfirmarBtn" onclick="paqEnviarBD()">
-        <div class="btn-spinner"></div>
-        <span class="btn-text" style="display:flex;align-items:center;gap:8px">
-          <span class="sym f" style="font-size:18px">send</span>
-          Confirmar solicitud de envío
-        </span>
-      </button>
-      <p class="pq-btn-note">🔒 Tu solicitud queda registrada en el sistema WIL</p>
-
-    </div>
-  </div>
-</div>
-
 <!-- HEADER -->
 <header class="hdr">
-  <button class="hdr-back" onclick="goBack()"><span class="sym" style="font-size:17px">arrow_back</span></button>
-  <img class="hdr-logo" src="icons/icon-192.png" alt="WIL" onerror="this.style.display='none'"/>
-  <span class="hdr-title">Paquetería WIL</span>
+  <button class="hdr-back" onclick="history.back()">
+    <span class="sym" style="font-size:18px">arrow_back</span>
+  </button>
+  <img class="hdr-logo" src="icons/icon-192.png" alt="WIL"
+    onerror="this.style.display='none'"/>
+  <span class="hdr-title">Envío de Paquetes</span>
 </header>
 
 <main class="main">
 
   <!-- HERO -->
-  <div class="hero">
-    <div class="hero-card">
-      <div class="hero-top">
-        <div class="hero-badge">📦 Envíos y mensajería</div>
-        <div class="hero-live">
-          <div class="hero-live-dot"></div>
-          En línea
+  <div class="hero-banner">
+    <div class="hero-dots"></div>
+    <div class="hero-body">
+      <span class="hero-emo">📦</span>
+      <div class="hero-txt">
+        <div class="hero-badge">
+          <span class="sym f" style="font-size:11px">package_2</span>
+          Envíos y mensajería
         </div>
-      </div>
-      <div class="hero-h1">Enviamos a toda<br>Copacabana y Área Metro</div>
-      <div class="hero-sub">Busca tu barrio de destino y solicita el envío en segundos. Tarifas claras, sin sorpresas.</div>
-      <div class="hero-stats">
-        <div class="hero-stat">
-          <div>
-            <div class="hero-stat-val">8</div>
-            <div class="hero-stat-lbl">Zonas activas</div>
-          </div>
-        </div>
-        <div class="hero-stat">
-          <div>
-            <div class="hero-stat-val">60+</div>
-            <div class="hero-stat-lbl">Barrios</div>
-          </div>
-        </div>
-        <div class="hero-stat">
-          <div>
-            <div class="hero-stat-val">30 kg</div>
-            <div class="hero-stat-lbl">Máx. peso</div>
-          </div>
-        </div>
+        <div class="hero-tit">Envío fuera de Copacabana</div>
+        <div class="hero-sub">Caldas · Sabaneta · Itagüí · Medellín · Envigado y más.<br>Tarifa personalizada según distancia.</div>
       </div>
     </div>
   </div>
 
-  <!-- BÚSQUEDA -->
-  <div class="search-wrap">
-    <div class="search-box">
-      <span class="sym f" style="color:var(--p)">search</span>
-      <input class="search-input" id="searchInput" type="text"
-        placeholder="Busca tu barrio de destino…"
-        oninput="filtrarBarrios(this.value)"
-        autocomplete="off"/>
-      <button class="search-clear" id="searchClear" onclick="limpiarBusqueda()">
-        <span class="sym">close</span>
+  <!-- STEPS -->
+  <div class="steps-row">
+    <div class="step-item active" id="st0">
+      <div class="step-dot">1</div>
+      <span class="step-lbl">Ubicación</span>
+    </div>
+    <div class="step-item" id="st1">
+      <div class="step-dot">2</div>
+      <span class="step-lbl">Datos</span>
+    </div>
+    <div class="step-item" id="st2">
+      <div class="step-dot">3</div>
+      <span class="step-lbl">Cotizar</span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════
+       PASO 1 — GPS
+  ══════════════════════════════════ -->
+  <div class="paso-card" id="step-gps">
+    <div class="gps-card-hdr">
+      <div class="gps-hdr-ico">📍</div>
+      <div>
+        <div class="gps-hdr-lbl">1. Captura tu ubicación actual</div>
+        <div class="gps-hdr-sub">Para cotizar el envío necesitamos saber dónde estás</div>
+      </div>
+    </div>
+    <div class="gps-body">
+      <button class="gps-btn" id="gpsBtn" onclick="capturarGPS()">
+        <span class="sym f btn-ico" style="font-size:19px">my_location</span>
+        <span class="btn-txt">Capturar mi ubicación GPS</span>
+        <div class="spin-el"></div>
       </button>
-    </div>
-  </div>
-  <div class="search-results-count" id="resultsCount"></div>
 
-  <!-- FILTROS -->
-  <div class="zones-bar" id="zonesBar" style="margin-top:4px">
-    <div class="zones-track" id="zonesTrack"></div>
-  </div>
-
-  <!-- GRID -->
-  <div class="sec-hdr">
-    <div class="sec-tit">Barrios disponibles</div>
-    <span class="sec-sub" id="totalCount">—</span>
-  </div>
-
-  <div class="barrios-grid" id="barriosGrid"></div>
-
-  <!-- SECCIÓN EXTERNA WA -->
-  <div class="ext-section" id="extSection">
-    <div class="ext-banner">
-      <div class="ext-banner-hdr">
-        <div class="ext-banner-ico">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+      <div class="gps-result" id="gpsResult">
+        <div class="gps-result-row">
+          <span class="gps-result-ico">📍</span>
+          <span id="gpsDirTxt">—</span>
+        </div>
+        <div class="gps-result-row">
+          <span class="gps-result-ico">🗺️</span>
+          <span id="gpsCoordTxt" style="font-size:10.5px;opacity:.7">—</span>
         </div>
         <div>
-          <div class="ext-banner-tit">¿Tu destino está fuera de Copacabana?</div>
-          <div class="ext-banner-sub">Cotizamos envíos a otras ciudades y municipios</div>
+          <div class="dist-badge" id="gpsDistBadge">
+            <span class="sym f" style="font-size:13px">delivery_dining</span>
+            <span id="gpsDistTxt">Calculando distancia…</span>
+          </div>
         </div>
       </div>
-      <div class="ext-tags">
-        <span class="ext-tag">📦 Medellín</span>
-        <span class="ext-tag">📦 Rionegro</span>
-        <span class="ext-tag">📦 Envigado</span>
-        <span class="ext-tag">📦 Sabaneta</span>
-        <span class="ext-tag">📦 Itagüí</span>
-        <span class="ext-tag">📦 Otras ciudades</span>
-      </div>
-      <button class="ext-wa-btn" onclick="abrirWACotizar()">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
-        Cotizar envío por WhatsApp
-      </button>
-      <p class="ext-wa-note">📲 Te respondemos con tarifa y disponibilidad</p>
     </div>
   </div>
 
-  <!-- NOTA -->
-  <div class="nota-info">
-    <span style="font-size:15px;flex-shrink:0">⚠️</span>
-    <span>Tarifa base visible · puede variar por <strong>peso, tamaño y distancia real</strong>. El domi confirma antes de salir. Máx. <strong>30 kg</strong>.</span>
+  <!-- ══════════════════════════════════
+       PASO 2 — FORMULARIO
+  ══════════════════════════════════ -->
+  <div class="paso-card" id="step-form">
+    <div class="form-card-hdr">
+      <div class="form-hdr-ico">📋</div>
+      <div class="form-hdr-lbl">2. Datos del envío</div>
+    </div>
+    <div class="form-body">
+
+      <!-- Quien envía -->
+      <div class="divider-label">Quien envía</div>
+
+      <div class="wf">
+        <label>Tu nombre *</label>
+        <input type="text" id="fNombre" placeholder="¿Cómo te llamamos?" autocomplete="name"
+          oninput="checkForm()"/>
+      </div>
+
+      <div class="wf">
+        <label>Tu teléfono *</label>
+        <input type="tel" id="fTelEnvio" placeholder="Número del remitente" autocomplete="tel"
+          oninput="checkForm()"/>
+      </div>
+
+      <div class="wf">
+        <label>Lugar de recogida</label>
+        <input type="text" id="fComercio"
+          placeholder="Nombre del comercio, dirección o barrio de origen"/>
+        <span class="wf-note">Dirección o lugar donde el domi recoge el paquete</span>
+      </div>
+
+      <div class="wf">
+        <label>Teléfono de recogida</label>
+        <input type="tel" id="fTelRecogida"
+          placeholder="Número de quien entrega al domiciliario" autocomplete="tel"/>
+      </div>
+
+      <!-- Separador -->
+      <div class="divider-label">Destino y paquete</div>
+
+      <div class="wf">
+        <label>Ciudad / Barrio destino *</label>
+        <input type="text" id="fDestino"
+          placeholder="Ej: El Poblado Medellín, Sabaneta Centro, Caldas…"
+          oninput="checkForm()"/>
+      </div>
+
+      <div class="wf">
+        <label>Punto de referencia del destino</label>
+        <textarea id="fReferencia" rows="2"
+          placeholder="Ej: Casa azul con reja negra, edificio Torre Norte piso 5…"></textarea>
+      </div>
+
+      <div class="wf">
+        <label>Teléfono de entrega *</label>
+        <input type="tel" id="fTelEntrega"
+          placeholder="Número de quien recibe el paquete" autocomplete="tel"
+          oninput="checkForm()"/>
+      </div>
+
+      <div class="wf">
+        <label>¿Qué vamos a transportar? *</label>
+        <textarea id="fDescripcion" rows="3"
+          placeholder="Describe el paquete, encargo o mercancía…"
+          oninput="checkForm()"></textarea>
+        <span class="wf-note">⚠️ Peso máximo permitido: <strong>30 kg</strong></span>
+      </div>
+
+    </div>
   </div>
 
+  <!-- ══════════════════════════════════
+       PASO 3 — NOTA + WHATSAPP
+  ══════════════════════════════════ -->
+
+  <!-- Nota cotización -->
+  <div class="cotiza-nota">
+    <span class="cotiza-nota-ico">💡</span>
+    <p>El <strong>administrador de Domicilios WIL</strong> recibirá tu solicitud y te
+       enviará una <strong>cotización personalizada</strong> según la distancia real,
+       el peso y las condiciones de acceso. <strong>Tú apruebas antes de pagar.</strong></p>
+  </div>
+
+  <!-- Botón WhatsApp -->
+  <div class="wa-wrap">
+    <button class="wa-btn" id="waBtn" onclick="enviarWA()">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+      </svg>
+      Solicitar cotización por WhatsApp
+    </button>
+    <p class="wa-note">Te responderemos en minutos con el valor exacto del envío 🛵</p>
+  </div>
+
+  <div class="spacer"></div>
 </main>
 
+<!-- BOTTOM NAV -->
 <nav class="bnav">
-  <button class="bi" onclick="window.location.href='index.html'"><span class="sym">home</span><span class="bi-lbl">Inicio</span></button>
-  <button class="bi active"><span class="sym f">package_2</span><span class="bi-lbl">Paquete</span></button>
-  <button class="bi" onclick="window.location.href='pedidoRastreo.html'"><span class="sym">search</span><span class="bi-lbl">Rastreo</span></button>
-  <button class="bi" onclick="window.location.href='soporte.html'"><span class="sym">person</span><span class="bi-lbl">Soporte</span></button>
+  <button class="bi" onclick="window.location.href='index.html'">
+    <span class="sym">home</span><span class="bi-lbl">Inicio</span>
+  </button>
+  <button class="bi active">
+    <span class="sym f">package_2</span><span class="bi-lbl">Paquete</span>
+  </button>
+  <button class="bi" onclick="window.location.href='pedidoRastreo.html'">
+    <span class="sym">search</span><span class="bi-lbl">Rastreo</span>
+  </button>
+  <button class="bi" onclick="window.location.href='soporte.html'">
+    <span class="sym">person</span><span class="bi-lbl">Soporte</span>
+  </button>
 </nav>
 
 <script>
-/* ═══════════════════════════
+/* ═══════════════════════════════════════════════════
    CONFIG
-═══════════════════════════ */
-// Ajusta a tu endpoint real de la API de Domicilios WIL
-var API_BASE = 'https://domicilios-wil.vercel.app/api';
-var WA_NUM   = '573023452213';
+═══════════════════════════════════════════════════ */
+var WIL_WA  = '573023452213';
+var WIL_LAT = 6.3459291;
+var WIL_LNG = -75.512814;
 
-/* ═══════════════════════════
-   DATOS DE ZONAS
-═══════════════════════════ */
-// Estructura por barrio individual con precio propio
-var WIL_BARRIOS = [
-  {barrio:'ASUNCIÓN',              precio:5000,  zonaId:'z1'},
-  {barrio:'FÁTIMA',                precio:5000,  zonaId:'z1'},
-  {barrio:'MIRADOR AZUL',          precio:5000,  zonaId:'z1'},
-  {barrio:'AZULITA PARTE BAJA',    precio:5000,  zonaId:'z1'},
-  {barrio:'CRISTO REY (ABAJO DE LA PISCINA)', precio:5000, zonaId:'z1'},
-  {barrio:'HORIZONTES',            precio:5000,  zonaId:'z1'},
-  {barrio:'MIRAFLORES',            precio:5000,  zonaId:'z1'},
-  {barrio:'MISERICORDIA HASTA PRINCESS', precio:5000, zonaId:'z1'},
-  {barrio:'MOJÓN',                 precio:5000,  zonaId:'z1'},
-  {barrio:'PARQUE COPACABANA',     precio:5000,  zonaId:'z1'},
-  {barrio:'OBRERO',                precio:5000,  zonaId:'z1'},
-  {barrio:'PEDREGAL PARTE BAJA',   precio:5000,  zonaId:'z1'},
-  {barrio:'PEDRERA',               precio:5000,  zonaId:'z1'},
-  {barrio:'SAN FRANCISCO',         precio:5000,  zonaId:'z1'},
-  {barrio:'SHANGAY',               precio:5000,  zonaId:'z1'},
-  {barrio:'SIMÓN BOLÍVAR',         precio:5000,  zonaId:'z1'},
-  {barrio:'TOBÓN QUINTERO',        precio:5000,  zonaId:'z1'},
-  {barrio:'VEGAS PARTE BAJA',      precio:5000,  zonaId:'z1'},
-  {barrio:'MONTE VERDE',           precio:5000,  zonaId:'z1'},
-  {barrio:'REMANSO',               precio:5000,  zonaId:'z1'},
-  {barrio:'YARUMITO PARTE BAJA',   precio:5000,  zonaId:'z1'},
-  {barrio:'CANOAS HASTA LA TIENDA DEL CUSCO', precio:5000, zonaId:'z1'},
-  {barrio:'PIEDRAS BLANCAS',       precio:5000,  zonaId:'z1'},
-  {barrio:'PORVENIR',              precio:5000,  zonaId:'z1'},
-  {barrio:'RECREO',                precio:5000,  zonaId:'z1'},
+/* Estado GPS */
+var gps = {
+  lat:        null,
+  lng:        null,
+  direccion:  '',
+  distKm:     null,
+  distRealKm: null,
+  tiempoSeg:  null,
+  label:      ''
+};
 
-  {barrio:'CALORCOL',              precio:6000,  zonaId:'z2'},
-  {barrio:'AZULITA PARTE ALTA',    precio:6000,  zonaId:'z2'},
-  {barrio:'VILLAS DE COPACABANA',  precio:6000,  zonaId:'z2'},
-  {barrio:'TABLAZO',               precio:6000,  zonaId:'z2'},
-  {barrio:'CANOAS DESPUÉS DE LA TIENDA DEL CUSCO', precio:6000, zonaId:'z2'},
-  {barrio:'CRISTO REY DE LA PISCINA HACIA ARRIBA', precio:6000, zonaId:'z2'},
-  {barrio:'PEDREGAL PARTE ALTA',   precio:6000,  zonaId:'z2'},
-  {barrio:'COLINAS DEL PEDREGAL',  precio:6000,  zonaId:'z2'},
-  {barrio:'VEGAS INTERIORES IGLESIA MANANTIALES', precio:6000, zonaId:'z2'},
-  {barrio:'YARUMITO DESPUÉS DEL EMPEDRADO', precio:6000, zonaId:'z2'},
-  {barrio:'YARUMITO INTERIOR CANCHA NUEVA', precio:6000, zonaId:'z2'},
-  {barrio:'VEGAS PARTE ALTA',      precio:6000,  zonaId:'z2'},
-  {barrio:'EDIFICIOS AMARILLOS',   precio:6000,  zonaId:'z2'},
-  {barrio:'MONTESION',             precio:6000,  zonaId:'z2'},
-  {barrio:'JARDÍN DE LA MARGARITA',precio:6000,  zonaId:'z2'},
-  {barrio:'RESERVAS DE SAN JUAN 1',precio:6000,  zonaId:'z2'},
-  {barrio:'POSADA DEL VIENTO',     precio:6000,  zonaId:'z2'},
-  {barrio:'ROSA DE LOS VIENTOS',   precio:6000,  zonaId:'z2'},
-  {barrio:'VICENZA',               precio:6000,  zonaId:'z2'},
-  {barrio:'RESERVAS DE SAN JUAN 2',precio:6000,  zonaId:'z2'},
-
-  {barrio:'BARRIO MARIA',          precio:7000,  zonaId:'z3'},
-  {barrio:'PORTERIA PARCELACIÓN EL PARAISO', precio:7000, zonaId:'z3'},
-  {barrio:'TORRE DEL BOSQUE',      precio:7000,  zonaId:'z3'},
-  {barrio:'EDIFICIO POBLADO NORTE',precio:7000,  zonaId:'z3'},
-  {barrio:'SAN JUAN CAMPESTRE',    precio:7000,  zonaId:'z3'},
-
-  {barrio:'VIA MACHADO',           precio:8000,  zonaId:'z4'},
-  {barrio:'CANTERAS',              precio:8000,  zonaId:'z4'},
-  {barrio:'VILLANUEVA PARTE BAJA Y ALTA', precio:8000, zonaId:'z4'},
-  {barrio:'VILLA ROCA',            precio:8000,  zonaId:'z4'},
-  {barrio:'SAN JUAN',              precio:8000,  zonaId:'z4'},
-
-  {barrio:'GUASIMALITO (PARTE BAJA)', precio:10000, zonaId:'z5'},
-  {barrio:'MACHADO',               precio:10000, zonaId:'z5'},
-  {barrio:'GUASIMALITO (PARTE ALTA)', precio:13000, zonaId:'z5'},
-
-  {barrio:'UNIDADES DE MACHADO',   precio:11000, zonaId:'z6'},
-  {barrio:'ARBOLEDA DEL CAMPO',    precio:11000, zonaId:'z6'},
-  {barrio:'FONTIDUEÑO',            precio:13000, zonaId:'z6'},
-
-  {barrio:'NAVARRA',               precio:14000, zonaId:'z7'},
-  {barrio:'NIQUIA PARTE BAJA',     precio:14000, zonaId:'z7'},
-  {barrio:'UNIDADES DE NAVARRA',   precio:14000, zonaId:'z7'},
-
-  {barrio:'PARQUE DE GIRARDOTA',   precio:17000, zonaId:'z8'},
-  {barrio:'TOLEDO CAMPESTRE',      precio:17000, zonaId:'z8'},
-  {barrio:'PARQUE DE BELLO',       precio:18000, zonaId:'z8'},
-  {barrio:'FABRICATO',             precio:19000, zonaId:'z8'},
-  {barrio:'UNIDADES DE MADERA',    precio:25000, zonaId:'z8'},
-];
-
-var WIL_ZONAS = [
-  {id:'z1', nombre:'Zona 1 — Centro',       color:'#006970', gradiente:'linear-gradient(135deg,#004d52,#006970)', desc:'Barrios centrales de Copacabana'},
-  {id:'z2', nombre:'Zona 2 — Media',        color:'#00838f', gradiente:'linear-gradient(135deg,#006064,#00838f)', desc:'Barrios residenciales de altura media'},
-  {id:'z3', nombre:'Zona 3 — Alta',         color:'#1565c0', gradiente:'linear-gradient(135deg,#0d47a1,#1565c0)', desc:'Conjuntos cerrados y zonas de altura'},
-  {id:'z4', nombre:'Zona 4 — Rural',        color:'#6d4c41', gradiente:'linear-gradient(135deg,#4e342e,#6d4c41)', desc:'Sector rural y vías principales'},
-  {id:'z5', nombre:'Zona Especial',         color:'#e65100', gradiente:'linear-gradient(135deg,#bf360c,#e65100)', desc:'Sectores alejados'},
-  {id:'z6', nombre:'Zona Norte',            color:'#c62828', gradiente:'linear-gradient(135deg,#b71c1c,#c62828)', desc:'Fontidueño y sectores norte'},
-  {id:'z7', nombre:'Niquía / Navarra',      color:'#6a1b9a', gradiente:'linear-gradient(135deg,#4a148c,#6a1b9a)', desc:'Borde sur con Bello'},
-  {id:'z8', nombre:'Área Metropolitana',    color:'#1565c0', gradiente:'linear-gradient(135deg,#0d47a1,#1565c0)', desc:'Girardota, Bello, Fabricato y más'},
-];
-
-// Mapa rápido zonaId → zona
-var _zonaMap = {};
-WIL_ZONAS.forEach(function(z){ _zonaMap[z.id] = z; });
-
-var _estado = { zona: null, precio: 0, tamano: null, filtroZona: null, busqueda: '', barrioDst: '' };
-
-/* ═══════════════════════════
-   UTILIDADES
-═══════════════════════════ */
-function fmtCOP(n) { return '$' + (n||0).toLocaleString('es-CO'); }
-function norm(s) {
-  return (s||'').toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-    .replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
-}
-function _cap(s) {
-  return s.replace(/\w\S*/g, function(t){
-    return t.charAt(0).toUpperCase() + t.substr(1).toLowerCase();
-  });
-}
-
-/* TOAST */
+/* ═══════════════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════════════ */
 var _toastT = null;
 function toast(msg, icon) {
-  var t = document.getElementById('globalToast');
-  document.getElementById('globalToastMsg').textContent = msg;
-  document.getElementById('globalToastIcon').textContent = icon || 'info';
-  t.classList.add('show');
+  var el = document.getElementById('globalToast');
+  var ic = document.getElementById('globalToastIcon');
+  var ms = document.getElementById('globalToastMsg');
+  if (ic) ic.textContent = icon || 'info';
+  if (ms) ms.textContent = msg;
+  el.classList.add('show');
   clearTimeout(_toastT);
-  _toastT = setTimeout(function(){ t.classList.remove('show'); }, 3200);
+  _toastT = setTimeout(function(){ el.classList.remove('show'); }, 3200);
 }
 
-/* ═══════════════════════════
-   RENDER CHIPS ZONAS
-═══════════════════════════ */
-function renderZonesChips() {
-  var track = document.getElementById('zonesTrack');
-  track.innerHTML = WIL_ZONAS.map(function(z) {
-    var activa = _estado.filtroZona === z.id;
-    var label = z.nombre.indexOf('—') !== -1 ? z.nombre.split('—')[1].trim() : z.nombre;
-    return '<div class="zone-pill' + (activa ? ' active' : '') + '" onclick="filtrarZona(\'' + z.id + '\')">'
-      + '<div style="width:7px;height:7px;border-radius:50%;background:' + z.color + ';flex-shrink:0"></div>'
-      + label + '</div>';
-  }).join('');
+/* ═══════════════════════════════════════════════════
+   STEPS INDICATOR
+═══════════════════════════════════════════════════ */
+function setStep(n) {
+  for (var i = 0; i < 3; i++) {
+    var el = document.getElementById('st' + i);
+    if (!el) continue;
+    el.classList.remove('active','done');
+    if (i < n)  el.classList.add('done');
+    if (i === n) el.classList.add('active');
+  }
 }
 
-/* ═══════════════════════════
-   RENDER BARRIOS — precio individual por barrio
-═══════════════════════════ */
-function renderBarrios() {
-  var grid    = document.getElementById('barriosGrid');
-  var countEl = document.getElementById('totalCount');
-  var resEl   = document.getElementById('resultsCount');
-  var busq    = norm(_estado.busqueda);
+/* ═══════════════════════════════════════════════════
+   HAVERSINE
+═══════════════════════════════════════════════════ */
+function haversineKm(la1, lo1, la2, lo2) {
+  var R = 6371,
+      dL = (la2-la1)*Math.PI/180,
+      dO = (lo2-lo1)*Math.PI/180,
+      a  = Math.sin(dL/2)*Math.sin(dL/2)
+         + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)
+         * Math.sin(dO/2)*Math.sin(dO/2);
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
 
-  // Filtrar lista flat
-  var items = WIL_BARRIOS.filter(function(item) {
-    var zonaOk = !_estado.filtroZona || item.zonaId === _estado.filtroZona;
-    var busqOk = !busq || norm(item.barrio).indexOf(busq) !== -1;
-    return zonaOk && busqOk;
-  });
+function fmtKm(km) {
+  if (km < 0.1) return Math.round(km*1000)+' m';
+  if (km < 1)   return (km*1000).toFixed(0)+' m';
+  return km.toFixed(1)+' km';
+}
 
-  countEl.textContent = items.length + ' barrios';
-  resEl.textContent = busq
-    ? items.length + ' resultado' + (items.length !== 1 ? 's' : '') + ' para "' + _estado.busqueda + '"'
-    : '';
+function fmtTiempo(seg) {
+  var m = Math.round(seg/60);
+  return m < 60 ? m+' min' : Math.floor(m/60)+'h '+(m%60)+' min';
+}
 
-  if (!items.length) {
-    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1">'
-      + '<div class="empty-icon">🔍</div>'
-      + '<div class="empty-tit">No encontramos ese barrio</div>'
-      + '<div class="empty-sub">Intenta con otro nombre o selecciona una zona diferente.</div>'
-      + '<button class="empty-btn" onclick="limpiarBusqueda()">'
-      + '<span class="sym f" style="font-size:14px">refresh</span>Ver todos</button></div>';
+/* ═══════════════════════════════════════════════════
+   OSRM — distancia real por carretera
+═══════════════════════════════════════════════════ */
+function osrmRoute(lat, lng, onOk, onFail) {
+  var url = 'https://router.project-osrm.org/route/v1/driving/'
+    +lng.toFixed(6)+','+lat.toFixed(6)+';'
+    +WIL_LNG.toFixed(6)+','+WIL_LAT.toFixed(6)
+    +'?overview=false&alternatives=false';
+  var ctrl = new AbortController();
+  var t    = setTimeout(function(){ ctrl.abort(); }, 10000);
+  fetch(url, { signal: ctrl.signal })
+    .then(function(r){ clearTimeout(t); return r.json(); })
+    .then(function(d){
+      if (d.code === 'Ok' && d.routes && d.routes[0]) {
+        onOk(d.routes[0].distance/1000, d.routes[0].duration);
+      } else onFail();
+    })
+    .catch(function(){ clearTimeout(t); onFail(); });
+}
+
+/* ═══════════════════════════════════════════════════
+   CAPTURAR GPS
+═══════════════════════════════════════════════════ */
+function capturarGPS() {
+  var btn    = document.getElementById('gpsBtn');
+  var result = document.getElementById('gpsResult');
+
+  if (!navigator.geolocation) {
+    toast('GPS no disponible en tu dispositivo.', 'location_off');
     return;
   }
 
-  grid.innerHTML = items.map(function(item) {
-    var z   = _zonaMap[item.zonaId];
-    var b   = item.barrio;
-    var p   = item.precio;
-    var bEsc = b.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-    return '<div class="barrio-card" onclick="paqAbrirBarrio(\'' + item.zonaId + '\',\'' + bEsc + '\',' + p + ')">'
-      + '<div class="barrio-card-accent" style="background:' + z.gradiente + '"></div>'
-      + '<div class="barrio-card-body">'
-      + '<div class="barrio-zone-tag" style="color:' + z.color + '">' + z.nombre + '</div>'
-      + '<div class="barrio-name">' + _resaltar(b, busq) + '</div>'
-      + '<div class="barrio-price-row">'
-      + '<div><div class="barrio-price" style="color:' + z.color + '">' + fmtCOP(p) + '</div>'
-      + '<div class="barrio-price-lbl">Tarifa base</div></div>'
-      + '</div>'
-      + '<button class="barrio-btn" style="background:' + z.gradiente + ';box-shadow:0 3px 10px ' + z.color + '44">'
-      + '<span class="sym f" style="font-size:11px">package_2</span>Enviar aquí</button>'
-      + '</div></div>';
-  }).join('');
-}
+  gps.lat = gps.lng = null;
+  gps.distKm = gps.distRealKm = gps.tiempoSeg = null;
+  gps.direccion = gps.label = '';
 
-function _resaltar(texto, busq) {
-  if (!busq) return texto;
-  var nt = norm(texto), idx = nt.indexOf(busq);
-  if (idx === -1) return texto;
-  return texto.slice(0,idx)
-    + '<mark style="background:rgba(0,105,112,.15);color:var(--p);border-radius:3px;font-weight:900">'
-    + texto.slice(idx, idx+busq.length) + '</mark>'
-    + texto.slice(idx+busq.length);
-}
-
-/* ═══════════════════════════
-   FILTROS
-═══════════════════════════ */
-function filtrarZona(id) {
-  _estado.filtroZona = (_estado.filtroZona === id) ? null : id;
-  renderZonesChips();
-  renderBarrios();
-}
-function filtrarBarrios(val) {
-  _estado.busqueda = val;
-  var clr = document.getElementById('searchClear');
-  clr.classList.toggle('show', !!val);
-  if (val) { _estado.filtroZona = null; renderZonesChips(); }
-  renderBarrios();
-}
-function limpiarBusqueda() {
-  document.getElementById('searchInput').value = '';
-  _estado.busqueda = '';
-  document.getElementById('searchClear').classList.remove('show');
-  renderBarrios();
-}
-
-/* ═══════════════════════════
-   SHEET
-═══════════════════════════ */
-function paqAbrirBarrio(zonaId, barrio, precio) {
-  var zona = _zonaMap[zonaId];
-  if (!zona) return;
-  _estado.zona      = zona;
-  _estado.precio    = precio;
-  _estado.tamano    = null;
-  _estado.barrioDst = barrio;
-
-  document.getElementById('paqSheetHdr').style.background = zona.gradiente;
-  document.getElementById('paqHdrTit').textContent = 'Envío a ' + _cap(barrio);
-  document.getElementById('paqHdrSub').textContent = zona.nombre + ' · ' + fmtCOP(precio);
-
-  document.getElementById('paqZonaNombre').textContent = _cap(barrio);
-  document.getElementById('paqZonaDesc').textContent   = zona.desc;
-  document.getElementById('paqPrecioVal').textContent  = fmtCOP(precio);
-
-  // Step nums color
-  document.querySelectorAll('.pq-sn').forEach(function(el){ el.style.background = zona.color; });
-
-  // Botón confirmar color
-  var btn = document.getElementById('paqConfirmarBtn');
-  btn.style.background = zona.gradiente;
-  btn.style.boxShadow = '0 6px 22px ' + zona.color + '55';
-
-  // Dir placeholder
-  var dirEnt = document.getElementById('paqDirEnt');
-  if (dirEnt && !dirEnt.value.trim()) dirEnt.placeholder = 'Dirección en ' + _cap(barrio) + '…';
-
-  // Reset
-  document.querySelectorAll('.pq-tam-opt').forEach(function(b){ b.classList.remove('sel'); });
-  document.getElementById('paqSuccess').classList.add('hidden');
-  btn.classList.remove('loading');
-
-  document.getElementById('paq-overlay').classList.add('open');
-  document.body.style.overflow = 'hidden';
-}
-
-function paqCerrar() {
-  document.getElementById('paq-overlay').classList.remove('open');
-  document.body.style.overflow = '';
-  limpiarForm();
-}
-
-document.addEventListener('keydown', function(e){ if (e.key === 'Escape') paqCerrar(); });
-
-/* ═══════════════════════════
-   FORM
-═══════════════════════════ */
-function paqSelTam(el) {
-  document.querySelectorAll('.pq-tam-opt').forEach(function(b){ b.classList.remove('sel'); });
-  el.classList.add('sel');
-  _estado.tamano = el.dataset.sz;
-}
-
-function g(id) { var e = document.getElementById(id); return e ? e.value.trim() : ''; }
-
-/* ═══════════════════════════
-   ENVÍO A BD
-═══════════════════════════ */
-function paqEnviarBD() {
-  // Validaciones
-  if (!_estado.tamano)       { toast('Selecciona el tamaño del paquete.', 'inventory_2'); return; }
-  if (!g('paqBarrioRec'))    { toast('Escribe el barrio de recogida.', 'location_on'); return; }
-  if (!g('paqDirRec'))       { toast('Escribe la dirección de recogida.', 'location_on'); return; }
-  if (!g('paqNombreRec'))    { toast('Escribe el nombre de quien recibe.', 'person'); return; }
-  if (!g('paqTelRec2'))      { toast('Escribe el teléfono del destinatario.', 'phone'); return; }
-  if (!g('paqDirEnt'))       { toast('Escribe la dirección de entrega.', 'location_on'); return; }
-  if (!g('paqNombreEnv'))    { toast('Escribe tu nombre.', 'person'); return; }
-  if (!g('paqTelEnv'))       { toast('Escribe tu teléfono.', 'phone'); return; }
-
-  var zona = _estado.zona;
-  var SZ = { pequeno:'Pequeño (hasta 5 kg)', mediano:'Mediano (5–15 kg)', grande:'Grande (15–30 kg)' };
-
-  // Payload para la BD
-  var payload = {
-    tipo: 'paqueteria',
-    estado: 'pendiente',
-    createdAt: new Date().toISOString(),
-    zona: {
-      id:      zona.id,
-      nombre:  zona.nombre,
-      precio:  zona.precio
-    },
-    destino: {
-      barrio:    _estado.barrioDst,
-      direccion: g('paqDirEnt'),
-      referencia: g('paqRefEnt')
-    },
-    paquete: {
-      tamano:      _estado.tamano,
-      tamanoLabel: SZ[_estado.tamano],
-      descripcion: g('paqDescripcion')
-    },
-    recogida: {
-      barrio:    g('paqBarrioRec'),
-      direccion: g('paqDirRec'),
-      telefono:  g('paqTelRec')
-    },
-    destinatario: {
-      nombre:    g('paqNombreRec'),
-      telefono:  g('paqTelRec2')
-    },
-    remitente: {
-      nombre:   g('paqNombreEnv'),
-      telefono: g('paqTelEnv')
-    },
-    tarifaBase: _estado.precio
-  };
-
-  // Loading
-  var btn = document.getElementById('paqConfirmarBtn');
+  btn.disabled = true;
   btn.classList.add('loading');
 
-  fetch(API_BASE + '/paqueteria', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  })
-  .then(function(res) {
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    return res.json();
-  })
-  .then(function(data) {
-    btn.classList.remove('loading');
-    // Mostrar éxito
-    var successEl = document.getElementById('paqSuccess');
-    var idStr = data._id || data.id || data.pedidoId || '—';
-    document.getElementById('paqSuccessId').textContent = 'ID: ' + idStr;
-    successEl.classList.remove('hidden');
-    toast('✅ Solicitud registrada', 'check_circle');
-  })
-  .catch(function(err) {
-    btn.classList.remove('loading');
-    console.error('[WIL paquetería]', err);
-    // Fallback: si la API falla, ofrecemos WhatsApp
-    toast('Error de conexión — intenta por WhatsApp', 'wifi_off');
-    setTimeout(function(){ _fallbackWA(payload); }, 1200);
-  });
+  navigator.geolocation.getCurrentPosition(
+    /* ── ÉXITO ── */
+    function(pos) {
+      var lat = pos.coords.latitude;
+      var lng = pos.coords.longitude;
+      gps.lat = lat;
+      gps.lng = lng;
+
+      /* Haversine inmediato */
+      var dLinea  = haversineKm(lat, lng, WIL_LAT, WIL_LNG);
+      gps.distKm  = dLinea;
+      gps.label   = fmtKm(dLinea) + ' (línea recta)';
+
+      var elDist  = document.getElementById('gpsDistTxt');
+      var elCoord = document.getElementById('gpsCoordTxt');
+      var elDir   = document.getElementById('gpsDirTxt');
+
+      if (elDist)  elDist.textContent  = fmtKm(dLinea) + ' — calculando ruta real…';
+      if (elCoord) elCoord.textContent = lat.toFixed(6) + ', ' + lng.toFixed(6);
+      result.classList.add('show');
+
+      /* Restaurar botón con check */
+      btn.disabled = false;
+      btn.classList.remove('loading');
+      btn.innerHTML =
+        '<span class="sym f btn-ico" style="font-size:19px;color:#fff">check_circle</span>'
+        +'<span class="btn-txt">Ubicación capturada ✓</span>'
+        +'<div class="spin-el"></div>';
+      btn.style.background = 'linear-gradient(135deg,#14532d,#15803d)';
+
+      /* Actualizar step */
+      setStep(1);
+
+      /* OSRM — distancia real por carretera */
+      osrmRoute(lat, lng,
+        function(kmReal, seg) {
+          gps.distRealKm = kmReal;
+          gps.tiempoSeg  = seg;
+          gps.label      = fmtKm(kmReal) + ' por carretera (~'+fmtTiempo(seg)+')';
+          if (elDist)
+            elDist.textContent = fmtKm(kmReal) + ' por carretera (~'+fmtTiempo(seg)+') desde WIL';
+          toast('📍 '+fmtKm(kmReal)+' por carretera · '+fmtTiempo(seg), 'check_circle');
+        },
+        function() {
+          gps.label = fmtKm(dLinea) + ' en línea recta';
+          if (elDist)
+            elDist.textContent = fmtKm(dLinea) + ' en línea recta desde WIL';
+          toast('📍 Ubicación capturada · '+fmtKm(dLinea), 'check_circle');
+        }
+      );
+
+      /* Nominatim — geocodificación inversa */
+      if (elDir) elDir.textContent = 'Identificando zona…';
+      fetch(
+        'https://nominatim.openstreetmap.org/reverse?lat='+lat+'&lon='+lng
+        +'&format=json&accept-language=es',
+        { headers: { 'User-Agent': 'DomiciliosWIL/1.0' } }
+      )
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          var a   = d.address || {};
+          var dir = [
+            (a.road||a.street||'').trim(),
+            (a.hamlet||a.village||a.neighbourhood||a.suburb||'').trim(),
+            (a.municipality||a.city||a.town||'').trim(),
+            (a.county||'').trim()
+          ].filter(Boolean).join(', ');
+          gps.direccion = dir || lat.toFixed(5)+', '+lng.toFixed(5);
+          if (elDir) elDir.textContent = gps.direccion;
+        })
+        .catch(function(){
+          gps.direccion = lat.toFixed(5)+', '+lng.toFixed(5);
+          if (elDir) elDir.textContent = gps.direccion;
+        });
+    },
+    /* ── ERROR ── */
+    function(err) {
+      btn.disabled = false;
+      btn.classList.remove('loading');
+      btn.innerHTML =
+        '<span class="sym f btn-ico" style="font-size:19px">my_location</span>'
+        +'<span class="btn-txt">Reintentar GPS</span>'
+        +'<div class="spin-el"></div>';
+      var msg = 'No se pudo capturar el GPS.';
+      if (err.code === 1) msg = 'Permiso de ubicación denegado. Actívalo en ajustes.';
+      if (err.code === 3) msg = 'Tiempo agotado. Asegúrate de tener señal GPS.';
+      toast(msg, 'location_off');
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+  );
 }
 
-/* Fallback WhatsApp si la API falla */
-function _fallbackWA(p) {
-  var SZ = { pequeno:'Pequeño (hasta 5 kg)', mediano:'Mediano (5–15 kg)', grande:'Grande (15–30 kg)' };
-  var msg = [
+/* ═══════════════════════════════════════════════════
+   VALIDACIÓN FORMULARIO — actualizar step
+═══════════════════════════════════════════════════ */
+function checkForm() {
+  var nombre  = (document.getElementById('fNombre').value    || '').trim();
+  var tel     = (document.getElementById('fTelEnvio').value  || '').trim();
+  var destino = (document.getElementById('fDestino').value   || '').trim();
+  var telEnt  = (document.getElementById('fTelEntrega').value|| '').trim();
+  var desc    = (document.getElementById('fDescripcion').value|| '').trim();
+  var ok = nombre && tel && destino && telEnt && desc;
+  setStep(ok ? 2 : 1);
+}
+
+/* ═══════════════════════════════════════════════════
+   ENVIAR WHATSAPP
+═══════════════════════════════════════════════════ */
+function enviarWA() {
+  function val(id){ var e=document.getElementById(id); return e?e.value.trim():''; }
+
+  var nombre       = val('fNombre');
+  var telEnvio     = val('fTelEnvio');
+  var comercio     = val('fComercio');
+  var telRecogida  = val('fTelRecogida');
+  var destino      = val('fDestino');
+  var referencia   = val('fReferencia');
+  var telEntrega   = val('fTelEntrega');
+  var descripcion  = val('fDescripcion');
+
+  /* Validaciones */
+  if (!nombre)      { toast('Escribe tu nombre.',                        'person');      return; }
+  if (!telEnvio)    { toast('Escribe tu teléfono.',                      'phone');       return; }
+  if (!destino)     { toast('Indica el destino del envío.',              'location_on'); return; }
+  if (!telEntrega)  { toast('Escribe el teléfono de quien recibe.',      'phone');       return; }
+  if (!descripcion) { toast('Describe qué vamos a transportar.',         'inventory_2'); return; }
+
+  /* Enlace GPS */
+  var enlaceUbic = gps.lat
+    ? 'https://www.google.com/maps?q='+gps.lat.toFixed(6)+','+gps.lng.toFixed(6)
+    : 'No capturada';
+
+  /* Resumen distancia */
+  var distInfo;
+  if (gps.distRealKm !== null) {
+    distInfo = fmtKm(gps.distRealKm) + ' por carretera'
+      + (gps.tiempoSeg ? ' (~'+fmtTiempo(gps.tiempoSeg)+')' : '') + ' ✅';
+  } else if (gps.distKm !== null) {
+    distInfo = fmtKm(gps.distKm) + ' en línea recta';
+  } else {
+    distInfo = 'Sin datos GPS (se cotiza al confirmar)';
+  }
+
+  /* Construir mensaje */
+  var lineas = [
     '📦 *SOLICITUD DE ENVÍO — Domicilios WIL*',
     '',
-    '━━ 📍 ORIGEN ━━',
-    '🏠 *Barrio:* ' + p.recogida.barrio,
-    '📌 *Dirección:* ' + p.recogida.direccion,
-    p.recogida.telefono ? '📞 *Tel:* ' + p.recogida.telefono : null,
+    '👤 *Nombre (remitente):* '   + nombre,
+    '📱 *Teléfono (remitente):* ' + telEnvio,
     '',
-    '━━ 📬 DESTINO ━━',
-    '🏘️ *Barrio:* ' + _cap(p.destino.barrio),
-    '🏠 *Dirección:* ' + p.destino.direccion,
-    p.destino.referencia ? '🗝️ *Ref:* ' + p.destino.referencia : null,
+    '🏪 *Punto de recogida:* '    + (comercio   || 'No indicado'),
+    telRecogida ? ('📞 *Tel. recogida:* ' + telRecogida) : null,
     '',
-    '━━ 📦 PAQUETE ━━',
-    '📏 *Tamaño:* ' + (SZ[p.paquete.tamano] || p.paquete.tamano),
-    p.paquete.descripcion ? '📋 *Descripción:* ' + p.paquete.descripcion : null,
+    '🎯 *Destino:* '              + destino,
+    referencia  ? ('🏡 *Referencia destino:*\n' + referencia) : null,
+    '📞 *Tel. entrega:* '         + telEntrega,
     '',
-    '━━ 👤 DESTINATARIO ━━',
-    '🎁 ' + p.destinatario.nombre + ' · ' + p.destinatario.telefono,
+    '📋 *Descripción del envío:*',
+    descripcion,
     '',
-    '━━ 📤 REMITENTE ━━',
-    '👤 ' + p.remitente.nombre + ' · ' + p.remitente.telefono,
+    '📍 *Ubicación GPS del remitente:*',
+    gps.direccion || '(No capturada)',
+    '🗺️ ' + enlaceUbic,
     '',
-    '💰 *Tarifa base:* $' + (p.tarifaBase||0).toLocaleString('es-CO'),
-    '⚠️ Máx. 30 kg · Sujeta a confirmación.'
-  ].filter(function(l){ return l !== null; }).join('\n');
+    '📏 *Distancia desde WIL:* '  + distInfo,
+    '',
+    '⏳ _Esperando cotización del administrador…_'
+  ]
+    .filter(function(l){ return l !== null; })
+    .join('\n');
 
-  window.open('https://wa.me/' + WA_NUM + '?text=' + encodeURIComponent(msg), '_blank', 'noopener,noreferrer');
+  var url = 'https://wa.me/' + WIL_WA + '?text=' + encodeURIComponent(lineas);
+  window.open(url, '_blank', 'noopener,noreferrer');
 }
-
-/* ═══════════════════════════
-   WhatsApp COTIZACIÓN EXTERNA
-═══════════════════════════ */
-function abrirWACotizar() {
-  var msg = '📦 *Hola WIL, quiero cotizar un envío fuera de Copacabana.*\n\n¿Me pueden dar información de tarifas y disponibilidad?';
-  window.open('https://wa.me/' + WA_NUM + '?text=' + encodeURIComponent(msg), '_blank', 'noopener,noreferrer');
-}
-
-/* ═══════════════════════════
-   LIMPIAR
-═══════════════════════════ */
-function limpiarForm() {
-  ['paqBarrioRec','paqDirRec','paqTelRec','paqNombreRec','paqTelRec2',
-   'paqDirEnt','paqRefEnt','paqNombreEnv','paqTelEnv','paqDescripcion'].forEach(function(id){
-    var el = document.getElementById(id); if (el) el.value = '';
-  });
-  document.querySelectorAll('.pq-tam-opt').forEach(function(b){ b.classList.remove('sel'); });
-  _estado.tamano = null;
-}
-
-/* ═══════════════════════════
-   NAV
-═══════════════════════════ */
-function goBack() { window.history.back(); }
-
-/* ═══════════════════════════
-   INIT
-═══════════════════════════ */
-renderZonesChips();
-renderBarrios();
 </script>
 </body>
 </html>
