@@ -97,6 +97,20 @@ async function resolverIdWil(valor) {
   return valor.toUpperCase().trim();
 }
 
+async function siguienteId() {
+  const doc = await Contador.findByIdAndUpdate(
+    'pedido',
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true }
+  );
+  const n      = doc.seq - 1;
+  const numero = String((n % 99) + 1).padStart(2, '0');
+  const vuelta = Math.floor(n / 99);
+  const letra1 = String.fromCharCode(65 + Math.floor(vuelta / 26) % 26);
+  const letra2 = String.fromCharCode(65 + (vuelta % 26));
+  return numero + letra1 + letra2;
+}
+
 /* ══════════════════════════════════════════════════════════════
    HANDLER
 ══════════════════════════════════════════════════════════════ */
@@ -121,6 +135,8 @@ export default async function handler(req, res) {
       const body = req.body || {};
       if (!body.idPedido)
         return res.status(400).json({ ok: false, error: 'Falta idPedido en el body' });
+      body.idPedido = await siguienteId();
+
 
       const nuevo = await Pedido.create(body);
       return res.status(201).json({ ok: true, data: nuevo });
