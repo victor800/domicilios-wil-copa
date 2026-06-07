@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#006970"/>
+<title>Paquetería — Domicilios WIL</title>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icons/icon-192.png"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --p:#006970;--p2:#00a3b4;--p3:#00bcc9;
+  --pl:rgba(0,105,112,.09);--plb:rgba(0,105,112,.18);
+  --surf:#f0f4f7;--w:#ffffff;--w2:#f8fafb;--w3:#eef1f5;
+  --on:#18222e;--on2:#3d5068;--on3:#7a8fa6;
+  --gr:#16a34a;--rd:#dc2626;--am:#d97706;
+  --r-2xl:22px;--r-xl:17px;--r-lg:13px;--r-md:10px;
+  --sh:0 2px 10px rgba(0,60,80,.07);
+  --sh2:0 6px 24px rgba(0,60,80,.11);
+  --sh3:0 12px 40px rgba(0,60,80,.15);
+}
+html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(--surf);color:var(--on);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+.sym{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;font-size:22px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;direction:ltr;-webkit-font-smoothing:antialiased;font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24}
+.sym.f{font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24}
+.hidden{display:none!important}
+.spacer{height:20px}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes rot{to{transform:rotate(360deg)}}
+.spin{display:inline-block;width:16px;height:16px;border:2.5px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:rot .7s linear infinite;vertical-align:middle}
+.spin.dk{border-color:rgba(0,105,112,.2);border-top-color:var(--p)}
+
+/* HEADER */
+.hdr{position:fixed;top:0;left:0;right:0;z-index:200;height:56px;padding:0 14px;padding-top:env(safe-area-inset-top);display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.94);backdrop-filter:blur(24px);border-bottom:1px solid rgba(0,105,112,.08);box-shadow:0 1px 8px rgba(0,60,80,.06)}
+.hdr-back{width:34px;height:34px;border-radius:50%;border:none;background:var(--pl);color:var(--p);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s}
+.hdr-back:active{transform:scale(.88)}
+.hdr-logo{width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid rgba(0,105,112,.18)}
+.hdr-title{font-weight:800;font-size:15px;color:var(--on);flex:1;letter-spacing:-.01em}
+
+/* BOTTOM NAV */
+.bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;z-index:200;background:rgba(255,255,255,.97);backdrop-filter:blur(20px);border-top:1px solid rgba(0,105,112,.07);border-radius:20px 20px 0 0;display:flex;padding:6px 8px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -4px 24px rgba(0,60,80,.08)}
+.bi{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 4px;border-radius:12px;cursor:pointer;border:none;background:transparent;color:var(--on3);transition:.18s}
+.bi.active{background:var(--pl);color:var(--p)}
+.bi .sym{font-size:21px}
+.bi-lbl{font-size:9px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+
+/* MAIN */
+.main{padding-top:calc(56px + env(safe-area-inset-top));padding-bottom:calc(74px + env(safe-area-inset-bottom));max-width:480px;margin:0 auto}
+.view{display:none;animation:fadeUp .24s cubic-bezier(.22,1,.36,1) both}
+.view.active{display:block}
+
+/* PROGRESS BAR */
+.progress-bar{height:3px;background:#e2e9ef;margin:0 16px 0;border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--p),var(--p2));border-radius:3px;transition:width .4s cubic-bezier(.22,1,.36,1)}
+
+/* STEP HEADER */
+.step-hdr{padding:18px 16px 10px}
+.step-hdr-title{font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:4px}
+.step-hdr-sub{font-size:13px;color:var(--on3);font-weight:500}
+
+/* CARD */
+.card{background:var(--w);border:1.5px solid #e2e9ef;border-radius:var(--r-xl);margin:0 16px 12px;padding:16px;box-shadow:var(--sh)}
+.card-tit{font-size:14px;font-weight:800;color:var(--on);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.card-tit .sym{font-size:18px;color:var(--p)}
+
+/* FIELD */
+.field{margin-bottom:12px}
+.field label{display:block;font-size:11px;font-weight:700;color:var(--on3);margin-bottom:5px;letter-spacing:.04em;text-transform:uppercase}
+.field input,.field textarea{width:100%;border:1.5px solid #dce3ea;border-radius:var(--r-lg);padding:11px 13px;font-size:14px;font-family:'Plus Jakarta Sans',sans-serif;color:var(--on);background:#fff;outline:none;transition:.15s;resize:none}
+.field input::placeholder,.field textarea::placeholder{color:var(--on3)}
+.field input:focus,.field textarea:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(0,105,112,.08)}
+.field textarea{min-height:76px}
+.field-note{font-size:10.5px;color:var(--on3);margin-top:4px;font-weight:500}
+
+/* TAMAÑO */
+.tam-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.tam-opt{border:1.5px solid #dce3ea;border-radius:14px;padding:14px 8px;cursor:pointer;text-align:center;background:#f8fafb;transition:.18s}
+.tam-opt:active{transform:scale(.95)}
+.tam-opt.sel{border-color:var(--p);background:var(--pl)}
+.tam-opt-emo{font-size:32px;display:block;margin-bottom:6px}
+.tam-opt-nom{font-size:12px;font-weight:800;color:var(--on)}
+.tam-opt-sub{font-size:10px;color:var(--on3);margin-top:2px}
+.tam-opt.sel .tam-opt-nom{color:var(--p)}
+
+/* BARRIO AUTOCOMPLETE */
+.barrio-wrap{position:relative}
+.barrio-input{width:100%;border:1.5px solid #dce3ea;border-radius:var(--r-lg);padding:11px 13px;font-size:14px;font-family:'Plus Jakarta Sans',sans-serif;color:var(--on);background:#fff;outline:none;transition:.15s}
+.barrio-input:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(0,105,112,.08)}
+.barrio-sugs{display:none;position:absolute;left:0;right:0;top:100%;z-index:999;background:#fff;border:1.5px solid var(--plb);border-radius:var(--r-lg);box-shadow:var(--sh2);max-height:220px;overflow-y:auto;margin-top:4px}
+.barrio-sug-item{padding:10px 14px;font-size:13px;font-weight:600;color:var(--on);cursor:pointer;border-bottom:1px solid #f0f3f6;display:flex;align-items:center;justify-content:space-between;gap:8px;transition:background .12s}
+.barrio-sug-item:last-child{border-bottom:none}
+.barrio-sug-item:active{background:var(--pl)}
+.barrio-sug-match{color:var(--p);font-weight:800}
+.barrio-sug-precio{font-size:11px;font-weight:700;color:#15803d;background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:2px 7px;flex-shrink:0}
+.barrio-sug-ooz{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;background:#fff7ed;border-top:1.5px solid #fed7aa;font-size:12.5px;color:#c2410c;font-weight:600;transition:background .15s}
+.barrio-sug-ooz:hover{background:#ffedd5}
+
+/* TARIFA PILL */
+.tarifa-pill{border-radius:var(--r-md);background:#f0fdf4;border:1.5px solid #86efac;padding:12px 14px;display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.tarifa-pill-val{font-size:20px;font-weight:900;color:#15803d}
+.tarifa-pill-sub{font-size:11px;color:#166534;font-weight:600;margin-top:1px}
+
+/* OOZ PANEL */
+.ooz-panel{display:none;margin-top:10px;border:2px solid #f97316;border-radius:14px;background:#fff7ed;padding:14px;animation:oozIn .22s ease}
+@keyframes oozIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.ooz-header{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.ooz-icon{font-size:22px;flex-shrink:0}
+.ooz-title{font-size:13px;font-weight:800;color:#c2410c;line-height:1.3}
+.ooz-sub{font-size:11px;color:#ea580c;margin-top:1px;font-weight:500}
+.ooz-input{width:100%;border:1.5px solid #fdba74;border-radius:10px;padding:10px 12px;font-size:13px;background:#fff;font-family:'Plus Jakarta Sans',sans-serif;outline:none;transition:.15s;box-sizing:border-box;margin-bottom:8px}
+.ooz-input:focus{border-color:#f97316}
+.ooz-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:11px;border-radius:10px;border:none;background:#f97316;color:#fff;font-size:13px;font-weight:800;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:background .15s}
+.ooz-btn:active{background:#ea580c;transform:scale(.98)}
+.ooz-result{display:none;align-items:center;gap:8px;margin-top:8px;padding:9px 12px;border-radius:10px;background:#f0fdf4;border:1.5px solid #86efac;color:#15803d;font-size:12px;font-weight:700}
+
+/* FUERA WA PANEL */
+.ooz-wa-note{display:none;margin-top:10px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:12px;padding:12px 14px;font-size:12px;color:#15803d;font-weight:600;line-height:1.5}
+.ooz-wa-btn{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;padding:14px;border-radius:14px;background:linear-gradient(135deg,#16a34a 0%,#22c55e 50%,#25D366 100%);color:#fff;font-size:14px;font-weight:900;cursor:pointer;text-decoration:none;border:none;font-family:'Plus Jakarta Sans',sans-serif;box-shadow:0 6px 24px rgba(37,211,102,.42);margin-top:10px;transition:all .18s}
+.ooz-wa-btn:active{transform:scale(.97)}
+
+/* MÉTODO PAGO */
+.pago-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pago-c{border:1.5px solid #dce3ea;border-radius:var(--r-lg);padding:14px 10px;cursor:pointer;text-align:center;background:#f8fafb;transition:.18s}
+.pago-c.sel{border-color:var(--p);background:var(--pl)}
+.pago-ico{font-size:26px;margin-bottom:5px}
+.pago-lbl{font-size:12.5px;font-weight:800;color:var(--on)}
+.pago-sub{font-size:10px;color:var(--on3);margin-top:2px}
+.pago-c.sel .pago-lbl{color:var(--p)}
+
+/* CUENTA TRANSFERENCIA */
+.cuenta-card{border-radius:18px;background:linear-gradient(135deg,#006970 0%,#00898f 55%,#00a99d 100%);padding:22px 20px 18px;color:#fff;overflow:hidden;position:relative;box-shadow:0 8px 28px rgba(0,105,112,.32);margin-top:12px}
+.cuenta-card::before{content:'';position:absolute;top:-30px;right:-30px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.07)}
+.cuenta-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px}
+.cuenta-banco-lbl{font-size:9px;font-weight:700;letter-spacing:.1em;opacity:.6;text-transform:uppercase;margin-bottom:2px}
+.cuenta-banco{font-size:13px;font-weight:700;opacity:.85}
+.cuenta-chip{width:34px;height:26px;border-radius:5px;background:linear-gradient(135deg,#e8c97a,#c8a040);position:relative;overflow:hidden;flex-shrink:0}
+.cuenta-chip::after{content:'';position:absolute;width:100%;height:1px;background:rgba(0,0,0,.18);top:50%}
+.cuenta-chip::before{content:'';position:absolute;height:100%;width:1px;background:rgba(0,0,0,.18);left:50%}
+.cuenta-num{font-size:18px;font-weight:800;letter-spacing:.18em;margin-bottom:16px;font-family:'Plus Jakarta Sans',monospace}
+.cuenta-bottom{display:flex;justify-content:space-between;align-items:flex-end}
+.cuenta-val{font-size:13px;font-weight:700}
+.cuenta-tipo{font-size:10px;opacity:.7;font-weight:600}
+.copy-btn{margin-top:10px;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;padding:11px;border-radius:11px;border:1.5px solid rgba(0,105,112,.22);background:rgba(0,105,112,.06);color:#006970;font-size:13px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:background .15s}
+.copy-btn:active{background:rgba(0,105,112,.14);transform:scale(.97)}
+
+/* RESUMEN CARD */
+.resumen-row{display:flex;justify-content:space-between;align-items:flex-start;padding:6px 0;border-bottom:1px solid #f3f5f7}
+.resumen-row:last-child{border-bottom:none}
+.resumen-lbl{font-size:11px;color:var(--on3);font-weight:600;flex-shrink:0;padding-right:10px}
+.resumen-val{font-size:12px;color:var(--on);font-weight:700;text-align:right;flex:1}
+
+/* ACCIÓN BTNS */
+.act-row{padding:12px 16px 4px;display:flex;gap:10px}
+.btn-b{flex:1;padding:13px;border-radius:var(--r-lg);border:1.5px solid #dce3ea;background:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;color:var(--on2);cursor:pointer;transition:.15s}
+.btn-n{flex:2;padding:13px;border-radius:var(--r-lg);border:none;background:var(--p);font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:800;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 4px 16px rgba(0,105,112,.3);transition:.15s}
+.btn-n:active{transform:scale(.97)}.btn-n:disabled{opacity:.5;pointer-events:none}
+.btn-n .sym{font-size:17px}
+.btn-full{width:100%;padding:14px;border-radius:var(--r-lg);border:none;background:var(--p);font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:800;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 4px 16px rgba(0,105,112,.28);transition:.15s}
+.btn-full:active{transform:scale(.97)}
+.btn-full.gr{background:#16a34a;box-shadow:0 4px 16px rgba(22,163,74,.28)}
+.btn-full.dk{background:var(--on);box-shadow:none}
+.btn-full .sym{font-size:18px}
+
+/* CONFIRMADO */
+.succ-wrap{display:flex;flex-direction:column;align-items:center;padding:36px 24px 20px;text-align:center}
+.succ-ring{width:78px;height:78px;border-radius:50%;background:rgba(22,163,74,.1);border:2px solid rgba(22,163,74,.25);display:flex;align-items:center;justify-content:center;margin-bottom:18px;box-shadow:0 0 0 10px rgba(22,163,74,.06)}
+.succ-ring .sym{font-size:36px;color:#16a34a}
+.succ-tit{font-size:22px;font-weight:900;color:var(--on);letter-spacing:-.02em;margin-bottom:7px}
+.succ-sub{font-size:13px;color:var(--on3);line-height:1.6;max-width:280px;margin-bottom:20px;font-weight:500}
+.id-badge{background:linear-gradient(135deg,var(--pl),rgba(0,188,201,.04));border:1.5px solid var(--plb);border-radius:var(--r-xl);padding:22px 20px;margin:0 16px 16px;text-align:center}
+.id-badge-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on3);margin-bottom:10px}
+.id-badge-code{font-size:32px;font-weight:900;letter-spacing:.12em;color:var(--p);font-feature-settings:'tnum'}
+.id-badge-sub{font-size:11.5px;color:var(--on3);margin-top:8px;font-weight:500}
+
+/* TOAST */
+.toast{position:fixed;bottom:calc(84px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(20px);z-index:3000;background:#18222e;color:#fff;border-radius:14px;padding:12px 18px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;box-shadow:0 8px 28px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;white-space:nowrap;max-width:calc(100vw - 40px)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
+.toast .sym{font-size:16px;color:var(--p3)}
+
+/* MAX PESO BADGE */
+.peso-badge{display:inline-flex;align-items:center;gap:5px;background:#fef2f2;border:1px solid rgba(220,38,38,.2);border-radius:99px;padding:4px 12px;font-size:11px;font-weight:700;color:#dc2626;margin-bottom:12px}
+</style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div class="toast" id="globalToast">
+  <span class="sym f" id="globalToastIcon">info</span>
+  <span id="globalToastMsg">Mensaje</span>
+</div>
+
+<header class="hdr">
+  <button class="hdr-back" onclick="goBack()"><span class="sym" style="font-size:18px">arrow_back</span></button>
+  <img class="hdr-logo" src="icons/icon-192.png" alt="WIL" onerror="this.style.display='none'"/>
+  <span class="hdr-title" id="hdrTitle">Paquetería WIL 📦</span>
+</header>
+
+<main class="main">
+
+<!-- ════ PASO 1 — Servicio y barrios ════ -->
+<div class="view active" id="view-p1">
+  <div class="progress-bar"><div class="progress-fill" style="width:33%"></div></div>
+  <div class="step-hdr">
+    <div class="step-hdr-title">Envío de paquete 📦</div>
+    <div class="step-hdr-sub">Paso 1 de 3 — Origen y destino</div>
+  </div>
+
+  <!-- TIPO DE SERVICIO -->
+  <div class="card">
+    <div class="card-tit"><span class="sym f">package_2</span>¿Qué servicio necesitas?</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px">
+      <button class="tam-opt" id="srv-recoger" onclick="selServicio('recoger')">
+        <span class="tam-opt-emo">🛵</span>
+        <div class="tam-opt-nom">Recoger y Entregar</div>
+        <div class="tam-opt-sub">El domi recoge y lleva</div>
+      </button>
+      <button class="tam-opt" id="srv-traer" onclick="selServicio('traer')">
+        <span class="tam-opt-emo">🏪</span>
+        <div class="tam-opt-nom">Traer desde comercio</div>
+        <div class="tam-opt-sub">El domi recoge por ti</div>
+      </button>
+    </div>
+  </div>
+
+  <!-- TAMAÑO PAQUETE -->
+  <div class="card" id="card-tamano" style="display:none">
+    <div class="card-tit"><span class="sym f">inventory_2</span>Tamaño del paquete</div>
+    <div class="peso-badge"><span class="sym f" style="font-size:13px">warning</span>Máximo permitido: 30 kg</div>
+    <div class="tam-grid">
+      <button class="tam-opt" data-sz="pequeno" onclick="selTam(this)">
+        <span class="tam-opt-emo">📦</span>
+        <div class="tam-opt-nom">Pequeño</div>
+        <div class="tam-opt-sub">Hasta 5 kg</div>
+      </button>
+      <button class="tam-opt" data-sz="mediano" onclick="selTam(this)">
+        <span class="tam-opt-emo">🧳</span>
+        <div class="tam-opt-nom">Mediano</div>
+        <div class="tam-opt-sub">5 – 15 kg</div>
+      </button>
+      <button class="tam-opt" data-sz="grande" onclick="selTam(this)">
+        <span class="tam-opt-emo">📫</span>
+        <div class="tam-opt-nom">Grande</div>
+        <div class="tam-opt-sub">15 – 30 kg</div>
+      </button>
+    </div>
+    <div class="field">
+      <label>Descripción del paquete</label>
+      <textarea id="paq-descripcion" placeholder="Ej: Ropa, documentos, mercancía, regalo…"></textarea>
+    </div>
+  </div>
+
+  <!-- ORIGEN -->
+  <div class="card" id="card-origen" style="display:none">
+    <div class="card-tit"><span class="sym f">location_on</span>Barrio de origen (recogida)</div>
+    <div class="field">
+      <label>Barrio de recogida *</label>
+      <div class="barrio-wrap">
+        <input class="barrio-input" id="rec-txt" type="text" autocomplete="off"
+          placeholder="Escribe el barrio de origen…"
+          oninput="buscarBarrio('rec',this.value)"
+          onblur="setTimeout(function(){cerrarSugs('rec')},200)"/>
+        <input type="hidden" id="rec-val"/>
+        <input type="hidden" id="rec-precio" value="0"/>
+        <input type="hidden" id="rec-ooz" value="0"/>
+        <div class="barrio-sugs" id="sugs-rec"></div>
+      </div>
+      <div class="field-note">Barrio donde está el paquete o el remitente</div>
+    </div>
+    <div class="field" id="rec-dir-field" style="display:none">
+      <label>Dirección exacta de recogida *</label>
+      <input type="text" id="rec-dir" placeholder="Calle 52 #48-09, frente al parque…"/>
+    </div>
+    <div class="field" id="rec-tel-field" style="display:none">
+      <label>Teléfono de quien entrega <span style="font-weight:500;color:var(--on3)">(opcional)</span></label>
+      <input type="tel" id="rec-tel" placeholder="310 123 4567"/>
+    </div>
+    <div class="ooz-panel" id="ooz-rec">
+      <div class="ooz-header">
+        <div class="ooz-icon">🟠</div>
+        <div>
+          <div class="ooz-title">Barrio fuera de cobertura en Copacabana</div>
+          <div class="ooz-sub">Escribe la dirección completa para calcular tarifa por distancia</div>
+        </div>
+      </div>
+      <input class="ooz-input" id="ooz-rec-addr" type="text" placeholder="Ej: Cra 50 #80-20, Robledo, Medellín"/>
+      <button class="ooz-btn" onclick="calcularOOZ('rec')">
+        <span class="sym f" style="font-size:16px">my_location</span> Calcular tarifa
+      </button>
+      <div class="ooz-result" id="ooz-rec-result">
+        <span class="sym f" style="font-size:16px">check_circle</span>
+        <span id="ooz-rec-result-txt"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- DESTINO -->
+  <div class="card" id="card-destino" style="display:none">
+    <div class="card-tit"><span class="sym f">location_on</span>Barrio de destino (entrega)</div>
+    <div class="field">
+      <label>Barrio de entrega *</label>
+      <div class="barrio-wrap">
+        <input class="barrio-input" id="ent-txt" type="text" autocomplete="off"
+          placeholder="Escribe el barrio de destino…"
+          oninput="buscarBarrio('ent',this.value)"
+          onblur="setTimeout(function(){cerrarSugs('ent')},200)"/>
+        <input type="hidden" id="ent-val"/>
+        <input type="hidden" id="ent-precio" value="0"/>
+        <input type="hidden" id="ent-ooz" value="0"/>
+        <div class="barrio-sugs" id="sugs-ent"></div>
+      </div>
+    </div>
+    <div class="ooz-panel" id="ooz-ent">
+      <div class="ooz-header">
+        <div class="ooz-icon">🟠</div>
+        <div>
+          <div class="ooz-title">Barrio fuera de cobertura en Copacabana</div>
+          <div class="ooz-sub">Para destinos fuera de Copacabana calculamos el costo por distancia</div>
+        </div>
+      </div>
+      <input class="ooz-input" id="ooz-ent-addr" type="text" placeholder="Ej: Calle 10 #43-15, El Poblado, Medellín"/>
+      <button class="ooz-btn" onclick="calcularOOZ('ent')">
+        <span class="sym f" style="font-size:16px">my_location</span> Calcular tarifa por distancia
+      </button>
+      <div class="ooz-result" id="ooz-ent-result">
+        <span class="sym f" style="font-size:16px">check_circle</span>
+        <span id="ooz-ent-result-txt"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TARIFA CALCULADA -->
+  <div id="tarifa-pill-wrap" style="display:none;margin:0 16px 12px">
+    <div class="tarifa-pill">
+      <span class="sym f" style="font-size:24px;color:#15803d">delivery_dining</span>
+      <div>
+        <div class="tarifa-pill-val" id="tarifa-val">$0</div>
+        <div class="tarifa-pill-sub" id="tarifa-sub">Tarifa estimada de envío</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="act-row">
+    <button class="btn-b" onclick="window.location.href='index.html'">Inicio</button>
+    <button class="btn-n" onclick="irP2()">
+      <span class="sym" style="font-size:17px">arrow_forward</span>Continuar
+    </button>
+  </div>
+</div>
+
+<!-- ════ PASO 2 — Datos de entrega y remitente ════ -->
+<div class="view" id="view-p2">
+  <div class="progress-bar"><div class="progress-fill" style="width:66%"></div></div>
+  <div class="step-hdr">
+    <div class="step-hdr-title">Datos del envío 📋</div>
+    <div class="step-hdr-sub">Paso 2 de 3 — Quién envía y quién recibe</div>
+  </div>
+
+  <div class="card">
+    <div class="card-tit"><span class="sym f">person_pin</span>Quien recibe</div>
+    <div class="field"><label>Nombre completo *</label><input type="text" id="rec-nombre" placeholder="Nombre del destinatario"/></div>
+    <div class="field"><label>Teléfono *</label><input type="tel" id="rec-telefono" placeholder="310 123 4567"/></div>
+    <div class="field"><label>Dirección de entrega *</label><input type="text" id="ent-dir" placeholder="Cra 43 #18-20, Barrio El Centro…"/><div class="field-note">Incluye calle, número y barrio</div></div>
+    <div class="field"><label>Punto de referencia</label><input type="text" id="ent-ref" placeholder="Casa azul, frente al parque, piso 2…"/></div>
+  </div>
+
+  <div class="card">
+    <div class="card-tit"><span class="sym f">send</span>Quien envía (tú)</div>
+    <div class="field"><label>Tu nombre *</label><input type="text" id="env-nombre" placeholder="Tu nombre completo"/></div>
+    <div class="field"><label>Tu teléfono *</label><input type="tel" id="env-telefono" placeholder="310 987 6543"/></div>
+  </div>
+
+  <div class="act-row">
+    <button class="btn-b" onclick="showView('view-p1')">Atrás</button>
+    <button class="btn-n" onclick="irP3()">
+      <span class="sym" style="font-size:17px">arrow_forward</span>Continuar
+    </button>
+  </div>
+</div>
+
+<!-- ════ PASO 3 — Pago ════ -->
+<div class="view" id="view-p3">
+  <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+  <div class="step-hdr">
+    <div class="step-hdr-title">¿Cómo pagas? 💳</div>
+    <div class="step-hdr-sub">Paso 3 de 3 — Método de pago</div>
+  </div>
+
+  <div class="card">
+    <div class="card-tit"><span class="sym f">local_shipping</span>Resumen del envío</div>
+    <div id="p3-resumen-body" style="font-size:13px;color:var(--on2);line-height:1.9"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-tit"><span class="sym f">payments</span>Método de pago</div>
+    <div class="pago-grid">
+      <div class="pago-c" id="pago-ef" onclick="selPago('EFECTIVO')">
+        <div class="pago-ico">💵</div>
+        <div class="pago-lbl">Efectivo</div>
+        <div class="pago-sub">El domi cobra al entregar</div>
+      </div>
+      <div class="pago-c" id="pago-tr" onclick="selPago('TRANSFERENCIA')">
+        <div class="pago-ico">🏦</div>
+        <div class="pago-lbl">Transferencia</div>
+        <div class="pago-sub">Pagas al confirmar entrega</div>
+      </div>
+    </div>
+    <div id="cuenta-wrap" style="display:none">
+      <div class="cuenta-card">
+        <div class="cuenta-top">
+          <div>
+            <div class="cuenta-banco-lbl">Banco</div>
+            <div class="cuenta-banco">Bancolombia</div>
+          </div>
+          <div class="cuenta-chip"></div>
+        </div>
+        <div class="cuenta-num">553-296924-68</div>
+        <div class="cuenta-bottom">
+          <div>
+            <div class="cuenta-val">WIL Domicilios</div>
+            <div class="cuenta-tipo">Cuenta de ahorros</div>
+          </div>
+          <div style="text-align:right">
+            <div class="cuenta-banco-lbl">Nit/Cédula</div>
+            <div class="cuenta-val">55329692468</div>
+          </div>
+        </div>
+      </div>
+      <button class="copy-btn" onclick="copiarCuenta()">
+        <span class="sym" style="font-size:16px">content_copy</span>Copiar número de cuenta
+      </button>
+      <div style="margin-top:10px;font-size:11px;color:var(--on3);font-weight:500;text-align:center">
+        🛵 El domiciliario verifica el pago antes de salir
+      </div>
+    </div>
+  </div>
+
+  <div class="act-row">
+    <button class="btn-b" onclick="showView('view-p2')">Atrás</button>
+    <button class="btn-n" id="btn-confirmar" onclick="confirmarPedido()">
+      <span class="sym f" style="font-size:17px">check_circle</span>Confirmar envío
+    </button>
+  </div>
+</div>
+
+<!-- ════ CONFIRMADO ════ -->
+<div class="view" id="view-confirmado">
+  <div class="succ-wrap">
+    <div class="succ-ring"><span class="sym f">check_circle</span></div>
+    <div class="succ-tit">¡Envío solicitado! 🛵</div>
+    <p class="succ-sub" id="succ-msg">Tu pedido fue recibido. Un domiciliario te contactará pronto.</p>
+  </div>
+
+  <div class="id-badge">
+    <div class="id-badge-lbl">Tu código de pedido</div>
+    <div class="id-badge-code" id="id-display">—</div>
+    <div class="id-badge-sub">Guárdalo para rastrear tu pedido</div>
+    <div style="display:flex;gap:10px;margin-top:14px;justify-content:center">
+      <button id="btn-copiar"
+        style="display:flex;align-items:center;gap:6px;background:var(--p);border:none;border-radius:99px;padding:9px 18px;font-size:12px;font-weight:800;color:#fff;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;box-shadow:0 3px 10px rgba(0,105,112,.25)">
+        <span class="sym" style="font-size:15px">content_copy</span>Copiar código
+      </button>
+      <button onclick="compartirCodigo()"
+        style="display:flex;align-items:center;gap:6px;background:#f0f4f7;border:1.5px solid #dce3ea;border-radius:99px;padding:9px 18px;font-size:12px;font-weight:800;color:var(--on2);cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif">
+        <span class="sym" style="font-size:15px">share</span>Compartir
+      </button>
+    </div>
+  </div>
+
+  <div style="margin:0 16px 16px;padding:12px 14px;background:#fffbeb;border:1px solid rgba(217,119,6,.2);border-radius:var(--r-lg);font-size:12px;color:#92400e;line-height:1.55;display:flex;gap:8px">
+    <span style="font-size:16px;flex-shrink:0">📋</span>
+    <span>El domiciliario te contactará pronto. Usa el código para <strong>rastrear tu pedido</strong> en tiempo real.</span>
+  </div>
+
+  <div style="padding:0 16px 16px;display:flex;flex-direction:column;gap:10px">
+    <button class="btn-full gr" onclick="irARastrear()">
+      <span class="sym" style="font-size:18px">search</span>Rastrear este pedido
+    </button>
+    <button class="btn-full dk" onclick="reiniciar()">
+      <span class="sym" style="font-size:18px">home</span>Volver al inicio
+    </button>
+  </div>
+</div>
+
+</main>
+
+<nav class="bnav">
+  <button class="bi" onclick="window.location.href='index.html'"><span class="sym">home</span><span class="bi-lbl">Inicio</span></button>
+  <button class="bi active"><span class="sym f">package_2</span><span class="bi-lbl">Paquete</span></button>
+  <button class="bi" onclick="window.location.href='pedidoRastreo.html'"><span class="sym">search</span><span class="bi-lbl">Rastreo</span></button>
+  <button class="bi" onclick="window.location.href='soporte.html'"><span class="sym">person</span><span class="bi-lbl">Soporte</span></button>
+</nav>
+
+<script>
+/* ═══════════════════════════════════════════
+   BARRIOS COPACABANA con precios
+═══════════════════════════════════════════ */
+var WIL_BARRIOS = [
+  ['ASUNCION',5000],['FÁTIMA',5000],['MIRADOR AZUL',5000],
+  ['AZULITA PARTE BAJA',5000],['CRISTO REY ABAJO DE LA PISCINA',5000],
+  ['HORIZONTES',5000],['MIRAFLORES',5000],['MISERICORDIA HASTA PRINCESS',5000],
+  ['MOJÓN',5000],['OBRERO',5000],['PEDREGAL PARTE BAJA',5000],
+  ['PEDRERA',5000],['SAN FRANCISCO',5000],['SHANGAY',5000],
+  ['PARQUE COPACABANA',5000],['TOBÓN QUINTERO',5000],['MONTE VERDE',5000],
+  ['REMANSO',5000],['YARUMITO PARTE BAJA',5000],
+  ['CANOAS HASTA LA TIENDA DEL CUSCO',5000],['PIEDRAS BLANCAS',5000],
+  ['PORVENIR',5000],['RECREO',5000],
+  ['CALORCOL',6000],['AZULITA PARTE ALTA',6000],['VILLAS DE COPACABANA',6000],
+  ['TABLAZO',6000],['CANOAS DESPUÉS DE LA TIENDA DEL CUSCO',6000],
+  ['CRISTO REY DE LA PISCINA HACIA ARRIBA',6000],['PEDREGAL PARTE ALTA',6000],
+  ['COLINAS DEL PEDREGAL',6000],['VEGAS INTERIORES IGLESIA MANANTIALES',6000],
+  ['YARUMITO DESPUÉS DEL EMPEDRADO',6000],['YARUMITO INTERIOR CANCHA NUEVA',6000],
+  ['VEGAS PARTE ALTA',6000],['EDIFICIOS AMARILLOS',6000],['MONTESION',6000],
+  ['JARDÍN DE LA MARGARITA',6000],['RESERVAS DE SAN JUAN 1',6000],
+  ['POSADA DEL VIENTO',6000],['ROSA DE LOS VIENTOS',6000],['VICENZA',6000],
+  ['RESERVAS DE SAN JUAN 2',6000],
+  ['BARRIO MARIA',7000],['PORTERIA PARCELACIÓN EL PARAISO',7000],
+  ['TORRE DEL BOSQUE',7000],['EDIFICIO POBLADO NORTE',7000],
+  ['SAN JUAN CAMPESTRE',7000],
+  ['VIA MACHADO',8000],['CANTERAS',8000],['VILLANUEVA PARTE BAJA Y ALTA',8000],
+  ['VILLA ROCA',8000],['SAN JUAN',8000],
+  ['VEGAS PARTE BAJA',5000],['GUASIMALITO',10000],['MACHADO',10000],
+  ['UNIDADES DE MACHADO',11000],['ARBOLEDA DEL CAMPO',11000],
+  ['FONTIDUEÑO',13000],['NAVARRA',14000],['NIQUIA PARTE BAJA',14000],
+  ['UNIDADES DE NAVARRA',14000],['PARQUE DE GIRARDOTA',17000],
+  ['TOLEDO CAMPESTRE',17000],['PARQUE DE BELLO',18000],
+  ['FABRICATO',19000],['UNIDADES DE MADERA',25000]
+];
+
+/* ═══ CONFIG ═══ */
+var SEDE = { lat: 6.3208, lng: -75.5563 };
+var PRECIO_KM = 1800;
+var WA_NUM = '573023452213';
+
+/* ══════════════════════════════════════════
+   URL de tu API MongoDB — ajusta el dominio
+══════════════════════════════════════════ */
+var API_URL = '/api/foto?recurso=pedidos';
+
+/* ═══ STATE ═══ */
+var S = {
+  servicio: null, tamano: null,
+  barRec: '', barEnt: '',
+  precRec: 0, precEnt: 0,
+  oozRec: false, oozEnt: false,
+  oozRecLat: null, oozRecLng: null,
+  oozEntLat: null, oozEntLng: null,
+  tarifaFinal: 0,
+  metodoPago: null,
+  idPedido: null
+};
+
+/* ═══ UTILIDADES ═══ */
+var _toastT = null;
+function toast(msg, icon) {
+  var t = document.getElementById('globalToast');
+  document.getElementById('globalToastMsg').textContent = msg;
+  document.getElementById('globalToastIcon').textContent = icon || 'info';
+  t.classList.add('show');
+  clearTimeout(_toastT);
+  _toastT = setTimeout(function(){ t.classList.remove('show'); }, 3200);
+}
+function norm(s) {
+  return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+}
+function escH(t) {
+  return (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function fmtCOP(n) {
+  return '$' + (n||0).toLocaleString('es-CO');
+}
+function km(la1,lo1,la2,lo2) {
+  var R=6371, dL=(la2-la1)*Math.PI/180, dO=(lo2-lo1)*Math.PI/180;
+  var a=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dO/2)*Math.sin(dO/2);
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function calcTarifaKm(lat, lng) {
+  var d = km(SEDE.lat, SEDE.lng, lat, lng);
+  return Math.max(24000, Math.round((24000 + Math.max(0,d-0.5)*PRECIO_KM)/500)*500);
+}
+function showView(id) {
+  document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('active'); v.style.animation='none'; });
+  var el = document.getElementById(id);
+  el.classList.add('active');
+  void el.offsetHeight;
+  el.style.animation='';
+  window.scrollTo(0,0);
+}
+function goBack() {
+  if (document.getElementById('view-p2').classList.contains('active')) showView('view-p1');
+  else if (document.getElementById('view-p3').classList.contains('active')) showView('view-p2');
+  else window.history.back();
+}
+
+/* ═══ PASO 1 ═══ */
+function selServicio(tipo) {
+  S.servicio = tipo;
+  ['recoger','traer'].forEach(function(t){
+    document.getElementById('srv-'+t).classList.toggle('sel', t===tipo);
+  });
+  document.getElementById('card-tamano').style.display='block';
+  document.getElementById('card-origen').style.display='block';
+  document.getElementById('card-destino').style.display='block';
+  var recCard = document.getElementById('card-origen');
+  recCard.querySelector('.card-tit').innerHTML =
+    tipo==='traer'
+      ? '<span class="sym f" style="font-size:18px;color:var(--p)">storefront</span>Comercio o punto de recogida'
+      : '<span class="sym f" style="font-size:18px;color:var(--p)">location_on</span>Barrio de origen (recogida)';
+}
+function selTam(el) {
+  document.querySelectorAll('.tam-opt[data-sz]').forEach(function(t){ t.classList.remove('sel'); });
+  el.classList.add('sel');
+  S.tamano = el.dataset.sz;
+}
+
+/* ═══ AUTOCOMPLETE BARRIOS ═══ */
+function buscarBarrio(campo, query) {
+  var txt = (query||'').trim();
+  var sugEl = document.getElementById('sugs-'+campo);
+  var hidVal = document.getElementById(campo==='rec'?'rec-val':'ent-val');
+  var hidPrecio = document.getElementById(campo==='rec'?'rec-precio':'ent-precio');
+  var oozPanel = document.getElementById('ooz-'+campo);
+  hidVal.value=''; hidPrecio.value='0';
+  document.getElementById(campo==='rec'?'rec-ooz':'ent-ooz').value='0';
+  calcularTarifa();
+  if (!txt) { sugEl.style.display='none'; if(oozPanel) oozPanel.style.display='none'; return; }
+  if (txt.length<2) { sugEl.style.display='none'; return; }
+  var q = norm(txt);
+  var exactas = WIL_BARRIOS.filter(function(b){ return norm(b[0])===q; });
+  var parciales = WIL_BARRIOS.filter(function(b){
+    var n=norm(b[0]);
+    return n!==q && (n.indexOf(q)!==-1 || q.split(' ').every(function(w){ return n.indexOf(w)!==-1; }));
+  });
+  var res = exactas.concat(parciales).slice(0,8);
+  function resaltar(nombre) {
+    var idx = norm(nombre).indexOf(q);
+    if(idx<0) return escH(nombre);
+    return escH(nombre.slice(0,idx))+'<span class="barrio-sug-match">'+escH(nombre.slice(idx,idx+q.length))+'</span>'+escH(nombre.slice(idx+q.length));
+  }
+  var html = res.map(function(b){
+    return '<div class="barrio-sug-item" onmousedown="selBarrio(\''+campo+'\',\''+b[0].replace(/'/g,"\\'")+'\','+b[1]+')">'
+      +'<span>'+resaltar(b[0])+'</span>'
+      +'<span class="barrio-sug-precio">'+fmtCOP(b[1])+'</span>'
+      +'</div>';
+  }).join('');
+  html += '<div class="barrio-sug-ooz" onmousedown="activarOOZ(\''+campo+'\')">'
+    +'<span style="font-size:18px">🟠</span>'
+    +'<span>'+(res.length?'¿No aparece? Usar cálculo por distancia':'Barrio no encontrado — calcular por distancia')+'</span>'
+    +'</div>';
+  sugEl.innerHTML = html;
+  sugEl.style.display='block';
+}
+function selBarrio(campo, nombre, precio) {
+  var txtEl = document.getElementById(campo==='rec'?'rec-txt':'ent-txt');
+  var hidVal = document.getElementById(campo==='rec'?'rec-val':'ent-val');
+  var hidPrecio = document.getElementById(campo==='rec'?'rec-precio':'ent-precio');
+  var oozPanel = document.getElementById('ooz-'+campo);
+  txtEl.value = nombre; hidVal.value = nombre; hidPrecio.value = precio;
+  document.getElementById(campo==='rec'?'rec-ooz':'ent-ooz').value='0';
+  document.getElementById('sugs-'+campo).style.display='none';
+  if(oozPanel) oozPanel.style.display='none';
+  if(campo==='rec') {
+    document.getElementById('rec-dir-field').style.display='block';
+    document.getElementById('rec-tel-field').style.display='block';
+    S.barRec = nombre; S.precRec = precio; S.oozRec = false;
+  } else {
+    S.barEnt = nombre; S.precEnt = precio; S.oozEnt = false;
+  }
+  calcularTarifa();
+}
+function cerrarSugs(campo) {
+  var el = document.getElementById('sugs-'+campo);
+  if(el) el.style.display='none';
+}
+
+/* ═══ OOZ ═══ */
+function activarOOZ(campo) {
+  var txtEl = document.getElementById(campo==='rec'?'rec-txt':'ent-txt');
+  var hidVal = document.getElementById(campo==='rec'?'rec-val':'ent-val');
+  var oozPanel = document.getElementById('ooz-'+campo);
+  var oozAddr = document.getElementById('ooz-'+campo+'-addr');
+  var oozResult = document.getElementById('ooz-'+campo+'-result');
+  document.getElementById('sugs-'+campo).style.display='none';
+  oozPanel.style.display='block';
+  hidVal.value='__OOZ_PENDING__';
+  document.getElementById(campo==='rec'?'rec-ooz':'ent-ooz').value='1';
+  if(oozAddr && txtEl && !oozAddr.value.trim()) oozAddr.value = txtEl.value.trim();
+  if(oozResult) oozResult.style.display='none';
+  if(campo==='rec') {
+    document.getElementById('rec-dir-field').style.display='block';
+    document.getElementById('rec-tel-field').style.display='block';
+    S.oozRec = true; S.precRec = 0;
+  } else {
+    S.oozEnt = true; S.precEnt = 0;
+  }
+  calcularTarifa();
+}
+function calcularOOZ(campo) {
+  var addrEl = document.getElementById('ooz-'+campo+'-addr');
+  var addr = addrEl ? addrEl.value.trim() : '';
+  var resultEl = document.getElementById('ooz-'+campo+'-result');
+  var resultTxt = document.getElementById('ooz-'+campo+'-result-txt');
+  if (!addr) { toast('Escribe la dirección completa.','location_on'); return; }
+  var btnEl = document.getElementById('ooz-'+campo).querySelector('.ooz-btn');
+  if(btnEl){ btnEl.disabled=true; btnEl.innerHTML='<span class="spin" style="width:14px;height:14px;border-width:2px"></span> Calculando…'; }
+  if(resultEl) resultEl.style.display='none';
+  var queries = [
+    addr+', Copacabana, Antioquia, Colombia',
+    addr+', Bello, Antioquia, Colombia',
+    addr+', Medellín, Antioquia, Colombia',
+    addr+', Antioquia, Colombia',
+    addr+', Colombia'
+  ];
+  function tryGeo(idx) {
+    if(idx>=queries.length) {
+      if(btnEl){ btnEl.disabled=false; btnEl.innerHTML='<span class="sym f" style="font-size:16px">my_location</span> Reintentar'; }
+      resultTxt.innerHTML='No se pudo calcular — el domi confirmará la tarifa';
+      resultEl.style.display='flex';
+      if(campo==='ent') mostrarWAFuera(addr, 0, null, null);
+      return;
+    }
+    fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(queries[idx])+'&format=json&limit=1&accept-language=es',
+      {headers:{'User-Agent':'DomiciliosWIL/1.0'}})
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(!data||!data.length){ tryGeo(idx+1); return; }
+      var lat=parseFloat(data[0].lat), lng=parseFloat(data[0].lon);
+      var tarifa = calcTarifaKm(lat, lng);
+      var distKm = km(SEDE.lat, SEDE.lng, lat, lng);
+      if(campo==='rec'){
+        S.precRec=tarifa; S.oozRec=true; S.oozRecLat=lat; S.oozRecLng=lng;
+        document.getElementById('rec-precio').value=tarifa;
+      } else {
+        S.precEnt=tarifa; S.oozEnt=true; S.oozEntLat=lat; S.oozEntLng=lng;
+        document.getElementById('ent-precio').value=tarifa;
+      }
+      resultTxt.innerHTML='<b>'+fmtCOP(tarifa)+'</b> · '+distKm.toFixed(1)+' km desde WIL Copacabana';
+      resultEl.style.display='flex';
+      if(btnEl){ btnEl.disabled=false; btnEl.innerHTML='<span class="sym f" style="font-size:16px">my_location</span> Recalcular'; }
+      toast('✅ Tarifa calculada: '+fmtCOP(tarifa),'check_circle');
+      calcularTarifa();
+      if(campo==='ent') mostrarWAFuera(addr, tarifa, lat, lng);
+    })
+    .catch(function(){ tryGeo(idx+1); });
+  }
+  tryGeo(0);
+}
+function mostrarWAFuera(addr, tarifa, lat, lng) {
+  var oozEnt = document.getElementById('ooz-ent');
+  var existing = document.getElementById('wa-fuera-btn');
+  if(existing) existing.remove();
+  var distInfo = (lat && lng) ? km(SEDE.lat, SEDE.lng, lat, lng).toFixed(1)+' km desde Copacabana' : 'Distancia por calcular';
+  var msg = '📦 *CONSULTA PAQUETERÍA FUERA DE COPACABANA — Domicilios WIL*\n\n'
+    +'📍 *Destino:* '+addr+'\n'
+    +(tarifa>0?'💰 *Tarifa estimada:* '+fmtCOP(tarifa)+' ('+distInfo+')\n':'⚠️ No se pudo calcular la tarifa automáticamente\n')
+    +'\n¿Pueden hacer este envío? 🙏';
+  var wrap = document.createElement('div');
+  wrap.id='wa-fuera-btn';
+  wrap.innerHTML='<div class="ooz-wa-note" style="display:block">'
+    +'<strong>🛵 Destino fuera de Copacabana</strong> — El domi coordina el costo exacto según la distancia real a tu dirección.'
+    +'</div>'
+    +'<a href="https://wa.me/'+WA_NUM+'?text='+encodeURIComponent(msg)+'" target="_blank" class="ooz-wa-btn">'
+    +'<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>'
+    +'Consultar por WhatsApp'
+    +'</a>';
+  oozEnt.appendChild(wrap);
+}
+
+/* ═══ TARIFA ═══ */
+function calcularTarifa() {
+  var pR = parseInt(document.getElementById('rec-precio').value)||0;
+  var pE = parseInt(document.getElementById('ent-precio').value)||0;
+  if(!pR && !pE) { document.getElementById('tarifa-pill-wrap').style.display='none'; S.tarifaFinal=0; return; }
+  var base = Math.max(pR, pE);
+  S.tarifaFinal = base;
+  var oozR = document.getElementById('rec-ooz').value==='1';
+  var oozE = document.getElementById('ent-ooz').value==='1';
+  var nota = (oozR||oozE) ? 'Tarifa por distancia · el domi confirma' : 'Tarifa estimada de envío';
+  document.getElementById('tarifa-val').textContent = fmtCOP(base);
+  document.getElementById('tarifa-sub').textContent = nota;
+  document.getElementById('tarifa-pill-wrap').style.display='block';
+}
+
+/* ═══ PAGO ═══ */
+function selPago(tipo) {
+  S.metodoPago = tipo;
+  document.getElementById('pago-ef').classList.toggle('sel', tipo==='EFECTIVO');
+  document.getElementById('pago-tr').classList.toggle('sel', tipo==='TRANSFERENCIA');
+  document.getElementById('cuenta-wrap').style.display = tipo==='TRANSFERENCIA'?'block':'none';
+}
+function copiarCuenta() {
+  var num = '55329692468';
+  if(navigator.clipboard) navigator.clipboard.writeText(num).then(function(){ toast('Número '+num+' copiado ✓','content_copy'); });
+  else toast('Cuenta: '+num,'info');
+}
+
+/* ═══ NAVEGACIÓN ═══ */
+function irP2() {
+  if(!S.servicio){ toast('Selecciona el tipo de servicio.','help'); return; }
+  if(!S.tamano){ toast('Selecciona el tamaño del paquete.','inventory_2'); return; }
+  var recVal = document.getElementById('rec-val').value;
+  var entVal = document.getElementById('ent-val').value;
+  if(!recVal){ toast('Escribe el barrio de recogida.','location_on'); return; }
+  if(recVal==='__OOZ_PENDING__'){ toast('Calcula la tarifa del barrio de recogida primero.','location_on'); return; }
+  if(!entVal){ toast('Escribe el barrio de entrega.','location_on'); return; }
+  if(entVal==='__OOZ_PENDING__'){ toast('Calcula la tarifa del barrio de entrega primero.','location_on'); return; }
+  var recDir = document.getElementById('rec-dir').value.trim();
+  if(!recDir){ toast('Escribe la dirección de recogida.','location_on'); return; }
+  S.barRec = recVal; S.barEnt = entVal;
+  S.precRec = parseInt(document.getElementById('rec-precio').value)||0;
+  S.precEnt = parseInt(document.getElementById('ent-precio').value)||0;
+  S.tarifaFinal = Math.max(S.precRec, S.precEnt);
+  showView('view-p2');
+}
+function irP3() {
+  var nom = document.getElementById('rec-nombre').value.trim();
+  var tel = document.getElementById('rec-telefono').value.trim();
+  var dir = document.getElementById('ent-dir').value.trim();
+  var envNom = document.getElementById('env-nombre').value.trim();
+  var envTel = document.getElementById('env-telefono').value.trim();
+  if(!nom){ toast('Escribe el nombre de quien recibe.','person'); return; }
+  if(!tel){ toast('Escribe el teléfono de quien recibe.','phone'); return; }
+  if(!dir){ toast('Escribe la dirección de entrega.','location_on'); return; }
+  if(!envNom){ toast('Escribe tu nombre.','person'); return; }
+  if(!envTel){ toast('Escribe tu teléfono.','phone'); return; }
+
+  var desc = document.getElementById('paq-descripcion').value.trim();
+  var ref = document.getElementById('ent-ref').value.trim();
+  var recDir = document.getElementById('rec-dir').value.trim();
+  var recTel = document.getElementById('rec-tel').value.trim();
+  var tamNombre = {'pequeno':'Pequeño (hasta 5 kg)','mediano':'Mediano (5-15 kg)','grande':'Grande (15-30 kg)'}[S.tamano]||S.tamano;
+  var html='';
+  html+='<div class="resumen-row"><span class="resumen-lbl">📦 Tamaño</span><span class="resumen-val">'+escH(tamNombre)+(desc?' · '+escH(desc):'')+'</span></div>';
+  html+='<div class="resumen-row"><span class="resumen-lbl">🏪 Recogida</span><span class="resumen-val">'+escH(S.barRec)+'<br><small style="color:var(--on3)">'+escH(recDir)+'</small></span></div>';
+  if(recTel) html+='<div class="resumen-row"><span class="resumen-lbl">📞 Tel. recogida</span><span class="resumen-val">'+escH(recTel)+'</span></div>';
+  html+='<div class="resumen-row"><span class="resumen-lbl">📍 Entrega</span><span class="resumen-val">'+escH(S.barEnt)+'<br><small style="color:var(--on3)">'+escH(dir)+(ref?' – '+escH(ref):'')+'</small></span></div>';
+  html+='<div class="resumen-row"><span class="resumen-lbl">🎁 Recibe</span><span class="resumen-val">'+escH(nom)+' · '+escH(tel)+'</span></div>';
+  html+='<div class="resumen-row"><span class="resumen-lbl">📦 Envía</span><span class="resumen-val">'+escH(envNom)+' · '+escH(envTel)+'</span></div>';
+  html+='<div class="resumen-row" style="padding-top:8px;border-top:1.5px dashed #e2e9ef;margin-top:4px"><span class="resumen-lbl" style="font-size:12px;font-weight:800;color:var(--on)">🛵 Tarifa envío</span><span class="resumen-val" style="font-size:16px;font-weight:900;color:#15803d">'+fmtCOP(S.tarifaFinal)+'</span></div>';
+  html+='<div style="margin-top:10px;padding:10px 12px;background:#fef2f2;border:1px solid rgba(220,38,38,.2);border-radius:var(--r-md);font-size:11.5px;color:#dc2626;font-weight:600;line-height:1.5;display:flex;align-items:flex-start;gap:6px"><span style="font-size:15px;flex-shrink:0">⚠️</span><span><strong>Máximo 30 kg.</strong> En caso de demora en el punto de recogida/entrega se cobrará <strong>$2.000 por cada 15 min adicionales.</strong> 🔒 Tú apruebas antes de pagar.</span></div>';
+  document.getElementById('p3-resumen-body').innerHTML = html;
+  showView('view-p3');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CONFIRMAR PEDIDO → MongoDB vía /api/foto?recurso=pedidos
+═══════════════════════════════════════════════════════════ */
+async function confirmarPedido() {
+  if(!S.metodoPago){ toast('Selecciona un método de pago.','payments'); return; }
+
+  var btn = document.getElementById('btn-confirmar');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Enviando…';
+
+  /* ── Datos del formulario ── */
+  var now     = new Date();
+  var hora    = now.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true});
+  var fecha   = now.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
+  var id      = 'PKT-' + Date.now().toString(36).toUpperCase();   // ej: PKT-LXM9Z2F1
+
+  var recNombre  = document.getElementById('rec-nombre').value.trim();
+  var recTelefono= document.getElementById('rec-telefono').value.trim();
+  var entDir     = document.getElementById('ent-dir').value.trim();
+  var entRef     = document.getElementById('ent-ref').value.trim();
+  var envNombre  = document.getElementById('env-nombre').value.trim();
+  var envTelefono= document.getElementById('env-telefono').value.trim();
+  var desc       = document.getElementById('paq-descripcion').value.trim();
+  var recDir     = document.getElementById('rec-dir').value.trim();
+  var recTel     = document.getElementById('rec-tel').value.trim();
+  var tamNombre  = {'pequeno':'Pequeño (hasta 5 kg)','mediano':'Mediano (5-15 kg)','grande':'Grande (15-30 kg)'}[S.tamano]||S.tamano;
+  var dirCompleta= entDir + (entRef?' – Ref: '+entRef:'') + ', ' + S.barEnt;
+
+  /* ── Payload para el modelo Pedido ── */
+  var payload = {
+    idPedido:   id,
+    sede:       'wil-paqueteria',          // ← sede fija para paquetería
+    comercio:   'Envío WIL',
+    estado:     'Pendiente',
+
+    /* Destinatario (quien recibe) */
+    nombre:     recNombre,
+    telefono:   recTelefono,
+    direccion:  dirCompleta,
+    zona:       S.barEnt,
+
+    /* Método de pago y tarifa */
+    metodoPago: S.metodoPago,
+    domicilio:  S.tarifaFinal,
+    total:      S.tarifaFinal,
+    subtotal:   0,
+
+    /* Fecha y hora */
+    fecha:  fecha,
+    hora:   hora,
+
+    /* Modo de entrega */
+    modoEntrega: 'PAQUETERIA',
+
+    /* Notas con toda la info del envío */
+    notas: [
+      'TIPO: ' + S.servicio,
+      'TAMAÑO: ' + tamNombre,
+      desc ? 'DESC: ' + desc : '',
+      '--- RECOGIDA ---',
+      'BARRIO_REC: ' + S.barRec,
+      'DIR_REC: ' + recDir,
+      recTel ? 'TEL_REC: ' + recTel : '',
+      S.oozRec ? 'OOZ_REC: si' : '',
+      '--- ENVÍA ---',
+      'REMITENTE: ' + envNombre + ' / ' + envTelefono,
+      '--- ENTREGA ---',
+      'BARRIO_ENT: ' + S.barEnt,
+      'DIR_ENT: ' + dirCompleta,
+      S.oozEnt ? 'OOZ_ENT: si' : '',
+      S.precRec ? 'TARIFA_REC: ' + S.precRec : '',
+      S.precEnt ? 'TARIFA_ENT: ' + S.precEnt : '',
+    ].filter(Boolean).join('\n'),
+
+    /* Campo destinatario como objeto */
+    destinatario: {
+      nombre:    recNombre,
+      telefono:  recTelefono,
+      direccion: dirCompleta,
+    },
+
+    /* Items — un único ítem describe el paquete */
+    items: [{
+      producto:   tamNombre + (desc ? ' — ' + desc : ''),
+      laboratorio: 'Envío WIL · ' + S.servicio,
+      cantidad:   1,
+      precioUnit: S.tarifaFinal,
+      subtotal:   S.tarifaFinal,
+    }],
+
+    coords: null,
+  };
+
+  try {
+    var resp = await fetch(API_URL, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
+    });
+
+    var data = await resp.json();
+
+    if (!resp.ok || !data.ok) {
+      throw new Error(data.error || 'Error del servidor (' + resp.status + ')');
+    }
+
+    /* ── Éxito ── */
+    S.idPedido = id;
+    document.getElementById('id-display').textContent = id;
+    document.getElementById('succ-msg').textContent =
+      'Envío ' + id + ' registrado. Un domiciliario WIL te contactará pronto al ' + recTelefono + '.';
+
+    /* Botón copiar código */
+    var copiarBtn = document.getElementById('btn-copiar');
+    var copiarNew = copiarBtn.cloneNode(true);
+    copiarBtn.parentNode.replaceChild(copiarNew, copiarBtn);
+    copiarNew.addEventListener('click', function(){
+      if(navigator.clipboard) navigator.clipboard.writeText(id).then(function(){ toast('Código '+id+' copiado ✓','content_copy'); });
+      else toast('Tu código: '+id,'info');
+    });
+
+    showView('view-confirmado');
+
+  } catch(e) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="sym f" style="font-size:17px">check_circle</span>Confirmar envío';
+    toast('Error al registrar: ' + e.message, 'error');
+    console.error('[confirmarPedido]', e);
+  }
+}
+
+function irARastrear() {
+  window.location.href = 'pedidoRastreo.html?id=' + (S.idPedido || '');
+}
+function compartirCodigo() {
+  var id = S.idPedido || document.getElementById('id-display').textContent;
+  if(!id||id==='—') return;
+  var txt = 'Mi envío WIL: ' + id;
+  if(navigator.share) navigator.share({title:'Domicilios WIL',text:txt}).catch(function(){});
+  else if(navigator.clipboard) navigator.clipboard.writeText(id).then(function(){ toast('Código '+id+' copiado ✓','content_copy'); });
+}
+function reiniciar() {
+  window.location.href = 'pedido-wil.html';
+}
+</script>
+</body>
+</html>

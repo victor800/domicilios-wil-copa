@@ -193,6 +193,20 @@ export default async function handler(req, res) {
           filtro.modoEntrega = { $regex: new RegExp(tipoLimpio, 'i') };
       }
 
+      /* ── Filtro tipo entrega ── */
+if (tipo) {
+  const tipoLimpio = sanitizeStr(tipo);
+  if (tipoLimpio)
+    filtro.modoEntrega = { $regex: new RegExp(tipoLimpio, 'i') };
+}
+
+/* ── Filtro por sede ── */   // ← NUEVO
+if (req.query.sede) {
+  const sedeLimpia = sanitizeStr(req.query.sede);
+  if (sedeLimpia)
+    filtro.sede = { $regex: new RegExp(`^${sedeLimpia}$`, 'i') };
+}
+
       /* ── Límite seguro: entre 1 y 500 ── */
       const limitSeguro = Math.min(Math.max(Number(limit) || 300, 1), 500);
 
