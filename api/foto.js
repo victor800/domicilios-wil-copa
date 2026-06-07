@@ -102,6 +102,14 @@ async function resolverIdWil(valor) {
   return valor.toUpperCase().trim();
 }
 
+const Contador = mongoose.models.Contador || mongoose.model('Contador',
+  new mongoose.Schema({
+    _id: String,
+    seq: { type: Number, default: 0 }
+  }),
+  'contadores'
+);
+
 async function siguienteId() {
   const doc = await Contador.findByIdAndUpdate(
     'pedido',
