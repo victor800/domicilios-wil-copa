@@ -7,14 +7,14 @@
 <title>Paquetería — Domicilios WIL</title>
 <link rel="manifest" href="manifest.json"/>
 <link rel="apple-touch-icon" href="icons/icon-192.png"/>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
   --p:#1e2d4a;--p2:#2d4070;--p3:#3d5490;
   --pl:rgba(30,45,74,.09);--plb:rgba(30,45,74,.18);
-  --surf:#f0f4f7;--w:#ffffff;--w2:#f8fafb;--w3:#eef1f5;
+  --surf:#f0f4f7;--w:#fff;--w2:#f8fafb;--w3:#eef1f5;
   --on:#18222e;--on2:#3d5068;--on3:#7a8fa6;
   --gr:#16a34a;--rd:#dc2626;--am:#d97706;
   --r-2xl:22px;--r-xl:17px;--r-lg:13px;--r-md:10px;
@@ -26,453 +26,418 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 .sym{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;font-size:22px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;direction:ltr;-webkit-font-smoothing:antialiased;font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24}
 .sym.f{font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24}
 .hidden{display:none!important}
-@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes pingPulse{0%{transform:scale(1);opacity:.8}70%{transform:scale(2.2);opacity:0}100%{opacity:0}}
+@keyframes popIn{0%{opacity:0;transform:scale(.88) translateY(20px)}100%{opacity:1;transform:scale(1) translateY(0)}}
 
-/* ── TOAST ── */
-.toast{position:fixed;bottom:calc(84px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(20px);z-index:3000;background:#18222e;color:#fff;border-radius:14px;padding:12px 18px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;box-shadow:0 8px 28px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;white-space:nowrap;max-width:calc(100vw - 40px)}
+/* ─── TOAST ─── */
+.toast{position:fixed;bottom:calc(90px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(20px);z-index:4000;background:#18222e;color:#fff;border-radius:14px;padding:12px 18px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;box-shadow:0 8px 28px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;white-space:nowrap;max-width:calc(100vw - 32px)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast .sym{font-size:16px;color:#60a5fa}
 
-/* ── HEADER ── */
-.hdr{position:fixed;top:0;left:0;right:0;z-index:200;height:56px;padding:0 14px;padding-top:env(safe-area-inset-top);display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.94);backdrop-filter:blur(24px);border-bottom:1px solid rgba(30,45,74,.08);box-shadow:0 1px 8px rgba(0,30,80,.06)}
+/* ─── HEADER ─── */
+.hdr{position:fixed;top:0;left:0;right:0;z-index:200;height:56px;padding:0 14px;padding-top:env(safe-area-inset-top);display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.95);backdrop-filter:blur(24px);border-bottom:1px solid rgba(30,45,74,.08);box-shadow:0 1px 8px rgba(0,30,80,.06)}
 .hdr-back{width:34px;height:34px;border-radius:50%;border:none;background:var(--pl);color:var(--p);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s}
 .hdr-back:active{transform:scale(.88)}
 .hdr-logo{width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid rgba(30,45,74,.18)}
 .hdr-title{font-weight:800;font-size:15px;color:var(--on);flex:1;letter-spacing:-.01em}
 
-/* ── BOTTOM NAV ── */
+/* ─── BOTTOM NAV ─── */
 .bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;z-index:200;background:rgba(255,255,255,.97);backdrop-filter:blur(20px);border-top:1px solid rgba(30,45,74,.07);border-radius:20px 20px 0 0;display:flex;padding:6px 8px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -4px 24px rgba(0,30,80,.08)}
 .bi{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 4px;border-radius:12px;cursor:pointer;border:none;background:transparent;color:var(--on3);transition:.18s}
 .bi.active{background:var(--pl);color:var(--p)}
 .bi .sym{font-size:21px}
 .bi-lbl{font-size:9px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
 
-/* ── MAIN ── */
-.main{padding-top:calc(56px + env(safe-area-inset-top));padding-bottom:calc(88px + env(safe-area-inset-bottom));max-width:480px;margin:0 auto;display:flex;flex-direction:column;gap:12px;padding-left:0;padding-right:0}
+/* ─── MAIN ─── */
+.main{padding-top:calc(56px + env(safe-area-inset-top));padding-bottom:calc(96px + env(safe-area-inset-bottom));max-width:480px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
 
-/* ══════════════════════════════════════════
-   HERO BANNER
-══════════════════════════════════════════ */
-.hero-banner{
-  margin:16px 16px 0;
-  border-radius:var(--r-2xl);
-  background:linear-gradient(135deg,#1a2640 0%,#1e2d4a 45%,#2d4070 80%,#3d5490 100%);
-  padding:22px 20px 20px;
-  position:relative;overflow:hidden;
-  box-shadow:var(--sh3);
-}
-.hero-banner::before{
-  content:'';position:absolute;top:-40px;right:-40px;
-  width:180px;height:180px;border-radius:50%;
-  background:rgba(255,255,255,.05);pointer-events:none;
-}
-.hero-banner::after{
-  content:'';position:absolute;bottom:-30px;left:20px;
-  width:120px;height:120px;border-radius:50%;
-  background:rgba(255,255,255,.04);pointer-events:none;
-}
-.hero-dots{
-  position:absolute;inset:0;pointer-events:none;
-  background-image:radial-gradient(circle,rgba(255,255,255,.045) 1px,transparent 1px);
-  background-size:18px 18px;
-}
+/* ─── VIEWS ─── */
+.view{display:none;flex-direction:column;gap:12px}
+.view.active{display:flex}
+
+/* ══════════ HERO ══════════ */
+.hero-banner{margin:16px 16px 0;border-radius:var(--r-2xl);background:linear-gradient(135deg,#1a2640 0%,#1e2d4a 45%,#2d4070 80%,#3d5490 100%);padding:22px 20px 20px;position:relative;overflow:hidden;box-shadow:var(--sh3)}
+.hero-banner::before{content:'';position:absolute;top:-40px;right:-40px;width:180px;height:180px;border-radius:50%;background:rgba(255,255,255,.05);pointer-events:none}
+.hero-banner::after{content:'';position:absolute;bottom:-30px;left:20px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.04);pointer-events:none}
+.hero-dots{position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(circle,rgba(255,255,255,.045) 1px,transparent 1px);background-size:18px 18px}
 .hero-body{position:relative;z-index:1;display:flex;align-items:center;gap:16px}
-.hero-emo{font-size:56px;line-height:1;flex-shrink:0;filter:drop-shadow(0 4px 16px rgba(0,0,0,.3))}
-.hero-txt{}
-.hero-badge{
-  display:inline-flex;align-items:center;gap:5px;
-  background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.2);
-  border-radius:99px;padding:3px 11px;
-  font-size:10px;font-weight:700;color:rgba(255,255,255,.88);
-  margin-bottom:8px;letter-spacing:.02em;
-}
-.hero-badge .sym{font-size:11px}
-.hero-tit{font-size:19px;font-weight:900;color:#fff;line-height:1.2;letter-spacing:-.015em;margin-bottom:5px}
-.hero-sub{font-size:11.5px;color:rgba(255,255,255,.62);line-height:1.55;font-weight:500}
+.hero-emo{font-size:52px;line-height:1;flex-shrink:0;filter:drop-shadow(0 4px 16px rgba(0,0,0,.3))}
+.hero-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.2);border-radius:99px;padding:3px 11px;font-size:10px;font-weight:700;color:rgba(255,255,255,.88);margin-bottom:8px;letter-spacing:.02em}
+.hero-tit{font-size:18px;font-weight:900;color:#fff;line-height:1.2;letter-spacing:-.015em;margin-bottom:5px}
+.hero-sub{font-size:11px;color:rgba(255,255,255,.6);line-height:1.55;font-weight:500}
 
-/* ══════════════════════════════════════════
-   STEP INDICATOR
-══════════════════════════════════════════ */
-.steps-row{
-  display:flex;align-items:center;
-  padding:0 16px;gap:0;
-}
-.step-item{
-  flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;
-  position:relative;
-}
-.step-item:not(:last-child)::after{
-  content:'';
-  position:absolute;top:14px;left:calc(50% + 14px);right:calc(-50% + 14px);
-  height:2px;background:#dde4ed;z-index:0;
-}
-.step-item.done:not(:last-child)::after,
-.step-item.active:not(:last-child)::after{
-  background:linear-gradient(90deg,#1e2d4a,#dde4ed);
-}
-.step-dot{
-  width:28px;height:28px;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  font-size:11px;font-weight:900;z-index:1;
-  border:2px solid #dde4ed;background:#fff;color:#9aa5ae;
-  transition:all .3s;flex-shrink:0;
-}
+/* ══════════ STEPS ══════════ */
+.steps-row{display:flex;align-items:center;padding:0 16px;gap:0}
+.step-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;position:relative}
+.step-item:not(:last-child)::after{content:'';position:absolute;top:14px;left:calc(50% + 14px);right:calc(-50% + 14px);height:2px;background:#dde4ed;z-index:0;transition:background .4s}
+.step-item.done:not(:last-child)::after{background:var(--p)}
+.step-item.active:not(:last-child)::after{background:linear-gradient(90deg,var(--p),#dde4ed)}
+.step-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;z-index:1;border:2px solid #dde4ed;background:#fff;color:#9aa5ae;transition:all .3s;flex-shrink:0}
 .step-item.done .step-dot{background:var(--p);border-color:var(--p);color:#fff}
 .step-item.active .step-dot{background:#fff;border-color:var(--p);color:var(--p);box-shadow:0 0 0 4px rgba(30,45,74,.12)}
-.step-lbl{font-size:9px;font-weight:700;color:#9aa5ae;text-align:center;letter-spacing:.02em}
+.step-lbl{font-size:9px;font-weight:700;color:#9aa5ae;text-align:center;letter-spacing:.02em;transition:color .3s}
 .step-item.done .step-lbl,.step-item.active .step-lbl{color:var(--p)}
 
-/* ══════════════════════════════════════════
-   TARJETAS DE PASO
-══════════════════════════════════════════ */
-.paso-card{
-  margin:0 16px;
-  background:#fff;border-radius:var(--r-xl);
-  border:1.5px solid #e2e8f0;
-  box-shadow:var(--sh);
-  overflow:hidden;
-  animation:fadeUp .24s cubic-bezier(.22,1,.36,1) both;
-}
+/* ══════════ CARDS ══════════ */
+.paso-card{margin:0 16px;background:#fff;border-radius:var(--r-xl);border:1.5px solid #e2e8f0;box-shadow:var(--sh);overflow:hidden;animation:fadeUp .24s cubic-bezier(.22,1,.36,1) both}
+.card-hdr{padding:13px 15px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #f1f5f9}
+.card-hdr.green{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-bottom-color:#bbf7d0}
+.card-hdr.blue{background:linear-gradient(90deg,#f0f4ff,#fff);border-bottom-color:#e0e7ff}
+.card-hdr-ico{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.card-hdr-ico.green{background:rgba(22,163,74,.15)}
+.card-hdr-ico.blue{background:rgba(30,45,74,.1)}
+.card-hdr-lbl{font-size:13px;font-weight:800}
+.card-hdr-lbl.green{color:#14532d}
+.card-hdr-lbl.blue{color:#1e293b}
+.card-hdr-sub{font-size:10.5px;font-weight:500;margin-top:1px;line-height:1.4;color:#166534}
+.card-body{padding:15px;display:flex;flex-direction:column;gap:12px}
 
-/* GPS CARD */
-.gps-card-hdr{
-  padding:13px 15px;
-  background:linear-gradient(135deg,#f0fdf4,#dcfce7);
-  border-bottom:1px solid #bbf7d0;
-  display:flex;align-items:center;gap:10px;
-}
-.gps-hdr-ico{
-  width:36px;height:36px;border-radius:11px;
-  background:rgba(22,163,74,.15);
-  display:flex;align-items:center;justify-content:center;
-  font-size:18px;flex-shrink:0;
-}
-.gps-hdr-lbl{font-size:13px;font-weight:800;color:#14532d}
-.gps-hdr-sub{font-size:10.5px;color:#166534;font-weight:500;margin-top:1px;line-height:1.4}
-.gps-body{padding:13px 15px}
-
-.gps-btn{
-  width:100%;padding:13px 16px;border-radius:13px;border:none;
-  background:linear-gradient(135deg,#16a34a 0%,#15803d 100%);
-  color:#fff;font-family:'Plus Jakarta Sans',sans-serif;
-  font-size:14px;font-weight:800;
-  display:flex;align-items:center;justify-content:center;gap:8px;
-  cursor:pointer;transition:all .18s;
-  box-shadow:0 4px 18px rgba(22,163,74,.38);
-  letter-spacing:.01em;
-}
-.gps-btn:active{transform:scale(.97);box-shadow:0 2px 8px rgba(22,163,74,.25)}
+/* ══════════ GPS ══════════ */
+.gps-btn{width:100%;padding:13px 16px;border-radius:13px;border:none;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:all .18s;box-shadow:0 4px 18px rgba(22,163,74,.38)}
+.gps-btn:active{transform:scale(.97)}
 .gps-btn:disabled{opacity:.65;cursor:default}
-.gps-btn .sym{font-size:19px}
-
-.gps-result{
-  display:none;margin-top:11px;
-  border:1.5px solid #86efac;border-radius:13px;
-  background:#f0fdf4;padding:12px 14px;
-}
+.gps-result{display:none;margin-top:11px;border:1.5px solid #86efac;border-radius:13px;background:#f0fdf4;padding:12px 14px}
 .gps-result.show{display:block;animation:fadeIn .25s ease}
-.gps-result-row{
-  display:flex;align-items:flex-start;gap:8px;
-  font-size:12px;font-weight:600;color:#14532d;
-  margin-bottom:6px;line-height:1.55;
-}
-.gps-result-row:last-of-type{margin-bottom:0}
-.gps-result-ico{font-size:15px;flex-shrink:0;margin-top:1px}
-.dist-badge{
-  display:inline-flex;align-items:center;gap:6px;
-  background:linear-gradient(135deg,#1e2d4a,#2d4070);
-  color:#fff;border-radius:20px;padding:4px 12px;
-  font-size:12px;font-weight:900;margin-top:8px;
-  box-shadow:0 2px 10px rgba(30,45,74,.3);
-}
-.dist-badge .sym{font-size:13px}
-
-/* FORM CARD */
-.form-card-hdr{
-  padding:12px 15px;border-bottom:1px solid #f1f5f9;
-  display:flex;align-items:center;gap:9px;
-  background:linear-gradient(90deg,#f8fafc,#fff);
-}
-.form-hdr-ico{
-  width:34px;height:34px;border-radius:10px;
-  background:rgba(30,45,74,.1);
-  display:flex;align-items:center;justify-content:center;
-  font-size:17px;flex-shrink:0;
-}
-.form-hdr-lbl{font-size:13px;font-weight:800;color:#1e293b}
-.form-body{padding:15px;display:flex;flex-direction:column;gap:12px}
-
-.wf{display:flex;flex-direction:column;gap:5px}
-.wf label{font-size:10.5px;font-weight:700;color:#64748b;letter-spacing:.055em;text-transform:uppercase}
-.wf input,.wf textarea{
-  border:1.5px solid #e2e8f0;border-radius:12px;
-  padding:11px 14px;font-size:14px;
-  font-family:'Plus Jakarta Sans',sans-serif;
-  color:#1e293b;background:#f8fafc;outline:none;
-  transition:border-color .18s,background .18s,box-shadow .18s;
-  box-sizing:border-box;resize:none;-webkit-appearance:none;
-}
-.wf input:focus,.wf textarea:focus{
-  border-color:#1e2d4a;background:#fff;
-  box-shadow:0 0 0 3.5px rgba(30,45,74,.1);
-}
-.wf input::placeholder,.wf textarea::placeholder{color:#94a3b8}
-.wf-note{font-size:10.5px;color:#94a3b8;font-weight:500;line-height:1.45;padding-left:2px}
-
-.divider-label{
-  display:flex;align-items:center;gap:8px;
-  font-size:10px;font-weight:800;text-transform:uppercase;
-  letter-spacing:.07em;color:#94a3b8;margin:2px 0;
-}
-.divider-label::before,.divider-label::after{
-  content:'';flex:1;height:1px;background:#e2e8f0;
-}
-
-/* NOTA COTIZACIÓN */
-.cotiza-nota{
-  margin:0 16px;
-  background:linear-gradient(135deg,#fffbeb,#fef9c3);
-  border:1.5px solid rgba(217,119,6,.22);
-  border-radius:15px;padding:13px 15px;
-  display:flex;align-items:flex-start;gap:10px;
-  box-shadow:0 2px 10px rgba(217,119,6,.07);
-}
-.cotiza-nota-ico{font-size:20px;flex-shrink:0;margin-top:1px}
-.cotiza-nota p{font-size:12px;font-weight:600;color:#92400e;line-height:1.65}
-.cotiza-nota strong{font-weight:900;color:#78350f}
-
-/* BOTÓN WHATSAPP */
-.wa-wrap{padding:0 16px;display:flex;flex-direction:column;gap:7px}
-.wa-btn{
-  display:flex;align-items:center;justify-content:center;gap:10px;
-  width:100%;padding:16px 20px;border-radius:16px;border:none;
-  background:linear-gradient(135deg,#16a34a 0%,#22c55e 50%,#25D366 100%);
-  color:#fff;font-family:'Plus Jakarta Sans',sans-serif;
-  font-size:15px;font-weight:900;letter-spacing:.01em;
-  cursor:pointer;transition:all .18s;
-  box-shadow:0 6px 28px rgba(37,211,102,.42);
-  position:relative;overflow:hidden;
-}
-.wa-btn::before{
-  content:'';position:absolute;inset:0;
-  background:linear-gradient(135deg,rgba(255,255,255,.12) 0%,transparent 60%);
-  pointer-events:none;
-}
-.wa-btn:active{transform:scale(.97);box-shadow:0 3px 14px rgba(37,211,102,.3)}
-.wa-note{text-align:center;font-size:10.5px;color:#94a3b8;font-weight:600}
-
-/* SPINNER */
-.spin-el{
-  display:none;width:18px;height:18px;border-radius:50%;
-  border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;
-  animation:spin .7s linear infinite;flex-shrink:0;
-}
+.gps-row{display:flex;align-items:flex-start;gap:8px;font-size:12px;font-weight:600;color:#14532d;margin-bottom:6px;line-height:1.55}
+.dist-badge{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#1e2d4a,#2d4070);color:#fff;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:900;margin-top:8px;box-shadow:0 2px 10px rgba(30,45,74,.3)}
+.spin-el{display:none;width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;animation:spin .7s linear infinite;flex-shrink:0}
 .gps-btn.loading .spin-el{display:block}
 .gps-btn.loading .btn-ico,.gps-btn.loading .btn-txt{display:none}
 
-/* SPACER */
+/* ══════════ FORM ══════════ */
+.wf{display:flex;flex-direction:column;gap:5px;position:relative}
+.wf label{font-size:10.5px;font-weight:700;color:#64748b;letter-spacing:.055em;text-transform:uppercase}
+.wf input,.wf textarea{border:1.5px solid #e2e8f0;border-radius:12px;padding:11px 14px;font-size:14px;font-family:'Plus Jakarta Sans',sans-serif;color:#1e293b;background:#f8fafc;outline:none;transition:border-color .18s,background .18s,box-shadow .18s;box-sizing:border-box;resize:none;-webkit-appearance:none;width:100%}
+.wf input:focus,.wf textarea:focus{border-color:var(--p);background:#fff;box-shadow:0 0 0 3.5px rgba(30,45,74,.1)}
+.wf input::placeholder,.wf textarea::placeholder{color:#94a3b8}
+.wf-note{font-size:10.5px;color:#94a3b8;font-weight:500;line-height:1.45;padding-left:2px}
+.divider-lbl{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#94a3b8;margin:2px 0}
+.divider-lbl::before,.divider-lbl::after{content:'';flex:1;height:1px;background:#e2e8f0}
+
+/* ── AUTOCOMPLETE ── */
+.wil-sugs{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:500;background:#fff;border:1.5px solid #c7d6e8;border-radius:13px;box-shadow:0 8px 28px rgba(30,45,74,.15);overflow:hidden;display:none;max-height:220px;overflow-y:auto}
+.wil-sug-item{padding:11px 14px;font-size:13px;font-weight:600;color:#1e293b;cursor:pointer;transition:background .14s;display:flex;align-items:center;gap:8px;border-bottom:1px solid #f1f5f9}
+.wil-sug-item:last-child{border-bottom:none}
+.wil-sug-item:hover,.wil-sug-item:active{background:#f0f4ff}
+.wil-sug-item::before{content:'📍';font-size:12px;flex-shrink:0}
+.wil-sug-match{color:var(--p);font-weight:900;background:rgba(30,45,74,.07);border-radius:4px;padding:0 2px}
+.wil-sug-empty{padding:14px;font-size:12px;color:var(--on3);text-align:center}
+.wil-selected-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(30,45,74,.09);border-radius:8px;padding:4px 10px;font-size:11.5px;font-weight:700;color:var(--p);margin-top:5px}
+
+/* ══════════ BOTÓN CONTINUAR ══════════ */
+.btn-continuar{margin:0 16px;padding:16px;border-radius:16px;border:none;background:linear-gradient(135deg,var(--p),var(--p2));color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:900;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;transition:all .2s;box-shadow:0 6px 24px rgba(30,45,74,.32);letter-spacing:.01em}
+.btn-continuar:active{transform:scale(.97)}
+.btn-continuar:disabled{opacity:.45;cursor:default;box-shadow:none}
+.btn-continuar .sym{font-size:20px}
+
+/* ══════════ NOTA ══════════ */
+.nota-card{margin:0 16px;background:linear-gradient(135deg,#fffbeb,#fef9c3);border:1.5px solid rgba(217,119,6,.22);border-radius:15px;padding:13px 15px;display:flex;align-items:flex-start;gap:10px;box-shadow:0 2px 10px rgba(217,119,6,.07)}
+.nota-ico{font-size:20px;flex-shrink:0;margin-top:1px}
+.nota-card p{font-size:12px;font-weight:600;color:#92400e;line-height:1.65}
+.nota-card strong{font-weight:900;color:#78350f}
+
+/* ══════════ RESUMEN ══════════ */
+.resumen-card{margin:0 16px;background:#fff;border-radius:var(--r-xl);border:1.5px solid #e2e8f0;box-shadow:var(--sh);overflow:hidden;animation:fadeUp .28s cubic-bezier(.22,1,.36,1) both}
+.resumen-hdr{padding:15px;background:linear-gradient(135deg,#1e2d4a,#2d4070);display:flex;align-items:center;gap:12px}
+.resumen-hdr-ico{font-size:28px}
+.resumen-hdr-txt{color:#fff}
+.resumen-hdr-tit{font-size:15px;font-weight:900;letter-spacing:-.01em}
+.resumen-hdr-sub{font-size:11px;color:rgba(255,255,255,.65);margin-top:2px}
+.resumen-body{padding:0}
+.res-row{display:flex;align-items:flex-start;gap:10px;padding:11px 15px;border-bottom:1px solid #f1f5f9}
+.res-row:last-child{border-bottom:none}
+.res-ico{font-size:16px;flex-shrink:0;margin-top:1px;width:20px;text-align:center}
+.res-info{}
+.res-lbl{font-size:9.5px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+.res-val{font-size:13px;font-weight:700;color:#1e293b;line-height:1.45}
+.res-val.highlight{color:var(--p);font-weight:900}
+
+/* ══════════ BOTÓN ENVIAR ══════════ */
+.btn-enviar{margin:0 16px;padding:16px;border-radius:16px;border:none;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:900;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;transition:all .2s;box-shadow:0 6px 24px rgba(22,163,74,.35)}
+.btn-enviar:active{transform:scale(.97)}
+.btn-enviar:disabled{opacity:.5;cursor:default}
+
+/* ══════════ BOTÓN VOLVER ══════════ */
+.btn-volver{margin:0 16px;padding:13px;border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;color:var(--on2);font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:all .18s}
+.btn-volver:active{background:#f1f5f9}
+
+/* ══════════ POPUP ÉXITO ══════════ */
+.overlay{position:fixed;inset:0;z-index:3000;background:rgba(10,20,40,.65);backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center;padding-bottom:env(safe-area-inset-bottom);opacity:0;pointer-events:none;transition:opacity .3s}
+.overlay.show{opacity:1;pointer-events:all}
+.popup{background:#fff;border-radius:28px 28px 0 0;padding:28px 22px calc(24px + env(safe-area-inset-bottom));width:100%;max-width:480px;animation:popIn .35s cubic-bezier(.22,1,.36,1) both}
+.popup-check{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#16a34a,#22c55e);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;box-shadow:0 8px 28px rgba(22,163,74,.38)}
+.popup-check .sym{font-size:32px;color:#fff}
+.popup-tit{font-size:20px;font-weight:900;color:#1e293b;text-align:center;letter-spacing:-.015em;margin-bottom:6px}
+.popup-sub{font-size:13px;color:#64748b;font-weight:500;text-align:center;line-height:1.6;margin-bottom:20px}
+.codigo-box{background:linear-gradient(135deg,#f0f4ff,#e8eeff);border:2px solid rgba(30,45,74,.18);border-radius:16px;padding:16px;text-align:center;margin-bottom:18px}
+.codigo-lbl{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px}
+.codigo-val{font-size:28px;font-weight:900;color:var(--p);letter-spacing:.12em;font-variant-numeric:tabular-nums}
+.codigo-hint{font-size:11px;color:#94a3b8;font-weight:500;margin-top:4px}
+.popup-btns{display:flex;flex-direction:column;gap:8px}
+.btn-copiar{padding:14px;border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;color:var(--p);font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:all .18s}
+.btn-copiar:active{background:#f0f4ff}
+.btn-inicio{padding:14px;border-radius:14px;border:none;background:linear-gradient(135deg,var(--p),var(--p2));color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:all .18s;box-shadow:0 4px 18px rgba(30,45,74,.28)}
+.btn-inicio:active{transform:scale(.97)}
+
+/* ══════════ WHATSAPP BTN ══════════ */
+.wa-wrap{padding:0 16px;display:flex;flex-direction:column;gap:7px}
+.wa-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:16px 20px;border-radius:16px;border:none;background:linear-gradient(135deg,#16a34a 0%,#22c55e 50%,#25D366 100%);color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:900;cursor:pointer;transition:all .18s;box-shadow:0 6px 28px rgba(37,211,102,.42);position:relative;overflow:hidden}
+.wa-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.12),transparent 60%);pointer-events:none}
+.wa-btn:active{transform:scale(.97)}
+.wa-note{text-align:center;font-size:10.5px;color:#94a3b8;font-weight:600}
+
 .spacer{height:16px}
-
-/* PULSE en GPS */
-.gps-live-dot{
-  width:9px;height:9px;border-radius:50%;background:#16a34a;
-  position:relative;flex-shrink:0;
-}
-.gps-live-dot::after{
-  content:'';position:absolute;inset:-4px;border-radius:50%;
-  background:rgba(22,163,74,.25);animation:pingPulse 1.6s ease-in-out infinite;
-}
-
 </style>
 </head>
 <body>
 
 <!-- TOAST -->
-<div class="toast" id="globalToast">
-  <span class="sym f" id="globalToastIcon">info</span>
-  <span id="globalToastMsg">Mensaje</span>
+<div class="toast" id="gToast">
+  <span class="sym f" id="gToastIco">info</span>
+  <span id="gToastMsg">—</span>
+</div>
+
+<!-- OVERLAY ÉXITO -->
+<div class="overlay" id="overlayExito">
+  <div class="popup">
+    <div class="popup-check"><span class="sym f">check</span></div>
+    <div class="popup-tit">¡Pedido enviado! 🎉</div>
+    <div class="popup-sub">Tu solicitud de envío fue registrada.<br>En breve te contactamos con la tarifa exacta.</div>
+    <div class="codigo-box">
+      <div class="codigo-lbl">Tu código de rastreo</div>
+      <div class="codigo-val" id="codigoRastreo">—</div>
+      <div class="codigo-hint">Guárdalo para consultar el estado de tu envío</div>
+    </div>
+    <div class="popup-btns">
+      <button class="btn-copiar" onclick="copiarCodigo()">
+        <span class="sym" style="font-size:18px">content_copy</span>
+        Copiar código
+      </button>
+      <button class="btn-inicio" onclick="irInicio()">
+        <span class="sym f" style="font-size:18px">home</span>
+        Ir al inicio
+      </button>
+    </div>
+  </div>
 </div>
 
 <!-- HEADER -->
 <header class="hdr">
-  <button class="hdr-back" onclick="history.back()">
+  <button class="hdr-back" id="btnHeaderBack" onclick="volverPaso()">
     <span class="sym" style="font-size:18px">arrow_back</span>
   </button>
-  <img class="hdr-logo" src="icons/icon-192.png" alt="WIL"
-    onerror="this.style.display='none'"/>
-  <span class="hdr-title">Envío de Paquetes</span>
+  <img class="hdr-logo" src="icons/icon-192.png" alt="WIL" onerror="this.style.display='none'"/>
+  <span class="hdr-title" id="hdrTitle">Envío de Paquetes</span>
 </header>
 
 <main class="main">
 
-  <!-- HERO -->
-  <div class="hero-banner">
-    <div class="hero-dots"></div>
-    <div class="hero-body">
-      <span class="hero-emo">📦</span>
-      <div class="hero-txt">
-        <div class="hero-badge">
-          <span class="sym f" style="font-size:11px">package_2</span>
-          Envíos y mensajería
-        </div>
-        <div class="hero-tit">Envío fuera de Copacabana</div>
-        <div class="hero-sub">Caldas · Sabaneta · Itagüí · Medellín · Envigado y más.<br>Tarifa personalizada según distancia.</div>
-      </div>
-    </div>
-  </div>
+  <!-- ════════════════════
+       VISTA 1 — FORMULARIO
+  ════════════════════ -->
+  <div class="view active" id="view1">
 
-  <!-- STEPS -->
-  <div class="steps-row">
-    <div class="step-item active" id="st0">
-      <div class="step-dot">1</div>
-      <span class="step-lbl">Ubicación</span>
-    </div>
-    <div class="step-item" id="st1">
-      <div class="step-dot">2</div>
-      <span class="step-lbl">Datos</span>
-    </div>
-    <div class="step-item" id="st2">
-      <div class="step-dot">3</div>
-      <span class="step-lbl">Cotizar</span>
-    </div>
-  </div>
-
-  <!-- ══════════════════════════════════
-       PASO 1 — GPS
-  ══════════════════════════════════ -->
-  <div class="paso-card" id="step-gps">
-    <div class="gps-card-hdr">
-      <div class="gps-hdr-ico">📍</div>
-      <div>
-        <div class="gps-hdr-lbl">1. Captura tu ubicación actual</div>
-        <div class="gps-hdr-sub">Para cotizar el envío necesitamos saber dónde estás</div>
-      </div>
-    </div>
-    <div class="gps-body">
-      <button class="gps-btn" id="gpsBtn" onclick="capturarGPS()">
-        <span class="sym f btn-ico" style="font-size:19px">my_location</span>
-        <span class="btn-txt">Capturar mi ubicación GPS</span>
-        <div class="spin-el"></div>
-      </button>
-
-      <div class="gps-result" id="gpsResult">
-        <div class="gps-result-row">
-          <span class="gps-result-ico">📍</span>
-          <span id="gpsDirTxt">—</span>
-        </div>
-        <div class="gps-result-row">
-          <span class="gps-result-ico">🗺️</span>
-          <span id="gpsCoordTxt" style="font-size:10.5px;opacity:.7">—</span>
-        </div>
+    <!-- HERO -->
+    <div class="hero-banner">
+      <div class="hero-dots"></div>
+      <div class="hero-body">
+        <span class="hero-emo">📦</span>
         <div>
+          <div class="hero-badge">
+            <span class="sym f" style="font-size:11px">package_2</span>
+            Paquetería WIL
+          </div>
+          <div class="hero-tit">Envío fuera de Copacabana</div>
+          <div class="hero-sub">Caldas · Sabaneta · Itagüí · Medellín · Envigado y más.<br>Tarifa personalizada según distancia.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEPS -->
+    <div class="steps-row">
+      <div class="step-item active" id="st0"><div class="step-dot">1</div><span class="step-lbl">Datos</span></div>
+      <div class="step-item" id="st1"><div class="step-dot">2</div><span class="step-lbl">Resumen</span></div>
+      <div class="step-item" id="st2"><div class="step-dot">3</div><span class="step-lbl">Confirmado</span></div>
+    </div>
+
+    <!-- GPS -->
+    <div class="paso-card">
+      <div class="card-hdr green">
+        <div class="card-hdr-ico green">📍</div>
+        <div>
+          <div class="card-hdr-lbl green">Ubicación del remitente</div>
+          <div class="card-hdr-sub">Opcional pero ayuda a calcular la tarifa</div>
+        </div>
+      </div>
+      <div class="card-body" style="gap:0;padding:13px 15px">
+        <button class="gps-btn" id="gpsBtn" onclick="capturarGPS()">
+          <span class="sym f btn-ico" style="font-size:19px">my_location</span>
+          <span class="btn-txt">Capturar mi ubicación GPS</span>
+          <div class="spin-el"></div>
+        </button>
+        <div class="gps-result" id="gpsResult">
+          <div class="gps-row"><span>📍</span><span id="gpsDirTxt">—</span></div>
+          <div class="gps-row"><span style="opacity:.6">🗺️</span><span id="gpsCoordTxt" style="font-size:10.5px;opacity:.7">—</span></div>
           <div class="dist-badge" id="gpsDistBadge">
             <span class="sym f" style="font-size:13px">delivery_dining</span>
-            <span id="gpsDistTxt">Calculando distancia…</span>
+            <span id="gpsDistTxt">Calculando…</span>
           </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- ══════════════════════════════════
-       PASO 2 — FORMULARIO
-  ══════════════════════════════════ -->
-  <div class="paso-card" id="step-form">
-    <div class="form-card-hdr">
-      <div class="form-hdr-ico">📋</div>
-      <div class="form-hdr-lbl">2. Datos del envío</div>
+    <!-- FORMULARIO -->
+    <div class="paso-card">
+      <div class="card-hdr blue">
+        <div class="card-hdr-ico blue">📋</div>
+        <div class="card-hdr-lbl blue">Datos del envío</div>
+      </div>
+      <div class="card-body">
+
+        <div class="divider-lbl">Quien envía</div>
+
+        <div class="wf">
+          <label>Tu nombre *</label>
+          <input type="text" id="fNombre" placeholder="¿Cómo te llamamos?" autocomplete="name" oninput="checkForm()"/>
+        </div>
+        <div class="wf">
+          <label>Tu teléfono *</label>
+          <input type="tel" id="fTelEnvio" placeholder="Número del remitente" autocomplete="tel" oninput="checkForm()"/>
+        </div>
+
+        <div class="divider-lbl">Recogida</div>
+
+        <!-- BARRIO RECOGIDA -->
+        <div class="wf" id="wf-barrio-recogida">
+          <label>Barrio de recogida *</label>
+          <input type="text" id="barrio-recogida-txt"
+            placeholder="Escribe el barrio de origen…"
+            autocomplete="off"
+            oninput="buscarBarrio('recogida', this.value)"
+            onblur="cerrarSugs('recogida')"
+            onfocus="if(this.value.length>=2) buscarBarrio('recogida',this.value)"/>
+          <div class="wil-sugs" id="sugs-recogida"></div>
+          <input type="hidden" id="barrio-recogida-hid" data-precio="0"/>
+        </div>
+
+        <div class="wf">
+          <label>Dirección / Punto de recogida</label>
+          <input type="text" id="fComercio" placeholder="Nombre del comercio, calle, referencia…"/>
+          <span class="wf-note">Dónde el domiciliario recoge el paquete</span>
+        </div>
+        <div class="wf">
+          <label>Teléfono de recogida</label>
+          <input type="tel" id="fTelRecogida" placeholder="Número de quien entrega al domiciliario" autocomplete="tel"/>
+        </div>
+
+        <div class="divider-lbl">Destino</div>
+
+        <!-- BARRIO ENTREGA -->
+        <div class="wf" id="wf-barrio-entrega">
+          <label>Barrio de entrega *</label>
+          <input type="text" id="barrio-entrega-txt"
+            placeholder="Escribe el barrio destino…"
+            autocomplete="off"
+            oninput="buscarBarrio('entrega', this.value)"
+            onblur="cerrarSugs('entrega')"
+            onfocus="if(this.value.length>=2) buscarBarrio('entrega',this.value)"/>
+          <div class="wil-sugs" id="sugs-entrega"></div>
+          <input type="hidden" id="barrio-entrega-hid" data-precio="0"/>
+        </div>
+
+        <div class="wf">
+          <label>Referencia del destino</label>
+          <textarea id="fReferencia" rows="2" placeholder="Ej: Casa azul con reja negra, piso 3 apto 401…"></textarea>
+        </div>
+        <div class="wf">
+          <label>Nombre de quien recibe *</label>
+          <input type="text" id="fNombreEntrega" placeholder="Nombre del destinatario" oninput="checkForm()"/>
+        </div>
+        <div class="wf">
+          <label>Teléfono de entrega *</label>
+          <input type="tel" id="fTelEntrega" placeholder="Número de quien recibe el paquete" autocomplete="tel" oninput="checkForm()"/>
+        </div>
+
+        <div class="divider-lbl">Paquete</div>
+
+        <div class="wf">
+          <label>¿Qué vamos a transportar? *</label>
+          <textarea id="fDescripcion" rows="3" placeholder="Describe el paquete, encargo o mercancía…" oninput="checkForm()"></textarea>
+          <span class="wf-note">⚠️ Peso máximo permitido: <strong>30 kg</strong></span>
+        </div>
+
+      </div>
     </div>
-    <div class="form-body">
 
-      <!-- Quien envía -->
-      <div class="divider-label">Quien envía</div>
-
-      <div class="wf">
-        <label>Tu nombre *</label>
-        <input type="text" id="fNombre" placeholder="¿Cómo te llamamos?" autocomplete="name"
-          oninput="checkForm()"/>
-      </div>
-
-      <div class="wf">
-        <label>Tu teléfono *</label>
-        <input type="tel" id="fTelEnvio" placeholder="Número del remitente" autocomplete="tel"
-          oninput="checkForm()"/>
-      </div>
-
-      <div class="wf">
-        <label>Lugar de recogida</label>
-        <input type="text" id="fComercio"
-          placeholder="Nombre del comercio, dirección o barrio de origen"/>
-        <span class="wf-note">Dirección o lugar donde el domi recoge el paquete</span>
-      </div>
-
-      <div class="wf">
-        <label>Teléfono de recogida</label>
-        <input type="tel" id="fTelRecogida"
-          placeholder="Número de quien entrega al domiciliario" autocomplete="tel"/>
-      </div>
-
-      <!-- Separador -->
-      <div class="divider-label">Destino y paquete</div>
-
-      <div class="wf">
-        <label>Ciudad / Barrio destino *</label>
-        <input type="text" id="fDestino"
-          placeholder="Ej: El Poblado Medellín, Sabaneta Centro, Caldas…"
-          oninput="checkForm()"/>
-      </div>
-
-      <div class="wf">
-        <label>Punto de referencia del destino</label>
-        <textarea id="fReferencia" rows="2"
-          placeholder="Ej: Casa azul con reja negra, edificio Torre Norte piso 5…"></textarea>
-      </div>
-
-      <div class="wf">
-        <label>Teléfono de entrega *</label>
-        <input type="tel" id="fTelEntrega"
-          placeholder="Número de quien recibe el paquete" autocomplete="tel"
-          oninput="checkForm()"/>
-      </div>
-
-      <div class="wf">
-        <label>¿Qué vamos a transportar? *</label>
-        <textarea id="fDescripcion" rows="3"
-          placeholder="Describe el paquete, encargo o mercancía…"
-          oninput="checkForm()"></textarea>
-        <span class="wf-note">⚠️ Peso máximo permitido: <strong>30 kg</strong></span>
-      </div>
-
+    <!-- NOTA -->
+    <div class="nota-card">
+      <span class="nota-ico">💡</span>
+      <p>El <strong>administrador de WIL</strong> recibirá tu solicitud y te enviará una <strong>cotización personalizada</strong> según distancia, peso y acceso. <strong>Tú apruebas antes de pagar.</strong></p>
     </div>
-  </div>
 
-  <!-- ══════════════════════════════════
-       PASO 3 — NOTA + WHATSAPP
-  ══════════════════════════════════ -->
-
-  <!-- Nota cotización -->
-  <div class="cotiza-nota">
-    <span class="cotiza-nota-ico">💡</span>
-    <p>El <strong>administrador de Domicilios WIL</strong> recibirá tu solicitud y te
-       enviará una <strong>cotización personalizada</strong> según la distancia real,
-       el peso y las condiciones de acceso. <strong>Tú apruebas antes de pagar.</strong></p>
-  </div>
-
-  <!-- Botón WhatsApp -->
-  <div class="wa-wrap">
-    <button class="wa-btn" id="waBtn" onclick="enviarWA()">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff">
-        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
-      </svg>
-      Solicitar cotización por WhatsApp
+    <!-- BOTÓN CONTINUAR -->
+    <button class="btn-continuar" id="btnContinuar" disabled onclick="irResumen()">
+      <span class="sym f">arrow_forward</span>
+      Ver resumen del pedido
     </button>
-    <p class="wa-note">Te responderemos en minutos con el valor exacto del envío 🛵</p>
-  </div>
 
-  <div class="spacer"></div>
+    <div class="spacer"></div>
+  </div><!-- /view1 -->
+
+  <!-- ════════════════════
+       VISTA 2 — RESUMEN
+  ════════════════════ -->
+  <div class="view" id="view2">
+
+    <div style="height:8px"></div>
+
+    <!-- Steps -->
+    <div class="steps-row">
+      <div class="step-item done" id="st0b"><div class="step-dot"><span class="sym f" style="font-size:13px">check</span></div><span class="step-lbl">Datos</span></div>
+      <div class="step-item active" id="st1b"><div class="step-dot">2</div><span class="step-lbl">Resumen</span></div>
+      <div class="step-item" id="st2b"><div class="step-dot">3</div><span class="step-lbl">Confirmado</span></div>
+    </div>
+
+    <!-- Resumen card -->
+    <div class="resumen-card">
+      <div class="resumen-hdr">
+        <span class="resumen-hdr-ico">📦</span>
+        <div class="resumen-hdr-txt">
+          <div class="resumen-hdr-tit">Resumen del envío</div>
+          <div class="resumen-hdr-sub">Revisa los datos antes de confirmar</div>
+        </div>
+      </div>
+      <div class="resumen-body" id="resumenBody">
+        <!-- Se llena dinámicamente -->
+      </div>
+    </div>
+
+    <!-- Botones -->
+    <button class="btn-enviar" id="btnEnviar" onclick="enviarPedido()">
+      <span class="sym f" style="font-size:20px">send</span>
+      Confirmar y enviar pedido
+    </button>
+
+    <!-- WHATSAPP (siempre visible como alternativa) -->
+    <div class="wa-wrap">
+      <button class="wa-btn" onclick="enviarWA()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+        También por WhatsApp
+      </button>
+      <p class="wa-note">Si prefieres coordinar directamente con el administrador</p>
+    </div>
+
+    <button class="btn-volver" onclick="volverForm()">
+      <span class="sym" style="font-size:18px">arrow_back</span>
+      Editar datos
+    </button>
+
+    <div class="spacer"></div>
+  </div><!-- /view2 -->
+
 </main>
 
 <!-- BOTTOM NAV -->
@@ -492,289 +457,413 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 </nav>
 
 <script>
-/* ═══════════════════════════════════════════════════
+/* ════════════════════════════════════════════
    CONFIG
-═══════════════════════════════════════════════════ */
-var WIL_WA  = '573023452213';
-var WIL_LAT = 6.3459291;
-var WIL_LNG = -75.512814;
+════════════════════════════════════════════ */
+var API_URL  = '/api/foto?recurso=pedidos';
+var WIL_WA   = '573023452213';
+var WIL_LAT  = 6.3459291;
+var WIL_LNG  = -75.512814;
 
-/* Estado GPS */
-var gps = {
-  lat:        null,
-  lng:        null,
-  direccion:  '',
-  distKm:     null,
-  distRealKm: null,
-  tiempoSeg:  null,
-  label:      ''
-};
+/* ── GPS STATE ── */
+var gps = { lat:null, lng:null, direccion:'', distKm:null, distRealKm:null, tiempoSeg:null };
 
-/* ═══════════════════════════════════════════════════
+/* ── BARRIOS STATE ── */
+var barrioSel = { recogida: { nombre:'', precio:0 }, entrega: { nombre:'', precio:0 } };
+
+/* ── PEDIDO ENVIADO ── */
+var pedidoCodigo = '';
+
+/* ════════════════════════════════════════════
+   LISTA DE BARRIOS
+════════════════════════════════════════════ */
+var BARRIOS = [
+  ['ASUNCION',5000],['FÁTIMA',5000],['MIRADOR AZUL',5000],
+  ['AZULITA PARTE BAJA',5000],['CRISTO REY (ABAJO DE LA PISCINA)',5000],
+  ['HORIZONTES',5000],['MIRAFLORES',5000],['MISERICORDIA HASTA PRINCESS',5000],
+  ['MOJÓN',5000],['PARQUE COPACABANA',5000],['OBRERO',5000],
+  ['PEDREGAL PARTE BAJA',5000],['PEDRERA',5000],['SAN FRANCISCO',5000],
+  ['SHANGAY',5000],['SIMÓN BOLÍVAR',5000],['TOBÓN QUINTERO',5000],
+  ['VEGAS PARTE BAJA',5000],['MONTE VERDE',5000],['REMANSO',5000],
+  ['YARUMITO PARTE BAJA',5000],['CANOAS HASTA LA TIENDA DEL CUSCO',5000],
+  ['PIEDRAS BLANCAS',5000],['PORVENIR',5000],['RECREO',5000],
+  ['CALORCOL',6000],['AZULITA PARTE ALTA',6000],['VILLAS DE COPACABANA',6000],
+  ['TABLAZO',6000],['CANOAS DESPUÉS DE LA TIENDA DEL CUSCO',6000],
+  ['CRISTO REY DE LA PISCINA HACIA ARRIBA',6000],['PEDREGAL PARTE ALTA',6000],
+  ['COLINAS DEL PEDREGAL',6000],['VEGAS INTERIORES IGLESIA MANANTIALES',6000],
+  ['YARUMITO DESPUÉS DEL EMPEDRADO',6000],['YARUMITO INTERIOR CANCHA NUEVA',6000],
+  ['VEGAS PARTE ALTA',6000],['EDIFICIOS AMARILLOS',6000],['MONTESION',6000],
+  ['JARDÍN DE LA MARGARITA',6000],['RESERVAS DE SAN JUAN 1',6000],
+  ['POSADA DEL VIENTO',6000],['ROSA DE LOS VIENTOS',6000],['VICENZA',6000],
+  ['RESERVAS DE SAN JUAN 2',6000],['BARRIO MARIA',7000],
+  ['PORTERIA PARCELACIÓN EL PARAISO',7000],['TORRE DEL BOSQUE',7000],
+  ['EDIFICIO POBLADO NORTE',7000],['SAN JUAN CAMPESTRE',7000],
+  ['VIA MACHADO',8000],['CANTERAS',8000],['VILLANUEVA PARTE BAJA Y ALTA',8000],
+  ['VILLA ROCA',8000],['SAN JUAN',8000],
+  ['GUASIMALITO (PARTE BAJA)',10000],['GUASIMALITO (PARTE ALTA)',13000],
+  ['MACHADO',10000],['UNIDADES DE MACHADO',11000],['ARBOLEDA DEL CAMPO',11000],
+  ['FONTIDUEÑO',13000],['NAVARRA',14000],['NIQUIA PARTE BAJA',14000],
+  ['UNIDADES DE NAVARRA',14000],['PARQUE DE GIRARDOTA',17000],
+  ['TOLEDO CAMPESTRE',17000],['PARQUE DE BELLO',18000],
+  ['FABRICATO',19000],['UNIDADES DE MADERA',25000]
+];
+
+/* ════════════════════════════════════════════
    TOAST
-═══════════════════════════════════════════════════ */
-var _toastT = null;
-function toast(msg, icon) {
-  var el = document.getElementById('globalToast');
-  var ic = document.getElementById('globalToastIcon');
-  var ms = document.getElementById('globalToastMsg');
-  if (ic) ic.textContent = icon || 'info';
-  if (ms) ms.textContent = msg;
+════════════════════════════════════════════ */
+var _tt = null;
+function toast(msg, ico) {
+  var el = document.getElementById('gToast');
+  document.getElementById('gToastIco').textContent = ico||'info';
+  document.getElementById('gToastMsg').textContent = msg;
   el.classList.add('show');
-  clearTimeout(_toastT);
-  _toastT = setTimeout(function(){ el.classList.remove('show'); }, 3200);
+  clearTimeout(_tt);
+  _tt = setTimeout(function(){ el.classList.remove('show'); }, 3400);
 }
 
-/* ═══════════════════════════════════════════════════
-   STEPS INDICATOR
-═══════════════════════════════════════════════════ */
-function setStep(n) {
-  for (var i = 0; i < 3; i++) {
-    var el = document.getElementById('st' + i);
-    if (!el) continue;
-    el.classList.remove('active','done');
-    if (i < n)  el.classList.add('done');
-    if (i === n) el.classList.add('active');
-  }
+/* ════════════════════════════════════════════
+   NORMALIZAR
+════════════════════════════════════════════ */
+function norm(s) {
+  return (s||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9 ()]/g,' ').replace(/\s+/g,' ').trim();
+}
+function esc(t){
+  return (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-/* ═══════════════════════════════════════════════════
-   HAVERSINE
-═══════════════════════════════════════════════════ */
-function haversineKm(la1, lo1, la2, lo2) {
-  var R = 6371,
-      dL = (la2-la1)*Math.PI/180,
-      dO = (lo2-lo1)*Math.PI/180,
-      a  = Math.sin(dL/2)*Math.sin(dL/2)
-         + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)
-         * Math.sin(dO/2)*Math.sin(dO/2);
-  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-}
+/* ════════════════════════════════════════════
+   AUTOCOMPLETE BARRIOS
+════════════════════════════════════════════ */
+function buscarBarrio(campo, txt) {
+  txt = (txt||'').trim();
+  var sugEl = document.getElementById('sugs-'+campo);
 
-function fmtKm(km) {
-  if (km < 0.1) return Math.round(km*1000)+' m';
-  if (km < 1)   return (km*1000).toFixed(0)+' m';
-  return km.toFixed(1)+' km';
-}
+  /* Limpiar selección */
+  barrioSel[campo] = { nombre:'', precio:0 };
+  checkForm();
 
-function fmtTiempo(seg) {
-  var m = Math.round(seg/60);
-  return m < 60 ? m+' min' : Math.floor(m/60)+'h '+(m%60)+' min';
-}
+  if (!txt || txt.length < 2) { sugEl.style.display='none'; return; }
 
-/* ═══════════════════════════════════════════════════
-   OSRM — distancia real por carretera
-═══════════════════════════════════════════════════ */
-function osrmRoute(lat, lng, onOk, onFail) {
-  var url = 'https://router.project-osrm.org/route/v1/driving/'
-    +lng.toFixed(6)+','+lat.toFixed(6)+';'
-    +WIL_LNG.toFixed(6)+','+WIL_LAT.toFixed(6)
-    +'?overview=false&alternatives=false';
-  var ctrl = new AbortController();
-  var t    = setTimeout(function(){ ctrl.abort(); }, 10000);
-  fetch(url, { signal: ctrl.signal })
-    .then(function(r){ clearTimeout(t); return r.json(); })
-    .then(function(d){
-      if (d.code === 'Ok' && d.routes && d.routes[0]) {
-        onOk(d.routes[0].distance/1000, d.routes[0].duration);
-      } else onFail();
-    })
-    .catch(function(){ clearTimeout(t); onFail(); });
-}
+  var q = norm(txt);
+  var exactas   = BARRIOS.filter(function(b){ return norm(b[0])===q; });
+  var empiezan  = BARRIOS.filter(function(b){ var n=norm(b[0]); return n!==q && n.indexOf(q)===0; });
+  var contienen = BARRIOS.filter(function(b){ var n=norm(b[0]); return n!==q && n.indexOf(q)>0; });
+  var porPal    = BARRIOS.filter(function(b){
+    var n=norm(b[0]);
+    if(n===q||n.indexOf(q)!=-1) return false;
+    return q.split(' ').every(function(w){ return w.length>1 && n.indexOf(w)!==-1; });
+  });
 
-/* ═══════════════════════════════════════════════════
-   CAPTURAR GPS
-═══════════════════════════════════════════════════ */
-function capturarGPS() {
-  var btn    = document.getElementById('gpsBtn');
-  var result = document.getElementById('gpsResult');
+  var res = exactas.concat(empiezan).concat(contienen).concat(porPal).slice(0,9);
 
-  if (!navigator.geolocation) {
-    toast('GPS no disponible en tu dispositivo.', 'location_off');
+  if (!res.length) {
+    sugEl.innerHTML='<div class="wil-sug-empty">Sin coincidencias para "'+esc(txt)+'"</div>';
+    sugEl.style.display='block';
     return;
   }
 
-  gps.lat = gps.lng = null;
-  gps.distKm = gps.distRealKm = gps.tiempoSeg = null;
-  gps.direccion = gps.label = '';
-
-  btn.disabled = true;
-  btn.classList.add('loading');
-
-  navigator.geolocation.getCurrentPosition(
-    /* ── ÉXITO ── */
-    function(pos) {
-      var lat = pos.coords.latitude;
-      var lng = pos.coords.longitude;
-      gps.lat = lat;
-      gps.lng = lng;
-
-      /* Haversine inmediato */
-      var dLinea  = haversineKm(lat, lng, WIL_LAT, WIL_LNG);
-      gps.distKm  = dLinea;
-      gps.label   = fmtKm(dLinea) + ' (línea recta)';
-
-      var elDist  = document.getElementById('gpsDistTxt');
-      var elCoord = document.getElementById('gpsCoordTxt');
-      var elDir   = document.getElementById('gpsDirTxt');
-
-      if (elDist)  elDist.textContent  = fmtKm(dLinea) + ' — calculando ruta real…';
-      if (elCoord) elCoord.textContent = lat.toFixed(6) + ', ' + lng.toFixed(6);
-      result.classList.add('show');
-
-      /* Restaurar botón con check */
-      btn.disabled = false;
-      btn.classList.remove('loading');
-      btn.innerHTML =
-        '<span class="sym f btn-ico" style="font-size:19px;color:#fff">check_circle</span>'
-        +'<span class="btn-txt">Ubicación capturada ✓</span>'
-        +'<div class="spin-el"></div>';
-      btn.style.background = 'linear-gradient(135deg,#14532d,#15803d)';
-
-      /* Actualizar step */
-      setStep(1);
-
-      /* OSRM — distancia real por carretera */
-      osrmRoute(lat, lng,
-        function(kmReal, seg) {
-          gps.distRealKm = kmReal;
-          gps.tiempoSeg  = seg;
-          gps.label      = fmtKm(kmReal) + ' por carretera (~'+fmtTiempo(seg)+')';
-          if (elDist)
-            elDist.textContent = fmtKm(kmReal) + ' por carretera (~'+fmtTiempo(seg)+') desde WIL';
-          toast('📍 '+fmtKm(kmReal)+' por carretera · '+fmtTiempo(seg), 'check_circle');
-        },
-        function() {
-          gps.label = fmtKm(dLinea) + ' en línea recta';
-          if (elDist)
-            elDist.textContent = fmtKm(dLinea) + ' en línea recta desde WIL';
-          toast('📍 Ubicación capturada · '+fmtKm(dLinea), 'check_circle');
-        }
-      );
-
-      /* Nominatim — geocodificación inversa */
-      if (elDir) elDir.textContent = 'Identificando zona…';
-      fetch(
-        'https://nominatim.openstreetmap.org/reverse?lat='+lat+'&lon='+lng
-        +'&format=json&accept-language=es',
-        { headers: { 'User-Agent': 'DomiciliosWIL/1.0' } }
-      )
-        .then(function(r){ return r.json(); })
-        .then(function(d){
-          var a   = d.address || {};
-          var dir = [
-            (a.road||a.street||'').trim(),
-            (a.hamlet||a.village||a.neighbourhood||a.suburb||'').trim(),
-            (a.municipality||a.city||a.town||'').trim(),
-            (a.county||'').trim()
-          ].filter(Boolean).join(', ');
-          gps.direccion = dir || lat.toFixed(5)+', '+lng.toFixed(5);
-          if (elDir) elDir.textContent = gps.direccion;
-        })
-        .catch(function(){
-          gps.direccion = lat.toFixed(5)+', '+lng.toFixed(5);
-          if (elDir) elDir.textContent = gps.direccion;
-        });
-    },
-    /* ── ERROR ── */
-    function(err) {
-      btn.disabled = false;
-      btn.classList.remove('loading');
-      btn.innerHTML =
-        '<span class="sym f btn-ico" style="font-size:19px">my_location</span>'
-        +'<span class="btn-txt">Reintentar GPS</span>'
-        +'<div class="spin-el"></div>';
-      var msg = 'No se pudo capturar el GPS.';
-      if (err.code === 1) msg = 'Permiso de ubicación denegado. Actívalo en ajustes.';
-      if (err.code === 3) msg = 'Tiempo agotado. Asegúrate de tener señal GPS.';
-      toast(msg, 'location_off');
-    },
-    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-  );
-}
-
-/* ═══════════════════════════════════════════════════
-   VALIDACIÓN FORMULARIO — actualizar step
-═══════════════════════════════════════════════════ */
-function checkForm() {
-  var nombre  = (document.getElementById('fNombre').value    || '').trim();
-  var tel     = (document.getElementById('fTelEnvio').value  || '').trim();
-  var destino = (document.getElementById('fDestino').value   || '').trim();
-  var telEnt  = (document.getElementById('fTelEntrega').value|| '').trim();
-  var desc    = (document.getElementById('fDescripcion').value|| '').trim();
-  var ok = nombre && tel && destino && telEnt && desc;
-  setStep(ok ? 2 : 1);
-}
-
-/* ═══════════════════════════════════════════════════
-   ENVIAR WHATSAPP
-═══════════════════════════════════════════════════ */
-function enviarWA() {
-  function val(id){ var e=document.getElementById(id); return e?e.value.trim():''; }
-
-  var nombre       = val('fNombre');
-  var telEnvio     = val('fTelEnvio');
-  var comercio     = val('fComercio');
-  var telRecogida  = val('fTelRecogida');
-  var destino      = val('fDestino');
-  var referencia   = val('fReferencia');
-  var telEntrega   = val('fTelEntrega');
-  var descripcion  = val('fDescripcion');
-
-  /* Validaciones */
-  if (!nombre)      { toast('Escribe tu nombre.',                        'person');      return; }
-  if (!telEnvio)    { toast('Escribe tu teléfono.',                      'phone');       return; }
-  if (!destino)     { toast('Indica el destino del envío.',              'location_on'); return; }
-  if (!telEntrega)  { toast('Escribe el teléfono de quien recibe.',      'phone');       return; }
-  if (!descripcion) { toast('Describe qué vamos a transportar.',         'inventory_2'); return; }
-
-  /* Enlace GPS */
-  var enlaceUbic = gps.lat
-    ? 'https://www.google.com/maps?q='+gps.lat.toFixed(6)+','+gps.lng.toFixed(6)
-    : 'No capturada';
-
-  /* Resumen distancia */
-  var distInfo;
-  if (gps.distRealKm !== null) {
-    distInfo = fmtKm(gps.distRealKm) + ' por carretera'
-      + (gps.tiempoSeg ? ' (~'+fmtTiempo(gps.tiempoSeg)+')' : '') + ' ✅';
-  } else if (gps.distKm !== null) {
-    distInfo = fmtKm(gps.distKm) + ' en línea recta';
-  } else {
-    distInfo = 'Sin datos GPS (se cotiza al confirmar)';
+  function resaltar(nombre, q) {
+    var n = norm(nombre);
+    var idx = n.indexOf(q);
+    if (idx===-1) return esc(nombre);
+    return esc(nombre.slice(0,idx))
+      +'<span class="wil-sug-match">'+esc(nombre.slice(idx,idx+q.length))+'</span>'
+      +esc(nombre.slice(idx+q.length));
   }
 
-  /* Construir mensaje */
-  var lineas = [
-    '📦 *SOLICITUD DE ENVÍO — Domicilios WIL*',
-    '',
-    '👤 *Nombre (remitente):* '   + nombre,
-    '📱 *Teléfono (remitente):* ' + telEnvio,
-    '',
-    '🏪 *Punto de recogida:* '    + (comercio   || 'No indicado'),
-    telRecogida ? ('📞 *Tel. recogida:* ' + telRecogida) : null,
-    '',
-    '🎯 *Destino:* '              + destino,
-    referencia  ? ('🏡 *Referencia destino:*\n' + referencia) : null,
-    '📞 *Tel. entrega:* '         + telEntrega,
-    '',
-    '📋 *Descripción del envío:*',
-    descripcion,
-    '',
-    '📍 *Ubicación GPS del remitente:*',
-    gps.direccion || '(No capturada)',
-    '🗺️ ' + enlaceUbic,
-    '',
-    '📏 *Distancia desde WIL:* '  + distInfo,
-    '',
-    '⏳ _Esperando cotización del administrador…_'
-  ]
-    .filter(function(l){ return l !== null; })
-    .join('\n');
-
-  var url = 'https://wa.me/' + WIL_WA + '?text=' + encodeURIComponent(lineas);
-  window.open(url, '_blank', 'noopener,noreferrer');
+  sugEl.innerHTML = res.map(function(b){
+    return '<div class="wil-sug-item" onmousedown="selBarrio(\''+campo+'\',\''+b[0].replace(/'/g,"\\'")+'\',' +b[1]+')">'
+      + resaltar(b[0], q)
+      + '</div>';
+  }).join('');
+  sugEl.style.display = 'block';
 }
+
+function selBarrio(campo, nombre, precio) {
+  document.getElementById('barrio-'+campo+'-txt').value = nombre;
+  document.getElementById('sugs-'+campo).style.display = 'none';
+  barrioSel[campo] = { nombre: nombre, precio: precio };
+  checkForm();
+}
+
+function cerrarSugs(campo) {
+  setTimeout(function(){
+    var el = document.getElementById('sugs-'+campo);
+    if (el) el.style.display='none';
+  }, 180);
+}
+
+/* Tarifa = mayor entre recogida y entrega */
+function calcTarifa() {
+  return Math.max(barrioSel.recogida.precio, barrioSel.entrega.precio);
+}
+
+/* ════════════════════════════════════════════
+   VALIDACIÓN
+════════════════════════════════════════════ */
+function v(id){ var e=document.getElementById(id); return e?(e.value||'').trim():''; }
+
+function checkForm() {
+  var ok = v('fNombre') && v('fTelEnvio')
+        && barrioSel.recogida.nombre
+        && barrioSel.entrega.nombre
+        && v('fNombreEntrega') && v('fTelEntrega')
+        && v('fDescripcion');
+  document.getElementById('btnContinuar').disabled = !ok;
+}
+
+/* ════════════════════════════════════════════
+   GPS
+════════════════════════════════════════════ */
+function haversineKm(la1,lo1,la2,lo2){
+  var R=6371,dL=(la2-la1)*Math.PI/180,dO=(lo2-lo1)*Math.PI/180,
+      a=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dO/2)*Math.sin(dO/2);
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function fmtKm(km){ return km<0.1?Math.round(km*1000)+' m':km<1?(km*1000).toFixed(0)+' m':km.toFixed(1)+' km'; }
+function fmtMin(s){ var m=Math.round(s/60); return m<60?m+' min':Math.floor(m/60)+'h '+(m%60)+' min'; }
+
+function capturarGPS() {
+  var btn = document.getElementById('gpsBtn');
+  if (!navigator.geolocation) { toast('GPS no disponible en tu dispositivo.','location_off'); return; }
+  gps = { lat:null,lng:null,direccion:'',distKm:null,distRealKm:null,tiempoSeg:null };
+  btn.disabled=true; btn.classList.add('loading');
+
+  navigator.geolocation.getCurrentPosition(function(pos){
+    var lat=pos.coords.latitude, lng=pos.coords.longitude;
+    gps.lat=lat; gps.lng=lng;
+    var dl=haversineKm(lat,lng,WIL_LAT,WIL_LNG);
+    gps.distKm=dl;
+    document.getElementById('gpsDistTxt').textContent=fmtKm(dl)+' — calculando ruta…';
+    document.getElementById('gpsCoordTxt').textContent=lat.toFixed(6)+', '+lng.toFixed(6);
+    document.getElementById('gpsResult').classList.add('show');
+    btn.disabled=false; btn.classList.remove('loading');
+    btn.innerHTML='<span class="sym f btn-ico" style="font-size:19px">check_circle</span><span class="btn-txt">Ubicación capturada ✓</span><div class="spin-el"></div>';
+    btn.style.background='linear-gradient(135deg,#14532d,#15803d)';
+
+    /* OSRM */
+    var url='https://router.project-osrm.org/route/v1/driving/'+lng.toFixed(6)+','+lat.toFixed(6)+';'+WIL_LNG.toFixed(6)+','+WIL_LAT.toFixed(6)+'?overview=false';
+    fetch(url).then(function(r){return r.json();}).then(function(d){
+      if(d.code==='Ok'&&d.routes[0]){
+        gps.distRealKm=d.routes[0].distance/1000;
+        gps.tiempoSeg=d.routes[0].duration;
+        document.getElementById('gpsDistTxt').textContent=fmtKm(gps.distRealKm)+' por carretera (~'+fmtMin(gps.tiempoSeg)+') desde WIL';
+        toast('📍 '+fmtKm(gps.distRealKm)+' · '+fmtMin(gps.tiempoSeg),'check_circle');
+      }
+    }).catch(function(){
+      document.getElementById('gpsDistTxt').textContent=fmtKm(dl)+' en línea recta desde WIL';
+    });
+
+    /* Nominatim */
+    document.getElementById('gpsDirTxt').textContent='Identificando zona…';
+    fetch('https://nominatim.openstreetmap.org/reverse?lat='+lat+'&lon='+lng+'&format=json&accept-language=es',{headers:{'User-Agent':'DomiciliosWIL/1.0'}})
+      .then(function(r){return r.json();}).then(function(d){
+        var a=d.address||{};
+        gps.direccion=[(a.road||a.street||''),(a.hamlet||a.village||a.neighbourhood||a.suburb||''),(a.municipality||a.city||a.town||''),(a.county||'')].filter(Boolean).join(', ');
+        document.getElementById('gpsDirTxt').textContent=gps.direccion||lat.toFixed(5)+', '+lng.toFixed(5);
+      }).catch(function(){
+        gps.direccion=lat.toFixed(5)+', '+lng.toFixed(5);
+        document.getElementById('gpsDirTxt').textContent=gps.direccion;
+      });
+  }, function(err){
+    btn.disabled=false; btn.classList.remove('loading');
+    btn.innerHTML='<span class="sym f btn-ico" style="font-size:19px">my_location</span><span class="btn-txt">Reintentar GPS</span><div class="spin-el"></div>';
+    var msg='No se pudo capturar el GPS.';
+    if(err.code===1) msg='Permiso de ubicación denegado. Actívalo en ajustes.';
+    if(err.code===3) msg='Tiempo agotado. Verifica señal GPS.';
+    toast(msg,'location_off');
+  }, {enableHighAccuracy:true,timeout:15000,maximumAge:0});
+}
+
+/* ════════════════════════════════════════════
+   NAVEGACIÓN ENTRE VISTAS
+════════════════════════════════════════════ */
+function irResumen() {
+  /* Validación final */
+  if (!v('fNombre'))          { toast('Escribe tu nombre.','person'); return; }
+  if (!v('fTelEnvio'))        { toast('Escribe tu teléfono.','phone'); return; }
+  if (!barrioSel.recogida.nombre){ toast('Selecciona el barrio de recogida.','location_on'); return; }
+  if (!barrioSel.entrega.nombre) { toast('Selecciona el barrio de entrega.','location_on'); return; }
+  if (!v('fNombreEntrega'))   { toast('Escribe el nombre de quien recibe.','person'); return; }
+  if (!v('fTelEntrega'))      { toast('Escribe el teléfono de entrega.','phone'); return; }
+  if (!v('fDescripcion'))     { toast('Describe el paquete.','inventory_2'); return; }
+
+  poblarResumen();
+  document.getElementById('view1').classList.remove('active');
+  document.getElementById('view2').classList.add('active');
+  document.getElementById('hdrTitle').textContent = 'Confirmar pedido';
+  window.scrollTo(0,0);
+}
+
+function volverForm() {
+  document.getElementById('view2').classList.remove('active');
+  document.getElementById('view1').classList.add('active');
+  document.getElementById('hdrTitle').textContent = 'Envío de Paquetes';
+  window.scrollTo(0,0);
+}
+
+function volverPaso() {
+  if (document.getElementById('view2').classList.contains('active')) {
+    volverForm();
+  } else {
+    history.back();
+  }
+}
+
+/* ════════════════════════════════════════════
+   POBLAR RESUMEN
+════════════════════════════════════════════ */
+function fmtCOP(n){ return n>0?'$'+n.toLocaleString('es-CO'):'Por cotizar'; }
+
+function fila(ico, lbl, val, cls) {
+  return '<div class="res-row">'
+    +'<span class="res-ico">'+ico+'</span>'
+    +'<div class="res-info">'
+    +'<div class="res-lbl">'+lbl+'</div>'
+    +'<div class="res-val'+(cls?' '+cls:'')+'">'+val+'</div>'
+    +'</div></div>';
+}
+
+function poblarResumen() {
+  var tarifa = calcTarifa();
+  var distInfo = gps.distRealKm
+    ? fmtKm(gps.distRealKm)+' por carretera'+(gps.tiempoSeg?' (~'+fmtMin(gps.tiempoSeg)+')':'')
+    : gps.distKm ? fmtKm(gps.distKm)+' línea recta' : 'Sin GPS (se cotiza)';
+
+  var html = ''
+    + fila('👤','Remitente', esc(v('fNombre'))+' · '+esc(v('fTelEnvio')))
+    + fila('📍','Recogida — Barrio', esc(barrioSel.recogida.nombre), 'highlight')
+    + (v('fComercio') ? fila('🏪','Dirección recogida', esc(v('fComercio'))) : '')
+    + (v('fTelRecogida') ? fila('📞','Tel. recogida', esc(v('fTelRecogida'))) : '')
+    + fila('🎯','Entrega — Barrio', esc(barrioSel.entrega.nombre), 'highlight')
+    + fila('👤','Destinatario', esc(v('fNombreEntrega'))+' · '+esc(v('fTelEntrega')))
+    + (v('fReferencia') ? fila('🏡','Referencia destino', esc(v('fReferencia'))) : '')
+    + fila('📋','Descripción del envío', esc(v('fDescripcion')))
+    + (gps.lat ? fila('🗺️','Distancia desde WIL', distInfo) : '')
+    + fila('🛵','Tarifa de domicilio', fmtCOP(tarifa), tarifa>0?'highlight':'');
+
+  document.getElementById('resumenBody').innerHTML = html;
+}
+
+/* ════════════════════════════════════════════
+   ENVIAR A MONGODB
+════════════════════════════════════════════ */
+async function enviarPedido() {
+  var btn = document.getElementById('btnEnviar');
+  btn.disabled = true;
+  btn.innerHTML = '<div style="width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;animation:spin .7s linear infinite"></div> Enviando…';
+
+  var tarifa = calcTarifa();
+  var now    = new Date();
+  var fecha  = now.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
+  var hora   = now.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+
+  var payload = {
+    modoEntrega:  'paqueteria',
+    sede:         'paqueteria',
+    estado:       'Pendiente',
+    fecha:        fecha,
+    hora:         hora,
+    /* Remitente */
+    nombre:       v('fNombre'),
+    telefono:     v('fTelEnvio'),
+    comercio:     v('fComercio') || '',
+    /* Recogida */
+    zona:         barrioSel.recogida.nombre,
+    /* Entrega */
+    direccion:    barrioSel.entrega.nombre + (v('fReferencia') ? ' — '+v('fReferencia') : ''),
+    destinatario: {
+      nombre:    v('fNombreEntrega'),
+      telefono:  v('fTelEntrega'),
+      barrio:    barrioSel.entrega.nombre,
+      referencia:v('fReferencia') || ''
+    },
+    /* Paquete */
+    notas:        v('fDescripcion'),
+    /* Tarifa */
+    domicilio:    tarifa,
+    metodoPago:   'por_definir',
+    /* GPS */
+    coords: gps.lat ? { lat: gps.lat, lng: gps.lng } : null,
+  };
+
+  try {
+    var resp = await fetch(API_URL, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload)
+    });
+    var data = await resp.json();
+
+    if (!resp.ok || !data.ok) throw new Error(data.error || 'Error del servidor');
+
+    pedidoCodigo = data.data.idPedido || '—';
+    document.getElementById('codigoRastreo').textContent = pedidoCodigo;
+    document.getElementById('overlayExito').classList.add('show');
+
+    /* Actualizar steps */
+    document.getElementById('st0b').classList.add('done');
+    document.getElementById('st1b').classList.remove('active');
+    document.getElementById('st1b').classList.add('done');
+    document.getElementById('st2b').classList.add('active');
+
+  } catch(err) {
+    toast('Error al enviar: '+err.message, 'error');
+    btn.disabled = false;
+    btn.innerHTML = '<span class="sym f" style="font-size:20px">send</span> Confirmar y enviar pedido';
+  }
+}
+
+/* ════════════════════════════════════════════
+   POPUP ACCIONES
+════════════════════════════════════════════ */
+function copiarCodigo() {
+  if (!pedidoCodigo) return;
+  navigator.clipboard.writeText(pedidoCodigo).then(function(){
+    toast('Código copiado: '+pedidoCodigo, 'content_copy');
+  }).catch(function(){
+    toast('Código: '+pedidoCodigo, 'info');
+  });
+}
+
+function irInicio() {
+  window.location.href = 'index.html';
+}
+
+/* ════════════════════════════════════════════
+   WHATSAPP (alternativa)
+════════════════════════════════════════════ */
+function enviarWA() {
+  var tarifa = calcTarifa();
+  var distInfo = gps.distRealKm
+    ? fmtKm(gps.distRealKm)+' por carretera'+(gps.tiempoSeg?' (~'+fmtMin(gps.tiempoSeg)+')':'')
+    : gps.distKm ? fmtKm(gps.distKm)+' línea recta' : 'Sin datos GPS';
+
+  var lineas = [
+    '📦 *SOLICITUD DE ENVÍO — Domicilios WIL*','',
+    '👤 *Remitente:* '+v('fNombre')+' · '+v('fTelEnvio'),'',
+    '📍 *Barrio recogida:* '+(barrioSel.recogida.nombre||'—'),
+    '🏪 *Dirección recogida:* '+(v('fComercio')||'No indicada'),
+    v('fTelRecogida')?'📞 *Tel. recogida:* '+v('fTelRecogida'):null,'',
+    '🎯 *Barrio entrega:* '+(barrioSel.entrega.nombre||'—'),
+    '👤 *Destinatario:* '+v('fNombreEntrega')+' · '+v('fTelEntrega'),
+    v('fReferencia')?'🏡 *Referencia:* '+v('fReferencia'):null,'',
+    '📋 *Descripción:*',v('fDescripcion'),'',
+    gps.lat?('🗺️ *Ubicación GPS:* https://www.google.com/maps?q='+gps.lat.toFixed(6)+','+gps.lng.toFixed(6)):null,
+    gps.lat?('📏 *Distancia desde WIL:* '+distInfo):null,'',
+    '⏳ _Esperando cotización del administrador…_'
+  ].filter(function(l){return l!==null;}).join('\n');
+
+  window.open('https://wa.me/'+WIL_WA+'?text='+encodeURIComponent(lineas),'_blank','noopener,noreferrer');
+}
+
+/* ════════════════════════════════════════════
+   HELPER fmtKm dentro de resumen
+════════════════════════════════════════════ */
+function fmtKm(km){ return km<0.1?Math.round(km*1000)+' m':km<1?(km*1000).toFixed(0)+' m':km.toFixed(1)+' km'; }
+function fmtMin(s){ var m=Math.round(s/60); return m<60?m+' min':Math.floor(m/60)+'h '+(m%60)+' min'; }
 </script>
 </body>
 </html>
