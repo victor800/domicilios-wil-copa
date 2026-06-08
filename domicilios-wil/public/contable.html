@@ -1341,7 +1341,7 @@ async function loadPedidos(){
       tel:p.telefono||'',
       direccion:p.direccion||'',
       metodo:p.metodoPago||'',
-      imagen:p.comprobanteId||'',
+      imagen:p.comprobanteImg?.url||p.comprobanteId||'',
       costoEnvio:p.domicilio??0,
       tipoEntrega:p.modoEntrega||'',
       estado:normEstado(p.estado||''),
@@ -1993,7 +1993,10 @@ function openTfModal(pedId,imgUrl,meta){
   document.getElementById('tf-img-loading').style.display='flex';
   document.getElementById('tf-img-loading').innerHTML='<div style="width:22px;height:22px;border:3px solid rgba(37,99,235,.2);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;"></div><span style="font-size:11px;font-weight:700;">Cargando imagen…</span>';
   const img=document.getElementById('tf-modal-img');img.style.display='none';img.src='';
-  const src=driveUrlToImg(imgUrl);
+  const esApiUrl=imgUrl.startsWith('/api/');
+  const src=esApiUrl?imgUrl:driveUrlToImg(imgUrl);
+  if(src){img.src=src+(esApiUrl?'':'?ts='+Date.now());}
+  else{document.getElementById('tf-img-loading').innerHTML='<span style="font-size:24px;">📎</span><span style="font-size:11px;color:var(--text3);">Sin imagen adjunta</span>';}
   if(src){img.src=src+'?ts='+Date.now();}
   else{document.getElementById('tf-img-loading').innerHTML='<span style="font-size:24px;">📎</span><span style="font-size:11px;color:var(--text3);">Sin imagen adjunta</span>';}
   const ped=allPedidos.find(p=>p.id===pedId);
