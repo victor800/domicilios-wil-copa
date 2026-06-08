@@ -1210,43 +1210,64 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 
 <!-- MODAL COMPROBANTE TRANSFERENCIA -->
 <div class="modal-overlay" id="modal-tf" onclick="if(event.target===this)closeTfModal()">
-  <div class="tf-modal-box">
+  <div class="tf-modal-box" style="width:min(560px,96vw);">
+
+    <!-- HEADER -->
     <div class="modal-hdr" style="background:linear-gradient(135deg,#0f172a,#1e3a5f);">
-      <div class="modal-hdr-ico" style="background:rgba(37,99,235,.25);color:#93c5fd;"><span class="material-symbols-rounded">receipt_long</span></div>
+      <div class="modal-hdr-ico" style="background:rgba(37,99,235,.25);color:#93c5fd;">
+        <span class="material-symbols-rounded">receipt_long</span>
+      </div>
       <div style="flex:1;">
         <h3 style="color:#fff;">Comprobante de transferencia</h3>
         <div style="font-size:9px;color:rgba(255,255,255,.4);margin-top:1px;" id="tf-modal-sub">–</div>
       </div>
-      <button class="modal-close" style="background:rgba(255,255,255,.07);color:rgba(255,255,255,.6);" onclick="closeTfModal()"><span class="material-symbols-rounded" style="font-size:14px;">close</span></button>
+      <button class="modal-close" style="background:rgba(255,255,255,.07);color:rgba(255,255,255,.6);" onclick="closeTfModal()">
+        <span class="material-symbols-rounded" style="font-size:14px;">close</span>
+      </button>
     </div>
-    <!-- controles de zoom -->
-<div style="display:flex;align-items:center;gap:6px;padding:10px 20px 0;">
-  <button onclick="zoomTf(-0.25)" style="width:28px;height:28px;border-radius:7px;background:var(--bg2);border:1.5px solid var(--border);cursor:pointer;font-size:16px;font-weight:800;color:var(--text2);">−</button>
-  <button onclick="zoomTf(0.25)"  style="width:28px;height:28px;border-radius:7px;background:var(--bg2);border:1.5px solid var(--border);cursor:pointer;font-size:16px;font-weight:800;color:var(--text2);">+</button>
-  <button onclick="resetZoom()"   style="padding:0 10px;height:28px;border-radius:7px;background:var(--bg2);border:1.5px solid var(--border);cursor:pointer;font-size:10px;font-weight:800;color:var(--text2);">1:1</button>
-  <span style="font-size:9px;color:var(--text3);margin-left:4px;" id="zoom-lbl">100 %</span>
-</div>
 
-<div style="margin:8px 20px 0;border-radius:12px;overflow:hidden;border:1.5px solid var(--border);background:var(--bg2);min-height:260px;display:flex;align-items:center;justify-content:center;position:relative;cursor:grab;" id="tf-img-wrap"
-  onmousedown="tfPanStart(event)" onmousemove="tfPanMove(event)" onmouseup="tfPanEnd()" onmouseleave="tfPanEnd()"
-  onwheel="tfWheel(event)">
-  <div id="tf-img-loading" style="display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--text3);">
-    <div style="width:24px;height:24px;border:3px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;"></div>
-    <span style="font-size:11px;font-weight:700;">Cargando imagen…</span>
-  </div>
-  <img id="tf-modal-img" src="" alt="Comprobante"
-    style="display:none;max-width:100%;max-height:65vh;object-fit:contain;border-radius:12px;transform-origin:center center;transition:transform .15s;user-select:none;pointer-events:none;"
-    draggable="false">
-</div>
-      <img id="tf-modal-img" src="" alt="Comprobante" style="display:none;width:100%;max-height:65vh;object-fit:contain;border-radius:12px;"
-        onload="document.getElementById('tf-img-loading').style.display='none';this.style.display='block'"
-        onerror="document.getElementById('tf-img-loading').innerHTML='<span style=font-size:24px;color:var(--red)>⚠</span><span style=font-size:11px>No se pudo cargar la imagen</span>'">
+    <!-- CONTROLES ZOOM -->
+    <div style="display:flex;align-items:center;gap:6px;padding:10px 16px 0;">
+      <button onclick="zoomTf(-0.25)" style="width:28px;height:28px;border-radius:7px;background:var(--bg2);border:1.5px solid var(--border);cursor:pointer;font-size:16px;font-weight:800;color:var(--text2);display:flex;align-items:center;justify-content:center;">−</button>
+      <button onclick="zoomTf(0.25)"  style="width:28px;height:28px;border-radius:7px;background:var(--bg2);border:1.5px solid var(--border);cursor:pointer;font-size:16px;font-weight:800;color:var(--text2);display:flex;align-items:center;justify-content:center;">+</button>
+      <button onclick="resetZoom()"   style="padding:0 10px;height:28px;border-radius:7px;background:var(--bg2);border:1.5px solid var(--border);cursor:pointer;font-size:10px;font-weight:800;color:var(--text2);">1:1</button>
+      <span style="font-size:9px;color:var(--text3);margin-left:4px;" id="zoom-lbl">100 %</span>
     </div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;padding:12px 20px 0;" id="tf-modal-chips"></div>
-    <div style="display:flex;gap:8px;padding:14px 20px 20px;border-top:1.5px solid var(--border);margin-top:12px;" id="tf-modal-footer">
-      <button class="btn btn-ghost" onclick="closeTfModal()" style="flex:1;"><span class="material-symbols-rounded">close</span>Cerrar</button>
-      <button class="btn btn-green" id="btn-verificar" onclick="verificarTransferencia()" style="flex:2;"><span class="material-symbols-rounded">verified</span>Marcar como verificada</button>
+
+    <!-- IMAGEN -->
+    <div style="margin:8px 16px 0;border-radius:12px;overflow:hidden;border:1.5px solid var(--border);background:var(--bg2);min-height:280px;display:flex;align-items:center;justify-content:center;position:relative;cursor:grab;"
+      id="tf-img-wrap"
+      onmousedown="tfPanStart(event)" onmousemove="tfPanMove(event)"
+      onmouseup="tfPanEnd()" onmouseleave="tfPanEnd()" onwheel="tfWheel(event)">
+      <div id="tf-img-loading" style="display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--text3);">
+        <div style="width:24px;height:24px;border:3px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;"></div>
+        <span style="font-size:11px;font-weight:700;">Cargando imagen…</span>
+      </div>
+      <img id="tf-modal-img" src="" alt="Comprobante"
+        style="display:none;width:100%;max-height:60vh;object-fit:contain;border-radius:12px;transform-origin:center center;transition:transform .15s;user-select:none;pointer-events:none;"
+        draggable="false">
     </div>
+
+    <!-- AVISO imagen incorrecta -->
+    <div id="tf-aviso-tipo" style="display:none;margin:8px 16px 0;background:var(--orange-l);border:1.5px solid rgba(217,119,6,.3);border-radius:9px;padding:8px 12px;font-size:10px;font-weight:700;color:#92400e;"></div>
+
+    <!-- CHIPS -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;padding:10px 16px 0;" id="tf-modal-chips"></div>
+
+    <!-- FOOTER -->
+    <div style="display:flex;gap:8px;padding:14px 16px 18px;border-top:1.5px solid var(--border);margin-top:12px;" id="tf-modal-footer">
+      <button class="btn btn-ghost" onclick="closeTfModal()" style="flex:1;">
+        <span class="material-symbols-rounded">close</span>Cerrar
+      </button>
+      <button class="btn" id="btn-solicitar-tf" onclick="solicitarComprobanteTf()"
+        style="flex:1;background:#25D366;color:#fff;justify-content:center;">
+        <span class="material-symbols-rounded">whatsapp</span>Solicitar
+      </button>
+      <button class="btn btn-green" id="btn-verificar" onclick="verificarTransferencia()" style="flex:2;justify-content:center;">
+        <span class="material-symbols-rounded">verified</span>Marcar como verificada
+      </button>
+    </div>
+
   </div>
 </div>
 
