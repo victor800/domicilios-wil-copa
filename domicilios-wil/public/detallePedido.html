@@ -169,7 +169,7 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
   box-shadow:0 -20px 60px rgba(0,0,0,.22);
   transform:translateY(100%);
   transition:transform .38s cubic-bezier(.22,1,.36,1);
-  max-height:82vh; display:flex; flex-direction:column;
+  max-height:90vh; display:flex; flex-direction:column;
 }
 .docs-panel.open { transform:translateY(0); }
 .docs-handle { width:42px; height:5px; background:#d1ccc8; border-radius:3px; margin:12px auto 0; flex-shrink:0; }
@@ -217,7 +217,11 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
 .docs-empty-title { font-size:14px; font-weight:800; color:var(--muted); }
 .docs-empty-sub { font-size:12px; font-weight:600; color:#b0a8a3; line-height:1.5; }
 
-/* Visor de imagen con zoom (solo dentro del popup) */
+/* ═══════════════════════════════════════════
+   VISOR DE IMAGEN — altura controlada al 90%
+   del panel disponible (aprox 90vh - 220px
+   para header+tabs+controles)
+═══════════════════════════════════════════ */
 .img-viewer {
   position:relative; background:#f5f5f4;
   border-radius:16px; overflow:hidden;
@@ -225,13 +229,30 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
   user-select:none;
 }
 .img-viewer-inner {
-  overflow:hidden; width:100%; touch-action:none;
-  cursor:grab; border-radius:16px;
+  /* FIX: altura máxima para que la imagen no desborde el panel */
+  max-height: calc(90vh - 230px);
+  overflow: hidden;
+  width:100%;
+  touch-action:none;
+  cursor:grab;
+  border-radius:16px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#f5f5f4;
 }
 .img-viewer-inner.grabbing { cursor:grabbing; }
 .img-viewer img {
-  width:100%; display:block; transition:transform .08s linear;
-  transform-origin:0 0; pointer-events:none;
+  /* FIX: imagen contenida dentro del visor, sin desbordar */
+  max-width: 100%;
+  max-height: calc(90vh - 230px);
+  width: auto;
+  height: auto;
+  display:block;
+  transition:transform .08s linear;
+  transform-origin:center center;
+  pointer-events:none;
+  object-fit:contain;
 }
 .img-viewer-controls {
   position:absolute; bottom:10px; left:50%; transform:translateX(-50%);
@@ -422,7 +443,7 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
     </div>
   </div>
 
-  <!-- FACTURA: solo items + total, sin header ni imagen -->
+  <!-- FACTURA: solo items + total -->
   <div class="factura-card" id="facturaCard" style="display:none">
     <div class="factura-items" id="factItems"></div>
     <div class="total-row">
@@ -630,6 +651,28 @@ async function geocodificarDestino(p) {
 }
 
 // ════════ ACTUALIZAR MAPA ════════
+// FIX: Si el pedido no trae domiCoords, busca la ubicacion en vivo del domi
+async function obtenerCoordsDomi(p) {
+  // Caso 1: el pedido ya trae coords del domi directamente
+  if (p.domiCoords?.lat && p.domiCoords?.lng) {
+    return { lat: p.domiCoords.lat, lng: p.domiCoords.lng };
+  }
+  // Caso 2: fallback — buscar en la colección de domiciliarios
+  if (!p.domiciliarioId) return null;
+  try {
+    const res = await fetch(`/api/foto?recurso=domiciliarios`);
+    if (!res.ok) return null;
+    const json = await res.json();
+    const domi = (json.data || []).find(d =>
+      d.idWil === p.domiciliarioId || d._id === p.domiciliarioId
+    );
+    if (domi?.ubicacion?.lat && domi?.ubicacion?.lng) {
+      return { lat: domi.ubicacion.lat, lng: domi.ubicacion.lng };
+    }
+  } catch(_) {}
+  return null;
+}
+
 async function actualizarMapa(p) {
   if (!mapInstance) return;
   const entregado = estadoIndex(p.estado) === 3;
@@ -666,17 +709,19 @@ async function actualizarMapa(p) {
     return;
   }
 
-  const dc = p.domiCoords;
-  if (dc?.lat && dc?.lng) {
+  // FIX: obtener coordenadas del domi (pedido o fallback a domiciliarios)
+  const domiPos = await obtenerCoordsDomi(p);
+
+  if (domiPos?.lat && domiPos?.lng) {
     if (!domiMarker) {
-      domiMarker = L.marker([dc.lat, dc.lng], { icon: mkDomiIcon(p.domiciliarioNombre || 'Domi') }).addTo(mapInstance);
-      domiCurrentPos = { lat: dc.lat, lng: dc.lng };
-      const bounds = L.latLngBounds([[dc.lat, dc.lng], [destLat, destLng]]);
+      domiMarker = L.marker([domiPos.lat, domiPos.lng], { icon: mkDomiIcon(p.domiciliarioNombre || 'Domi') }).addTo(mapInstance);
+      domiCurrentPos = { lat: domiPos.lat, lng: domiPos.lng };
+      const bounds = L.latLngBounds([[domiPos.lat, domiPos.lng], [destLat, destLng]]);
       mapInstance.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
     } else {
-      animarDomiHacia(dc.lat, dc.lng);
+      animarDomiHacia(domiPos.lat, domiPos.lng);
     }
-    calcularRutaOSRM(dc.lat, dc.lng, destLat, destLng);
+    calcularRutaOSRM(domiPos.lat, domiPos.lng, destLat, destLng);
   } else {
     mapInstance.setView([destLat, destLng], 15);
   }
@@ -840,7 +885,6 @@ function renderPedido(p) {
 function construirPanelDocs(p) {
   let docsCount = 0;
 
-  // Tab comprobante
   const comprPane = document.getElementById('comprPaneContent');
   const comprUrl  = p.comprobanteImg?.url || null;
   if (comprUrl) {
@@ -855,7 +899,6 @@ function construirPanelDocs(p) {
     initImageViewer('viewer-compr');
   }
 
-  // Tab factura domi
   const factPane         = document.getElementById('factDomiPaneContent');
   const tieneItems       = p.items?.length > 0;
   const tieneFotoFactura = !!(p.facturaImg?.url || p.facturaFotoId);
@@ -907,7 +950,7 @@ function construirPanelDocs(p) {
   }
 }
 
-// ════════ VISOR DE IMAGEN (solo en popup) ════════
+// ════════ VISOR DE IMAGEN ════════
 function buildImageViewer(id, src) {
   return `
     <div class="img-viewer" id="${id}">
@@ -1004,6 +1047,8 @@ function applyTransform(id) {
   const img = document.getElementById(id + '-img');
   const pct = document.getElementById(id + '-pct');
   if (!img) return;
+  // FIX: transform-origin centrado para que el zoom se haga desde el centro
+  img.style.transformOrigin = 'center center';
   img.style.transform = `translate(${s.tx}px,${s.ty}px) scale(${s.scale})`;
   if (pct) pct.textContent = Math.round(s.scale * 100) + '%';
 }
