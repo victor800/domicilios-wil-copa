@@ -1393,6 +1393,9 @@ async function loadPedidos(){
         qty:it.cantidad??1,
         vu:it.precioUnit??0,
         vtotal:it.subtotal??0,
+        total: p.total ?? p.subtotal ?? 
+       (p.items || []).reduce((s, it) => s + (it.subtotal ?? (it.precioUnit ?? 0) * (it.cantidad ?? 1)), 0) + (p.domicilio ?? 0),
+costoEnvio: p.domicilio ?? p.costoEnvio ?? 0,
       })),
     }));
   }catch(e){console.warn('[loadPedidos]:',e.message);allPedidos=[];}
@@ -1529,47 +1532,96 @@ function renderKPIs(pedsEnt,totalFact,totalEnvio,totalProd,diasPer){
     </div>`).join('');
 }
 
-function renderTF(peds,bodyId,subId){
-  bodyId=bodyId||'tf-panel-body';subId=subId||'tf-header-sub';
-  const tfPeds=peds.filter(p=>/transfer/i.test(p.metodo||''));
-  const tfVerif=tfPeds.filter(p=>verificados.has(p.id));
-  const tfPend=tfPeds.filter(p=>!verificados.has(p.id));
-  const tfTotal$=tfPeds.reduce((s,p)=>s+parsePrecio(p.total),0);
-  const tfVerif$=tfVerif.reduce((s,p)=>s+parsePrecio(p.total),0);
-  const tfPend$=tfPend.reduce((s,p)=>s+parsePrecio(p.total),0);
-  const subEl=document.getElementById(subId);if(subEl)subEl.textContent=`${tfPeds.length} pedidos`;
-  const bodyEl=document.getElementById(bodyId);if(!bodyEl) return;
-  if(!tfPeds.length){bodyEl.innerHTML='<div class="empty-state"><div class="es-ico">💳</div><p>Sin transferencias</p></div>';return;}
-  bodyEl.innerHTML=`
+function renderTF(peds, bodyId, subId){
+  bodyId = bodyId || 'tf-panel-body';
+  subId  = subId  || 'tf-header-sub';
+
+  const tfPeds  = peds.filter(p => /transfer/i.test(p.metodo || ''));
+  const tfVerif = tfPeds.filter(p => verificados.has(p.id));
+  const tfPend  = tfPeds.filter(p => !verificados.has(p.id));
+
+  // ── Calcular totales correctamente ──
+  const getTotal = p => {
+    const t = parsePrecio(p.total);
+    if (t > 0) return t;
+    // fallback: sumar items + envío
+    const sub = calcSubtotal(p);
+    const env = parsePrecio(p.costoEnvio);
+    return sub + env || parsePrecio(p.costoEnvio) || 0;
+  };
+
+  const tfTotal$ = tfPeds.reduce((s,p)  => s + getTotal(p), 0);
+  const tfVerif$ = tfVerif.reduce((s,p) => s + getTotal(p), 0);
+  const tfPend$  = tfPend.reduce((s,p)  => s + getTotal(p), 0);
+
+  const subEl = document.getElementById(subId);
+  if (subEl) subEl.textContent = tfPeds.length + ' pedido' + (tfPeds.length !== 1 ? 's' : '');
+
+  const bodyEl = document.getElementById(bodyId);
+  if (!bodyEl) return;
+
+  if (!tfPeds.length){
+    bodyEl.innerHTML = '<div class="empty-state"><div class="es-ico">💳</div><p>Sin transferencias</p></div>';
+    return;
+  }
+
+  bodyEl.innerHTML = `
     <div class="tf-kpi-grid">
-      <div class="tf-kpi" style="background:#dbeafe;"><div class="tf-val" style="color:#1d4ed8;">${tfPeds.length}</div><div class="tf-lbl" style="color:#1e40af;">Total</div></div>
-      <div class="tf-kpi" style="background:#dcfce7;"><div class="tf-val" style="color:#16a34a;">${tfVerif.length}</div><div class="tf-lbl" style="color:#166534;">Verificadas</div></div>
-      <div class="tf-kpi" style="background:#fef3c7;"><div class="tf-val" style="color:#d97706;">${tfPend.length}</div><div class="tf-lbl" style="color:#92400e;">Pendientes</div></div>
+      <div class="tf-kpi" style="background:#dbeafe;">
+        <div class="tf-val" style="color:#1d4ed8;">${tfPeds.length}</div>
+        <div class="tf-lbl" style="color:#1e40af;">Total</div>
+      </div>
+      <div class="tf-kpi" style="background:#dcfce7;">
+        <div class="tf-val" style="color:#16a34a;">${tfVerif.length}</div>
+        <div class="tf-lbl" style="color:#166534;">Verificadas</div>
+      </div>
+      <div class="tf-kpi" style="background:#fef3c7;">
+        <div class="tf-val" style="color:#d97706;">${tfPend.length}</div>
+        <div class="tf-lbl" style="color:#92400e;">Pendientes</div>
+      </div>
     </div>
     <div class="tf-totals">
-      <div class="tf-row"><span>Total recibido</span><span style="color:#93c5fd;">${fmtMoney(tfTotal$)}</span></div>
-      <div class="tf-row"><span>✓ Verificado</span><span style="color:#4ade80;">${fmtMoney(tfVerif$)}</span></div>
-      <div class="tf-row"><span>⏳ Sin verificar</span><span style="color:#fcd34d;">${fmtMoney(tfPend$)}</span></div>
+      <div class="tf-row">
+        <span>Total recibido</span>
+        <span style="color:#93c5fd;">${tfTotal$ > 0 ? fmtMoney(tfTotal$) : '<span style="color:rgba(255,255,255,.25);font-size:10px;">sin datos</span>'}</span>
+      </div>
+      <div class="tf-row">
+        <span>✓ Verificado</span>
+        <span style="color:#4ade80;">${tfVerif$ > 0 ? fmtMoney(tfVerif$) : tfVerif.length > 0 ? '<span style="color:rgba(255,255,255,.25);font-size:10px;">sin monto</span>' : '—'}</span>
+      </div>
+      <div class="tf-row">
+        <span>⏳ Sin verificar</span>
+        <span style="color:#fcd34d;">${tfPend$ > 0 ? fmtMoney(tfPend$) : tfPend.length > 0 ? '<span style="color:rgba(255,255,255,.25);font-size:10px;">sin monto</span>' : '—'}</span>
+      </div>
     </div>
     <div class="tf-list">
-      ${tfPeds.slice(0,12).map(p=>{
-        const ver=verificados.has(p.id);
-        const imgUrl=(p.imagen||'').trim();
-        const meta=safeEsc(`${p.cliente||''} · Pedido #${p.id} · ${p.hora||''} ${p.fecha||''}`);
-        return `<div class="tf-item${ver?' verified':''}" onclick="openTfModal('${p.id}','${safeEsc(imgUrl)}','${meta}')">
-          <div class="tf-dot" style="background:${ver?'#16a34a':'#d97706'};box-shadow:0 0 5px ${ver?'rgba(22,163,74,.5)':'rgba(217,119,6,.5)'};"></div>
+      ${tfPeds.slice(0, 12).map(p => {
+        const ver    = verificados.has(p.id);
+        const imgUrl = (p.imagen || '').trim();
+        const total  = getTotal(p);
+        const meta   = safeEsc(`${p.domi || ''} · ${p.cliente || ''} · #${p.id} · ${p.hora || ''} ${p.fecha || ''}`);
+        return `<div class="tf-item${ver ? ' verified' : ''}"
+          onclick="openTfModal('${p.id}','${safeEsc(imgUrl)}','${meta}')">
+          <div class="tf-dot" style="background:${ver ? '#16a34a' : '#d97706'};
+            box-shadow:0 0 5px ${ver ? 'rgba(22,163,74,.5)' : 'rgba(217,119,6,.5)'};"></div>
           <div class="tf-info">
-            <div class="tf-name">${p.cliente||'–'}</div>
-            <div class="tf-meta">#${p.id} · ${p.hora||''} · ${p.fecha||''}</div>
+            <div class="tf-name">${p.cliente || '–'}</div>
+            <div class="tf-meta">#${p.id} · ${p.hora || ''} · ${p.fecha || ''}</div>
           </div>
-          <div class="tf-amount" style="color:${ver?'#4ade80':'#93c5fd'};">${fmtMoney(parsePrecio(p.total))}</div>
-          <div class="tf-icon" style="background:${ver?'rgba(22,163,74,.15)':'rgba(37,99,235,.15)'};">
-            <span class="material-symbols-rounded" style="font-size:13px;color:${ver?'#4ade80':'#93c5fd'};">${ver?'verified':'receipt_long'}</span>
+          <div class="tf-amount" style="color:${ver ? '#4ade80' : '#93c5fd'};">
+            ${total > 0 ? fmtMoney(total) : '<span style="font-size:9px;color:rgba(255,255,255,.3);">—</span>'}
           </div>
-          ${ver?'<span style="font-size:7px;font-weight:800;padding:1px 6px;border-radius:99px;background:rgba(22,163,74,.2);color:#4ade80;flex-shrink:0;">✓</span>':''}
+          <div class="tf-icon" style="background:${ver ? 'rgba(22,163,74,.15)' : 'rgba(37,99,235,.15)'};">
+            <span class="material-symbols-rounded" style="font-size:13px;color:${ver ? '#4ade80' : '#93c5fd'};">
+              ${ver ? 'verified' : 'receipt_long'}
+            </span>
+          </div>
+          ${ver ? '<span style="font-size:7px;font-weight:800;padding:1px 6px;border-radius:99px;background:rgba(22,163,74,.2);color:#4ade80;flex-shrink:0;">✓</span>' : ''}
         </div>`;
       }).join('')}
-      ${tfPeds.length>12?`<div style="text-align:center;font-size:9px;color:rgba(255,255,255,.3);padding:6px;">+${tfPeds.length-12} más</div>`:''}
+      ${tfPeds.length > 12
+        ? `<div style="text-align:center;font-size:9px;color:rgba(255,255,255,.3);padding:6px;">+${tfPeds.length - 12} más</div>`
+        : ''}
     </div>`;
 }
 
