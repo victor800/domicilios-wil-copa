@@ -370,7 +370,7 @@ export default async function handler(req, res) {
 
       // Excluir el buffer binario de la fórmula en los listados
       const pedidos = await Pedido
-        .find(filtro, { 'formulaMedica.data': 0 })
+        .find(filtro, { 'formulaMedica.data': 0, 'comprobanteImg.data': 0 })
         .sort({ creadoEn: -1 })
         .limit(limitSeguro)
         .lean();
@@ -533,7 +533,7 @@ export default async function handler(req, res) {
           domiciliarioId:     idWilResuelto,
           domiciliarioNombre: nombreFinal,
         },
-        { new: true, projection: { 'formulaMedica.data': 0 } }
+        { new: true, projection: { 'formulaMedica.data': 0, 'comprobanteImg.data': 0 } }
       );
 
       if (!pedido)
@@ -574,7 +574,7 @@ export default async function handler(req, res) {
       const pedido = await Pedido.findOneAndUpdate(
         { idPedido: pedidoId },
         update,
-        { new: true, projection: { 'formulaMedica.data': 0 } }
+        { new: true, projection: { 'formulaMedica.data': 0, 'comprobanteImg.data': 0 } }
       );
 
       if (!pedido)
@@ -589,33 +589,222 @@ export default async function handler(req, res) {
 
   /* ════════════════════════════════════════
      PATCH /api/foto?recurso=ubicacion-domi
-  ════════════════════════════════════════ */
+     Actualiza la ubicación del domiciliario y sus pedidos activos
+  ═══════════════════════════════════════ */
   if (recurso === 'ubicacion-domi' && req.method === 'PATCH') {
     try {
       const { domiId, lat, lng } = req.body || {};
 
-      if (!domiId || lat == null || lng == null)
-        return res.status(400).json({ ok: false, error: 'Faltan domiId, lat o lng' });
+      // Validaciones mejoradas
+      if (!domiId) {
+        return res.status(400).json({ ok: false, error: 'Falta domiId' });
+      }
+      
+      if (lat === undefined || lat === null || lng === undefined || lng === null) {
+        return res.status(400).json({ ok: false, error: 'Faltan lat o lng' });
+      }
+
+      const latNum = Number(lat);
+      const lngNum = Number(lng);
+      
+      if (isNaN(latNum) || isNaN(lngNum)) {
+        return res.status(400).json({ ok: false, error: 'lat y lng deben ser números válidos' });
+      }
 
       const ahora  = new Date();
-      const coords = { lat: Number(lat), lng: Number(lng), actualizadoEn: ahora };
-      const idWil  = domiId.toUpperCase().trim();
+      const coords = { 
+        lat: latNum, 
+        lng: lngNum, 
+        actualizadoEn: ahora 
+      };
+      
+      const idWil = domiId.toUpperCase().trim();
 
-      await Domiciliario.findOneAndUpdate({ idWil }, { ubicacion: coords });
-      await Pedido.findOneAndUpdate(
-        { domiciliarioId: idWil, estado: { $in: [/^en ruta$/i, /^en camino$/i] } },
+      // 1. Actualizar ubicación del domiciliario
+      const domiActualizado = await Domiciliario.findOneAndUpdate(
+        { idWil }, 
+        { ubicacion: coords },
+        { new: true }
+      );
+
+      if (!domiActualizado) {
+        return res.status(404).json({ ok: false, error: 'Domiciliario no encontrado' });
+      }
+
+      // 2. Actualizar coordenadas en pedidos activos (no entregados ni cancelados)
+      const pedidosActualizados = await Pedido.updateMany(
+        { 
+          domiciliarioId: idWil,
+          estado: { $nin: ['Entregado', 'Cancelado', 'Completado'] }
+        },
         { domiCoords: coords }
       );
 
-      return res.status(200).json({ ok: true, coords });
+      console.log(`[UBICACIÓN] ${idWil} -> lat:${latNum}, lng:${lngNum} | Pedidos actualizados: ${pedidosActualizados.modifiedCount}`);
+
+      return res.status(200).json({ 
+        ok: true, 
+        coords,
+        pedidosActualizados: pedidosActualizados.modifiedCount
+      });
     } catch (e) {
       console.error('[PATCH ubicacion-domi]', e.message);
       return res.status(500).json({ ok: false, error: e.message });
     }
   }
 
+  /* ════════════════════════════════════════
+     GET /api/foto?recurso=ubicacion
+     Consulta la ubicación actual de un pedido o domiciliario
+     Uso: 
+       - ?pedidoId=XXX  (devuelve ubicación del pedido o su domiciliario)
+       - ?domiId=XXX    (devuelve ubicación actual del domiciliario)
+  ═══════════════════════════════════════ */
+  if (recurso === 'ubicacion' && req.method === 'GET') {
+    try {
+      const { pedidoId, domiId } = req.query;
+      
+      if (pedidoId) {
+        // Buscar por pedido
+        const pedido = await Pedido.findOne(
+          { idPedido: pedidoId },
+          { domiciliarioId: 1, domiCoords: 1, estado: 1 }
+        ).lean();
+        
+        if (!pedido) {
+          return res.status(404).json({ ok: false, error: 'Pedido no encontrado' });
+        }
+        
+        // Si el pedido tiene coordenadas recientes (menos de 30 segundos), devolverlas
+        if (pedido.domiCoords?.lat && pedido.domiCoords?.lng) {
+          const actualizadoHace = pedido.domiCoords.actualizadoEn 
+            ? Math.floor((Date.now() - new Date(pedido.domiCoords.actualizadoEn)) / 1000)
+            : null;
+            
+          // Si la ubicación tiene menos de 60 segundos, es confiable
+          const esReciente = actualizadoHace !== null && actualizadoHace < 60;
+            
+          return res.status(200).json({ 
+            ok: true, 
+            ubicacion: pedido.domiCoords,
+            estado: pedido.estado,
+            actualizadoHaceSegundos: actualizadoHace,
+                esReciente
+          });
+        }
+        
+        // Si no tiene coordenadas en el pedido, buscar ubicación actual del domiciliario
+        if (pedido.domiciliarioId) {
+          const domi = await Domiciliario.findOne(
+            { idWil: pedido.domiciliarioId },
+            { ubicacion: 1, nombre: 1 }
+          ).lean();
+          
+          if (domi?.ubicacion?.lat) {
+            const actualizadoHace = domi.ubicacion.actualizadoEn 
+              ? Math.floor((Date.now() - new Date(domi.ubicacion.actualizadoEn)) / 1000)
+              : null;
+              
+            return res.status(200).json({ 
+              ok: true, 
+              ubicacion: domi.ubicacion,
+              domiciliarioNombre: domi.nombre,
+              fuente: 'domiciliario',
+              actualizadoHaceSegundos: actualizadoHace
+            });
+          }
+        }
+        
+        return res.status(200).json({ 
+          ok: true, 
+          ubicacion: null,
+          mensaje: 'No hay ubicación disponible para este pedido'
+        });
+      }
+      
+      if (domiId) {
+        // Buscar directamente por domiciliario
+        const domi = await Domiciliario.findOne(
+          { idWil: domiId.toUpperCase().trim() },
+          { ubicacion: 1, nombre: 1, activo: 1 }
+        ).lean();
+        
+        if (!domi) {
+          return res.status(404).json({ ok: false, error: 'Domiciliario no encontrado' });
+        }
+        
+        if (!domi.activo) {
+          return res.status(200).json({ 
+            ok: true, 
+            ubicacion: null,
+            mensaje: 'Domiciliario inactivo'
+          });
+        }
+        
+        const actualizadoHace = domi.ubicacion?.actualizadoEn 
+          ? Math.floor((Date.now() - new Date(domi.ubicacion.actualizadoEn)) / 1000)
+          : null;
+        
+        return res.status(200).json({ 
+          ok: true, 
+          ubicacion: domi.ubicacion || null,
+          nombre: domi.nombre,
+          actualizadoHaceSegundos: actualizadoHace
+        });
+      }
+      
+      return res.status(400).json({ 
+        ok: false, 
+        error: 'Se requiere pedidoId o domiId' 
+      });
+    } catch (e) {
+      console.error('[GET ubicacion]', e.message);
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
+  /* ════════════════════════════════════════
+     POST /api/foto?recurso=debug-ubicacion
+     SOLO PARA DEPURACIÓN - Actualiza ubicación manualmente
+     Uso: { "pedidoId": "01AB", "lat": 4.7110, "lng": -74.0721 }
+  ═══════════════════════════════════════ */
+  if (recurso === 'debug-ubicacion' && req.method === 'POST') {
+    try {
+      const { pedidoId, lat, lng } = req.body;
+      
+      if (!pedidoId || lat === undefined || lng === undefined) {
+        return res.status(400).json({ ok: false, error: 'Faltan pedidoId, lat o lng' });
+      }
+      
+      const pedido = await Pedido.findOneAndUpdate(
+        { idPedido: pedidoId },
+        { 
+          domiCoords: { 
+            lat: Number(lat), 
+            lng: Number(lng), 
+            actualizadoEn: new Date() 
+          } 
+        },
+        { new: true, projection: { 'formulaMedica.data': 0, 'comprobanteImg.data': 0 } }
+      );
+      
+      if (!pedido) {
+        return res.status(404).json({ ok: false, error: 'Pedido no encontrado' });
+      }
+      
+      return res.status(200).json({ 
+        ok: true, 
+        mensaje: 'Ubicación actualizada manualmente (debug)',
+        data: pedido 
+      });
+    } catch (e) {
+      console.error('[POST debug-ubicacion]', e.message);
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
   return res.status(400).json({
     ok: false,
-    error: `Recurso no válido: "${recurso}". Usa: pedidos | domiciliarios | asignar | estado | foto | formula | ubicacion-domi`,
+    error: `Recurso no válido: "${recurso}". Usa: pedidos | domiciliarios | asignar | estado | foto | formula | ubicacion-domi | ubicacion | debug-ubicacion`,
   });
 }
