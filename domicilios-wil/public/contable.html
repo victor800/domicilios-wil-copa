@@ -476,6 +476,10 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
   <button class="sb-item" id="sb-domis" onclick="setView('domis')">
     <span class="material-symbols-rounded">badge</span>Registrar Domiciliarios
   </button>
+  <button class="sb-item" id="sb-califs" onclick="setView('califs')">
+    <span class="material-symbols-rounded">star</span>Calificaciones
+    <span class="sb-badge teal" id="sb-badge-califs">–</span>
+  </button>
   <div class="sb-footer">
     <div class="sb-footer-item">
       <span class="material-symbols-rounded">schedule</span>
@@ -1132,6 +1136,47 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
     </div>
   </div>
 
+<!-- ════ VISTA CALIFICACIONES ════ -->
+  <div class="view" id="view-califs">
+    <div class="page-hdr">
+      <div class="page-hdr-left">
+        <h1>Calificaciones</h1>
+        <p id="califs-hdr-sub">Opiniones de clientes sobre el servicio</p>
+      </div>
+      <div class="hdr-actions">
+        <div class="rt-live-chip"><div class="rt-live-dot"></div>Tiempo real</div>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px;" id="califs-kpi-grid"></div>
+
+    <!-- Cards -->
+    <div class="panel">
+      <div class="panel-hdr">
+        <div class="panel-hdr-ico" style="background:#fef9c3;color:#a16207;">
+          <span class="material-symbols-rounded" style="font-size:15px;">star</span>
+        </div>
+        <h3>Reseñas de clientes</h3>
+        <span class="ph-sub" id="califs-count">–</span>
+        <div style="margin-left:auto;display:flex;gap:6px;">
+          <select id="califs-filter-estrellas" onchange="renderCalifs()" style="background:var(--white);border:1.5px solid var(--border);border-radius:8px;padding:4px 9px;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;color:var(--text);outline:none;">
+            <option value="">Todas las estrellas</option>
+            <option value="5">⭐⭐⭐⭐⭐ Solo 5</option>
+            <option value="4">⭐⭐⭐⭐ Solo 4</option>
+            <option value="3">⭐⭐⭐ Solo 3</option>
+            <option value="2">⭐⭐ Solo 2</option>
+            <option value="1">⭐ Solo 1</option>
+          </select>
+          <select id="califs-filter-domi" onchange="renderCalifs()" style="background:var(--white);border:1.5px solid var(--border);border-radius:8px;padding:4px 9px;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;color:var(--text);outline:none;">
+            <option value="">Todos los domis</option>
+          </select>
+        </div>
+      </div>
+      <div class="panel-body" id="califs-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;"></div>
+    </div>
+  </div>
+
 </div>
 </main>
 
@@ -1355,6 +1400,7 @@ function setView(view){
   const mnEl=document.getElementById('mn-'+view);if(mnEl)mnEl.classList.add('active');
   if(view==='caja') initCajaSelects();
   if(view==='domis'){renderListaDomis();sugerirIdWil();}
+  if(view==='califs'){loadCalifs();}
 }
 function setPedTab(tab){
   document.querySelectorAll('#view-pedidos .ctab-view').forEach(v=>v.classList.remove('active'));
@@ -2610,6 +2656,145 @@ function initMapaRastreo() {
   if (_mapaInterval) clearInterval(_mapaInterval);
   _mapaInterval = setInterval(actualizarMapaRastreo, 12000);  // ← 12 segundos
 }
+
+/* ════ CALIFICACIONES ════ */
+let califsData = [];
+
+async function loadCalifs() {
+  try {
+    const res  = await fetch('/api/foto?recurso=pedidos&limit=500');
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error);
+    califsData = (json.data || [])
+      .filter(p => p.calificacion?.estrellas)
+      .map(p => ({
+        idPedido:    p.idPedido || String(p._id),
+        cliente:     p.nombre  || 'Cliente',
+        domi:        p.domiciliarioNombre || '—',
+        estrellas:   p.calificacion.estrellas,
+        comentario:  p.calificacion.comentario || '',
+        fecha:       p.calificacion.fecha ? new Date(p.calificacion.fecha) : null,
+        comercio:    p.comercio || '',
+      }))
+      .sort((a, b) => (b.fecha || 0) - (a.fecha || 0));
+    renderCalifs();
+    updateCalifsBadge();
+  } catch(e) { console.warn('[loadCalifs]:', e.message); }
+}
+
+function updateCalifsBadge() {
+  const el = document.getElementById('sb-badge-califs');
+  if (el) el.textContent = califsData.length || '0';
+}
+
+function renderCalifs() {
+  const filtroEst  = document.getElementById('califs-filter-estrellas')?.value || '';
+  const filtroDomi = document.getElementById('califs-filter-domi')?.value || '';
+
+  let list = califsData;
+  if (filtroEst)  list = list.filter(c => String(c.estrellas) === filtroEst);
+  if (filtroDomi) list = list.filter(c => c.domi === filtroDomi);
+
+  // Poblar select domis
+  const domiSel = document.getElementById('califs-filter-domi');
+  if (domiSel) {
+    const prev    = domiSel.value;
+    const nombres = [...new Set(califsData.map(c => c.domi).filter(d => d && d !== '—'))].sort();
+    domiSel.innerHTML = '<option value="">Todos los domis</option>' +
+      nombres.map(n => `<option value="${n}">${n}</option>`).join('');
+    if (prev) domiSel.value = prev;
+  }
+
+  // KPIs
+  const total   = califsData.length;
+  const promedio = total ? (califsData.reduce((s,c) => s + c.estrellas, 0) / total).toFixed(1) : '—';
+  const pct5    = total ? Math.round(califsData.filter(c => c.estrellas === 5).length / total * 100) : 0;
+  const conCom  = califsData.filter(c => c.comentario?.trim()).length;
+  const kpiGrid = document.getElementById('califs-kpi-grid');
+  if (kpiGrid) kpiGrid.innerHTML = [
+    { acc:'#f59e0b', bg:'#fef9c3', c:'#a16207', ico:'star',           lbl:'Total reseñas',   val: String(total),      sub: `${pct5}% con 5 estrellas` },
+    { acc:'#16a34a', bg:'#dcfce7', c:'#16a34a', ico:'grade',          lbl:'Promedio',        val: promedio + ' ★',    sub: 'Puntuación media' },
+    { acc:'#2563eb', bg:'#dbeafe', c:'#2563eb', ico:'chat',           lbl:'Con comentario',  val: String(conCom),     sub: `de ${total} reseñas` },
+    { acc:'var(--teal)', bg:'var(--teal-m)', c:'var(--teal-d)', ico:'delivery_dining', lbl:'Domis evaluados', val: String(new Set(califsData.map(c=>c.domi)).size), sub: 'Con al menos 1 reseña' },
+  ].map(k => `
+    <div class="kpi-card">
+      <div class="kpi-acc" style="background:${k.acc};"></div>
+      <div class="kpi-ico" style="background:${k.bg};color:${k.c};"><span class="material-symbols-rounded" style="font-size:16px;">${k.ico}</span></div>
+      <div class="kpi-lbl">${k.lbl}</div>
+      <div class="kpi-val" style="color:${k.c};">${k.val}</div>
+      <div class="kpi-sub">${k.sub}</div>
+    </div>`).join('');
+
+  // Contador
+  const cnt = document.getElementById('califs-count');
+  if (cnt) cnt.textContent = list.length + ' reseña' + (list.length !== 1 ? 's' : '');
+
+  // Header sub
+  const hdr = document.getElementById('califs-hdr-sub');
+  if (hdr) hdr.textContent = `${total} reseña${total!==1?'s':''} · Promedio ${promedio} ★`;
+
+  // Cards
+  const grid = document.getElementById('califs-grid');
+  if (!grid) return;
+
+  if (!list.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><div class="es-ico">⭐</div><p>Sin reseñas con ese filtro</p></div>`;
+    return;
+  }
+
+  const estColores = { 5:'#16a34a', 4:'#22c55e', 3:'#d97706', 2:'#ea580c', 1:'#dc2626' };
+  const estBg      = { 5:'#dcfce7', 4:'#dcfce7', 3:'#fef3c7', 2:'#fef3c7', 1:'#fee2e2' };
+
+  grid.innerHTML = list.map(c => {
+    const stars   = '⭐'.repeat(c.estrellas) + '☆'.repeat(5 - c.estrellas);
+    const color   = estColores[c.estrellas] || '#d97706';
+    const bg      = estBg[c.estrellas]      || '#fef3c7';
+    const iniciales = (c.cliente || '?').split(' ').slice(0,2).map(p=>p[0]||'').join('').toUpperCase();
+    const fechaStr = c.fecha
+      ? c.fecha.toLocaleString('es-CO', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
+      : '—';
+    return `
+      <div style="background:var(--white);border:1.5px solid var(--border);border-radius:16px;
+           padding:16px;display:flex;flex-direction:column;gap:10px;
+           transition:box-shadow .15s;box-shadow:0 2px 8px rgba(0,0,0,.04);"
+           onmouseover="this.style.boxShadow='0 6px 20px rgba(0,0,0,.09)'"
+           onmouseout="this.style.boxShadow='0 2px 8px rgba(0,0,0,.04)'">
+        <!-- cabecera: avatar + nombre + pedido -->
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:40px;height:40px;border-radius:50%;background:${bg};
+               display:flex;align-items:center;justify-content:center;
+               font-size:14px;font-weight:800;color:${color};
+               border:2px solid ${color}44;flex-shrink:0;">${iniciales}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:12px;font-weight:800;color:var(--text);
+                 white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.cliente}</div>
+            <div style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;">Pedido #${c.idPedido}</div>
+          </div>
+          <div style="font-size:16px;flex-shrink:0;" title="${c.estrellas} estrellas">${stars}</div>
+        </div>
+        <!-- comentario -->
+        ${c.comentario?.trim()
+          ? `<div style="background:var(--bg);border-left:3px solid ${color};border-radius:0 8px 8px 0;
+                  padding:8px 11px;font-size:11px;font-weight:600;color:var(--text2);
+                  line-height:1.5;font-style:italic;">"${c.comentario}"</div>`
+          : `<div style="font-size:10px;color:var(--text3);font-style:italic;padding:4px 0;">Sin comentario escrito</div>`
+        }
+        <!-- footer: domi + fecha -->
+        <div style="display:flex;align-items:center;justify-content:space-between;
+             padding-top:8px;border-top:1px solid var(--border);flex-wrap:wrap;gap:4px;">
+          <div style="display:flex;align-items:center;gap:5px;">
+            <span class="material-symbols-rounded" style="font-size:13px;color:var(--teal);">delivery_dining</span>
+            <span style="font-size:10px;font-weight:700;color:var(--text2);">${c.domi}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <span class="material-symbols-rounded" style="font-size:12px;color:var(--text3);">schedule</span>
+            <span style="font-size:9px;font-weight:700;color:var(--text3);font-family:'DM Mono',monospace;">${fechaStr}</span>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
 
 /* ═══ BOOT ═══ */
 (async function boot(){
