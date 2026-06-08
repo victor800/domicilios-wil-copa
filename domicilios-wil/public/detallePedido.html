@@ -731,39 +731,34 @@ async function actualizarMapa(p) {
 function estadoIndex(estado) {
   if (!estado) return 0;
   const e = estado.toLowerCase();
-  if (e.includes('cancelado'))                                                     return -1;
-  if (e.includes('entregado'))                                                     return 3;
-  if (e.includes('ruta') || e.includes('camino'))                                  return 2;
-  if (e.includes('confirmado') || e.includes('asignado') || e.includes('curso'))   return 1;
+  if (e.includes('cancelado')) return -1;
+  if (e.includes('entregado')) return 3;
+  if (e.includes('ruta') || e.includes('camino')) return 2;
+  // 🔥 MODIFICACIÓN: "asignado" ahora cuenta como step 1 (confirmado)
+  if (e.includes('asignado') || e.includes('confirmado')) return 1;
   return 0;
 }
 
 function renderSteps(p) {
   const idx = estadoIndex(p.estado);
   if (idx === -1) {
-    document.getElementById('stepsCard').style.display = 'block';
-    document.getElementById('stepsTrack').innerHTML = `
-      <div style="width:100%;text-align:center;padding:10px 0;">
-        <div style="display:inline-flex;align-items:center;gap:8px;background:#fef2f2;border:1.5px solid #fca5a5;border-radius:14px;padding:10px 18px;">
-          <span style="font-size:20px;">❌</span>
-          <span style="font-size:13px;font-weight:800;color:#991b1b;">Pedido cancelado</span>
-        </div>
-      </div>`;
-    document.getElementById('progressFill').style.width = '0%';
-    document.getElementById('progressPct').textContent  = '—';
-    document.getElementById('progressTxt').textContent  = 'Cancelado';
-    document.getElementById('btnCancelarWrap').style.display = 'none';
+    // ... cancelado
     return;
   }
+  
   const pct = Math.round((idx / (STEPS_DEF.length - 1)) * 100);
   const track = document.getElementById('stepsTrack');
+  
   track.innerHTML = STEPS_DEF.map((s, i) => {
     const cls = i < idx ? 'done' : (i === idx ? 'active' : '');
-    const timeLabel = i === 0 ? (p.hora || '')
-                    : i === 1 ? (p.horaToma || '')
-                    : i === 2 ? (p.horaEnCamino || '')
-                    : i === 3 ? (p.horaEntregado || '')
-                    : '';
+    let timeLabel = '';
+    
+    // Asignar horas según el estado
+    if (i === 0) timeLabel = p.hora || p.fecha?.split('·')[1]?.trim() || '';
+    if (i === 1) timeLabel = p.horaToma || (p.estado?.toLowerCase().includes('asignado') ? p.horaAsignacion || '' : '');
+    if (i === 2) timeLabel = p.horaEnCamino || '';
+    if (i === 3) timeLabel = p.horaEntregado || '';
+    
     return `<div class="step ${cls}">
       <div class="step-circle">${i < idx ? '✓' : s.icon}</div>
       <div class="step-line"></div>
@@ -771,17 +766,21 @@ function renderSteps(p) {
       ${timeLabel ? `<div class="step-time">${timeLabel}</div>` : ''}
     </div>`;
   }).join('');
+  
   setTimeout(() => {
-    document.getElementById('progressFill').style.width  = pct + '%';
-    document.getElementById('progressPct').textContent   = pct + '%';
-    document.getElementById('progressTxt').textContent   = STEPS_DEF[idx]?.label || '';
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressPct').textContent = pct + '%';
+    document.getElementById('progressTxt').textContent = STEPS_DEF[idx]?.label || '';
   }, 200);
+  
   document.getElementById('stepsCard').style.display = 'block';
+  
+  // Mostrar botón de cancelar solo en step 0 o 1
   const wrap = document.getElementById('btnCancelarWrap');
   if (wrap) {
-    wrap.style.display = idx === 0 ? 'block' : 'none';
+    wrap.style.display = (idx === 0 || idx === 1) ? 'block' : 'none';
     document.getElementById('confirmCancelarBox').style.display = 'none';
-    document.getElementById('btnCancelar').style.display        = 'flex';
+    document.getElementById('btnCancelar').style.display = 'flex';
   }
 }
 
