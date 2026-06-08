@@ -1219,11 +1219,25 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
       </div>
       <button class="modal-close" style="background:rgba(255,255,255,.07);color:rgba(255,255,255,.6);" onclick="closeTfModal()"><span class="material-symbols-rounded" style="font-size:14px;">close</span></button>
     </div>
-    <div style="margin:18px 20px 0;border-radius:12px;overflow:hidden;border:1.5px solid var(--border);background:var(--bg2);min-height:260px;display:flex;align-items:center;justify-content:center;position:relative;" id="tf-img-wrap">
-      <div id="tf-img-loading" style="display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--text3);">
-        <div style="width:24px;height:24px;border:3px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;"></div>
-        <span style="font-size:11px;font-weight:700;">Cargando imagen…</span>
-      </div>
+    <!-- controles de zoom -->
+<div style="display:flex;align-items:center;gap:6px;padding:10px 20px 0;">
+  <button onclick="zoomTf(-0.25)" style="width:28px;height:28px;border-radius:7px;background:var(--bg2);border:1.5px solid var(--border);cursor:pointer;font-size:16px;font-weight:800;color:var(--text2);">−</button>
+  <button onclick="zoomTf(0.25)"  style="width:28px;height:28px;border-radius:7px;background:var(--bg2);border:1.5px solid var(--border);cursor:pointer;font-size:16px;font-weight:800;color:var(--text2);">+</button>
+  <button onclick="resetZoom()"   style="padding:0 10px;height:28px;border-radius:7px;background:var(--bg2);border:1.5px solid var(--border);cursor:pointer;font-size:10px;font-weight:800;color:var(--text2);">1:1</button>
+  <span style="font-size:9px;color:var(--text3);margin-left:4px;" id="zoom-lbl">100 %</span>
+</div>
+
+<div style="margin:8px 20px 0;border-radius:12px;overflow:hidden;border:1.5px solid var(--border);background:var(--bg2);min-height:260px;display:flex;align-items:center;justify-content:center;position:relative;cursor:grab;" id="tf-img-wrap"
+  onmousedown="tfPanStart(event)" onmousemove="tfPanMove(event)" onmouseup="tfPanEnd()" onmouseleave="tfPanEnd()"
+  onwheel="tfWheel(event)">
+  <div id="tf-img-loading" style="display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--text3);">
+    <div style="width:24px;height:24px;border:3px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;"></div>
+    <span style="font-size:11px;font-weight:700;">Cargando imagen…</span>
+  </div>
+  <img id="tf-modal-img" src="" alt="Comprobante"
+    style="display:none;max-width:100%;max-height:65vh;object-fit:contain;border-radius:12px;transform-origin:center center;transition:transform .15s;user-select:none;pointer-events:none;"
+    draggable="false">
+</div>
       <img id="tf-modal-img" src="" alt="Comprobante" style="display:none;width:100%;max-height:65vh;object-fit:contain;border-radius:12px;"
         onload="document.getElementById('tf-img-loading').style.display='none';this.style.display='block'"
         onerror="document.getElementById('tf-img-loading').innerHTML='<span style=font-size:24px;color:var(--red)>⚠</span><span style=font-size:11px>No se pudo cargar la imagen</span>'">
@@ -1987,54 +2001,103 @@ function renderTablaPedidos(){
   }).join('');
 }
 
-function openTfModal(pedId,imgUrl,meta){
-  _tfPedId=pedId;
-  document.getElementById('tf-modal-sub').textContent=meta;
-  document.getElementById('tf-img-loading').style.display='flex';
-  document.getElementById('tf-img-loading').innerHTML='<div style="width:22px;height:22px;border:3px solid rgba(37,99,235,.2);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;"></div><span style="font-size:11px;font-weight:700;">Cargando imagen…</span>';
-  const img=document.getElementById('tf-modal-img');img.style.display='none';img.src='';
-  const esApiUrl=imgUrl.startsWith('/api/');
-  const src=esApiUrl?imgUrl:driveUrlToImg(imgUrl);
-  if(src){img.src=src+(esApiUrl?'':'?ts='+Date.now());}
-  else{document.getElementById('tf-img-loading').innerHTML='<span style="font-size:24px;">📎</span><span style="font-size:11px;color:var(--text3);">Sin imagen adjunta</span>';}
-  if(src){img.src=src+'?ts='+Date.now();}
-  else{document.getElementById('tf-img-loading').innerHTML='<span style="font-size:24px;">📎</span><span style="font-size:11px;color:var(--text3);">Sin imagen adjunta</span>';}
-  const ped=allPedidos.find(p=>p.id===pedId);
-  const chips=[];
-  if(ped?.domi)    chips.push(['delivery_dining',ped.domi]);
-  if(ped?.cliente) chips.push(['person',ped.cliente]);
-  if(ped?.total)   chips.push(['payments',fmtMoney(parsePrecio(ped.total))]);
-  if(ped?.hora)    chips.push(['schedule',ped.hora]);
-  if(ped?.id)      chips.push(['tag','Pedido #'+ped.id]);
-  document.getElementById('tf-modal-chips').innerHTML=chips.map(([ico,txt])=>`<div style="display:inline-flex;align-items:center;gap:4px;background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:3px 9px;font-size:9px;font-weight:700;color:var(--text2);"><span class="material-symbols-rounded" style="font-size:12px;color:var(--teal);">${ico}</span>${txt}</div>`).join('');
-  const ver=verificados.has(pedId);const btnV=document.getElementById('btn-verificar');const footer=document.getElementById('tf-modal-footer');
-  const existing=document.getElementById('tf-ya-verificada');if(existing)existing.remove();
-  if(ver){btnV.style.display='none';const badge=document.createElement('div');badge.id='tf-ya-verificada';badge.style.cssText='flex:2;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--green-l);color:var(--green);border:1.5px solid rgba(22,163,74,.22);border-radius:9px;padding:9px;font-size:11px;font-weight:800;';badge.innerHTML='<span class="material-symbols-rounded" style="font-size:15px;">check_circle</span>Transferencia verificada ✓';footer.appendChild(badge);}
-  else{btnV.style.display='flex';}
+function openTfModal(pedId, imgUrl, meta){
+  _tfPedId = pedId;
+  document.getElementById('tf-modal-sub').textContent = meta;
+
+  const loadEl = document.getElementById('tf-img-loading');
+  const imgEl  = document.getElementById('tf-modal-img');
+  loadEl.style.display = 'flex';
+  loadEl.innerHTML = '<div style="width:22px;height:22px;border:3px solid rgba(37,99,235,.2);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;"></div><span style="font-size:11px;font-weight:700;">Cargando imagen…</span>';
+  imgEl.style.display = 'none';
+  imgEl.src = '';
+
+  // ── Construir URL correcta ──
+  let src = '';
+  const raw = (imgUrl || '').trim();
+  if (!raw) {
+    loadEl.innerHTML = '<span style="font-size:24px;">📎</span><span style="font-size:11px;color:var(--text3);">Sin imagen adjunta</span>';
+  } else if (raw.startsWith('/api/')) {
+    // URL interna: agregar cachebust con & no con ?
+    src = raw + (raw.includes('?') ? '&' : '?') + 'ts=' + Date.now();
+  } else {
+    src = driveUrlToImg(raw);
+    if (src) src = src + '?ts=' + Date.now();
+  }
+
+  if (src) {
+    imgEl.src = src;
+    imgEl.onload  = () => { loadEl.style.display = 'none'; imgEl.style.display = 'block'; resetZoom(); };
+    imgEl.onerror = () => { loadEl.innerHTML = '<span style="font-size:24px;color:var(--red)">⚠</span><span style="font-size:11px">No se pudo cargar la imagen</span>'; };
+  }
+
+  // chips
+  const ped = allPedidos.find(p => p.id === pedId);
+  const chips = [];
+  if (ped?.domi)    chips.push(['delivery_dining', ped.domi]);
+  if (ped?.cliente) chips.push(['person', ped.cliente]);
+  if (ped?.total)   chips.push(['payments', fmtMoney(parsePrecio(ped.total))]);
+  if (ped?.hora)    chips.push(['schedule', ped.hora]);
+  if (ped?.id)      chips.push(['tag', 'Pedido #' + ped.id]);
+  document.getElementById('tf-modal-chips').innerHTML = chips.map(([ico, txt]) =>
+    `<div style="display:inline-flex;align-items:center;gap:4px;background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:3px 9px;font-size:9px;font-weight:700;color:var(--text2);">
+      <span class="material-symbols-rounded" style="font-size:12px;color:var(--teal);">${ico}</span>${txt}
+    </div>`).join('');
+
+  const ver = verificados.has(pedId);
+  const btnV = document.getElementById('btn-verificar');
+  const footer = document.getElementById('tf-modal-footer');
+  const existing = document.getElementById('tf-ya-verificada');
+  if (existing) existing.remove();
+  if (ver) {
+    btnV.style.display = 'none';
+    const badge = document.createElement('div');
+    badge.id = 'tf-ya-verificada';
+    badge.style.cssText = 'flex:2;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--green-l);color:var(--green);border:1.5px solid rgba(22,163,74,.22);border-radius:9px;padding:9px;font-size:11px;font-weight:800;';
+    badge.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;">check_circle</span>Transferencia verificada ✓';
+    footer.appendChild(badge);
+  } else {
+    btnV.style.display = 'flex';
+  }
   document.getElementById('modal-tf').classList.add('show');
 }
+
 function closeTfModal(){document.getElementById('modal-tf').classList.remove('show');_tfPedId=null;}
 
 async function verificarTransferencia(){
-  if(!_tfPedId) return;
+  if (!_tfPedId) return;
   verificados.add(_tfPedId);
-  try{localStorage.setItem('wil_tf_verificados',JSON.stringify([...verificados]));}catch(e){}
-  try{await fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({accion:'verificar-transferencia',pedidoId:String(_tfPedId).trim(),verificadaEn:new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})})});}catch(e){console.warn('[verificarTf]:',e.message);}
-  document.getElementById('btn-verificar').style.display='none';
-  const footer=document.getElementById('tf-modal-footer');const badge=document.createElement('div');badge.id='tf-ya-verificada';
-  badge.style.cssText='flex:2;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--green-l);color:var(--green);border:1.5px solid rgba(22,163,74,.22);border-radius:9px;padding:9px;font-size:11px;font-weight:800;';
-  badge.innerHTML='<span class="material-symbols-rounded" style="font-size:15px;">verified</span>Transferencia verificada ✓';footer.appendChild(badge);
-  showToast('s','✓ Transferencia verificada','Pedido #'+_tfPedId+' actualizado');
-  const peds=allPedidos.filter(p=>enPeriodo(p)&&(p.estado==='entregado'||p.estado==='proceso'||p.estado==='encamino'));
-  const pedsEnt=peds.filter(p=>p.estado==='entregado');
-  const totalFacturado=pedsEnt.reduce((s,p)=>s+parsePrecio(p.total),0);
-  const totalEnvio=pedsEnt.reduce((s,p)=>s+parsePrecio(p.costoEnvio),0);
-  const diasPer=periodo==='hoy'||periodo==='ayer'?1:parseInt(periodo);
-  renderKPIs(pedsEnt,totalFacturado,totalEnvio,totalFacturado-totalEnvio,diasPer);
-  renderTF(peds,'tf-panel-body','tf-header-sub');
-  renderTF(peds,'tf2-panel-body','tf2-header-sub');
+  try { localStorage.setItem('wil_tf_verificados', JSON.stringify([...verificados])); } catch(e){}
+
+  // ── Actualizar MongoDB vía tu propio API ──
+  try {
+    await fetch(`/api/foto?recurso=verificar&id=${encodeURIComponent(String(_tfPedId).trim())}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ verificadaEn: new Date().toISOString() })
+    });
+  } catch(e){ console.warn('[verificarTf]:', e.message); }
+
+  document.getElementById('btn-verificar').style.display = 'none';
+  const footer  = document.getElementById('tf-modal-footer');
+  const badge   = document.createElement('div');
+  badge.id      = 'tf-ya-verificada';
+  badge.style.cssText = 'flex:2;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--green-l);color:var(--green);border:1.5px solid rgba(22,163,74,.22);border-radius:9px;padding:9px;font-size:11px;font-weight:800;';
+  badge.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;">verified</span>Transferencia verificada ✓';
+  footer.appendChild(badge);
+
+  showToast('s', '✓ Transferencia verificada', 'Pedido #' + _tfPedId + ' actualizado');
+
+  const peds    = allPedidos.filter(p => enPeriodo(p) && ['entregado','proceso','encamino'].includes(p.estado));
+  const pedsEnt = peds.filter(p => p.estado === 'entregado');
+  const totalFact   = pedsEnt.reduce((s,p) => s + parsePrecio(p.total), 0);
+  const totalEnvio  = pedsEnt.reduce((s,p) => s + parsePrecio(p.costoEnvio), 0);
+  const diasPer = periodo === 'hoy' || periodo === 'ayer' ? 1 : parseInt(periodo);
+  renderKPIs(pedsEnt, totalFact, totalEnvio, totalFact - totalEnvio, diasPer);
+  renderTF(peds, 'tf-panel-body', 'tf-header-sub');
+  renderTF(peds, 'tf2-panel-body', 'tf2-header-sub');
   renderPendientesRT();
-  setTimeout(closeTfModal,1400);
+  setTimeout(closeTfModal, 1400);
 }
 
 function abrirModalPedCont(id){
@@ -2822,6 +2885,47 @@ function renderCalifs() {
         </div>
       </div>`;
   }).join('');
+}
+
+/* ── ZOOM / PAN comprobante ── */
+let _tfZoom = 1, _tfPanX = 0, _tfPanY = 0, _tfDragging = false, _tfDragSX = 0, _tfDragSY = 0;
+
+function _applyTfTransform(){
+  const img = document.getElementById('tf-modal-img');
+  if (!img) return;
+  img.style.transform = `scale(${_tfZoom}) translate(${_tfPanX}px,${_tfPanY}px)`;
+  const lbl = document.getElementById('zoom-lbl');
+  if (lbl) lbl.textContent = Math.round(_tfZoom * 100) + ' %';
+}
+function zoomTf(delta){
+  _tfZoom = Math.min(5, Math.max(0.25, _tfZoom + delta));
+  _applyTfTransform();
+}
+function resetZoom(){
+  _tfZoom = 1; _tfPanX = 0; _tfPanY = 0;
+  _applyTfTransform();
+}
+function tfWheel(e){
+  e.preventDefault();
+  zoomTf(e.deltaY < 0 ? 0.15 : -0.15);
+}
+function tfPanStart(e){
+  if (_tfZoom <= 1) return;
+  _tfDragging = true;
+  _tfDragSX = e.clientX - _tfPanX * _tfZoom;
+  _tfDragSY = e.clientY - _tfPanY * _tfZoom;
+  document.getElementById('tf-img-wrap').style.cursor = 'grabbing';
+}
+function tfPanMove(e){
+  if (!_tfDragging) return;
+  _tfPanX = (e.clientX - _tfDragSX) / _tfZoom;
+  _tfPanY = (e.clientY - _tfDragSY) / _tfZoom;
+  _applyTfTransform();
+}
+function tfPanEnd(){
+  _tfDragging = false;
+  const w = document.getElementById('tf-img-wrap');
+  if (w) w.style.cursor = _tfZoom > 1 ? 'grab' : 'default';
 }
 
 
