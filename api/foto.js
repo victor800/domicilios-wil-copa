@@ -41,11 +41,19 @@ const Pedido = mongoose.models.Pedido || mongoose.model('Pedido',
       lng:           { type: Number, default: null },
       actualizadoEn: { type: Date,   default: null },
     },
-    /* ── FÓRMULA MÉDICA ── */
+
+   
+   /* ── FÓRMULA MÉDICA ── */
     formulaMedica: {
-      url:       { type: String, default: null }, // URL pública: /api/foto?recurso=formula&id=<_id>
-      mime:      { type: String, default: null }, // ej: image/jpeg, application/pdf
-      data:      { type: Buffer, default: null }, // bytes del archivo
+      url:       { type: String, default: null },
+      mime:      { type: String, default: null },
+      data:      { type: Buffer, default: null },
+    },
+    /* ── COMPROBANTE DE PAGO ── */
+    comprobanteImg: {
+      url:       { type: String, default: null },
+      mime:      { type: String, default: null },
+      data:      { type: Buffer, default: null },
     },
   }), 'pedidos'
 );
@@ -90,6 +98,18 @@ function setCors(res) {
 function sanitizeStr(val) {
   if (val == null) return null;
   return String(val).replace(/[${}()|[\]\\^*+?./]/g, '').trim().slice(0, 100);
+}
+
+/* ══ Token comprobante ══ */
+import crypto from 'crypto';
+
+function tokenComprobante(id) {
+  const secret = process.env.COMPROBANTE_SECRET || 'wil-secret-fallback';
+  return crypto.createHmac('sha256', secret).update(String(id)).digest('hex').slice(0, 32);
+}
+
+function verificarTokenComprobante(id, t) {
+  return t && t === tokenComprobante(id);
 }
 
 /* ══ Resolver idWil ══ */
@@ -156,60 +176,109 @@ export default async function handler(req, res) {
       if (!body.idPedido)
         body.idPedido = await siguienteId();
 
-      /* ── Procesar fórmula médica si viene en el payload ── */
+     /* ── Procesar fórmula médica si viene en el payload ── */
       let formulaBuffer = null;
       let formulaMime   = null;
 
       if (body.formulaMedica && typeof body.formulaMedica === 'string') {
-        // Formato esperado: "data:image/jpeg;base64,/9j/4AAQ..."
         const match = body.formulaMedica.match(/^data:([^;]+);base64,(.+)$/);
         if (match) {
-          formulaMime   = match[1];                              // ej: "image/jpeg"
-          formulaBuffer = Buffer.from(match[2], 'base64');       // bytes binarios
+          formulaMime   = match[1];
+          formulaBuffer = Buffer.from(match[2], 'base64');
         }
-        // Quitar el base64 del body para no duplicarlo como string
         delete body.formulaMedica;
       }
 
-      /* Inyectar los bytes en el pedido (url se rellena después) */
       if (formulaBuffer) {
-        body.formulaMedica = {
-          data: formulaBuffer,
-          mime: formulaMime,
-          url:  null,          // se actualiza justo después del create
-        };
+        body.formulaMedica = { data: formulaBuffer, mime: formulaMime, url: null };
+      }
+
+      /* ── Procesar comprobante de pago si viene en el payload ── */
+      let compBuffer = null;
+      let compMime   = null;
+
+      if (body.comprobanteImg && typeof body.comprobanteImg === 'string') {
+        const match = body.comprobanteImg.match(/^data:([^;]+);base64,(.+)$/);
+        if (match) {
+          compMime   = match[1];
+          compBuffer = Buffer.from(match[2], 'base64');
+        }
+        delete body.comprobanteImg;
+      }
+
+      if (compBuffer) {
+        body.comprobanteImg = { data: compBuffer, mime: compMime, url: null };
       }
 
       /* Crear el pedido */
       const nuevo = await Pedido.create(body);
 
-      /* ── Si había fórmula, construir URL y escribirla en el documento ── */
+      /* ── Construir URLs y escribirlas en el documento ── */
+      const urlUpdate = {};
+
       if (formulaBuffer) {
-        // La URL pública apunta al GET que sirve el buffer como imagen/pdf
         const formulaUrl = `/api/foto?recurso=formula&id=${nuevo._id}`;
-
-        await Pedido.findByIdAndUpdate(nuevo._id, {
-          'formulaMedica.url': formulaUrl,
-        });
-
-        nuevo.formulaMedica = {
-          url:  formulaUrl,
-          mime: formulaMime,
-          // no devolvemos el buffer en la respuesta JSON
-        };
+        urlUpdate['formulaMedica.url'] = formulaUrl;
+        nuevo.formulaMedica = { url: formulaUrl, mime: formulaMime };
       }
 
-      /* Respuesta: omitir el buffer binario para no saturar la red */
+      if (compBuffer) {
+        const compUrl = `/api/foto?recurso=comprobante&id=${nuevo._id}&t=${tokenComprobante(nuevo._id)}`;
+        urlUpdate['comprobanteImg.url'] = compUrl;
+        nuevo.comprobanteImg = { url: compUrl, mime: compMime };
+      }
+
+      if (Object.keys(urlUpdate).length) {
+        await Pedido.findByIdAndUpdate(nuevo._id, urlUpdate);
+      }
+
+      /* Respuesta: omitir buffers binarios */
       const respuesta = nuevo.toObject();
-      if (respuesta.formulaMedica?.data) {
-        delete respuesta.formulaMedica.data;
-      }
+      if (respuesta.formulaMedica?.data)  delete respuesta.formulaMedica.data;
+      if (respuesta.comprobanteImg?.data) delete respuesta.comprobanteImg.data;
 
       return res.status(201).json({ ok: true, data: respuesta });
     } catch (e) {
       if (e.code === 11000)
         return res.status(409).json({ ok: false, error: 'Pedido duplicado' });
       console.error('[POST pedidos]', e.message);
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
+  /* ════════════════════════════════════════
+     GET /api/foto?recurso=comprobante&id=<_id>
+     Sirve la imagen del comprobante de pago
+  ════════════════════════════════════════ */
+  if (recurso === 'comprobante' && req.method === 'GET') {
+    try {
+      const { id } = req.query;
+      if (!id || !/^[a-f\d]{24}$/i.test(id))
+        return res.status(400).json({ ok: false, error: 'id inválido' });
+
+      const { t } = req.query;
+      if (!verificarTokenComprobante(id, t))
+        return res.status(403).json({ ok: false, error: 'Token inválido' });
+
+      const pedido = await Pedido.findById(id, { comprobanteImg: 1 }).lean();
+      if (!pedido?.comprobanteImg?.data)
+        return res.status(404).json({ ok: false, error: 'Comprobante no encontrado' });
+
+      const mime = pedido.comprobanteImg.mime || 'image/jpeg';
+      let buf;
+      if (Buffer.isBuffer(pedido.comprobanteImg.data)) {
+        buf = pedido.comprobanteImg.data;
+      } else if (pedido.comprobanteImg.data?.buffer) {
+        buf = Buffer.from(pedido.comprobanteImg.data.buffer);
+      } else {
+        buf = Buffer.from(Object.values(pedido.comprobanteImg.data));
+      }
+
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.status(200).send(buf);
+    } catch (e) {
+      console.error('[GET comprobante]', e.message);
       return res.status(500).json({ ok: false, error: e.message });
     }
   }

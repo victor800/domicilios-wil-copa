@@ -682,7 +682,7 @@ var API_IMG  = '/api/foto?recurso=comprobantes'; // endpoint para subir imagen
 var WIL_WA   = '573023452213';
 var WIL_LAT  = 6.3459291;
 var WIL_LNG  = -75.512814;
-var WIL_CUENTA = '300 000 0000'; // ← actualiza con el número real
+var WIL_CUENTA = '55329692468'; // 
 
 /* ── GPS STATE ── */
 var gps = { lat:null, lng:null, direccion:'', distKm:null, distRealKm:null, tiempoSeg:null };
@@ -1071,21 +1071,19 @@ async function enviarPedido() {
     /* Paquete — descripción va en el array items Y en notas */
     notas:        v('fDescripcion'),
     items: [
-      {
-        nombre:      v('fDescripcion'),
-        cantidad:    1,
-        descripcion: v('fDescripcion')
-      }
-    ],
+  {
+    producto:    v('fDescripcion'),
+    cantidad:    1,
+    descripcion: v('fDescripcion')
+  }
+],
     /* Tarifa */
     domicilio:    tarifa,
     metodoPago:   metodoPago,
     /* Comprobante */
-    comprobante: comprobanteB64 ? {
-      data:     comprobanteB64,
-      mimeType: comprobanteMime || 'image/jpeg',
-      nombre:   comprobanteFile ? comprobanteFile.name : 'comprobante'
-    } : null,
+        comprobanteImg: comprobanteB64
+      ? `data:${comprobanteMime || 'image/jpeg'};base64,${comprobanteB64}`
+      : null,
     /* GPS */
     coords: gps.lat ? { lat: gps.lat, lng: gps.lng } : null,
     distanciaKm: gps.distRealKm || gps.distKm || null,
@@ -1101,8 +1099,27 @@ async function enviarPedido() {
 
     if (!resp.ok || !data.ok) throw new Error(data.error || 'Error del servidor');
 
-    pedidoCodigo = data.data.idPedido || '—';
+  pedidoCodigo = data.data.idPedido || '—';
     document.getElementById('codigoRastreo').textContent = pedidoCodigo;
+
+    /* Inyectar fila de comprobante en panel transferencia */
+    if (metodoPago === 'transferencia' && data.data.comprobanteImg?.url) {
+      var urlComp = data.data.comprobanteImg.url;
+      if (!document.getElementById('comp-url-fila')) {
+        var fila = document.createElement('div');
+        fila.id = 'comp-url-fila';
+        fila.style.cssText = 'margin:0 12px 14px;display:flex;align-items:flex-start;gap:9px;'
+          + 'background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:11px;padding:10px 12px';
+        fila.innerHTML = '<span style="font-size:18px;flex-shrink:0;margin-top:1px">🧾</span>'
+          + '<div style="flex:1;min-width:0">'
+          + '<div style="font-size:9.5px;font-weight:700;color:#64748b;text-transform:uppercase;'
+          + 'letter-spacing:.05em;margin-bottom:3px">Comprobante de pago</div>'
+          + '<div style="font-size:11.5px;font-weight:700;color:#0284c7;word-break:break-all">'
+          + urlComp + '</div></div>';
+        document.getElementById('panelTransf').appendChild(fila);
+      }
+    }
+
     document.getElementById('overlayExito').classList.add('show');
 
     /* Steps → paso 3 */
