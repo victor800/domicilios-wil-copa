@@ -1068,26 +1068,24 @@ async function enviarPedido() {
       barrio:    barrioSel.entrega.nombre,
       referencia:v('fReferencia') || ''
     },
-    /* Paquete — descripción va en el array items Y en notas */
+    /* Paquete */
     notas:        v('fDescripcion'),
     items: [
-  {
-    producto:    v('fDescripcion'),
-    cantidad:    1,
-    descripcion: v('fDescripcion')
-  }
-],
+      {
+        producto:    v('fDescripcion'),
+        cantidad:    1,
+        descripcion: v('fDescripcion')
+      }
+    ],
     /* Tarifa */
     domicilio:    tarifa,
     metodoPago:   metodoPago,
     /* Comprobante */
-        comprobanteImg: comprobanteB64
+    comprobanteImg: comprobanteB64
       ? `data:${comprobanteMime || 'image/jpeg'};base64,${comprobanteB64}`
       : null,
-    /* GPS */
-    coordsRemitente: gps.lat ? { lat: gps.lat, lng: gps.lng } : null,
-coords: null, // el destino real se geocodifica en detallePedido con la dirección
-distanciaKm: gps.distRealKm || gps.distKm || null,
+    /* GPS - CORREGIDO: usar 'coords' en lugar de 'coordsRemitente' */
+    coords: gps.lat ? { lat: gps.lat, lng: gps.lng } : null,
     distanciaKm: gps.distRealKm || gps.distKm || null,
   };
 
@@ -1101,7 +1099,7 @@ distanciaKm: gps.distRealKm || gps.distKm || null,
 
     if (!resp.ok || !data.ok) throw new Error(data.error || 'Error del servidor');
 
-  pedidoCodigo = data.data.idPedido || '—';
+    pedidoCodigo = data.data.idPedido || '—';
     document.getElementById('codigoRastreo').textContent = pedidoCodigo;
 
     /* Inyectar fila de comprobante en panel transferencia */
@@ -1129,6 +1127,13 @@ distanciaKm: gps.distRealKm || gps.distKm || null,
     document.getElementById('st1b').classList.remove('active');
     document.getElementById('st1b').classList.add('done');
     document.getElementById('st2b').classList.add('active');
+
+    // Mostrar en consola que se guardaron las coordenadas
+    if (gps.lat) {
+      console.log('✅ Coordenadas guardadas:', gps.lat, gps.lng);
+    } else {
+      console.log('⚠️ No se capturaron coordenadas GPS');
+    }
 
   } catch(err) {
     toast('Error al enviar: '+err.message, 'error');
