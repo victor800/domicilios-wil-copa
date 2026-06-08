@@ -635,14 +635,18 @@ function mostrarModalPedido(p) {
             <div class="item-lab">${item.laboratorio || ''}</div>
           </div>
         </div>
-        <div class="item-price">${formatCOP(item.subtotal)}</div>
+          <div class="item-price">${item.subtotal != null ? formatCOP(item.subtotal) : ''}</div>
+
       </div>
     `).join('');
   } else {
     itemsEl.innerHTML = '<div style="font-size:13px;color:var(--muted);padding:8px 0;">Sin productos registrados</div>';
   }
 
-  document.getElementById('sheetTotal').textContent = formatCOP(p.total || 0);
+  const totalFinal = (p.modoEntrega === 'paqueteria' || p.sede === 'paqueteria')
+    ? (p.domicilio || 0)
+    : (p.total || 0);
+  document.getElementById('sheetTotal').textContent = formatCOP(totalFinal);
 
   document.getElementById('btnDetalle').onclick = () => {
     window.location.href = `detallePedido.html?id=${encodeURIComponent(p.idPedido)}`;
