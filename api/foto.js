@@ -40,7 +40,13 @@ const Pedido = mongoose.models.Pedido || mongoose.model('Pedido',
       lat:           { type: Number, default: null },
       lng:           { type: Number, default: null },
       actualizadoEn: { type: Date,   default: null },
+      
     },
+    calificacion: {
+  estrellas:  { type: Number, default: null },
+  comentario: { type: String, default: '' },
+  fecha:      { type: Date,   default: null },
+},
 
    
    /* ── FÓRMULA MÉDICA ── */
@@ -802,9 +808,30 @@ export default async function handler(req, res) {
       return res.status(500).json({ ok: false, error: e.message });
     }
   }
+ if (recurso === 'calificacion' && req.method === 'PATCH') {
+    try {
+      const { pedidoId, estrellas, comentario } = req.body || {};
+      if (!pedidoId || !estrellas)
+        return res.status(400).json({ ok: false, error: 'Faltan pedidoId o estrellas' });
+      const estrellasNum = Number(estrellas);
+      if (isNaN(estrellasNum) || estrellasNum < 1 || estrellasNum > 5)
+        return res.status(400).json({ ok: false, error: 'estrellas debe ser entre 1 y 5' });
+      const pedido = await Pedido.findOneAndUpdate(
+        { idPedido: pedidoId },
+        { calificacion: { estrellas: estrellasNum, comentario: String(comentario || '').trim().slice(0, 500), fecha: new Date() } },
+        { new: true, projection: { 'formulaMedica.data': 0, 'comprobanteImg.data': 0 } }
+      );
+      if (!pedido)
+        return res.status(404).json({ ok: false, error: 'Pedido no encontrado: ' + pedidoId });
+      return res.status(200).json({ ok: true, data: pedido });
+    } catch (e) {
+      console.error('[PATCH calificacion]', e.message);
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
 
   return res.status(400).json({
     ok: false,
-    error: `Recurso no válido: "${recurso}". Usa: pedidos | domiciliarios | asignar | estado | foto | formula | ubicacion-domi | ubicacion | debug-ubicacion`,
+    error: `Recurso no válido: "${recurso}". Usa: pedidos | domiciliarios | asignar | estado | foto | formula | ubicacion-domi | ubicacion | debug-ubicacion | calificacion`,
   });
 }

@@ -410,6 +410,30 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
     <div class="notas-text" id="notasText"></div>
   </div>
 
+  <!-- CALIFICACIÓN -->
+<div class="calif-card" id="califCard">
+  <div id="califForm">
+    <div class="calif-title">⭐ ¿Cómo estuvo el servicio?</div>
+    <div class="calif-sub">Tu opinión nos ayuda a mejorar</div>
+    <div class="calif-stars" id="califStars">
+      <span class="calif-star" data-v="1">⭐</span>
+      <span class="calif-star" data-v="2">⭐</span>
+      <span class="calif-star" data-v="3">⭐</span>
+      <span class="calif-star" data-v="4">⭐</span>
+      <span class="calif-star" data-v="5">⭐</span>
+    </div>
+    <textarea class="calif-textarea" id="califTexto" placeholder="Comentario opcional…" maxlength="500"></textarea>
+    <button class="btn-calif" id="btnCalif" disabled onclick="enviarCalificacion()">Enviar calificación</button>
+  </div>
+  <div id="califEnviada" style="display:none">
+    <div class="calif-enviada">
+      <div class="calif-enviada-icon">🎉</div>
+      <div class="calif-enviada-title">¡Gracias por tu calificación!</div>
+      <div class="calif-enviada-sub">Tu opinión nos ayuda a mejorar el servicio.</div>
+    </div>
+  </div>
+</div>
+
   <!-- INFO ENTREGA -->
   <div class="info-card" id="infoCard" style="display:none">
     <div class="info-card-title">📋 Información de entrega</div>
@@ -877,6 +901,7 @@ function renderPedido(p) {
     geocodificarDestino(p).then(() => actualizarMapa(p));
   } else {
     actualizarMapa(p);
+    mostrarCalifCard(p);
   }
 }
 
@@ -1142,6 +1167,57 @@ async function init() {
     }
     construirPanelDocs(fresh);
   }, 10000);
+}
+
+// ════════ CALIFICACIÓN ════════
+let califStarSel = 0;
+
+function initCalifStars() {
+  document.querySelectorAll('.calif-star').forEach(el => {
+    el.addEventListener('click', () => {
+      califStarSel = Number(el.dataset.v);
+      document.querySelectorAll('.calif-star').forEach((s, i) => {
+        s.classList.toggle('on', i < califStarSel);
+      });
+      document.getElementById('btnCalif').disabled = false;
+    });
+  });
+}
+
+function mostrarCalifCard(p) {
+  const card = document.getElementById('califCard');
+  if (!card) return;
+  if (estadoIndex(p.estado) !== 3) return;   // solo si entregado
+  if (p.calificacion?.estrellas) {
+    // ya calificado: mostrar estado enviado
+    document.getElementById('califForm').style.display    = 'none';
+    document.getElementById('califEnviada').style.display = 'block';
+  }
+  card.classList.add('visible');
+  initCalifStars();
+}
+
+async function enviarCalificacion() {
+  if (!califStarSel || !pedidoData?.idPedido) return;
+  const btn = document.getElementById('btnCalif');
+  btn.textContent = 'Enviando…'; btn.disabled = true;
+  try {
+    const res = await fetch('/api/foto?recurso=calificacion', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pedidoId:   pedidoData.idPedido,
+        estrellas:  califStarSel,
+        comentario: document.getElementById('califTexto').value.trim(),
+      }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    document.getElementById('califForm').style.display    = 'none';
+    document.getElementById('califEnviada').style.display = 'block';
+  } catch(e) {
+    btn.textContent = 'Enviar calificación'; btn.disabled = false;
+    alert('No se pudo enviar: ' + e.message);
+  }
 }
 
 function nuevaConsulta() {
