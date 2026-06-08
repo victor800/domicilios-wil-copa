@@ -2345,23 +2345,31 @@ function renderListaDomis(){
     if(cnt)cnt.textContent='0 registrados';return;
   }
   if(cnt)cnt.textContent=allDrivers.length+' registrados';
-  el.innerHTML=allDrivers.map(d=>{
-    const fotoUrl=d.foto||'';
-    const iniciales=(d.nombre||'?').split(' ').slice(0,2).map(p=>p[0]).join('').toUpperCase();
-    const avatarHTML=fotoUrl
-      ?`<img src="${fotoUrl}" alt="${d.nombre}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid var(--teal);flex-shrink:0;"
-           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-         <div style="display:none;width:40px;height:40px;border-radius:50%;background:var(--teal);align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#071e22;flex-shrink:0;">${iniciales}</div>`
-      :`<div style="width:40px;height:40px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#071e22;flex-shrink:0;">${iniciales}</div>`;
-    return `<div class="bm-item" style="align-items:center;">
-      ${avatarHTML}
-      <div style="flex:1;min-width:0;">
-        <div class="bm-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${d.nombre}</div>
-        <div class="bm-meta">${d.id}${d.tel?' · 📞 '+d.tel:''}</div>
-      </div>
-      <span style="font-size:8px;font-weight:800;padding:2px 8px;border-radius:99px;background:${d.activo!==false?'var(--green-l)':'var(--red-l)'};color:${d.activo!==false?'var(--green)':'var(--red)'};flex-shrink:0;">${d.activo!==false?'Activo':'Inactivo'}</span>
-    </div>`;
-  }).join('');
+  el.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:4px 0;">` +
+    allDrivers.map(d=>{
+      const fotoUrl=d.foto||'';
+      const iniciales=(d.nombre||'?').split(' ').slice(0,2).map(p=>p[0]).join('').toUpperCase();
+      const avatarHTML=fotoUrl
+        ?`<img src="${fotoUrl}" alt="${d.nombre}"
+             style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--teal);display:block;margin:0 auto;"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+          +`<div style="display:none;width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--teal),var(--teal-d));align-items:center;justify-content:center;font-size:26px;font-weight:800;color:#071e22;margin:0 auto;">${iniciales}</div>`
+        :`<div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--teal),var(--teal-d));display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;color:#071e22;margin:0 auto;">${iniciales}</div>`;
+      return `<div style="background:var(--bg);border:1.5px solid var(--border);border-radius:16px;padding:18px 14px 14px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;transition:box-shadow .15s;"
+           onmouseover="this.style.boxShadow='0 6px 20px rgba(40,185,193,.12)';this.style.borderColor='var(--border2)'"
+           onmouseout="this.style.boxShadow='none';this.style.borderColor='var(--border)'">
+        <div style="position:relative;display:inline-block;">
+          ${avatarHTML}
+          <div style="position:absolute;bottom:2px;right:2px;width:14px;height:14px;border-radius:50%;background:${d.activo!==false?'var(--green)':'var(--red)'};border:2.5px solid var(--bg);"></div>
+        </div>
+        <div style="width:100%;">
+          <div style="font-size:13px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;">${d.nombre}</div>
+          <div style="font-size:9px;font-weight:700;color:var(--teal-d);font-family:'DM Mono',monospace;margin-bottom:5px;">${d.idWil||d.id||'—'}</div>
+          ${d.tel?`<div style="display:flex;align-items:center;justify-content:center;gap:4px;font-size:9px;font-weight:700;color:var(--text2);"><span class="material-symbols-rounded" style="font-size:12px;color:var(--teal);">phone</span>${d.tel}</div>`:''}
+        </div>
+        <span style="font-size:8px;font-weight:800;padding:3px 10px;border-radius:99px;background:${d.activo!==false?'var(--green-l)':'var(--red-l)'};color:${d.activo!==false?'var(--green)':'var(--red)'};">${d.activo!==false?'● Activo':'○ Inactivo'}</span>
+      </div>`;
+    }).join('') + `</div>`;
 }
 
 /* ════════════════════════════════════════════════════════
