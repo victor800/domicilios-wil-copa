@@ -698,6 +698,15 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
             <option value="domicilio">Solo Domicilio</option>
             <option value="recogida">Solo Recogida</option>
           </select>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <input type="date" id="ped-cont-fecha"
+              style="background:var(--white);border:1.5px solid var(--border);border-radius:8px;padding:4px 9px;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;color:var(--text);outline:none;cursor:pointer;"
+              onchange="filterPedCont(document.querySelector('#ped-cont-tabs .ped-tab.on')?.dataset?.f||'todos',null)"
+              title="Filtrar por fecha">
+            <button onclick="document.getElementById('ped-cont-fecha').value='';filterPedCont(document.querySelector('#ped-cont-tabs .ped-tab.on')?.dataset?.f||'todos',null)"
+              style="background:var(--bg2);border:1.5px solid var(--border);border-radius:7px;padding:3px 7px;cursor:pointer;font-size:9px;font-weight:800;color:var(--text2);"
+              title="Hoy / Limpiar">Hoy</button>
+          </div>
           <span style="font-size:9px;font-weight:700;color:var(--text3);" id="ped-cont-count">–</span>
         </div>
         <div style="overflow-x:auto;padding:5px 7px 8px;">
@@ -1942,6 +1951,15 @@ function renderTablaPedidos(){
   if(domiSel)list=list.filter(p=>(p.domi||'')===domiSel);
   if(tipoSel==='domicilio')list=list.filter(p=>!(p.tipoEntrega||'').toLowerCase().includes('recog'));
   if(tipoSel==='recogida') list=list.filter(p=>(p.tipoEntrega||'').toLowerCase().includes('recog'));
+  const fechaSel=(document.getElementById('ped-cont-fecha')?.value||'').trim();
+  if(fechaSel){
+    list=list.filter(p=>{
+      const d=parseDate(p.fecha||'');
+      if(!d||isNaN(d)) return false;
+      const dd=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      return dd===fechaSel;
+    });
+  }
   const cnt=document.getElementById('ped-cont-count');if(cnt)cnt.textContent=list.length+' pedido'+(list.length!==1?'s':'');
   const tbody=document.getElementById('ped-cont-tbody');
   if(!list.length){tbody.innerHTML=`<tr><td colspan="12" style="text-align:center;padding:24px;color:var(--text3);">Sin pedidos con ese filtro</td></tr>`;return;}
@@ -2812,7 +2830,7 @@ function renderCalifs() {
     showToast('s','✓ Contable listo',`${allPedidos.length} pedidos · ${allDrivers.length} domis · ${basesData.length} bases`);
     startRefreshBar();
     const today=new Date().toISOString().slice(0,10);
-    ['b-fecha','m-fecha'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=today;});
+    ['b-fecha','m-fecha','ped-cont-fecha'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=today;});
     poblarDomis('b-domi');poblarDomis('m-domi');
   }catch(e){
     document.getElementById('loading-txt').textContent='⚠ Error: '+e.message;
