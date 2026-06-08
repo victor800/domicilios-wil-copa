@@ -801,6 +801,9 @@ function formatCOP(v) { return '$ ' + Number(v || 0).toLocaleString('es-CO'); }
 // ════════════════════════════════════════════════════════════
 //  RENDER PEDIDO
 // ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+//  RENDER PEDIDO
+// ════════════════════════════════════════════════════════════
 function renderPedido(p) {
   pedidoData = p;
   document.getElementById('hdrTitle').textContent = `Pedido #${p.idPedido || '—'}`;
@@ -828,7 +831,6 @@ function renderPedido(p) {
   document.getElementById('infoDir').textContent     = p.direccion || '—';
   document.getElementById('infoCliente').textContent = `${p.nombre || '—'}${p.telefono ? ' · ' + p.telefono : ''}`;
 
-  // ── Total domicilio: para paquetería usar p.domicilio si no hay items ──
   const tipoPago    = p.metodoPago || '—';
   const valDomicilio = p.domicilio || p.valorDomicilio || 0;
   document.getElementById('infoPago').textContent = `${tipoPago} · Domicilio: ${formatCOP(valDomicilio)}`;
@@ -838,12 +840,16 @@ function renderPedido(p) {
   document.getElementById('infoCard').style.display  = 'block';
 
   document.getElementById('factComercio').textContent = p.comercio || p.sede || '—';
-  if (p.comprobanteId) {
+
+  // ── Comprobante: ahora viene como comprobanteImg.url ──
+  const comprUrl = p.comprobanteImg?.url || null;
+  if (comprUrl) {
     const img = document.getElementById('factFotoImg');
-    img.src   = `/api/foto?recurso=foto&id=${p.comprobanteId}`;
+    img.src   = comprUrl;
     img.onerror = () => { document.getElementById('factFotoWrap').style.display = 'none'; };
     document.getElementById('factFotoWrap').classList.add('visible');
   }
+
   if (p.items?.length) {
     document.getElementById('factItems').innerHTML = p.items.map(it => `
       <div class="item-row">
@@ -856,14 +862,12 @@ function renderPedido(p) {
       </div>`).join('');
   }
 
-  // ── Total factura: si es paquetería (sin items) usar valor domicilio ──
   const totalFactura = (p.items?.length > 0)
     ? (p.total ?? valDomicilio)
     : valDomicilio;
   document.getElementById('factTotal').textContent = formatCOP(totalFactura);
   document.getElementById('facturaCard').style.display = 'block';
 
-  // ── Panel documentos: construir contenido ──
   construirPanelDocs(p);
   actualizarMapa(p);
 }
@@ -876,27 +880,32 @@ function construirPanelDocs(p) {
 
   // ── Tab comprobante ──
   const comprPane = document.getElementById('comprPaneContent');
-  if (p.comprobanteId) {
+  const comprUrl  = p.comprobanteImg?.url || null;   // ← antes buscaba p.comprobanteId
+
+  if (comprUrl) {
     docsCount++;
-    const imgSrc = `/api/foto?recurso=foto&id=${p.comprobanteId}`;
     comprPane.innerHTML = `
       <div class="doc-label">
         <span class="doc-label-tag comprobante">Comprobante de pago</span>
         ${p.horaToma ? `<span class="doc-label-ts">${p.horaToma}</span>` : ''}
       </div>
-      ${buildImageViewer('viewer-compr', imgSrc)}
+      ${buildImageViewer('viewer-compr', comprUrl)}
     `;
     initImageViewer('viewer-compr');
   }
-  // else muestra el estado vacío que ya está en el HTML
+  // else queda el estado vacío del HTML
 
   // ── Tab factura domi ──
-  const factPane = document.getElementById('factDomiPaneContent');
-  const tieneItems = p.items?.length > 0;
-  const tieneFotoFactura = !!p.facturaFotoId; // campo futuro cuando el domi adjunte foto de factura física
+  const factPane        = document.getElementById('factDomiPaneContent');
+  const tieneItems      = p.items?.length > 0;
+  const tieneFotoFactura = !!(p.facturaImg?.url || p.facturaFotoId);   // soporte futuro
+  const facturaUrl       = p.facturaImg?.url || (p.facturaFotoId ? `/api/foto?recurso=foto&id=${p.facturaFotoId}` : null);
 
   if (tieneFotoFactura || tieneItems) {
     docsCount++;
+    const valDomicilio  = p.domicilio || p.valorDomicilio || 0;
+    const totalFactura  = (tieneItems && p.total != null) ? p.total : valDomicilio;
+
     let html = `
       <div class="doc-label">
         <span class="doc-label-tag factura-domi">Factura del comercio</span>
@@ -904,11 +913,10 @@ function construirPanelDocs(p) {
       </div>`;
 
     if (tieneFotoFactura) {
-      html += buildImageViewer('viewer-fact', `/api/foto?recurso=foto&id=${p.facturaFotoId}`);
+      html += buildImageViewer('viewer-fact', facturaUrl);
     }
 
     if (tieneItems) {
-      const totalFactura = p.total ?? (p.domicilio || 0);
       html += `
         <div class="docs-factura-items" style="${tieneFotoFactura ? 'margin-top:14px;' : ''}">
           ${p.items.map(it => `
@@ -931,7 +939,7 @@ function construirPanelDocs(p) {
     if (tieneFotoFactura) initImageViewer('viewer-fact');
   }
 
-  // Mostrar FAB y badge si hay al menos un documento
+  // Mostrar FAB y badge
   if (docsCount > 0) {
     const fab = document.getElementById('docsFab');
     fab.style.display = 'flex';
