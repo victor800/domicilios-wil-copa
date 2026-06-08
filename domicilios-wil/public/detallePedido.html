@@ -659,16 +659,84 @@ async function calcularRutaOSRM(fromLat, fromLng, toLat, toLng) {
 // ════════════════════════════════════════════════════════════
 //  ACTUALIZAR MAPA
 // ════════════════════════════════════════════════════════════
-function actualizarMapa(p) {
-  if (!mapInstance) return;
-  const entregado = estadoIndex(p.estado) === 3;
-  if (p.coords?.lat && p.coords?.lng) {
-    const pos = [p.coords.lat, p.coords.lng];
-    if (!destinoMarker) {
-      destinoMarker = L.marker(pos, { icon: mkDestinoIcon(p.nombre || 'Cliente') }).addTo(mapInstance);
-      mapInstance.setView(pos, 15);
+// ════════════════════════════════════════════════════════════
+//  GEOCODIFICAR DIRECCIÓN DESTINO (solo paquetería sin coords)
+// ════════════════════════════════════════════════════════════
+async function geocodificarDestino(p) {
+  // Si ya tiene coords de destino reales, no hacer nada
+  if (p.coords?.lat && p.coords?.lng) return p;
+
+  // Construir query: barrio + referencia + municipio
+  const partes = [
+    p.destinatario?.barrio || p.barrioEntrega || p.zona || '',
+    p.destinatario?.referencia || '',
+    'Copacabana, Antioquia, Colombia'
+  ].filter(Boolean);
+  const query = partes.join(', ');
+
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1&accept-language=es`;
+    const res  = await fetch(url, { headers: { 'User-Agent': 'DomiciliosWIL/1.0' } });
+    const data = await res.json();
+    if (data?.length) {
+      p._coordsDestino = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+      p._geoLabel = data[0].display_name;
     }
+  } catch(_) {}
+
+  return p;
+}
+
+// ════════════════════════════════════════════════════════════
+//  ACTUALIZAR MAPA
+// ════════════════════════════════════════════════════════════
+async function actualizarMapa(p) {
+  if (!mapInstance) return;
+
+  const entregado = estadoIndex(p.estado) === 3;
+
+  // ── Resolver coordenadas de destino ──
+  // 1) coords explícitas en el pedido (farmacia / domicilio normal)
+  // 2) coordenadas geocodificadas (_coordsDestino, calculadas arriba)
+  // 3) fallback: Parque Principal Copacabana
+  let destLat = p.coords?.lat  || p._coordsDestino?.lat  || null;
+  let destLng = p.coords?.lng  || p._coordsDestino?.lng  || null;
+
+  // Si es paquetería y no hay coords todavía → geocodificar ahora
+  if ((!destLat || !destLng) && (p.modoEntrega === 'paqueteria' || p.sede === 'paqueteria')) {
+    await geocodificarDestino(p);
+    destLat = p._coordsDestino?.lat || null;
+    destLng = p._coordsDestino?.lng || null;
   }
+
+  // Último fallback: Parque de Copacabana
+  if (!destLat || !destLng) {
+    destLat = 6.3459291;
+    destLng = -75.512814;
+  }
+
+  // ── Marcador destino ──
+  const labelDestino = p.destinatario?.nombre || p.nombre || 'Cliente';
+  if (!destinoMarker) {
+    destinoMarker = L.marker([destLat, destLng], {
+      icon: mkDestinoIcon(labelDestino)
+    }).addTo(mapInstance);
+
+    // Tooltip con dirección completa
+    const tooltipTxt = [
+      p.destinatario?.barrio || p.barrioEntrega || '',
+      p.destinatario?.referencia || ''
+    ].filter(Boolean).join(' — ');
+    if (tooltipTxt) {
+      destinoMarker.bindTooltip(tooltipTxt, {
+        permanent: false, direction: 'top',
+        className: 'leaflet-tooltip-wil'
+      });
+    }
+
+    mapInstance.setView([destLat, destLng], 15);
+  }
+
   if (entregado) {
     if (domiMarker) { mapInstance.removeLayer(domiMarker); domiMarker = null; }
     if (rutaLayer)  { mapInstance.removeLayer(rutaLayer);  rutaLayer  = null; }
@@ -679,23 +747,29 @@ function actualizarMapa(p) {
     document.getElementById('etaRowVal').textContent = '✓ Pedido entregado';
     return;
   }
+
+  // ── Coords del domi (GPS en vivo) ──
   const dc = p.domiCoords;
   if (dc?.lat && dc?.lng) {
     if (!domiMarker) {
-      domiMarker = L.marker([dc.lat, dc.lng], { icon: mkDomiIcon(p.domiciliarioNombre || 'Domi') }).addTo(mapInstance);
+      domiMarker = L.marker([dc.lat, dc.lng], {
+        icon: mkDomiIcon(p.domiciliarioNombre || 'Domi')
+      }).addTo(mapInstance);
       domiCurrentPos = { lat: dc.lat, lng: dc.lng };
-      if (p.coords?.lat) {
-        const bounds = L.latLngBounds([[dc.lat, dc.lng], [p.coords.lat, p.coords.lng]]);
-        mapInstance.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
-      }
+
+      // Fitbounds domi ↔ destino
+      const bounds = L.latLngBounds(
+        [[dc.lat, dc.lng], [destLat, destLng]]
+      );
+      mapInstance.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
     } else {
       animarDomiHacia(dc.lat, dc.lng);
     }
-    if (p.coords?.lat && p.coords?.lng) {
-      calcularRutaOSRM(dc.lat, dc.lng, p.coords.lat, p.coords.lng);
-    }
-  } else if (p.coords?.lat) {
-    mapInstance.setView([p.coords.lat, p.coords.lng], 15);
+    calcularRutaOSRM(dc.lat, dc.lng, destLat, destLng);
+
+  } else {
+    // Sin domi asignado: centrar en destino
+    mapInstance.setView([destLat, destLng], 15);
   }
 }
 
@@ -801,9 +875,6 @@ function formatCOP(v) { return '$ ' + Number(v || 0).toLocaleString('es-CO'); }
 // ════════════════════════════════════════════════════════════
 //  RENDER PEDIDO
 // ════════════════════════════════════════════════════════════
-// ════════════════════════════════════════════════════════════
-//  RENDER PEDIDO
-// ════════════════════════════════════════════════════════════
 function renderPedido(p) {
   pedidoData = p;
   document.getElementById('hdrTitle').textContent = `Pedido #${p.idPedido || '—'}`;
@@ -869,7 +940,12 @@ function renderPedido(p) {
   document.getElementById('facturaCard').style.display = 'block';
 
   construirPanelDocs(p);
+// Geocodificar destino si es paquetería sin coords, luego pintar mapa
+if ((p.modoEntrega === 'paqueteria' || p.sede === 'paqueteria') && !p.coords?.lat) {
+  geocodificarDestino(p).then(() => actualizarMapa(p));
+} else {
   actualizarMapa(p);
+}
 }
 
 // ════════════════════════════════════════════════════════════
