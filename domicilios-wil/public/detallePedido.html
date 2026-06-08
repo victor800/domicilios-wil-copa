@@ -922,8 +922,9 @@ function renderPedido(p) {
     geocodificarDestino(p).then(() => actualizarMapa(p));
   } else {
     actualizarMapa(p);
-    mostrarCalifCard(p);
+    
   }
+  mostrarCalifCard(p);
 }
 
 // ════════ PANEL DOCUMENTOS ════════
@@ -1176,19 +1177,19 @@ async function init() {
   if (!p) { document.getElementById('errorState').classList.add('visible'); return; }
   renderPedido(p);
 
-  pollInterval = setInterval(async () => {
+ pollInterval = setInterval(async () => {
     const fresh = await cargarPedido(id);
     if (!fresh) return;
     actualizarMapa(fresh);
     if (fresh.estado !== pedidoData?.estado) {
       pedidoData = fresh;
       renderSteps(fresh);
+      mostrarCalifCard(fresh);
     } else {
       pedidoData = fresh;
     }
     construirPanelDocs(fresh);
   }, 10000);
-}
 
 // ════════ CALIFICACIÓN ════════
 let califStarSel = 0;
