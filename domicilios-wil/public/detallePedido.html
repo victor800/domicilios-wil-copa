@@ -299,6 +299,8 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
 @keyframes spin { to{transform:rotate(360deg);} }
 .loading-txt { font-size:14px; font-weight:800; color:var(--muted); }
 
+.factura-card .img-viewer .img-viewer-inner { max-height: 180px; }
+
 /* ERROR */
 .error-state { display:none; flex-direction:column; align-items:center; justify-content:center; padding:60px 24px; gap:14px; text-align:center; }
 .error-state.visible { display:flex; }
@@ -443,12 +445,8 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
 
   <!-- FACTURA -->
   <div class="factura-card" id="facturaCard" style="display:none">
-    <div class="factura-header">
-      <div><div class="factura-title">🧾 Factura</div><div class="factura-comercio" id="factComercio">—</div></div>
-    </div>
-    <div class="factura-foto-wrap" id="factFotoWrap">
-      <img class="factura-foto-img" id="factFotoImg" src="" alt="Comprobante"/>
-    </div>
+    <div class="factura-foto-wrap" id="factFotoWrap" style="padding:12px 16px 0;display:none;"></div>
+
     <div class="factura-items" id="factItems"></div>
     <div class="total-row">
       <span class="total-label">Total a pagar</span>
@@ -910,16 +908,16 @@ function renderPedido(p) {
   document.getElementById('infoFecha').textContent   = partesFecha.filter(Boolean).join(' · ') || '—';
   document.getElementById('infoCard').style.display  = 'block';
 
-  document.getElementById('factComercio').textContent = p.comercio || p.sede || '—';
+ 
 
   // ── Comprobante: ahora viene como comprobanteImg.url ──
   const comprUrl = p.comprobanteImg?.url || null;
-  if (comprUrl) {
-    const img = document.getElementById('factFotoImg');
-    img.src   = comprUrl;
-    img.onerror = () => { document.getElementById('factFotoWrap').style.display = 'none'; };
-    document.getElementById('factFotoWrap').classList.add('visible');
-  }
+if (comprUrl) {
+  const wrap = document.getElementById('factFotoWrap');
+  wrap.style.display = 'block';
+  wrap.innerHTML = buildImageViewer('viewer-fact-inline', comprUrl);
+  initImageViewer('viewer-fact-inline');
+}
 
   if (p.items?.length) {
     document.getElementById('factItems').innerHTML = p.items.map(it => `
