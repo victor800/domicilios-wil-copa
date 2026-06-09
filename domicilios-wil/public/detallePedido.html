@@ -597,6 +597,19 @@ let docsOpen = false;
 let activeTab = 'comprobante';
 let docsBadgeCount = 0;
 
+// ════════ FUNCIÓN PARA FORMATEAR BASE64 A DATA URL ════════
+function formatBase64Image(b64) {
+  if (!b64) return null;
+  // Si ya es data URL, devolverlo igual
+  if (b64.startsWith('data:image')) return b64;
+  // Si empieza con /9j/ es JPEG
+  if (b64.startsWith('/9j/')) return 'data:image/jpeg;base64,' + b64;
+  // Si empieza con iVBOR es PNG
+  if (b64.startsWith('iVBOR')) return 'data:image/png;base64,' + b64;
+  // Por defecto asumir JPEG
+  return 'data:image/jpeg;base64,' + b64;
+}
+
 // ════════ MAPA ════════
 function initMapa() {
   mapInstance = L.map('map-detail', {
@@ -1011,7 +1024,7 @@ function construirPanelDocs(p) {
     comprPane.innerHTML = `<div class="docs-empty"><div class="docs-empty-icon">🧾</div><div class="docs-empty-title">Sin comprobante aún</div><div class="docs-empty-sub">El domiciliario no ha adjuntado<br>el comprobante de pago todavía.</div></div>`;
   }
 
-  // ══ TAB 2: FACTURA DOMI ══
+  // ══ TAB 2: FACTURA DOMI (con imágenes en Base64) ══
   const factPane = document.getElementById('paneFactura');
   const facturaImgs = p.facturas?.fotos || [];
   const facturaValor = p.facturas?.valorFactura || null;
@@ -1024,9 +1037,10 @@ function construirPanelDocs(p) {
         <span class="doc-label-ts">${p.comercio || ''}</span>
       </div>`;
     
-    // Mostrar todas las fotos de factura
-    facturaImgs.forEach((img, idx) => {
-      html += buildImageViewer(`viewer-fact-${idx}`, img);
+    // Mostrar todas las fotos de factura (convertir Base64 a data URL)
+    facturaImgs.forEach((imgBase64, idx) => {
+      const imgSrc = formatBase64Image(imgBase64);
+      html += buildImageViewerWithSrc(`viewer-fact-${idx}`, imgSrc);
     });
     
     // Mostrar valor de factura
@@ -1046,7 +1060,7 @@ function construirPanelDocs(p) {
     factPane.innerHTML = `<div class="docs-empty"><div class="docs-empty-icon">📋</div><div class="docs-empty-title">Sin factura aún</div><div class="docs-empty-sub">Cuando el domiciliario adjunte<br>la factura del comercio aparecerá aquí.</div></div>`;
   }
 
-  // ══ TAB 3: TARDANZA ══
+  // ══ TAB 3: TARDANZA (con imágenes en Base64) ══
   const tardanzaPane = document.getElementById('paneTardanza');
   const tardanzaNota = p.comprobantesTardanza?.nota || '';
   const tardanzaFotos = p.comprobantesTardanza?.fotos || [];
@@ -1071,9 +1085,10 @@ function construirPanelDocs(p) {
         </div>`;
     }
     
-    // Fotos de tardanza
-    tardanzaFotos.forEach((img, idx) => {
-      html += buildImageViewer(`viewer-tardanza-${idx}`, img);
+    // Fotos de tardanza (convertir Base64 a data URL)
+    tardanzaFotos.forEach((imgBase64, idx) => {
+      const imgSrc = formatBase64Image(imgBase64);
+      html += buildImageViewerWithSrc(`viewer-tardanza-${idx}`, imgSrc);
     });
     
     // Tiempo extra
@@ -1107,8 +1122,8 @@ function construirPanelDocs(p) {
   }
 }
 
-// ════════ VISOR DE IMAGEN ════════
-function buildImageViewer(id, src) {
+// ════════ VISOR DE IMAGEN (con src directo) ════════
+function buildImageViewerWithSrc(id, src) {
   return `
     <div class="img-viewer" id="${id}">
       <div class="img-viewer-inner" id="${id}-inner">
@@ -1123,6 +1138,11 @@ function buildImageViewer(id, src) {
         <button class="ivc-btn" style="font-size:13px;padding:0 6px;width:auto;" onclick="resetViewer('${id}')">↺</button>
       </div>
     </div>`;
+}
+
+// Versión con URL (para comprobante que viene como URL)
+function buildImageViewer(id, src) {
+  return buildImageViewerWithSrc(id, src);
 }
 
 const viewerState = {};
