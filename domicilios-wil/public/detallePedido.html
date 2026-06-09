@@ -272,7 +272,6 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
   user-select:none;
 }
 .img-viewer-inner {
-  /* FIX: altura máxima para que la imagen no desborde el panel */
   max-height: calc(90vh - 230px);
   overflow: hidden;
   width:100%;
@@ -286,7 +285,6 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
 }
 .img-viewer-inner.grabbing { cursor:grabbing; }
 .img-viewer img {
-  /* FIX: imagen contenida dentro del visor, sin desbordar */
   max-width: 100%;
   max-height: calc(90vh - 230px);
   width: auto;
@@ -352,7 +350,6 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
 .error-sub { font-size:14px; font-weight:600; color:var(--muted); }
 .btn-reintentar { height:46px; padding:0 24px; background:linear-gradient(135deg,var(--teal),var(--teal-light)); border:none; border-radius:14px; color:#fff; font-size:14px; font-weight:800; font-family:'Nunito',sans-serif; cursor:pointer; margin-top:8px; }
 
-
 /* CALIFICACIÓN */
 .calif-card { background:var(--white); border-radius:20px; border:1px solid var(--border); padding:20px 18px; box-shadow:0 2px 12px rgba(0,0,0,.04); display:none; }
 .calif-card.visible { display:block; }
@@ -371,7 +368,6 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
 .calif-enviada-icon { font-size:38px; }
 .calif-enviada-title { font-size:14px; font-weight:900; color:var(--teal-d); }
 .calif-enviada-sub { font-size:12px; font-weight:700; color:var(--muted); }
-
 
 @keyframes pulsate { 0%{transform:translate(-50%,-50%) scale(.4);opacity:1;} 100%{transform:translate(-50%,-50%) scale(2.8);opacity:0;} }
 </style>
@@ -475,28 +471,28 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
   </div>
 
   <!-- CALIFICACIÓN -->
-<div class="calif-card" id="califCard">
-  <div id="califForm">
-    <div class="calif-title">⭐ ¿Cómo estuvo el servicio?</div>
-    <div class="calif-sub">Tu opinión nos ayuda a mejorar</div>
-    <div class="calif-stars" id="califStars">
-      <span class="calif-star" data-v="1">⭐</span>
-      <span class="calif-star" data-v="2">⭐</span>
-      <span class="calif-star" data-v="3">⭐</span>
-      <span class="calif-star" data-v="4">⭐</span>
-      <span class="calif-star" data-v="5">⭐</span>
+  <div class="calif-card" id="califCard">
+    <div id="califForm">
+      <div class="calif-title">⭐ ¿Cómo estuvo el servicio?</div>
+      <div class="calif-sub">Tu opinión nos ayuda a mejorar</div>
+      <div class="calif-stars" id="califStars">
+        <span class="calif-star" data-v="1">⭐</span>
+        <span class="calif-star" data-v="2">⭐</span>
+        <span class="calif-star" data-v="3">⭐</span>
+        <span class="calif-star" data-v="4">⭐</span>
+        <span class="calif-star" data-v="5">⭐</span>
+      </div>
+      <textarea class="calif-textarea" id="califTexto" placeholder="Comentario opcional…" maxlength="500"></textarea>
+      <button class="btn-calif" id="btnCalif" disabled onclick="enviarCalificacion()">Enviar calificación</button>
     </div>
-    <textarea class="calif-textarea" id="califTexto" placeholder="Comentario opcional…" maxlength="500"></textarea>
-    <button class="btn-calif" id="btnCalif" disabled onclick="enviarCalificacion()">Enviar calificación</button>
-  </div>
-  <div id="califEnviada" style="display:none">
-    <div class="calif-enviada">
-      <div class="calif-enviada-icon">🎉</div>
-      <div class="calif-enviada-title">¡Gracias por tu calificación!</div>
-      <div class="calif-enviada-sub">Tu opinión nos ayuda a mejorar el servicio.</div>
+    <div id="califEnviada" style="display:none">
+      <div class="calif-enviada">
+        <div class="calif-enviada-icon">🎉</div>
+        <div class="calif-enviada-title">¡Gracias por tu calificación!</div>
+        <div class="calif-enviada-sub">Tu opinión nos ayuda a mejorar el servicio.</div>
+      </div>
     </div>
   </div>
-</div>
 
   <!-- INFO ENTREGA -->
   <div class="info-card" id="infoCard" style="display:none">
@@ -740,13 +736,10 @@ async function geocodificarDestino(p) {
 }
 
 // ════════ ACTUALIZAR MAPA ════════
-// FIX: Si el pedido no trae domiCoords, busca la ubicacion en vivo del domi
 async function obtenerCoordsDomi(p) {
-  // Caso 1: el pedido ya trae coords del domi directamente
   if (p.domiCoords?.lat && p.domiCoords?.lng) {
     return { lat: p.domiCoords.lat, lng: p.domiCoords.lng };
   }
-  // Caso 2: fallback — buscar en la colección de domiciliarios
   if (!p.domiciliarioId) return null;
   try {
     const res = await fetch(`/api/foto?recurso=domiciliarios`);
@@ -798,7 +791,6 @@ async function actualizarMapa(p) {
     return;
   }
 
-  // FIX: obtener coordenadas del domi (pedido o fallback a domiciliarios)
   const domiPos = await obtenerCoordsDomi(p);
 
   if (domiPos?.lat && domiPos?.lng) {
@@ -823,7 +815,6 @@ function estadoIndex(estado) {
   if (e.includes('cancelado')) return -1;
   if (e.includes('entregado')) return 3;
   if (e.includes('ruta') || e.includes('camino')) return 2;
-  // 🔥 MODIFICACIÓN: "asignado" ahora cuenta como step 1 (confirmado)
   if (e.includes('asignado') || e.includes('confirmado')) return 1;
   return 0;
 }
@@ -831,7 +822,6 @@ function estadoIndex(estado) {
 function renderSteps(p) {
   const idx = estadoIndex(p.estado);
   if (idx === -1) {
-    // ... cancelado
     return;
   }
   
@@ -842,9 +832,8 @@ function renderSteps(p) {
     const cls = i < idx ? 'done' : (i === idx ? 'active' : '');
     let timeLabel = '';
     
-    // Asignar horas según el estado
     if (i === 0) timeLabel = p.hora || p.fecha?.split('·')[1]?.trim() || '';
-    if (i === 1) timeLabel = p.horaToma || (p.estado?.toLowerCase().includes('asignado') ? p.horaAsignacion || '' : '');
+    if (i === 1) timeLabel = p.horaToma || '';
     if (i === 2) timeLabel = p.horaEnCamino || '';
     if (i === 3) timeLabel = p.horaEntregado || '';
     
@@ -864,7 +853,6 @@ function renderSteps(p) {
   
   document.getElementById('stepsCard').style.display = 'block';
   
-  // Mostrar botón de cancelar solo en step 0 o 1
   const wrap = document.getElementById('btnCancelarWrap');
   if (wrap) {
     wrap.style.display = (idx === 0 || idx === 1) ? 'block' : 'none';
@@ -907,7 +895,6 @@ async function confirmarCancelacion() {
 
 // ════════ FORMAT ════════
 function formatCOP(v) { return '$ ' + Number(v || 0).toLocaleString('es-CO'); }
-
 function escapeHtml(str) {
   if (!str) return '';
   return str.replace(/[&<>]/g, function(m) {
@@ -926,7 +913,6 @@ function renderFacturaYCostos(p) {
   const costoExtra = p.tiempoExtra?.costoExtra || 0;
   const totalFinal = subtotal + domicilio + valorFactura + costoExtra;
 
-  // Items del pedido
   let itemsHtml = '';
   if (p.items?.length) {
     itemsHtml = p.items.map(it => `
@@ -943,7 +929,6 @@ function renderFacturaYCostos(p) {
   }
   document.getElementById('factItems').innerHTML = itemsHtml;
 
-  // Desglose de costos (mostrar solo si hay valores adicionales)
   let costosHtml = `
     <div class="costo-row">
       <span class="costo-label">Subtotal productos</span>
@@ -1011,23 +996,20 @@ function renderPedido(p) {
   document.getElementById('infoCliente').textContent = `${p.nombre || '—'}${p.telefono ? ' · ' + p.telefono : ''}`;
 
   const tipoPago     = p.metodoPago || '—';
-  const valDomicilio = p.domicilio || p.valorDomicilio || 0;
+  const valDomicilio = p.domicilio || 0;
   document.getElementById('infoPago').textContent  = `${tipoPago} · Domicilio: ${formatCOP(valDomicilio)}`;
 
   const partesFecha = [p.fecha || null, p.horaRegistro ? `Registro: ${p.horaRegistro}` : null, p.hora ? `Pedido: ${p.hora}` : null];
   document.getElementById('infoFecha').textContent  = partesFecha.filter(Boolean).join(' · ') || '—';
   document.getElementById('infoCard').style.display = 'block';
 
-  // Render factura y desglose de costos
   renderFacturaYCostos(p);
-
   construirPanelDocs(p);
 
   if ((p.modoEntrega === 'paqueteria' || p.sede === 'paqueteria') && !p.coords?.lat) {
     geocodificarDestino(p).then(() => actualizarMapa(p));
   } else {
     actualizarMapa(p);
-    
   }
   mostrarCalifCard(p);
 }
@@ -1050,47 +1032,53 @@ function construirPanelDocs(p) {
     initImageViewer('viewer-compr');
   }
 
-  const factPane         = document.getElementById('factDomiPaneContent');
-  const tieneItems       = p.items?.length > 0;
-  const tieneFotoFactura = !!(p.facturaImg?.url || p.facturaFotoId);
-  const facturaUrl       = p.facturaImg?.url || (p.facturaFotoId ? `/api/foto?recurso=foto&id=${p.facturaFotoId}` : null);
-
-  if (tieneFotoFactura || tieneItems) {
+  const factPane = document.getElementById('factDomiPaneContent');
+  const facturaImg = p.facturas?.fotos?.[0] || null;
+  const facturaValor = p.facturas?.valorFactura || null;
+  
+  if (facturaImg || facturaValor) {
     docsCount++;
-    const valDomicilio = p.domicilio || p.valorDomicilio || 0;
-    const totalFactura = (tieneItems && p.total != null) ? p.total : valDomicilio;
-
     let html = `
       <div class="doc-label">
         <span class="doc-label-tag factura-domi">Factura del comercio</span>
         ${p.comercio ? `<span class="doc-label-ts">${p.comercio}</span>` : ''}
       </div>`;
-
-    if (tieneFotoFactura) {
-      html += buildImageViewer('viewer-fact', facturaUrl);
+    
+    if (facturaImg) {
+      html += buildImageViewer('viewer-fact', facturaImg);
     }
-
-    if (tieneItems) {
-      html += `
-        <div class="docs-factura-items" style="${tieneFotoFactura ? 'margin-top:14px;' : ''}">
-          ${p.items.map(it => `
-            <div class="docs-factura-item">
-              <div class="docs-item-qty">${it.cantidad}</div>
-              <div class="docs-item-info">
-                <div class="docs-item-name">${it.producto}</div>
-                ${it.laboratorio ? `<div class="docs-item-lab">${it.laboratorio}</div>` : ''}
-              </div>
-              <div class="docs-item-price">${formatCOP(it.subtotal)}</div>
-            </div>`).join('')}
+    
+    html += `
+      <div class="docs-factura-items">
+        <div class="docs-factura-item">
+          <div class="docs-item-info">
+            <div class="docs-item-name">Valor factura registrado</div>
+          </div>
+          <div class="docs-item-price">${formatCOP(facturaValor || 0)}</div>
         </div>
-        <div class="docs-total-row">
-          <span class="docs-total-label">Total a pagar</span>
-          <span class="docs-total-value">${formatCOP(totalFactura)}</span>
+      </div>`;
+    
+    // Agregar nota de tardanza si existe
+    if (p.comprobantesTardanza?.nota) {
+      html += `
+        <div style="margin-top:12px; padding:10px; background:var(--orange-l); border-radius:12px;">
+          <div style="font-size:9px; font-weight:800; color:var(--orange);">⚠️ Nota de tardanza</div>
+          <div style="font-size:11px; margin-top:4px;">${escapeHtml(p.comprobantesTardanza.nota)}</div>
         </div>`;
     }
-
+    
+    // Agregar tiempo extra si existe
+    if (p.tiempoExtra?.costoExtra > 0) {
+      html += `
+        <div style="margin-top:8px; padding:10px; background:var(--blue-l); border-radius:12px;">
+          <div style="font-size:9px; font-weight:800; color:var(--blue);">⏱️ Tiempo extra</div>
+          <div style="font-size:11px; margin-top:4px;">${p.tiempoExtra.intervalos} × 15min = ${formatCOP(p.tiempoExtra.costoExtra)}</div>
+          ${p.tiempoExtra.nota ? `<div style="font-size:10px; margin-top:4px; color:var(--text3);">📝 ${escapeHtml(p.tiempoExtra.nota)}</div>` : ''}
+        </div>`;
+    }
+    
     factPane.innerHTML = html;
-    if (tieneFotoFactura) initImageViewer('viewer-fact');
+    if (facturaImg) initImageViewer('viewer-fact');
   }
 
   if (docsCount > 0) {
@@ -1198,7 +1186,6 @@ function applyTransform(id) {
   const img = document.getElementById(id + '-img');
   const pct = document.getElementById(id + '-pct');
   if (!img) return;
-  // FIX: transform-origin centrado para que el zoom se haga desde el centro
   img.style.transformOrigin = 'center center';
   img.style.transform = `translate(${s.tx}px,${s.ty}px) scale(${s.scale})`;
   if (pct) pct.textContent = Math.round(s.scale * 100) + '%';
@@ -1282,7 +1269,7 @@ async function init() {
   if (!p) { document.getElementById('errorState').classList.add('visible'); return; }
   renderPedido(p);
 
- pollInterval = setInterval(async () => {
+  pollInterval = setInterval(async () => {
     const fresh = await cargarPedido(id);
     if (!fresh) return;
     actualizarMapa(fresh);
@@ -1296,8 +1283,7 @@ async function init() {
     renderFacturaYCostos(fresh);
     construirPanelDocs(fresh);
   }, 10000);
-  }
-
+}
 
 // ════════ CALIFICACIÓN ════════
 let califStarSel = 0;
@@ -1317,9 +1303,8 @@ function initCalifStars() {
 function mostrarCalifCard(p) {
   const card = document.getElementById('califCard');
   if (!card) return;
-  if (estadoIndex(p.estado) !== 3) return;   // solo si entregado
+  if (estadoIndex(p.estado) !== 3) return;
   if (p.calificacion?.estrellas) {
-    // ya calificado: mostrar estado enviado
     document.getElementById('califForm').style.display    = 'none';
     document.getElementById('califEnviada').style.display = 'block';
   }
