@@ -665,18 +665,21 @@ async function calcularRutaOSRM(fromLat, fromLng, toLat, toLng) {
   if (now - lastOsrmCall < OSRM_COOLDOWN) return;
   lastOsrmCall = now;
   try {
-    const url  = `https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson&steps=false`;
+    const url  = `https://router.project-osrm.org/route/v1/bike/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson&steps=false`;
     const res  = await fetch(url);
     if (!res.ok) throw new Error('osrm error');
     const data = await res.json();
     if (data.code !== 'Ok' || !data.routes?.length) throw new Error('no route');
     const route  = data.routes[0];
     const distKm = (route.distance / 1000).toFixed(1);
-    const durMin = Math.ceil(route.duration / 60);
+
+    // Velocidad real moto urbana Medellín/Copacabana ~22 km/h + 3 min base semáforos
+    const durMin = Math.ceil((route.distance / 1000) / 22 * 60) + 3;
+
     const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
     if (rutaLayer) mapInstance.removeLayer(rutaLayer);
     rutaLayer = L.polyline(coords, { color:'#0ceac9', weight:4, opacity:0.85, lineCap:'round', lineJoin:'round' }).addTo(mapInstance);
-    const etaText = durMin < 1 ? 'Llegando' : `~${durMin} min`;
+    const etaText = durMin < 5 ? 'Llegando' : `~${durMin} min`;
     document.getElementById('etaTime').textContent = etaText;
     document.getElementById('etaDist').textContent = `${distKm} km`;
     document.getElementById('etaBadge').classList.add('visible');
@@ -685,6 +688,19 @@ async function calcularRutaOSRM(fromLat, fromLng, toLat, toLng) {
   } catch(e) {
     if (rutaLayer) mapInstance.removeLayer(rutaLayer);
     rutaLayer = L.polyline([[fromLat,fromLng],[toLat,toLng]], { color:'#0ceac9', weight:3, opacity:0.6, dashArray:'8 6' }).addTo(mapInstance);
+    // Fallback con haversine
+    const R    = 6371;
+    const dLat = (toLat - fromLat) * Math.PI / 180;
+    const dLng = (toLng - fromLng) * Math.PI / 180;
+    const a    = Math.sin(dLat/2)**2 + Math.cos(fromLat*Math.PI/180) * Math.cos(toLat*Math.PI/180) * Math.sin(dLng/2)**2;
+    const distLineal = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const durMin     = Math.ceil(distLineal * 1.35 / 22 * 60) + 3;
+    const etaText    = durMin < 5 ? 'Llegando' : `~${durMin} min`;
+    document.getElementById('etaTime').textContent = etaText;
+    document.getElementById('etaDist').textContent = `${distLineal.toFixed(1)} km`;
+    document.getElementById('etaBadge').classList.add('visible');
+    document.getElementById('etaRowVal').textContent = `${etaText} · ${distLineal.toFixed(1)} km`;
+    document.getElementById('etaRow').style.display = 'flex';
   }
 }
 
