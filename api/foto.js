@@ -302,9 +302,7 @@ export default async function handler(req, res) {
     }
   }
 
-  /* ════════════════════════════════════════
-     GET /api/foto?recurso=formula&id=<_id>
-  ════════════════════════════════════════ */
+ 
   if (recurso === 'formula' && req.method === 'GET') {
     try {
       const { id } = req.query;
