@@ -261,15 +261,14 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
 .docs-empty-sub { font-size:12px; font-weight:600; color:#b0a8a3; line-height:1.5; }
 
 /* ═══════════════════════════════════════════
-   VISOR DE IMAGEN — altura controlada al 90%
-   del panel disponible (aprox 90vh - 220px
-   para header+tabs+controles)
+   VISOR DE IMAGEN
 ═══════════════════════════════════════════ */
 .img-viewer {
   position:relative; background:#f5f5f4;
   border-radius:16px; overflow:hidden;
   border:1px solid var(--border);
   user-select:none;
+  margin-bottom:12px;
 }
 .img-viewer-inner {
   max-height: calc(90vh - 230px);
@@ -321,19 +320,7 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
 }
 .doc-label-tag.comprobante { background:#f0fdfb; color:#0a8f7a; border:1.5px solid #0ceac940; }
 .doc-label-tag.factura-domi { background:#fff7ed; color:#c2410c; border:1.5px solid #fed7aa; }
-
-/* Factura items dentro del panel */
-.docs-factura-items { background:var(--surface); border-radius:14px; border:1px solid var(--border); overflow:hidden; margin-top:12px; }
-.docs-factura-item { display:flex; align-items:flex-start; justify-content:space-between; padding:10px 14px; border-bottom:1px solid var(--border); }
-.docs-factura-item:last-child { border-bottom:none; }
-.docs-item-qty { min-width:22px; height:22px; border-radius:7px; background:#f0fdfb; border:1.5px solid #0ceac940; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:900; color:#0a8f7a; flex-shrink:0; margin-top:1px; margin-right:10px; }
-.docs-item-info { flex:1; }
-.docs-item-name { font-size:12px; font-weight:800; color:var(--text); line-height:1.3; }
-.docs-item-lab { font-size:10px; font-weight:600; color:var(--muted); margin-top:1px; }
-.docs-item-price { font-size:13px; font-weight:800; color:var(--text); white-space:nowrap; padding-left:8px; }
-.docs-total-row { margin-top:10px; display:flex; align-items:center; justify-content:space-between; padding:12px 14px; background:linear-gradient(135deg,var(--teal),var(--teal-light)); border-radius:12px; }
-.docs-total-label { font-size:12px; font-weight:800; color:rgba(255,255,255,.85); }
-.docs-total-value { font-size:16px; font-weight:900; color:#fff; }
+.doc-label-tag.tardanza { background:#fef3c7; color:#d97706; border:1.5px solid #fed7aa; }
 
 /* LOADING */
 .loading-overlay { position:fixed; inset:0; z-index:2000; background:var(--white); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; }
@@ -559,7 +546,7 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
         Documentos del pedido
       </div>
-      <div class="docs-panel-sub" id="docsPanelSub">Comprobante · Factura domi · Tardanza</div>
+      <div class="docs-panel-sub" id="docsPanelSub">Comprobante · Factura · Tardanza</div>
     </div>
     <button class="docs-close" onclick="cerrarDocs()">✕</button>
   </div>
@@ -568,9 +555,9 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
       <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
       Comprobante
     </button>
-    <button class="docs-tab" id="tabFacturaDomi" onclick="switchTab('factura_domi')">
+    <button class="docs-tab" id="tabFactura" onclick="switchTab('factura')">
       <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      Factura domi
+      Factura
     </button>
     <button class="docs-tab" id="tabTardanza" onclick="switchTab('tardanza')">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -578,15 +565,9 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
     </button>
   </div>
   <div class="docs-body">
-    <div class="docs-tab-pane active" id="paneComprobante">
-      <div id="comprPaneContent"></div>
-    </div>
-    <div class="docs-tab-pane" id="paneFacturaDomi">
-      <div id="factDomiPaneContent"></div>
-    </div>
-    <div class="docs-tab-pane" id="paneTardanza">
-      <div id="tardanzaPaneContent"></div>
-    </div>
+    <div class="docs-tab-pane active" id="paneComprobante"></div>
+    <div class="docs-tab-pane" id="paneFactura"></div>
+    <div class="docs-tab-pane" id="paneTardanza"></div>
   </div>
 </div>
 
@@ -1013,51 +994,60 @@ function construirPanelDocs(p) {
   let docsCount = 0;
 
   // ══ TAB 1: COMPROBANTE DE PAGO ══
-  const comprPane = document.getElementById('comprPaneContent');
-  const comprUrl  = p.comprobanteImg?.url || null;
+  const comprPane = document.getElementById('paneComprobante');
+  const comprUrl = p.comprobanteImg?.url || null;
+  
   if (comprUrl) {
     docsCount++;
     comprPane.innerHTML = `
       <div class="doc-label">
-        <span class="doc-label-tag comprobante">Comprobante de pago</span>
-        ${p.horaToma ? `<span class="doc-label-ts">${p.horaToma}</span>` : ''}
+        <span class="doc-label-tag comprobante">🧾 Comprobante de pago</span>
+        <span class="doc-label-ts">${p.horaToma || ''}</span>
       </div>
       ${buildImageViewer('viewer-compr', comprUrl)}
     `;
-    initImageViewer('viewer-compr');
+    setTimeout(() => initImageViewer('viewer-compr'), 50);
   } else {
     comprPane.innerHTML = `<div class="docs-empty"><div class="docs-empty-icon">🧾</div><div class="docs-empty-title">Sin comprobante aún</div><div class="docs-empty-sub">El domiciliario no ha adjuntado<br>el comprobante de pago todavía.</div></div>`;
   }
 
   // ══ TAB 2: FACTURA DOMI ══
-  const factPane = document.getElementById('factDomiPaneContent');
-  const facturaImg = p.facturas?.fotos?.[0] || null;
+  const factPane = document.getElementById('paneFactura');
+  const facturaImgs = p.facturas?.fotos || [];
   const facturaValor = p.facturas?.valorFactura || null;
   
-  if (facturaImg) {
+  if (facturaImgs.length > 0 || facturaValor) {
     docsCount++;
     let html = `
       <div class="doc-label">
-        <span class="doc-label-tag factura-domi">Factura del comercio</span>
-        ${p.comercio ? `<span class="doc-label-ts">${p.comercio}</span>` : ''}
-      </div>
-      ${buildImageViewer('viewer-fact', facturaImg)}
-      <div class="docs-factura-items">
-        <div class="docs-factura-item">
-          <div class="docs-item-info">
-            <div class="docs-item-name">Valor factura registrado</div>
-          </div>
-          <div class="docs-item-price">${formatCOP(facturaValor || 0)}</div>
-        </div>
+        <span class="doc-label-tag factura-domi">📋 Factura del comercio</span>
+        <span class="doc-label-ts">${p.comercio || ''}</span>
       </div>`;
+    
+    // Mostrar todas las fotos de factura
+    facturaImgs.forEach((img, idx) => {
+      html += buildImageViewer(`viewer-fact-${idx}`, img);
+    });
+    
+    // Mostrar valor de factura
+    if (facturaValor) {
+      html += `
+        <div style="background:var(--teal-m); border-radius:12px; padding:12px; margin-top:8px;">
+          <div style="font-size:11px; font-weight:800; color:var(--teal-d);">💰 Valor factura registrado</div>
+          <div style="font-size:18px; font-weight:900; color:var(--text); margin-top:4px;">${formatCOP(facturaValor)}</div>
+        </div>`;
+    }
+    
     factPane.innerHTML = html;
-    if (facturaImg) initImageViewer('viewer-fact');
+    setTimeout(() => {
+      facturaImgs.forEach((_, idx) => initImageViewer(`viewer-fact-${idx}`));
+    }, 50);
   } else {
     factPane.innerHTML = `<div class="docs-empty"><div class="docs-empty-icon">📋</div><div class="docs-empty-title">Sin factura aún</div><div class="docs-empty-sub">Cuando el domiciliario adjunte<br>la factura del comercio aparecerá aquí.</div></div>`;
   }
 
-  // ══ TAB 3: TARDANZA (nota + fotos) ══
-  const tardanzaPane = document.getElementById('tardanzaPaneContent');
+  // ══ TAB 3: TARDANZA ══
+  const tardanzaPane = document.getElementById('paneTardanza');
   const tardanzaNota = p.comprobantesTardanza?.nota || '';
   const tardanzaFotos = p.comprobantesTardanza?.fotos || [];
   const tiempoExtraSegundos = p.tiempoExtra?.segundos || 0;
@@ -1067,32 +1057,34 @@ function construirPanelDocs(p) {
 
   if (tardanzaNota || tardanzaFotos.length > 0 || tiempoExtraCosto > 0) {
     docsCount++;
-    let html = '<div class="doc-label"><span class="doc-label-tag factura-domi" style="background:#fef3c7;color:#d97706;">⏱️ Tardanza y tiempo extra</span></div>';
+    let html = `
+      <div class="doc-label">
+        <span class="doc-label-tag tardanza">⏱️ Registro de tardanza</span>
+      </div>`;
     
     // Nota de tardanza
     if (tardanzaNota) {
-      html += `<div style="background:var(--orange-l);border-radius:12px;padding:12px;margin-bottom:12px;">
-        <div style="font-size:9px;font-weight:800;color:var(--orange);margin-bottom:4px;">📝 Nota de tardanza</div>
-        <div style="font-size:11px;line-height:1.4;">${escapeHtml(tardanzaNota)}</div>
-      </div>`;
+      html += `
+        <div style="background:var(--orange-l); border-radius:12px; padding:12px; margin-bottom:12px;">
+          <div style="font-size:11px; font-weight:800; color:var(--orange);">📝 Nota del domiciliario</div>
+          <div style="font-size:13px; margin-top:6px; line-height:1.4;">${escapeHtml(tardanzaNota)}</div>
+        </div>`;
     }
     
     // Fotos de tardanza
-    if (tardanzaFotos.length > 0) {
-      tardanzaFotos.forEach((foto, idx) => {
-        html += buildImageViewer(`viewer-tardanza-${idx}`, foto);
-        html += `<div style="margin-bottom:12px;"></div>`;
-      });
-    }
+    tardanzaFotos.forEach((img, idx) => {
+      html += buildImageViewer(`viewer-tardanza-${idx}`, img);
+    });
     
     // Tiempo extra
     if (tiempoExtraCosto > 0) {
-      html += `<div style="background:var(--blue-l);border-radius:12px;padding:12px;margin-top:12px;">
-        <div style="font-size:9px;font-weight:800;color:var(--blue);margin-bottom:4px;">⏱️ Tiempo extra</div>
-        <div style="font-size:11px;">${tiempoExtraIntervalos} × 15min = ${formatCOP(tiempoExtraCosto)}</div>
-        ${tiempoExtraNota ? `<div style="font-size:10px;margin-top:6px;color:var(--text3);">📝 ${escapeHtml(tiempoExtraNota)}</div>` : ''}
-        <div style="font-size:9px;color:var(--text3);margin-top:4px;">⏲️ ${Math.floor(tiempoExtraSegundos / 60)} minutos total</div>
-      </div>`;
+      html += `
+        <div style="background:var(--blue-l); border-radius:12px; padding:12px; margin-top:12px;">
+          <div style="font-size:11px; font-weight:800; color:var(--blue);">⏱️ Tiempo extra facturado</div>
+          <div style="font-size:13px; margin-top:6px;"><strong>${tiempoExtraIntervalos}</strong> × 15min = <strong>${formatCOP(tiempoExtraCosto)}</strong></div>
+          <div style="font-size:11px; color:var(--text3); margin-top:4px;">⏲️ Total: ${Math.floor(tiempoExtraSegundos / 60)} minutos</div>
+          ${tiempoExtraNota ? `<div style="font-size:11px; margin-top:8px; padding:8px; background:rgba(0,0,0,.05); border-radius:8px;">📝 ${escapeHtml(tiempoExtraNota)}</div>` : ''}
+        </div>`;
     }
     
     if (!tardanzaNota && tardanzaFotos.length === 0 && tiempoExtraCosto === 0) {
@@ -1100,10 +1092,9 @@ function construirPanelDocs(p) {
     }
     
     tardanzaPane.innerHTML = html;
-    // Inicializar visores de imágenes de tardanza
-    for (let i = 0; i < tardanzaFotos.length; i++) {
-      initImageViewer(`viewer-tardanza-${i}`);
-    }
+    setTimeout(() => {
+      tardanzaFotos.forEach((_, idx) => initImageViewer(`viewer-tardanza-${idx}`));
+    }, 50);
   } else {
     tardanzaPane.innerHTML = `<div class="docs-empty"><div class="docs-empty-icon">⏰</div><div class="docs-empty-title">Sin registro de tardanza</div><div class="docs-empty-sub">No se ha registrado tiempo extra<br>ni notas de tardanza.</div></div>`;
   }
@@ -1239,10 +1230,10 @@ function switchTab(tab) {
   document.querySelectorAll('.docs-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.docs-tab-pane').forEach(p => p.classList.remove('active'));
   document.getElementById('tabComprobante').classList.toggle('active', tab === 'comprobante');
-  document.getElementById('tabFacturaDomi').classList.toggle('active', tab === 'factura_domi');
+  document.getElementById('tabFactura').classList.toggle('active', tab === 'factura');
   document.getElementById('tabTardanza').classList.toggle('active', tab === 'tardanza');
   document.getElementById('paneComprobante').classList.toggle('active', tab === 'comprobante');
-  document.getElementById('paneFacturaDomi').classList.toggle('active', tab === 'factura_domi');
+  document.getElementById('paneFactura').classList.toggle('active', tab === 'factura');
   document.getElementById('paneTardanza').classList.toggle('active', tab === 'tardanza');
 }
 
