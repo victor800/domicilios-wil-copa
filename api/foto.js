@@ -953,9 +953,7 @@ export default async function handler(req, res) {
     }
   }
 
-  /* ════════════════════════════════════════
-     PATCH /api/foto?recurso=calificacion
-  ════════════════════════════════════════ */
+ 
   if (recurso === 'calificacion' && req.method === 'PATCH') {
     try {
       const { pedidoId, estrellas, comentario } = req.body || {};
