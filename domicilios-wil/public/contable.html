@@ -646,7 +646,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
             <th>Domiciliario</th><th>Entregas</th><th>Efectivo</th>
             <th>Transferencias</th><th>Total fact.</th><th>Envíos</th>
             <th>Base dada</th><th>Multas</th><th>Balance</th>
-          </tr></thead>
+           </tr</thead>
           <tbody id="domi-tbody">
             <tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text3);">Cargando…</td></tr>
           </tbody>
@@ -712,12 +712,12 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
         <div style="overflow-x:auto;padding:5px 7px 8px;">
           <table class="ptbl">
             <thead><tr>
-              <th>Pedido #</th><th>Cliente</th><th>Dirección</th><th>Domi</th>
+              <th>Pedido</th><th>Cliente</th><th>Dirección</th><th>Domi</th>
               <th>Estado</th><th>Comercio</th><th>Método</th>
-              <th>Subtotal</th><th>Domicilio</th><th>Total</th><th>Hora</th><th>Fecha</th>
-            </tr></thead>
+              <th>Subtotal</th><th>Domicilio</th><th>Factura</th><th>Tiempo Extra</th><th>Total Final</th><th>Hora</th><th>Fecha</th>
+             </tr</thead>
             <tbody id="ped-cont-tbody">
-              <tr><td colspan="12" style="text-align:center;padding:24px;color:var(--text3);">Cargando…</td></tr>
+              <tr><td colspan="14" style="text-align:center;padding:24px;color:var(--text3);">Cargando…</td</tr>
             </tbody>
           </table>
         </div>
@@ -847,9 +847,9 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
               <th>Domiciliario</th><th>Entregas</th><th>Efectivo</th>
               <th>Transferencias</th><th>Total fact.</th><th>Envíos</th>
               <th>Base dada</th><th>Multas</th><th>Balance</th>
-            </tr></thead>
+             </tr</thead>
             <tbody id="domi-tbody-caja">
-              <tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text3);">Cargando…</td></tr>
+              <tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text3);">Cargando…</td</tr>
             </tbody>
           </table>
         </div>
@@ -1145,7 +1145,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
     </div>
   </div>
 
-<!-- ════ VISTA CALIFICACIONES ════ -->
+  <!-- ════ VISTA CALIFICACIONES ════ -->
   <div class="view" id="view-califs">
     <div class="page-hdr">
       <div class="page-hdr-left">
@@ -1355,6 +1355,16 @@ function calcSubtotal(p){
 }
 function safeEsc(s){return String(s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');}
 
+// ═══════════════════════════════════════════════════════════
+// NUEVA FUNCIÓN: Calcular total final del pedido
+function calcularTotalFinal(p) {
+  const subtotal = calcSubtotal(p);
+  const domicilio = parsePrecio(p.costoEnvio);
+  const valorFactura = p.facturas?.valorFactura || 0;
+  const tiempoExtra = p.tiempoExtra?.costoExtra || 0;
+  return subtotal + domicilio + valorFactura + tiempoExtra;
+}
+
 /* ════ LOAD DATA ════ */
 async function loadDrivers(){
   try{
@@ -1387,15 +1397,15 @@ async function loadPedidos(){
       fecha:p.fecha||'',
       hora:p.hora||'',
       total:p.total??p.subtotal??0,
+      // NUEVOS CAMPOS
+      facturas: p.facturas || { valorFactura: 0 },
+      tiempoExtra: p.tiempoExtra || { costoExtra: 0 },
       _prods:(p.items||[]).map(it=>({
         nom:it.producto||'',
         marca:it.laboratorio||'',
         qty:it.cantidad??1,
         vu:it.precioUnit??0,
         vtotal:it.subtotal??0,
-        total: p.total ?? p.subtotal ?? 
-       (p.items || []).reduce((s, it) => s + (it.subtotal ?? (it.precioUnit ?? 0) * (it.cantidad ?? 1)), 0) + (p.domicilio ?? 0),
-costoEnvio: p.domicilio ?? p.costoEnvio ?? 0,
       })),
     }));
   }catch(e){console.warn('[loadPedidos]:',e.message);allPedidos=[];}
@@ -1707,7 +1717,7 @@ function renderDomiTable(peds,pedsEnt,tbodyId){
   });
   const arr=Object.entries(domiMap).sort((a,b)=>b[1].total-a[1].total);
   const tbody=document.getElementById(tbodyId);if(!tbody) return;
-  if(!arr.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text3);">Sin entregas en este período</td></tr>';return;}
+  if(!arr.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text3);">Sin entregas en este período</td</tr>';return;}
   tbody.innerHTML=arr.map(([nombre,d])=>{
     const basesDomi=basesData.filter(b=>b.domi===nombre).reduce((s,b)=>s+b.monto,0);
     const multasDomi=multasData.filter(m=>m.domi===nombre&&m.tipo!=='pyp').reduce((s,m)=>s+m.monto,0);
@@ -2024,6 +2034,9 @@ function filterPedCont(f,btn){
   if(btn)btn.classList.add('on');
   renderTablaPedidos();
 }
+
+// ═══════════════════════════════════════════════════════════
+// NUEVA FUNCIÓN: Renderizar tabla de pedidos con todas las columnas
 function renderTablaPedidos(){
   poblarFiltroDomiCont();
   const domiSel=(document.getElementById('ped-cont-domi')?.value||'').trim();
@@ -2049,12 +2062,16 @@ function renderTablaPedidos(){
   }
   const cnt=document.getElementById('ped-cont-count');if(cnt)cnt.textContent=list.length+' pedido'+(list.length!==1?'s':'');
   const tbody=document.getElementById('ped-cont-tbody');
-  if(!list.length){tbody.innerHTML=`<tr><td colspan="12" style="text-align:center;padding:24px;color:var(--text3);">Sin pedidos con ese filtro</td></tr>`;return;}
+  if(!list.length){tbody.innerHTML=`<td><td colspan="14" style="text-align:center;padding:24px;color:var(--text3);">Sin pedidos con ese filtro</td></tr>`;return;}
   const stLbl={pendiente:'Pendiente',asignado:'✦ Asignado',proceso:'En proceso',encamino:'🛵 En camino',entregado:'Entregado ✓',cancelado:'❌ Cancelado'};
+  
   tbody.innerHTML=list.map(p=>{
-    const subtotal=calcSubtotal(p);const costoEnvio=parsePrecio(p.costoEnvio);const totalSheet=parsePrecio(p.total);
-    const totalMostr=totalSheet>0?totalSheet:(subtotal+costoEnvio)||0;
-    const envioReal=costoEnvio>0?costoEnvio:(totalSheet>0&&subtotal>0&&totalSheet>subtotal?totalSheet-subtotal:0);
+    const subtotal = calcSubtotal(p);
+    const domicilio = parsePrecio(p.costoEnvio);
+    const valorFactura = p.facturas?.valorFactura || 0;
+    const tiempoExtra = p.tiempoExtra?.costoExtra || 0;
+    const totalFinal = subtotal + domicilio + valorFactura + tiempoExtra;
+    
     const esTf=/transfer/i.test(p.metodo||'');const imgUrl=(p.imagen||'').trim();
     const meta=safeEsc(`${p.domi||''} · ${p.cliente||''} · #${p.id} · ${p.hora||''} ${p.fecha||''}`);
     return `<tr onclick="abrirModalPedCont('${p.id.replace(/'/g,"\\'")}')">
@@ -2066,11 +2083,13 @@ function renderTablaPedidos(){
       <td style="font-size:9px;color:var(--text2);">${p.comercio||'–'}</td>
       <td>${esTf?`<span class="tf-badge-btn" onclick="event.stopPropagation();openTfModal('${p.id}','${safeEsc(imgUrl)}','${meta}')"><span class="material-symbols-rounded">receipt_long</span>Transf.</span>`:`<span style="font-size:9px;">${p.metodo||'–'}</span>`}</td>
       <td style="font-family:'DM Mono',monospace;font-size:10px;font-weight:700;">${subtotal>0?fmtMoney(subtotal):'–'}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:10px;">${envioReal>0?`<span style="color:var(--orange);font-weight:700;">${fmtMoney(envioReal)}</span>`:`<span style="color:var(--green);font-size:8px;font-weight:800;">Gratis</span>`}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:11px;font-weight:800;color:var(--teal-d);">${totalMostr>0?fmtMoney(totalMostr):'–'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--orange);">${domicilio>0?fmtMoney(domicilio):(domicilio===0?'Gratis':'–')}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--purple);">${valorFactura>0?fmtMoney(valorFactura):'–'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--red);">${tiempoExtra>0?fmtMoney(tiempoExtra):'–'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;font-weight:800;color:var(--teal-d);">${totalFinal>0?fmtMoney(totalFinal):'–'}</td>
       <td style="font-family:'DM Mono',monospace;font-size:9px;">${p.hora||'–'}</td>
       <td style="font-family:'DM Mono',monospace;font-size:9px;">${p.fecha||'–'}</td>
-    </tr>`;
+     </tr>`;
   }).join('');
 }
 
@@ -2180,9 +2199,10 @@ function abrirModalPedCont(id){
     items=p._prods.map(x=>({nom:x.nom,q:x.qty,pr:x.vu>0?x.vu:(x.vtotal/(x.qty||1)),sub:x.vu>0?x.vu*x.qty:x.vtotal}));
     calcSub=items.reduce((s,x)=>s+x.sub,0);
   }
-  const costoEnvio=parsePrecio(p.costoEnvio);const totalSheet=parsePrecio(p.total);
-  const totalFinal=totalSheet>0?totalSheet:(calcSub+costoEnvio);
-  const envioReal=costoEnvio>0?costoEnvio:(totalSheet>0&&calcSub>0&&totalSheet>calcSub?totalSheet-calcSub:0);
+  const costoEnvio = parsePrecio(p.costoEnvio);
+  const valorFactura = p.facturas?.valorFactura || 0;
+  const tiempoExtra = p.tiempoExtra?.costoExtra || 0;
+  const totalFinal = calcSub + costoEnvio + valorFactura + tiempoExtra;
   const imgUrl=(p.imagen||'').trim();const tieneComprobante=imgUrl.startsWith('http');
   const esTf=/transfer/i.test(p.metodo||'');const ver=verificados.has(p.id);
   const stCfg={
@@ -2277,10 +2297,12 @@ function abrirModalPedCont(id){
         </div>
         <div class="inv-totals">
           <div class="inv-tot-row"><span class="inv-tot-lbl">Subtotal</span><span class="inv-tot-val">${calcSub>0?fmtMoney(calcSub):'—'}</span></div>
-          <div class="inv-tot-row"><span class="inv-tot-lbl">🛵 Domicilio</span><span class="inv-tot-val" style="color:${envioReal>0?'#fcd34d':'#4ade80'};">${envioReal>0?fmtMoney(envioReal):'Gratis 🎉'}</span></div>
+          <div class="inv-tot-row"><span class="inv-tot-lbl">🛵 Domicilio</span><span class="inv-tot-val" style="color:${costoEnvio>0?'#fcd34d':'#4ade80'};">${costoEnvio>0?fmtMoney(costoEnvio):'Gratis 🎉'}</span></div>
+          <div class="inv-tot-row"><span class="inv-tot-lbl">🧾 Factura (domi)</span><span class="inv-tot-val" style="color:${valorFactura>0?'#a855f7':'rgba(255,255,255,.4)'};">${valorFactura>0?fmtMoney(valorFactura):'—'}</span></div>
+          <div class="inv-tot-row"><span class="inv-tot-lbl">⏱️ Tiempo extra</span><span class="inv-tot-val" style="color:${tiempoExtra>0?'#ef4444':'rgba(255,255,255,.4)'};">${tiempoExtra>0?fmtMoney(tiempoExtra):'—'}</span></div>
           <hr class="inv-tot-sep">
           <div style="display:flex;justify-content:space-between;align-items:center;padding-top:4px;">
-            <span style="font-size:12px;font-weight:800;color:#fff;">TOTAL</span>
+            <span style="font-size:12px;font-weight:800;color:#fff;">TOTAL FINAL</span>
             <span style="font-size:24px;font-weight:800;color:var(--teal);font-family:'DM Mono',monospace;">${totalFinal>0?fmtMoney(totalFinal):'—'}</span>
           </div>
         </div>
@@ -2299,8 +2321,15 @@ function cerrarModalPedCont(){document.getElementById('modal-ped-cont').classLis
 function exportarExcel(){
   const peds=allPedidos.filter(p=>p.estado==='entregado'&&enPeriodo(p));
   if(!peds.length){showToast('w','Sin datos','No hay entregas en este período');return;}
-  const rows=[['Pedido','Cliente','Domiciliario','Método','Subtotal','Domicilio','Total','Fecha','Hora','Dirección','Comercio']];
-  peds.forEach(p=>rows.push([p.id,p.cliente||'',p.domi||'',p.metodo||'',calcSubtotal(p),parsePrecio(p.costoEnvio),parsePrecio(p.total),p.fecha||'',p.hora||'',p.direccion||'',p.comercio||'']));
+  const rows=[['Pedido','Cliente','Domiciliario','Método','Subtotal','Domicilio','Factura','Tiempo Extra','Total','Fecha','Hora','Dirección','Comercio']];
+  peds.forEach(p=>{
+    const subtotal = calcSubtotal(p);
+    const domicilio = parsePrecio(p.costoEnvio);
+    const valorFactura = p.facturas?.valorFactura || 0;
+    const tiempoExtra = p.tiempoExtra?.costoExtra || 0;
+    const totalFinal = subtotal + domicilio + valorFactura + tiempoExtra;
+    rows.push([p.id,p.cliente||'',p.domi||'',p.metodo||'',subtotal,domicilio,valorFactura,tiempoExtra,totalFinal,p.fecha||'',p.hora||'',p.direccion||'',p.comercio||'']);
+  });
   const csv=rows.map(r=>r.map(c=>'"'+String(c||'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='contable_wil_'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(a.href);
