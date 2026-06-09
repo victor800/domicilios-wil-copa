@@ -61,29 +61,29 @@ const Pedido = mongoose.models.Pedido || mongoose.model('Pedido',
       data:      { type: Buffer, default: null },
     },
 
-    /* ══════════════════════════════════════
-       DATOS DEL DOMICILIARIO EN RUTA
-    ══════════════════════════════════════ */
-
     /* ── FACTURAS (fotos + valor ingresado por el domi) ── */
     facturas: {
-  valorFactura: { type: Number, default: null },
-  fotos:        { type: [mongoose.Schema.Types.Mixed], default: [] }, // Buffer
-  mimes:        { type: [String], default: [] },                      // ← nuevo
-  guardadoEn:   { type: Date, default: null },
-},
-comprobantesTardanza: {
-  nota:       { type: String, default: '' },
-  fotos:      { type: [mongoose.Schema.Types.Mixed], default: [] },   // Buffer
-  mimes:      { type: [String], default: [] },                        // ← nuevo
-  guardadoEn: { type: Date, default: null },
-},
+      valorFactura:  { type: Number, default: null },
+      fotos:         { type: [mongoose.Schema.Types.Mixed], default: [] },
+      mimes:         { type: [String], default: [] },
+      cantidadFotos: { type: Number, default: 0 },
+      guardadoEn:    { type: Date, default: null },
+    },
+
+    /* ── COMPROBANTES DE TARDANZA ── */
+    comprobantesTardanza: {
+      nota:          { type: String, default: '' },
+      fotos:         { type: [mongoose.Schema.Types.Mixed], default: [] },
+      mimes:         { type: [String], default: [] },
+      cantidadFotos: { type: Number, default: 0 },
+      guardadoEn:    { type: Date, default: null },
+    },
 
     /* ── TIEMPO EXTRA POR TARDANZA ── */
     tiempoExtra: {
       segundos:   { type: Number, default: 0  },
-      costoExtra: { type: Number, default: 0  },  // cada 15 min = $2000
-      intervalos: { type: Number, default: 0  },  // cuántos bloques de 15 min
+      costoExtra: { type: Number, default: 0  },
+      intervalos: { type: Number, default: 0  },
       nota:       { type: String, default: '' },
       guardadoEn: { type: Date,   default: null },
     },
@@ -190,12 +190,11 @@ async function recalcularYActualizarTotal(pedidoId) {
     return;
   }
 
-  const subtotal = pedido.subtotal || 0;
-  const domicilio = pedido.domicilio || 0;
-  const valorFactura = pedido.facturas?.valorFactura || 0;
-  const costoExtra = pedido.tiempoExtra?.costoExtra || 0;
-
-  const nuevoTotal = subtotal + domicilio + valorFactura + costoExtra;
+  const subtotal     = pedido.subtotal               || 0;
+  const domicilio    = pedido.domicilio               || 0;
+  const valorFactura = pedido.facturas?.valorFactura  || 0;
+  const costoExtra   = pedido.tiempoExtra?.costoExtra || 0;
+  const nuevoTotal   = subtotal + domicilio + valorFactura + costoExtra;
 
   await Pedido.findOneAndUpdate(
     { idPedido: pedidoId },
@@ -331,7 +330,9 @@ export default async function handler(req, res) {
     }
   }
 
- 
+  /* ════════════════════════════════════════
+     GET /api/foto?recurso=formula&id=<_id>
+  ════════════════════════════════════════ */
   if (recurso === 'formula' && req.method === 'GET') {
     try {
       const { id } = req.query;
@@ -412,13 +413,13 @@ export default async function handler(req, res) {
 
       const limitSeguro = Math.min(Math.max(Number(limit) || 300, 1), 500);
 
-      // Excluir buffers binarios y base64 de fotos en los listados (pueden ser muy pesados)
+      // Excluir buffers binarios — pero incluir cantidadFotos y mimes
       const pedidos = await Pedido
         .find(filtro, {
-          'formulaMedica.data': 0,
-          'comprobanteImg.data': 0,
-          'facturas.fotos': 0,
-          'comprobantesTardanza.fotos': 0,
+          'formulaMedica.data':        0,
+          'comprobanteImg.data':       0,
+          'facturas.fotos':            0,
+          'comprobantesTardanza.fotos':0,
         })
         .sort({ creadoEn: -1 })
         .limit(limitSeguro)
@@ -606,7 +607,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ ok: false, error: 'Faltan pedidoId o estado' });
 
       const update = { estado };
-      if (horaToma)    update.horaToma    = horaToma;
+      if (horaToma)     update.horaToma     = horaToma;
       if (horaEnCamino) update.horaEnCamino = horaEnCamino;
 
       if (domiciliarioId) {
@@ -639,66 +640,51 @@ export default async function handler(req, res) {
 
   /* ════════════════════════════════════════
      PATCH /api/foto?recurso=adjuntar-foto
-     ─────────────────────────────────────
-     Guarda fotos de factura o comprobantes de tardanza
-     en el pedido correspondiente.
-
-     Body:
-       {
-         pedidoId:      "01AB",
-         tipo:          "facturas" | "comprobantesTardanza",
-         fotos:         ["base64...", "base64...", ...],  // array de strings base64
-         valorFactura:  1500,    // solo para tipo "facturas" (opcional)
-         nota:          "...",   // solo para tipo "comprobantesTardanza" (opcional)
-       }
-
-     Las fotos anteriores del mismo tipo se REEMPLAZAN con el nuevo array
-     (el cliente ya acumula localmente antes de llamar).
-     Los demás campos del pedido no se tocan.
   ════════════════════════════════════════ */
   if (recurso === 'adjuntar-foto' && req.method === 'PATCH') {
     try {
       const { pedidoId, tipo, fotos, valorFactura, nota } = req.body || {};
 
-if (!pedidoId)
-  return res.status(400).json({ ok: false, error: 'Falta pedidoId' });
+      if (!pedidoId)
+        return res.status(400).json({ ok: false, error: 'Falta pedidoId' });
 
-if (!tipo || !['facturas', 'comprobantesTardanza'].includes(tipo))
-  return res.status(400).json({ ok: false, error: 'tipo debe ser "facturas" o "comprobantesTardanza"' });
+      if (!tipo || !['facturas', 'comprobantesTardanza'].includes(tipo))
+        return res.status(400).json({ ok: false, error: 'tipo debe ser "facturas" o "comprobantesTardanza"' });
 
-// ← REEMPLAZAR la línea anterior por esto:
-const fotosArr = [];
-const mimesArr = [];
-if (Array.isArray(fotos)) {
-  for (const f of fotos) {
-    if (typeof f !== 'string' || !f.length) continue;
-    const match = f.match(/^data:([^;]+);base64,(.+)$/s);
-    const mime  = match ? match[1] : 'image/jpeg';
-    const raw   = match ? match[2] : f;
-    fotosArr.push(Buffer.from(raw, 'base64'));
-    mimesArr.push(mime);
-  }
-}
+      // Convertir base64 → Buffer y extraer mimes
+      const fotosArr = [];
+      const mimesArr = [];
+      if (Array.isArray(fotos)) {
+        for (const f of fotos) {
+          if (typeof f !== 'string' || !f.length) continue;
+          const match = f.match(/^data:([^;]+);base64,(.+)$/s);
+          const mime  = match ? match[1] : 'image/jpeg';
+          const raw   = match ? match[2] : f;
+          fotosArr.push(Buffer.from(raw, 'base64'));
+          mimesArr.push(mime);
+        }
+      }
 
-const ahora = new Date();
-let update  = {};
+      const ahora = new Date();
+      let update  = {};
 
-if (tipo === 'facturas') {
-  update = {
-    'facturas.fotos':      fotosArr,
-    'facturas.mimes':      mimesArr,   // ← agregar
-    'facturas.guardadoEn': ahora,
-  };
-        // Solo pisar valorFactura si viene en el body
+      if (tipo === 'facturas') {
+        update = {
+          'facturas.fotos':         fotosArr,
+          'facturas.mimes':         mimesArr,
+          'facturas.cantidadFotos': fotosArr.length,
+          'facturas.guardadoEn':    ahora,
+        };
         if (valorFactura !== undefined && valorFactura !== null && valorFactura !== '') {
           const valorNum = Number(valorFactura);
           if (!isNaN(valorNum)) update['facturas.valorFactura'] = valorNum;
         }
       } else {
-        // comprobantesTardanza: fotos + nota del domi
         update = {
-          'comprobantesTardanza.fotos':       fotosArr,
-          'comprobantesTardanza.guardadoEn':  ahora,
+          'comprobantesTardanza.fotos':         fotosArr,
+          'comprobantesTardanza.mimes':         mimesArr,
+          'comprobantesTardanza.cantidadFotos': fotosArr.length,
+          'comprobantesTardanza.guardadoEn':    ahora,
         };
         if (nota !== undefined && nota !== null) {
           update['comprobantesTardanza.nota'] = String(nota).trim().slice(0, 500);
@@ -724,10 +710,8 @@ if (tipo === 'facturas') {
       if (!pedido)
         return res.status(404).json({ ok: false, error: 'Pedido no encontrado: ' + pedidoId });
 
-      // --- RECALCULAR EL TOTAL DESPUÉS DE ACTUALIZAR LA FACTURA ---
       if (tipo === 'facturas') {
         await recalcularYActualizarTotal(pedidoId);
-        // Volver a buscar el pedido para obtener el total actualizado en la respuesta
         const pedidoActualizado = await Pedido.findOne(
           { idPedido: pedidoId },
           {
@@ -739,20 +723,19 @@ if (tipo === 'facturas') {
             'comprobanteImg.url': 1,
           }
         ).lean();
-        
-        // Devolver resumen sin los base64
+
         const respuesta = pedidoActualizado;
-        if (respuesta.facturas?.fotos)              respuesta.facturas.cantidadFotos = respuesta.facturas.fotos.length, delete respuesta.facturas.fotos;
-        if (respuesta.comprobantesTardanza?.fotos)  respuesta.comprobantesTardanza.cantidadFotos = respuesta.comprobantesTardanza.fotos.length, delete respuesta.comprobantesTardanza.fotos;
-        
+        // Limpiar buffers de la respuesta pero conservar cantidadFotos
+        if (respuesta.facturas?.fotos)             { respuesta.facturas.cantidadFotos = respuesta.facturas.fotos.length; delete respuesta.facturas.fotos; delete respuesta.facturas.mimes; }
+        if (respuesta.comprobantesTardanza?.fotos) { respuesta.comprobantesTardanza.cantidadFotos = respuesta.comprobantesTardanza.fotos.length; delete respuesta.comprobantesTardanza.fotos; delete respuesta.comprobantesTardanza.mimes; }
+
         console.log(`[adjuntar-foto] pedido=${pedidoId} tipo=${tipo} fotos=${fotosArr.length} total recalculado=${respuesta.total}`);
         return res.status(200).json({ ok: true, data: respuesta });
       }
 
-      // Devolver resumen sin los base64 (para comprobantesTardanza, no afecta total)
       const respuesta = pedido.toObject();
-      if (respuesta.facturas?.fotos)              respuesta.facturas.cantidadFotos = respuesta.facturas.fotos.length, delete respuesta.facturas.fotos;
-      if (respuesta.comprobantesTardanza?.fotos)  respuesta.comprobantesTardanza.cantidadFotos = respuesta.comprobantesTardanza.fotos.length, delete respuesta.comprobantesTardanza.fotos;
+      if (respuesta.facturas?.fotos)             { respuesta.facturas.cantidadFotos = respuesta.facturas.fotos.length; delete respuesta.facturas.fotos; delete respuesta.facturas.mimes; }
+      if (respuesta.comprobantesTardanza?.fotos) { respuesta.comprobantesTardanza.cantidadFotos = respuesta.comprobantesTardanza.fotos.length; delete respuesta.comprobantesTardanza.fotos; delete respuesta.comprobantesTardanza.mimes; }
 
       console.log(`[adjuntar-foto] pedido=${pedidoId} tipo=${tipo} fotos=${fotosArr.length}`);
       return res.status(200).json({ ok: true, data: respuesta });
@@ -764,21 +747,6 @@ if (tipo === 'facturas') {
 
   /* ════════════════════════════════════════
      PATCH /api/foto?recurso=tiempo-extra
-     ─────────────────────────────────────
-     Guarda el tiempo extra de tardanza en el pedido.
-     El cronómetro se detiene en el cliente al llegar a
-     un múltiplo de 15 min → cada intervalo = $2 000.
-
-     Body:
-       {
-         pedidoId: "01AB",
-         tiempoExtra: {
-           segundos:   900,    // total de segundos corridos
-           costoExtra: 2000,   // segundos / 900 * 2000
-           intervalos: 1,      // cuántos bloques de 15 min completados
-           nota:       "...",  // opcional
-         }
-       }
   ════════════════════════════════════════ */
   if (recurso === 'tiempo-extra' && req.method === 'PATCH') {
     try {
@@ -827,9 +795,7 @@ if (tipo === 'facturas') {
       if (!pedido)
         return res.status(404).json({ ok: false, error: 'Pedido no encontrado: ' + pedidoId });
 
-      // --- RECALCULAR EL TOTAL DESPUÉS DE ACTUALIZAR EL TIEMPO EXTRA ---
       await recalcularYActualizarTotal(pedidoId);
-      // Volver a buscar el pedido para obtener el total actualizado en la respuesta
       const pedidoActualizado = await Pedido.findOne(
         { idPedido: pedidoId },
         {
@@ -842,10 +808,9 @@ if (tipo === 'facturas') {
         }
       ).lean();
 
-      // Devolver sin base64
       const respuesta = pedidoActualizado;
-      if (respuesta.facturas?.fotos)             respuesta.facturas.cantidadFotos = respuesta.facturas.fotos.length, delete respuesta.facturas.fotos;
-      if (respuesta.comprobantesTardanza?.fotos) respuesta.comprobantesTardanza.cantidadFotos = respuesta.comprobantesTardanza.fotos.length, delete respuesta.comprobantesTardanza.fotos;
+      if (respuesta.facturas?.fotos)             { respuesta.facturas.cantidadFotos = respuesta.facturas.fotos.length; delete respuesta.facturas.fotos; delete respuesta.facturas.mimes; }
+      if (respuesta.comprobantesTardanza?.fotos) { respuesta.comprobantesTardanza.cantidadFotos = respuesta.comprobantesTardanza.fotos.length; delete respuesta.comprobantesTardanza.fotos; delete respuesta.comprobantesTardanza.mimes; }
 
       console.log(`[tiempo-extra] pedido=${pedidoId} segundos=${segundos} costo=${costoExtra} intervalos=${intervalos} total recalculado=${respuesta.total}`);
       return res.status(200).json({ ok: true, data: respuesta });
@@ -996,7 +961,9 @@ if (tipo === 'facturas') {
     }
   }
 
-
+  /* ════════════════════════════════════════
+     POST /api/foto?recurso=debug-ubicacion
+  ════════════════════════════════════════ */
   if (recurso === 'debug-ubicacion' && req.method === 'POST') {
     try {
       const { pedidoId, lat, lng } = req.body;
@@ -1030,7 +997,9 @@ if (tipo === 'facturas') {
     }
   }
 
- 
+  /* ════════════════════════════════════════
+     PATCH /api/foto?recurso=calificacion
+  ════════════════════════════════════════ */
   if (recurso === 'calificacion' && req.method === 'PATCH') {
     try {
       const { pedidoId, estrellas, comentario } = req.body || {};
@@ -1054,82 +1023,77 @@ if (tipo === 'facturas') {
   }
 
   /* ════════════════════════════════════════
-   GET /api/foto?recurso=factura-foto&id=<_id>&idx=<0,1,...>
-════════════════════════════════════════ */
-if (recurso === 'factura-foto' && req.method === 'GET') {
-  try {
-    const { id, idx } = req.query;
-    if (!id || !/^[a-f\d]{24}$/i.test(id))
-      return res.status(400).json({ ok: false, error: 'id inválido' });
+     GET /api/foto?recurso=factura-foto&id=<_id>&idx=<0,1,...>
+  ════════════════════════════════════════ */
+  if (recurso === 'factura-foto' && req.method === 'GET') {
+    try {
+      const { id, idx } = req.query;
+      if (!id || !/^[a-f\d]{24}$/i.test(id))
+        return res.status(400).json({ ok: false, error: 'id inválido' });
 
-    const pedido = await Pedido.findById(id, { 'facturas.fotos': 1, 'facturas.mimes': 1 }).lean();
-    const fotos  = pedido?.facturas?.fotos || [];
-    const mimes  = pedido?.facturas?.mimes || [];
-    const i      = Number(idx ?? 0);
+      const pedido = await Pedido.findById(id, { 'facturas.fotos': 1, 'facturas.mimes': 1 }).lean();
+      const fotos  = pedido?.facturas?.fotos || [];
+      const mimes  = pedido?.facturas?.mimes || [];
+      const i      = Number(idx ?? 0);
 
-    if (!fotos[i]) return res.status(404).json({ ok: false, error: 'Foto no encontrada' });
+      if (!fotos[i]) return res.status(404).json({ ok: false, error: 'Foto no encontrada' });
 
-    const raw  = fotos[i];
-    const mime = mimes[i] || 'image/jpeg';
+      const raw  = fotos[i];
+      const mime = mimes[i] || 'image/jpeg';
 
-    let buf;
-    if (Buffer.isBuffer(raw))        buf = raw;
-    else if (raw?.buffer)            buf = Buffer.from(raw.buffer);
-    else if (raw?._bsontype === 'Binary') buf = Buffer.from(raw.value());
-    else if (typeof raw === 'string') buf = Buffer.from(raw.replace(/^data:[^;]+;base64,/, ''), 'base64');
-    else                              buf = Buffer.from(Object.values(raw));
+      let buf;
+      if (Buffer.isBuffer(raw))             buf = raw;
+      else if (raw?._bsontype === 'Binary') buf = Buffer.from(raw.value());
+      else if (raw?.buffer)                 buf = Buffer.from(raw.buffer);
+      else if (typeof raw === 'string')     buf = Buffer.from(raw.replace(/^data:[^;]+;base64,/, ''), 'base64');
+      else                                  buf = Buffer.from(Object.values(raw));
 
-    res.setHeader('Content-Type', mime);
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    return res.status(200).send(buf);
-  } catch (e) {
-    console.error('[GET factura-foto]', e.message);
-    return res.status(500).json({ ok: false, error: e.message });
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.status(200).send(buf);
+    } catch (e) {
+      console.error('[GET factura-foto]', e.message);
+      return res.status(500).json({ ok: false, error: e.message });
+    }
   }
-}
 
-/* ════════════════════════════════════════
-   GET /api/foto?recurso=tardanza-foto&id=<_id>&idx=<0,1,...>
-════════════════════════════════════════ */
-if (recurso === 'tardanza-foto' && req.method === 'GET') {
-  try {
-    const { id, idx } = req.query;
-    if (!id || !/^[a-f\d]{24}$/i.test(id))
-      return res.status(400).json({ ok: false, error: 'id inválido' });
+  /* ════════════════════════════════════════
+     GET /api/foto?recurso=tardanza-foto&id=<_id>&idx=<0,1,...>
+  ════════════════════════════════════════ */
+  if (recurso === 'tardanza-foto' && req.method === 'GET') {
+    try {
+      const { id, idx } = req.query;
+      if (!id || !/^[a-f\d]{24}$/i.test(id))
+        return res.status(400).json({ ok: false, error: 'id inválido' });
 
-    const pedido = await Pedido.findById(id, { 'comprobantesTardanza.fotos': 1, 'comprobantesTardanza.mimes': 1 }).lean();
-    const fotos  = pedido?.comprobantesTardanza?.fotos || [];
-    const mimes  = pedido?.comprobantesTardanza?.mimes || [];
-    const i      = Number(idx ?? 0);
+      const pedido = await Pedido.findById(id, { 'comprobantesTardanza.fotos': 1, 'comprobantesTardanza.mimes': 1 }).lean();
+      const fotos  = pedido?.comprobantesTardanza?.fotos || [];
+      const mimes  = pedido?.comprobantesTardanza?.mimes || [];
+      const i      = Number(idx ?? 0);
 
-        console.log('[factura-foto] id:', id, 'idx:', i);
-    console.log('[factura-foto] cantFotos:', fotos.length);
-    console.log('[factura-foto] tipo raw:', fotos[i] ? fotos[i]._bsontype || typeof fotos[i] : 'undefined');
-    console.log('[factura-foto] mime:', mimes[i]);
+      if (!fotos[i]) return res.status(404).json({ ok: false, error: 'Foto no encontrada' });
 
-    if (!fotos[i]) return res.status(404).json({ ok: false, error: 'Foto no encontrada' });
+      const raw  = fotos[i];
+      const mime = mimes[i] || 'image/jpeg';
 
-    const raw  = fotos[i];
-    const mime = mimes[i] || 'image/jpeg';
+      let buf;
+      if (Buffer.isBuffer(raw))             buf = raw;
+      else if (raw?._bsontype === 'Binary') buf = Buffer.from(raw.value());
+      else if (raw?.buffer)                 buf = Buffer.from(raw.buffer);
+      else if (typeof raw === 'string')     buf = Buffer.from(raw.replace(/^data:[^;]+;base64,/, ''), 'base64');
+      else                                  buf = Buffer.from(Object.values(raw));
 
-    let buf;
-    if (Buffer.isBuffer(raw))        buf = raw;
-    else if (raw?.buffer)            buf = Buffer.from(raw.buffer);
-    else if (raw?._bsontype === 'Binary') buf = Buffer.from(raw.value());
-    else if (typeof raw === 'string') buf = Buffer.from(raw.replace(/^data:[^;]+;base64,/, ''), 'base64');
-    else                              buf = Buffer.from(Object.values(raw));
-
-    res.setHeader('Content-Type', mime);
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    return res.status(200).send(buf);
-  } catch (e) {
-    console.error('[GET tardanza-foto]', e.message);
-    return res.status(500).json({ ok: false, error: e.message });
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.status(200).send(buf);
+    } catch (e) {
+      console.error('[GET tardanza-foto]', e.message);
+      return res.status(500).json({ ok: false, error: e.message });
+    }
   }
-}
 
   return res.status(400).json({
     ok: false,
-error: `Recurso no válido: "${recurso}". Usa: pedidos | domiciliarios | asignar | estado | foto | formula | comprobante | ubicacion-domi | ubicacion | debug-ubicacion | calificacion | adjuntar-foto | tiempo-extra | factura-foto | tardanza-foto`,
+    error: `Recurso no válido: "${recurso}". Usa: pedidos | domiciliarios | asignar | estado | foto | formula | comprobante | ubicacion-domi | ubicacion | debug-ubicacion | calificacion | adjuntar-foto | tiempo-extra | factura-foto | tardanza-foto`,
   });
 }
