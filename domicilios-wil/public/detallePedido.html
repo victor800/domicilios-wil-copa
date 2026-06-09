@@ -321,7 +321,6 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
 }
 .doc-label-tag.comprobante { background:#f0fdfb; color:#0a8f7a; border:1.5px solid #0ceac940; }
 .doc-label-tag.factura-domi { background:#fff7ed; color:#c2410c; border:1.5px solid #fed7aa; }
-.doc-label-ts { font-size:10px; font-weight:700; color:var(--muted); }
 
 /* Factura items dentro del panel */
 .docs-factura-items { background:var(--surface); border-radius:14px; border:1px solid var(--border); overflow:hidden; margin-top:12px; }
@@ -560,7 +559,7 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
         Documentos del pedido
       </div>
-      <div class="docs-panel-sub" id="docsPanelSub">Comprobante · Factura domi</div>
+      <div class="docs-panel-sub" id="docsPanelSub">Comprobante · Factura domi · Tardanza</div>
     </div>
     <button class="docs-close" onclick="cerrarDocs()">✕</button>
   </div>
@@ -573,25 +572,20 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
       <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
       Factura domi
     </button>
+    <button class="docs-tab" id="tabTardanza" onclick="switchTab('tardanza')">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Tardanza
+    </button>
   </div>
   <div class="docs-body">
     <div class="docs-tab-pane active" id="paneComprobante">
-      <div id="comprPaneContent">
-        <div class="docs-empty">
-          <div class="docs-empty-icon">🧾</div>
-          <div class="docs-empty-title">Sin comprobante aún</div>
-          <div class="docs-empty-sub">El domiciliario no ha adjuntado<br>el comprobante de pago todavía.</div>
-        </div>
-      </div>
+      <div id="comprPaneContent"></div>
     </div>
     <div class="docs-tab-pane" id="paneFacturaDomi">
-      <div id="factDomiPaneContent">
-        <div class="docs-empty">
-          <div class="docs-empty-icon">📋</div>
-          <div class="docs-empty-title">Sin factura aún</div>
-          <div class="docs-empty-sub">Cuando el domiciliario adjunte<br>la factura del comercio aparecerá aquí.</div>
-        </div>
-      </div>
+      <div id="factDomiPaneContent"></div>
+    </div>
+    <div class="docs-tab-pane" id="paneTardanza">
+      <div id="tardanzaPaneContent"></div>
     </div>
   </div>
 </div>
@@ -1018,6 +1012,7 @@ function renderPedido(p) {
 function construirPanelDocs(p) {
   let docsCount = 0;
 
+  // ══ TAB 1: COMPROBANTE DE PAGO ══
   const comprPane = document.getElementById('comprPaneContent');
   const comprUrl  = p.comprobanteImg?.url || null;
   if (comprUrl) {
@@ -1030,25 +1025,23 @@ function construirPanelDocs(p) {
       ${buildImageViewer('viewer-compr', comprUrl)}
     `;
     initImageViewer('viewer-compr');
+  } else {
+    comprPane.innerHTML = `<div class="docs-empty"><div class="docs-empty-icon">🧾</div><div class="docs-empty-title">Sin comprobante aún</div><div class="docs-empty-sub">El domiciliario no ha adjuntado<br>el comprobante de pago todavía.</div></div>`;
   }
 
+  // ══ TAB 2: FACTURA DOMI ══
   const factPane = document.getElementById('factDomiPaneContent');
   const facturaImg = p.facturas?.fotos?.[0] || null;
   const facturaValor = p.facturas?.valorFactura || null;
   
-  if (facturaImg || facturaValor) {
+  if (facturaImg) {
     docsCount++;
     let html = `
       <div class="doc-label">
         <span class="doc-label-tag factura-domi">Factura del comercio</span>
         ${p.comercio ? `<span class="doc-label-ts">${p.comercio}</span>` : ''}
-      </div>`;
-    
-    if (facturaImg) {
-      html += buildImageViewer('viewer-fact', facturaImg);
-    }
-    
-    html += `
+      </div>
+      ${buildImageViewer('viewer-fact', facturaImg)}
       <div class="docs-factura-items">
         <div class="docs-factura-item">
           <div class="docs-item-info">
@@ -1057,28 +1050,62 @@ function construirPanelDocs(p) {
           <div class="docs-item-price">${formatCOP(facturaValor || 0)}</div>
         </div>
       </div>`;
-    
-    // Agregar nota de tardanza si existe
-    if (p.comprobantesTardanza?.nota) {
-      html += `
-        <div style="margin-top:12px; padding:10px; background:var(--orange-l); border-radius:12px;">
-          <div style="font-size:9px; font-weight:800; color:var(--orange);">⚠️ Nota de tardanza</div>
-          <div style="font-size:11px; margin-top:4px;">${escapeHtml(p.comprobantesTardanza.nota)}</div>
-        </div>`;
-    }
-    
-    // Agregar tiempo extra si existe
-    if (p.tiempoExtra?.costoExtra > 0) {
-      html += `
-        <div style="margin-top:8px; padding:10px; background:var(--blue-l); border-radius:12px;">
-          <div style="font-size:9px; font-weight:800; color:var(--blue);">⏱️ Tiempo extra</div>
-          <div style="font-size:11px; margin-top:4px;">${p.tiempoExtra.intervalos} × 15min = ${formatCOP(p.tiempoExtra.costoExtra)}</div>
-          ${p.tiempoExtra.nota ? `<div style="font-size:10px; margin-top:4px; color:var(--text3);">📝 ${escapeHtml(p.tiempoExtra.nota)}</div>` : ''}
-        </div>`;
-    }
-    
     factPane.innerHTML = html;
     if (facturaImg) initImageViewer('viewer-fact');
+  } else {
+    factPane.innerHTML = `<div class="docs-empty"><div class="docs-empty-icon">📋</div><div class="docs-empty-title">Sin factura aún</div><div class="docs-empty-sub">Cuando el domiciliario adjunte<br>la factura del comercio aparecerá aquí.</div></div>`;
+  }
+
+  // ══ TAB 3: TARDANZA (nota + fotos) ══
+  const tardanzaPane = document.getElementById('tardanzaPaneContent');
+  const tardanzaNota = p.comprobantesTardanza?.nota || '';
+  const tardanzaFotos = p.comprobantesTardanza?.fotos || [];
+  const tiempoExtraSegundos = p.tiempoExtra?.segundos || 0;
+  const tiempoExtraCosto = p.tiempoExtra?.costoExtra || 0;
+  const tiempoExtraIntervalos = p.tiempoExtra?.intervalos || 0;
+  const tiempoExtraNota = p.tiempoExtra?.nota || '';
+
+  if (tardanzaNota || tardanzaFotos.length > 0 || tiempoExtraCosto > 0) {
+    docsCount++;
+    let html = '<div class="doc-label"><span class="doc-label-tag factura-domi" style="background:#fef3c7;color:#d97706;">⏱️ Tardanza y tiempo extra</span></div>';
+    
+    // Nota de tardanza
+    if (tardanzaNota) {
+      html += `<div style="background:var(--orange-l);border-radius:12px;padding:12px;margin-bottom:12px;">
+        <div style="font-size:9px;font-weight:800;color:var(--orange);margin-bottom:4px;">📝 Nota de tardanza</div>
+        <div style="font-size:11px;line-height:1.4;">${escapeHtml(tardanzaNota)}</div>
+      </div>`;
+    }
+    
+    // Fotos de tardanza
+    if (tardanzaFotos.length > 0) {
+      tardanzaFotos.forEach((foto, idx) => {
+        html += buildImageViewer(`viewer-tardanza-${idx}`, foto);
+        html += `<div style="margin-bottom:12px;"></div>`;
+      });
+    }
+    
+    // Tiempo extra
+    if (tiempoExtraCosto > 0) {
+      html += `<div style="background:var(--blue-l);border-radius:12px;padding:12px;margin-top:12px;">
+        <div style="font-size:9px;font-weight:800;color:var(--blue);margin-bottom:4px;">⏱️ Tiempo extra</div>
+        <div style="font-size:11px;">${tiempoExtraIntervalos} × 15min = ${formatCOP(tiempoExtraCosto)}</div>
+        ${tiempoExtraNota ? `<div style="font-size:10px;margin-top:6px;color:var(--text3);">📝 ${escapeHtml(tiempoExtraNota)}</div>` : ''}
+        <div style="font-size:9px;color:var(--text3);margin-top:4px;">⏲️ ${Math.floor(tiempoExtraSegundos / 60)} minutos total</div>
+      </div>`;
+    }
+    
+    if (!tardanzaNota && tardanzaFotos.length === 0 && tiempoExtraCosto === 0) {
+      html = `<div class="docs-empty"><div class="docs-empty-icon">⏰</div><div class="docs-empty-title">Sin registro de tardanza</div><div class="docs-empty-sub">No se ha registrado tiempo extra<br>ni notas de tardanza.</div></div>`;
+    }
+    
+    tardanzaPane.innerHTML = html;
+    // Inicializar visores de imágenes de tardanza
+    for (let i = 0; i < tardanzaFotos.length; i++) {
+      initImageViewer(`viewer-tardanza-${i}`);
+    }
+  } else {
+    tardanzaPane.innerHTML = `<div class="docs-empty"><div class="docs-empty-icon">⏰</div><div class="docs-empty-title">Sin registro de tardanza</div><div class="docs-empty-sub">No se ha registrado tiempo extra<br>ni notas de tardanza.</div></div>`;
   }
 
   if (docsCount > 0) {
@@ -1213,8 +1240,10 @@ function switchTab(tab) {
   document.querySelectorAll('.docs-tab-pane').forEach(p => p.classList.remove('active'));
   document.getElementById('tabComprobante').classList.toggle('active', tab === 'comprobante');
   document.getElementById('tabFacturaDomi').classList.toggle('active', tab === 'factura_domi');
+  document.getElementById('tabTardanza').classList.toggle('active', tab === 'tardanza');
   document.getElementById('paneComprobante').classList.toggle('active', tab === 'comprobante');
   document.getElementById('paneFacturaDomi').classList.toggle('active', tab === 'factura_domi');
+  document.getElementById('paneTardanza').classList.toggle('active', tab === 'tardanza');
 }
 
 function abrirDocs() {
