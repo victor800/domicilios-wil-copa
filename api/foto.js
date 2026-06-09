@@ -177,6 +177,35 @@ async function siguienteId() {
 }
 
 /* ══════════════════════════════════════════════════════════════
+   FUNCIÓN AUXILIAR PARA RECALCULAR EL TOTAL DEL PEDIDO
+══════════════════════════════════════════════════════════════ */
+async function recalcularYActualizarTotal(pedidoId) {
+  const pedido = await Pedido.findOne(
+    { idPedido: pedidoId },
+    { subtotal: 1, domicilio: 1, 'facturas.valorFactura': 1, 'tiempoExtra.costoExtra': 1 }
+  ).lean();
+
+  if (!pedido) {
+    console.error(`[recalcularTotal] Pedido ${pedidoId} no encontrado para recalcular.`);
+    return;
+  }
+
+  const subtotal = pedido.subtotal || 0;
+  const domicilio = pedido.domicilio || 0;
+  const valorFactura = pedido.facturas?.valorFactura || 0;
+  const costoExtra = pedido.tiempoExtra?.costoExtra || 0;
+
+  const nuevoTotal = subtotal + domicilio + valorFactura + costoExtra;
+
+  await Pedido.findOneAndUpdate(
+    { idPedido: pedidoId },
+    { $set: { total: nuevoTotal } }
+  );
+
+  console.log(`[recalcularTotal] Pedido ${pedidoId}: Total recalculado a ${nuevoTotal} (${subtotal} + ${domicilio} + ${valorFactura} + ${costoExtra})`);
+}
+
+/* ══════════════════════════════════════════════════════════════
    HANDLER
 ══════════════════════════════════════════════════════════════ */
 export default async function handler(req, res) {
@@ -683,7 +712,32 @@ export default async function handler(req, res) {
       if (!pedido)
         return res.status(404).json({ ok: false, error: 'Pedido no encontrado: ' + pedidoId });
 
-      // Devolver resumen sin los base64 (pueden ser muy pesados)
+      // --- RECALCULAR EL TOTAL DESPUÉS DE ACTUALIZAR LA FACTURA ---
+      if (tipo === 'facturas') {
+        await recalcularYActualizarTotal(pedidoId);
+        // Volver a buscar el pedido para obtener el total actualizado en la respuesta
+        const pedidoActualizado = await Pedido.findOne(
+          { idPedido: pedidoId },
+          {
+            idPedido: 1, estado: 1, total: 1,
+            facturas: 1,
+            comprobantesTardanza: 1,
+            tiempoExtra: 1,
+            'formulaMedica.url': 1,
+            'comprobanteImg.url': 1,
+          }
+        ).lean();
+        
+        // Devolver resumen sin los base64
+        const respuesta = pedidoActualizado;
+        if (respuesta.facturas?.fotos)              respuesta.facturas.cantidadFotos = respuesta.facturas.fotos.length, delete respuesta.facturas.fotos;
+        if (respuesta.comprobantesTardanza?.fotos)  respuesta.comprobantesTardanza.cantidadFotos = respuesta.comprobantesTardanza.fotos.length, delete respuesta.comprobantesTardanza.fotos;
+        
+        console.log(`[adjuntar-foto] pedido=${pedidoId} tipo=${tipo} fotos=${fotosArr.length} total recalculado=${respuesta.total}`);
+        return res.status(200).json({ ok: true, data: respuesta });
+      }
+
+      // Devolver resumen sin los base64 (para comprobantesTardanza, no afecta total)
       const respuesta = pedido.toObject();
       if (respuesta.facturas?.fotos)              respuesta.facturas.cantidadFotos = respuesta.facturas.fotos.length, delete respuesta.facturas.fotos;
       if (respuesta.comprobantesTardanza?.fotos)  respuesta.comprobantesTardanza.cantidadFotos = respuesta.comprobantesTardanza.fotos.length, delete respuesta.comprobantesTardanza.fotos;
@@ -761,12 +815,27 @@ export default async function handler(req, res) {
       if (!pedido)
         return res.status(404).json({ ok: false, error: 'Pedido no encontrado: ' + pedidoId });
 
+      // --- RECALCULAR EL TOTAL DESPUÉS DE ACTUALIZAR EL TIEMPO EXTRA ---
+      await recalcularYActualizarTotal(pedidoId);
+      // Volver a buscar el pedido para obtener el total actualizado en la respuesta
+      const pedidoActualizado = await Pedido.findOne(
+        { idPedido: pedidoId },
+        {
+          idPedido: 1, estado: 1, total: 1,
+          tiempoExtra: 1,
+          facturas: 1,
+          comprobantesTardanza: 1,
+          'formulaMedica.url': 1,
+          'comprobanteImg.url': 1,
+        }
+      ).lean();
+
       // Devolver sin base64
-      const respuesta = pedido.toObject();
+      const respuesta = pedidoActualizado;
       if (respuesta.facturas?.fotos)             respuesta.facturas.cantidadFotos = respuesta.facturas.fotos.length, delete respuesta.facturas.fotos;
       if (respuesta.comprobantesTardanza?.fotos) respuesta.comprobantesTardanza.cantidadFotos = respuesta.comprobantesTardanza.fotos.length, delete respuesta.comprobantesTardanza.fotos;
 
-      console.log(`[tiempo-extra] pedido=${pedidoId} segundos=${segundos} costo=${costoExtra} intervalos=${intervalos}`);
+      console.log(`[tiempo-extra] pedido=${pedidoId} segundos=${segundos} costo=${costoExtra} intervalos=${intervalos} total recalculado=${respuesta.total}`);
       return res.status(200).json({ ok: true, data: respuesta });
     } catch (e) {
       console.error('[PATCH tiempo-extra]', e.message);
