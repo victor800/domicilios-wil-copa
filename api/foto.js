@@ -1102,6 +1102,11 @@ if (recurso === 'tardanza-foto' && req.method === 'GET') {
     const mimes  = pedido?.comprobantesTardanza?.mimes || [];
     const i      = Number(idx ?? 0);
 
+        console.log('[factura-foto] id:', id, 'idx:', i);
+    console.log('[factura-foto] cantFotos:', fotos.length);
+    console.log('[factura-foto] tipo raw:', fotos[i] ? fotos[i]._bsontype || typeof fotos[i] : 'undefined');
+    console.log('[factura-foto] mime:', mimes[i]);
+
     if (!fotos[i]) return res.status(404).json({ ok: false, error: 'Foto no encontrada' });
 
     const raw  = fotos[i];
