@@ -1041,8 +1041,67 @@ export default async function handler(req, res) {
     }
   }
 
+  /* ════════════════════════════════════════
+   GET /api/foto?recurso=factura-foto&id=<_id>&idx=<0,1,...>
+════════════════════════════════════════ */
+if (recurso === 'factura-foto' && req.method === 'GET') {
+  try {
+    const { id, idx } = req.query;
+    if (!id || !/^[a-f\d]{24}$/i.test(id))
+      return res.status(400).json({ ok: false, error: 'id inválido' });
+
+    const pedido = await Pedido.findById(id, { facturas: 1 }).lean();
+    const fotos  = pedido?.facturas?.fotos || [];
+    const i      = Number(idx ?? 0);
+
+    if (!fotos[i])
+      return res.status(404).json({ ok: false, error: 'Foto no encontrada' });
+
+    // El Base64 ya está guardado como string — convertir a Buffer
+    const b64  = fotos[i].replace(/[\s\r\n]/g, '');
+    const buf  = Buffer.from(b64, 'base64');
+    const mime = b64.startsWith('/9j/') ? 'image/jpeg' : 'image/png';
+
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.status(200).send(buf);
+  } catch (e) {
+    console.error('[GET factura-foto]', e.message);
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+}
+
+/* ════════════════════════════════════════
+   GET /api/foto?recurso=tardanza-foto&id=<_id>&idx=<0,1,...>
+════════════════════════════════════════ */
+if (recurso === 'tardanza-foto' && req.method === 'GET') {
+  try {
+    const { id, idx } = req.query;
+    if (!id || !/^[a-f\d]{24}$/i.test(id))
+      return res.status(400).json({ ok: false, error: 'id inválido' });
+
+    const pedido = await Pedido.findById(id, { comprobantesTardanza: 1 }).lean();
+    const fotos  = pedido?.comprobantesTardanza?.fotos || [];
+    const i      = Number(idx ?? 0);
+
+    if (!fotos[i])
+      return res.status(404).json({ ok: false, error: 'Foto no encontrada' });
+
+    const b64  = fotos[i].replace(/[\s\r\n]/g, '');
+    const buf  = Buffer.from(b64, 'base64');
+    const mime = b64.startsWith('/9j/') ? 'image/jpeg' : 'image/png';
+
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.status(200).send(buf);
+  } catch (e) {
+    console.error('[GET tardanza-foto]', e.message);
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+}
+
   return res.status(400).json({
     ok: false,
-    error: `Recurso no válido: "${recurso}". Usa: pedidos | domiciliarios | asignar | estado | foto | formula | comprobante | ubicacion-domi | ubicacion | debug-ubicacion | calificacion | adjuntar-foto | tiempo-extra`,
+error: `Recurso no válido: "${recurso}". Usa: pedidos | domiciliarios | asignar | estado | foto | formula | comprobante | ubicacion-domi | ubicacion | debug-ubicacion | calificacion | adjuntar-foto | tiempo-extra | factura-foto | tardanza-foto`,
   });
 }

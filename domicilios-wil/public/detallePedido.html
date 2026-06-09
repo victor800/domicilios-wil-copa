@@ -600,14 +600,21 @@ let docsBadgeCount = 0;
 // ════════ FUNCIÓN PARA FORMATEAR BASE64 A DATA URL ════════
 function formatBase64Image(b64) {
   if (!b64) return null;
-  // Si ya es data URL, devolverlo igual
+  
+  // Si ya es data URL, devolverlo limpio
   if (b64.startsWith('data:image')) return b64;
-  // Si empieza con /9j/ es JPEG
-  if (b64.startsWith('/9j/')) return 'data:image/jpeg;base64,' + b64;
-  // Si empieza con iVBOR es PNG
-  if (b64.startsWith('iVBOR')) return 'data:image/png;base64,' + b64;
-  // Por defecto asumir JPEG
-  return 'data:image/jpeg;base64,' + b64;
+  
+  // Limpiar saltos de línea, espacios y caracteres inválidos
+  const clean = b64.replace(/[\s\r\n]/g, '');
+  
+  // Detectar tipo por los primeros bytes del Base64
+  if (clean.startsWith('/9j/'))   return 'data:image/jpeg;base64,' + clean;
+  if (clean.startsWith('iVBOR')) return 'data:image/png;base64,'  + clean;
+  if (clean.startsWith('R0lGO')) return 'data:image/gif;base64,'  + clean;
+  if (clean.startsWith('UklGR')) return 'data:image/webp;base64,' + clean;
+  
+  // Por defecto JPEG
+  return 'data:image/jpeg;base64,' + clean;
 }
 
 // ════════ MAPA ════════
@@ -1024,102 +1031,88 @@ function construirPanelDocs(p) {
     comprPane.innerHTML = `<div class="docs-empty"><div class="docs-empty-icon">🧾</div><div class="docs-empty-title">Sin comprobante aún</div><div class="docs-empty-sub">El domiciliario no ha adjuntado<br>el comprobante de pago todavía.</div></div>`;
   }
 
-  // ══ TAB 2: FACTURA DOMI (con imágenes en Base64) ══
-  const factPane = document.getElementById('paneFactura');
-  const facturaImgs = p.facturas?.fotos || [];
-  const facturaValor = p.facturas?.valorFactura || null;
-  
-  if (facturaImgs.length > 0 || facturaValor) {
-    docsCount++;
-    let html = `
-      <div class="doc-label">
-        <span class="doc-label-tag factura-domi">📋 Factura del comercio</span>
-        <span class="doc-label-ts">${p.comercio || ''}</span>
+ // ══ TAB 2: FACTURA DOMI — usando URLs en vez de Base64 ══
+const factPane   = document.getElementById('paneFactura');
+const pedidoOid  = p._id;                          // ObjectId del pedido
+const cantFact   = p.facturas?.cantidadFotos        // viene del PATCH response
+                ?? (p.facturas?.fotos?.length ?? 0); // o del array si lo hubiera
+const facturaValor = p.facturas?.valorFactura || null;
+
+if (cantFact > 0 || facturaValor) {
+  docsCount++;
+  let html = `
+    <div class="doc-label">
+      <span class="doc-label-tag factura-domi">📋 Factura del comercio</span>
+      <span class="doc-label-ts">${p.comercio || ''}</span>
+    </div>`;
+
+  for (let idx = 0; idx < cantFact; idx++) {
+    const url = `/api/foto?recurso=factura-foto&id=${pedidoOid}&idx=${idx}`;
+    html += buildImageViewerWithSrc(`viewer-fact-${idx}`, url);
+  }
+
+  if (facturaValor) {
+    html += `
+      <div style="background:#f0fdfb;border-radius:12px;padding:12px;margin-top:8px;">
+        <div style="font-size:11px;font-weight:800;color:var(--teal-d);">💰 Valor factura registrado</div>
+        <div style="font-size:18px;font-weight:900;color:var(--text);margin-top:4px;">${formatCOP(facturaValor)}</div>
       </div>`;
-    
-    // Mostrar todas las fotos de factura (convertir Base64 a data URL)
-    facturaImgs.forEach((imgBase64, idx) => {
-      const imgSrc = formatBase64Image(imgBase64);
-      html += buildImageViewerWithSrc(`viewer-fact-${idx}`, imgSrc);
-    });
-    
-    // Mostrar valor de factura
-    if (facturaValor) {
-      html += `
-        <div style="background:var(--teal-m); border-radius:12px; padding:12px; margin-top:8px;">
-          <div style="font-size:11px; font-weight:800; color:var(--teal-d);">💰 Valor factura registrado</div>
-          <div style="font-size:18px; font-weight:900; color:var(--text); margin-top:4px;">${formatCOP(facturaValor)}</div>
-        </div>`;
-    }
-    
-    factPane.innerHTML = html;
-    setTimeout(() => {
-      facturaImgs.forEach((_, idx) => initImageViewer(`viewer-fact-${idx}`));
-    }, 50);
-  } else {
-    factPane.innerHTML = `<div class="docs-empty"><div class="docs-empty-icon">📋</div><div class="docs-empty-title">Sin factura aún</div><div class="docs-empty-sub">Cuando el domiciliario adjunte<br>la factura del comercio aparecerá aquí.</div></div>`;
   }
 
-  // ══ TAB 3: TARDANZA (con imágenes en Base64) ══
-  const tardanzaPane = document.getElementById('paneTardanza');
-  const tardanzaNota = p.comprobantesTardanza?.nota || '';
-  const tardanzaFotos = p.comprobantesTardanza?.fotos || [];
-  const tiempoExtraSegundos = p.tiempoExtra?.segundos || 0;
-  const tiempoExtraCosto = p.tiempoExtra?.costoExtra || 0;
-  const tiempoExtraIntervalos = p.tiempoExtra?.intervalos || 0;
-  const tiempoExtraNota = p.tiempoExtra?.nota || '';
+  factPane.innerHTML = html;
+  setTimeout(() => {
+    for (let idx = 0; idx < cantFact; idx++) initImageViewer(`viewer-fact-${idx}`);
+  }, 50);
+} else {
+  factPane.innerHTML = `<div class="docs-empty"><div class="docs-empty-icon">📋</div><div class="docs-empty-title">Sin factura aún</div><div class="docs-empty-sub">Cuando el domiciliario adjunte<br>la factura del comercio aparecerá aquí.</div></div>`;
+}
 
-  if (tardanzaNota || tardanzaFotos.length > 0 || tiempoExtraCosto > 0) {
-    docsCount++;
-    let html = `
-      <div class="doc-label">
-        <span class="doc-label-tag tardanza">⏱️ Registro de tardanza</span>
+// ══ TAB 3: TARDANZA — usando URLs en vez de Base64 ══
+const tardanzaPane  = document.getElementById('paneTardanza');
+const tardanzaNota  = p.comprobantesTardanza?.nota || '';
+const cantTardanza  = p.comprobantesTardanza?.cantidadFotos
+                   ?? (p.comprobantesTardanza?.fotos?.length ?? 0);
+const tiempoExtraSegundos  = p.tiempoExtra?.segundos   || 0;
+const tiempoExtraCosto     = p.tiempoExtra?.costoExtra || 0;
+const tiempoExtraIntervalos = p.tiempoExtra?.intervalos || 0;
+const tiempoExtraNota      = p.tiempoExtra?.nota       || '';
+
+if (tardanzaNota || cantTardanza > 0 || tiempoExtraCosto > 0) {
+  docsCount++;
+  let html = `
+    <div class="doc-label">
+      <span class="doc-label-tag tardanza">⏱️ Registro de tardanza</span>
+    </div>`;
+
+  if (tardanzaNota) {
+    html += `
+      <div style="background:#fff7ed;border-radius:12px;padding:12px;margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:800;color:#c2410c;">📝 Nota del domiciliario</div>
+        <div style="font-size:13px;margin-top:6px;line-height:1.4;">${escapeHtml(tardanzaNota)}</div>
       </div>`;
-    
-    // Nota de tardanza
-    if (tardanzaNota) {
-      html += `
-        <div style="background:var(--orange-l); border-radius:12px; padding:12px; margin-bottom:12px;">
-          <div style="font-size:11px; font-weight:800; color:var(--orange);">📝 Nota del domiciliario</div>
-          <div style="font-size:13px; margin-top:6px; line-height:1.4;">${escapeHtml(tardanzaNota)}</div>
-        </div>`;
-    }
-    
-    // Fotos de tardanza (convertir Base64 a data URL)
-    tardanzaFotos.forEach((imgBase64, idx) => {
-      const imgSrc = formatBase64Image(imgBase64);
-      html += buildImageViewerWithSrc(`viewer-tardanza-${idx}`, imgSrc);
-    });
-    
-    // Tiempo extra
-    if (tiempoExtraCosto > 0) {
-      html += `
-        <div style="background:var(--blue-l); border-radius:12px; padding:12px; margin-top:12px;">
-          <div style="font-size:11px; font-weight:800; color:var(--blue);">⏱️ Tiempo extra facturado</div>
-          <div style="font-size:13px; margin-top:6px;"><strong>${tiempoExtraIntervalos}</strong> × 15min = <strong>${formatCOP(tiempoExtraCosto)}</strong></div>
-          <div style="font-size:11px; color:var(--text3); margin-top:4px;">⏲️ Total: ${Math.floor(tiempoExtraSegundos / 60)} minutos</div>
-          ${tiempoExtraNota ? `<div style="font-size:11px; margin-top:8px; padding:8px; background:rgba(0,0,0,.05); border-radius:8px;">📝 ${escapeHtml(tiempoExtraNota)}</div>` : ''}
-        </div>`;
-    }
-    
-    if (!tardanzaNota && tardanzaFotos.length === 0 && tiempoExtraCosto === 0) {
-      html = `<div class="docs-empty"><div class="docs-empty-icon">⏰</div><div class="docs-empty-title">Sin registro de tardanza</div><div class="docs-empty-sub">No se ha registrado tiempo extra<br>ni notas de tardanza.</div></div>`;
-    }
-    
-    tardanzaPane.innerHTML = html;
-    setTimeout(() => {
-      tardanzaFotos.forEach((_, idx) => initImageViewer(`viewer-tardanza-${idx}`));
-    }, 50);
-  } else {
-    tardanzaPane.innerHTML = `<div class="docs-empty"><div class="docs-empty-icon">⏰</div><div class="docs-empty-title">Sin registro de tardanza</div><div class="docs-empty-sub">No se ha registrado tiempo extra<br>ni notas de tardanza.</div></div>`;
   }
 
-  if (docsCount > 0) {
-    const fab = document.getElementById('docsFab');
-    fab.style.display = 'flex';
-    document.getElementById('docsBadge').textContent = docsCount;
-    docsBadgeCount = docsCount;
+  for (let idx = 0; idx < cantTardanza; idx++) {
+    const url = `/api/foto?recurso=tardanza-foto&id=${pedidoOid}&idx=${idx}`;
+    html += buildImageViewerWithSrc(`viewer-tardanza-${idx}`, url);
   }
+
+  if (tiempoExtraCosto > 0) {
+    html += `
+      <div style="background:#eff6ff;border-radius:12px;padding:12px;margin-top:12px;">
+        <div style="font-size:11px;font-weight:800;color:#1d4ed8;">⏱️ Tiempo extra facturado</div>
+        <div style="font-size:13px;margin-top:6px;"><strong>${tiempoExtraIntervalos}</strong> × 15min = <strong>${formatCOP(tiempoExtraCosto)}</strong></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">⏲️ Total: ${Math.floor(tiempoExtraSegundos / 60)} minutos</div>
+        ${tiempoExtraNota ? `<div style="font-size:11px;margin-top:8px;padding:8px;background:rgba(0,0,0,.05);border-radius:8px;">📝 ${escapeHtml(tiempoExtraNota)}</div>` : ''}
+      </div>`;
+  }
+
+  tardanzaPane.innerHTML = html;
+  setTimeout(() => {
+    for (let idx = 0; idx < cantTardanza; idx++) initImageViewer(`viewer-tardanza-${idx}`);
+  }, 50);
+} else {
+  tardanzaPane.innerHTML = `<div class="docs-empty"><div class="docs-empty-icon">⏰</div><div class="docs-empty-title">Sin registro de tardanza</div><div class="docs-empty-sub">No se ha registrado tiempo extra<br>ni notas de tardanza.</div></div>`;
 }
 
 // ════════ VISOR DE IMAGEN (con src directo) ════════
