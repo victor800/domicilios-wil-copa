@@ -130,6 +130,49 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
 .total-label { font-size:12px; font-weight:800; color:rgba(255,255,255,.85); }
 .total-value { font-size:18px; font-weight:900; color:#fff; }
 
+/* Desglose de costos dentro de la tarjeta de factura */
+.costos-breakdown {
+  background: var(--surface);
+  border-radius: 14px;
+  margin: 0 16px 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+}
+.costo-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+.costo-row:last-child {
+  margin-bottom: 0;
+}
+.costo-label {
+  font-weight: 600;
+  color: var(--muted);
+}
+.costo-value {
+  font-weight: 800;
+  color: var(--text);
+}
+.costo-total {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 2px dashed var(--teal);
+  font-size: 14px;
+}
+.costo-total .costo-label {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--teal-d);
+}
+.costo-total .costo-value {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--teal-d);
+}
+
 /* INFO CARD */
 .info-card { background:var(--white); border-radius:20px; border:1px solid var(--border); padding:16px; box-shadow:0 2px 12px rgba(0,0,0,.04); display:flex; flex-direction:column; gap:10px; }
 .info-card-title { font-size:11px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:.7px; margin-bottom:2px; }
@@ -488,9 +531,10 @@ html, body { width:100%; min-height:100%; font-family:'Nunito',sans-serif; backg
     </div>
   </div>
 
-  <!-- FACTURA: solo items + total -->
+  <!-- FACTURA: items + desglose de costos + total -->
   <div class="factura-card" id="facturaCard" style="display:none">
     <div class="factura-items" id="factItems"></div>
+    <div class="costos-breakdown" id="costosBreakdown"></div>
     <div class="total-row">
       <span class="total-label">Total a pagar</span>
       <span class="total-value" id="factTotal">—</span>
@@ -864,6 +908,80 @@ async function confirmarCancelacion() {
 // ════════ FORMAT ════════
 function formatCOP(v) { return '$ ' + Number(v || 0).toLocaleString('es-CO'); }
 
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/[&<>]/g, function(m) {
+    if (m === '&') return '&amp;';
+    if (m === '<') return '&lt;';
+    if (m === '>') return '&gt;';
+    return m;
+  });
+}
+
+// ════════ RENDER FACTURA Y DESGLOSE DE COSTOS ════════
+function renderFacturaYCostos(p) {
+  const subtotal = p.subtotal || 0;
+  const domicilio = p.domicilio || 0;
+  const valorFactura = p.facturas?.valorFactura || 0;
+  const costoExtra = p.tiempoExtra?.costoExtra || 0;
+  const totalFinal = subtotal + domicilio + valorFactura + costoExtra;
+
+  // Items del pedido
+  let itemsHtml = '';
+  if (p.items?.length) {
+    itemsHtml = p.items.map(it => `
+      <div class="item-row">
+        <div class="item-qty">${it.cantidad}</div>
+        <div class="item-info">
+          <div class="item-name">${escapeHtml(it.producto)}</div>
+          ${it.laboratorio ? `<div class="item-lab">${escapeHtml(it.laboratorio)}</div>` : ''}
+        </div>
+        <div class="item-price">${formatCOP(it.subtotal)}</div>
+      </div>`).join('');
+  } else {
+    itemsHtml = `<div class="item-row"><div class="item-info"><div class="item-name" style="text-align:center;width:100%;">Sin productos</div></div></div>`;
+  }
+  document.getElementById('factItems').innerHTML = itemsHtml;
+
+  // Desglose de costos (mostrar solo si hay valores adicionales)
+  let costosHtml = `
+    <div class="costo-row">
+      <span class="costo-label">Subtotal productos</span>
+      <span class="costo-value">${formatCOP(subtotal)}</span>
+    </div>
+    <div class="costo-row">
+      <span class="costo-label">Valor domicilio</span>
+      <span class="costo-value">${formatCOP(domicilio)}</span>
+    </div>`;
+
+  if (valorFactura > 0) {
+    costosHtml += `
+    <div class="costo-row">
+      <span class="costo-label">Valor factura (domiciliario)</span>
+      <span class="costo-value">+ ${formatCOP(valorFactura)}</span>
+    </div>`;
+  }
+
+  if (costoExtra > 0) {
+    const intervalos = p.tiempoExtra?.intervalos || 0;
+    costosHtml += `
+    <div class="costo-row">
+      <span class="costo-label">Tiempo extra (${intervalos} × 15min)</span>
+      <span class="costo-value">+ ${formatCOP(costoExtra)}</span>
+    </div>`;
+  }
+
+  costosHtml += `
+    <div class="costo-row costo-total">
+      <span class="costo-label">TOTAL FINAL</span>
+      <span class="costo-value">${formatCOP(totalFinal)}</span>
+    </div>`;
+
+  document.getElementById('costosBreakdown').innerHTML = costosHtml;
+  document.getElementById('factTotal').textContent = formatCOP(totalFinal);
+  document.getElementById('facturaCard').style.display = 'block';
+}
+
 // ════════ RENDER PEDIDO ════════
 function renderPedido(p) {
   pedidoData = p;
@@ -900,21 +1018,8 @@ function renderPedido(p) {
   document.getElementById('infoFecha').textContent  = partesFecha.filter(Boolean).join(' · ') || '—';
   document.getElementById('infoCard').style.display = 'block';
 
-  if (p.items?.length) {
-    document.getElementById('factItems').innerHTML = p.items.map(it => `
-      <div class="item-row">
-        <div class="item-qty">${it.cantidad}</div>
-        <div class="item-info">
-          <div class="item-name">${it.producto}</div>
-          ${it.laboratorio ? `<div class="item-lab">${it.laboratorio}</div>` : ''}
-        </div>
-        <div class="item-price">${formatCOP(it.subtotal)}</div>
-      </div>`).join('');
-  }
-
-  const totalFactura = (p.items?.length > 0) ? (p.total ?? valDomicilio) : valDomicilio;
-  document.getElementById('factTotal').textContent      = formatCOP(totalFactura);
-  document.getElementById('facturaCard').style.display  = 'block';
+  // Render factura y desglose de costos
+  renderFacturaYCostos(p);
 
   construirPanelDocs(p);
 
@@ -1188,6 +1293,7 @@ async function init() {
     } else {
       pedidoData = fresh;
     }
+    renderFacturaYCostos(fresh);
     construirPanelDocs(fresh);
   }, 10000);
   }
