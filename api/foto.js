@@ -917,9 +917,7 @@ export default async function handler(req, res) {
     }
   }
 
-  /* ════════════════════════════════════════
-     POST /api/foto?recurso=debug-ubicacion
-  ════════════════════════════════════════ */
+
   if (recurso === 'debug-ubicacion' && req.method === 'POST') {
     try {
       const { pedidoId, lat, lng } = req.body;
