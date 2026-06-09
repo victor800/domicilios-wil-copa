@@ -983,8 +983,11 @@ function renderPedido(p) {
    PANEL DOCUMENTOS
 ════════════════════════════════════════════════════ */
 function construirPanelDocs(p) {
-  let docsCount  = 0;
-  const pedidoOid = p._id; // ObjectId de MongoDB
+  let docsCount = 0;
+
+  // ← FIX 1: forzar string limpio del _id
+  const pedidoOid = p._id?.$oid || String(p._id || '');
+  if (!pedidoOid) return;
 
   /* ── TAB 1: COMPROBANTE ── */
   const comprPane = document.getElementById('paneComprobante');
@@ -996,14 +999,16 @@ function construirPanelDocs(p) {
         <span class="doc-label-tag comprobante">🧾 Comprobante de pago</span>
       </div>
       ${buildImageViewer('viewer-compr', comprUrl)}`;
-    setTimeout(() => initImageViewer('viewer-compr'), 50);
+    setTimeout(() => initImageViewer('viewer-compr'), 100);
   } else {
     comprPane.innerHTML = `<div class="docs-empty"><div class="docs-empty-icon">🧾</div><div class="docs-empty-title">Sin comprobante aún</div><div class="docs-empty-sub">El domiciliario no ha adjuntado<br>el comprobante de pago todavía.</div></div>`;
   }
 
-  /* ── TAB 2: FACTURA (URLs via endpoint) ── */
+  /* ── TAB 2: FACTURA ── */
   const factPane     = document.getElementById('paneFactura');
-  const cantFact     = p.facturas?.cantidadFotos ?? (p.facturas?.fotos?.length ?? 0);
+
+  // ← FIX 2: leer cantidadFotos del campo guardado en BD
+  const cantFact     = Number(p.facturas?.cantidadFotos ?? 0);
   const facturaValor = p.facturas?.valorFactura || null;
 
   if (cantFact > 0 || facturaValor) {
@@ -1014,6 +1019,7 @@ function construirPanelDocs(p) {
         <span style="font-size:11px;color:var(--muted);font-weight:700;">${p.comercio || ''}</span>
       </div>`;
     for (let idx = 0; idx < cantFact; idx++) {
+      // ← FIX 3: URL con id como string limpio
       const url = `/api/foto?recurso=factura-foto&id=${pedidoOid}&idx=${idx}`;
       html += buildImageViewerWithSrc(`viewer-fact-${idx}`, url);
     }
@@ -1025,17 +1031,20 @@ function construirPanelDocs(p) {
         </div>`;
     }
     factPane.innerHTML = html;
+    // ← FIX 4: delay mayor para asegurar que el DOM esté listo
     setTimeout(() => {
       for (let idx = 0; idx < cantFact; idx++) initImageViewer(`viewer-fact-${idx}`);
-    }, 50);
+    }, 150);
   } else {
     factPane.innerHTML = `<div class="docs-empty"><div class="docs-empty-icon">📋</div><div class="docs-empty-title">Sin factura aún</div><div class="docs-empty-sub">Cuando el domiciliario adjunte<br>la factura del comercio aparecerá aquí.</div></div>`;
   }
 
-  /* ── TAB 3: TARDANZA (URLs via endpoint) ── */
-  const tardanzaPane      = document.getElementById('paneTardanza');
-  const tardanzaNota      = p.comprobantesTardanza?.nota      || '';
-  const cantTardanza      = p.comprobantesTardanza?.cantidadFotos ?? (p.comprobantesTardanza?.fotos?.length ?? 0);
+  /* ── TAB 3: TARDANZA ── */
+  const tardanzaPane          = document.getElementById('paneTardanza');
+  const tardanzaNota          = p.comprobantesTardanza?.nota      || '';
+
+  // ← FIX 5: igual para tardanza
+  const cantTardanza          = Number(p.comprobantesTardanza?.cantidadFotos ?? 0);
   const tiempoExtraSegundos   = p.tiempoExtra?.segundos    || 0;
   const tiempoExtraCosto      = p.tiempoExtra?.costoExtra  || 0;
   const tiempoExtraIntervalos = p.tiempoExtra?.intervalos  || 0;
@@ -1070,7 +1079,7 @@ function construirPanelDocs(p) {
     tardanzaPane.innerHTML = html;
     setTimeout(() => {
       for (let idx = 0; idx < cantTardanza; idx++) initImageViewer(`viewer-tardanza-${idx}`);
-    }, 50);
+    }, 150);
   } else {
     tardanzaPane.innerHTML = `<div class="docs-empty"><div class="docs-empty-icon">⏰</div><div class="docs-empty-title">Sin registro de tardanza</div><div class="docs-empty-sub">No se ha registrado tiempo extra<br>ni notas de tardanza.</div></div>`;
   }
