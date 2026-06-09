@@ -1073,14 +1073,11 @@ if (recurso === 'factura-foto' && req.method === 'GET') {
     const mime = mimes[i] || 'image/jpeg';
 
     let buf;
-    if (Buffer.isBuffer(raw))   buf = raw;
-    else if (raw?.buffer)       buf = Buffer.from(raw.buffer);
-    else if (typeof raw === 'string') {
-      // legacy base64
-      buf = Buffer.from(raw.replace(/^data:[^;]+;base64,/, ''), 'base64');
-    } else {
-      buf = Buffer.from(Object.values(raw));
-    }
+    if (Buffer.isBuffer(raw))        buf = raw;
+    else if (raw?.buffer)            buf = Buffer.from(raw.buffer);
+    else if (raw?._bsontype === 'Binary') buf = Buffer.from(raw.value());
+    else if (typeof raw === 'string') buf = Buffer.from(raw.replace(/^data:[^;]+;base64,/, ''), 'base64');
+    else                              buf = Buffer.from(Object.values(raw));
 
     res.setHeader('Content-Type', mime);
     res.setHeader('Cache-Control', 'public, max-age=86400');
@@ -1111,13 +1108,11 @@ if (recurso === 'tardanza-foto' && req.method === 'GET') {
     const mime = mimes[i] || 'image/jpeg';
 
     let buf;
-    if (Buffer.isBuffer(raw))   buf = raw;
-    else if (raw?.buffer)       buf = Buffer.from(raw.buffer);
-    else if (typeof raw === 'string') {
-      buf = Buffer.from(raw.replace(/^data:[^;]+;base64,/, ''), 'base64');
-    } else {
-      buf = Buffer.from(Object.values(raw));
-    }
+    if (Buffer.isBuffer(raw))        buf = raw;
+    else if (raw?.buffer)            buf = Buffer.from(raw.buffer);
+    else if (raw?._bsontype === 'Binary') buf = Buffer.from(raw.value());
+    else if (typeof raw === 'string') buf = Buffer.from(raw.replace(/^data:[^;]+;base64,/, ''), 'base64');
+    else                              buf = Buffer.from(Object.values(raw));
 
     res.setHeader('Content-Type', mime);
     res.setHeader('Cache-Control', 'public, max-age=86400');
