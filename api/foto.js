@@ -36,30 +36,56 @@ const Pedido = mongoose.models.Pedido || mongoose.model('Pedido',
     domiciliarioId:     String,
     domiciliarioNombre: String,
     horaToma:           { type: String, default: '' },
+    horaEnCamino:       { type: String, default: '' },
     domiCoords: {
       lat:           { type: Number, default: null },
       lng:           { type: Number, default: null },
       actualizadoEn: { type: Date,   default: null },
-      
     },
     calificacion: {
-  estrellas:  { type: Number, default: null },
-  comentario: { type: String, default: '' },
-  fecha:      { type: Date,   default: null },
-},
+      estrellas:  { type: Number, default: null },
+      comentario: { type: String, default: '' },
+      fecha:      { type: Date,   default: null },
+    },
 
-   
-   /* ── FÓRMULA MÉDICA ── */
+    /* ── FÓRMULA MÉDICA ── */
     formulaMedica: {
       url:       { type: String, default: null },
       mime:      { type: String, default: null },
       data:      { type: Buffer, default: null },
     },
-    /* ── COMPROBANTE DE PAGO ── */
+    /* ── COMPROBANTE DE PAGO DEL CLIENTE ── */
     comprobanteImg: {
       url:       { type: String, default: null },
       mime:      { type: String, default: null },
       data:      { type: Buffer, default: null },
+    },
+
+    /* ══════════════════════════════════════
+       DATOS DEL DOMICILIARIO EN RUTA
+    ══════════════════════════════════════ */
+
+    /* ── FACTURAS (fotos + valor ingresado por el domi) ── */
+    facturas: {
+      valorFactura: { type: Number, default: null },   // valor digitado por el domi
+      fotos:        { type: [String], default: [] },   // base64 de cada foto
+      guardadoEn:   { type: Date,   default: null },
+    },
+
+    /* ── COMPROBANTES DE TARDANZA (fotos + nota del domi) ── */
+    comprobantesTardanza: {
+      nota:       { type: String, default: '' },
+      fotos:      { type: [String], default: [] },     // base64 de cada foto
+      guardadoEn: { type: Date,   default: null },
+    },
+
+    /* ── TIEMPO EXTRA POR TARDANZA ── */
+    tiempoExtra: {
+      segundos:   { type: Number, default: 0  },
+      costoExtra: { type: Number, default: 0  },  // cada 15 min = $2000
+      intervalos: { type: Number, default: 0  },  // cuántos bloques de 15 min
+      nota:       { type: String, default: '' },
+      guardadoEn: { type: Date,   default: null },
     },
   }), 'pedidos'
 );
@@ -168,13 +194,6 @@ export default async function handler(req, res) {
 
   /* ════════════════════════════════════════
      POST /api/foto?recurso=pedidos
-     ─────────────────────────────────────
-     Si el body trae `formulaMedica` (string base64 "data:<mime>;base64,<bytes>"):
-       1. Se extrae mime + buffer.
-       2. Se crea el pedido SIN el base64 en texto (se guarda como Buffer).
-       3. Se construye la URL pública con el _id del pedido recién creado.
-       4. Se escribe esa URL en pedido.formulaMedica.url con findByIdAndUpdate.
-       5. Se retorna el pedido con la URL ya incluida.
   ════════════════════════════════════════ */
   if (recurso === 'pedidos' && req.method === 'POST') {
     try {
@@ -182,7 +201,6 @@ export default async function handler(req, res) {
       if (!body.idPedido)
         body.idPedido = await siguienteId();
 
-     /* ── Procesar fórmula médica si viene en el payload ── */
       let formulaBuffer = null;
       let formulaMime   = null;
 
@@ -199,7 +217,6 @@ export default async function handler(req, res) {
         body.formulaMedica = { data: formulaBuffer, mime: formulaMime, url: null };
       }
 
-      /* ── Procesar comprobante de pago si viene en el payload ── */
       let compBuffer = null;
       let compMime   = null;
 
@@ -216,10 +233,8 @@ export default async function handler(req, res) {
         body.comprobanteImg = { data: compBuffer, mime: compMime, url: null };
       }
 
-      /* Crear el pedido */
       const nuevo = await Pedido.create(body);
 
-      /* ── Construir URLs y escribirlas en el documento ── */
       const urlUpdate = {};
 
       if (formulaBuffer) {
@@ -238,7 +253,6 @@ export default async function handler(req, res) {
         await Pedido.findByIdAndUpdate(nuevo._id, urlUpdate);
       }
 
-      /* Respuesta: omitir buffers binarios */
       const respuesta = nuevo.toObject();
       if (respuesta.formulaMedica?.data)  delete respuesta.formulaMedica.data;
       if (respuesta.comprobanteImg?.data) delete respuesta.comprobanteImg.data;
@@ -254,7 +268,6 @@ export default async function handler(req, res) {
 
   /* ════════════════════════════════════════
      GET /api/foto?recurso=comprobante&id=<_id>
-     Sirve la imagen del comprobante de pago
   ════════════════════════════════════════ */
   if (recurso === 'comprobante' && req.method === 'GET') {
     try {
@@ -291,8 +304,6 @@ export default async function handler(req, res) {
 
   /* ════════════════════════════════════════
      GET /api/foto?recurso=formula&id=<_id>
-     Sirve el archivo (imagen o PDF) de la fórmula médica
-     almacenada dentro del documento del pedido.
   ════════════════════════════════════════ */
   if (recurso === 'formula' && req.method === 'GET') {
     try {
@@ -374,9 +385,14 @@ export default async function handler(req, res) {
 
       const limitSeguro = Math.min(Math.max(Number(limit) || 300, 1), 500);
 
-      // Excluir el buffer binario de la fórmula en los listados
+      // Excluir buffers binarios y base64 de fotos en los listados (pueden ser muy pesados)
       const pedidos = await Pedido
-        .find(filtro, { 'formulaMedica.data': 0, 'comprobanteImg.data': 0 })
+        .find(filtro, {
+          'formulaMedica.data': 0,
+          'comprobanteImg.data': 0,
+          'facturas.fotos': 0,
+          'comprobantesTardanza.fotos': 0,
+        })
         .sort({ creadoEn: -1 })
         .limit(limitSeguro)
         .lean();
@@ -557,13 +573,14 @@ export default async function handler(req, res) {
   ════════════════════════════════════════ */
   if (recurso === 'estado' && req.method === 'PATCH') {
     try {
-      const { pedidoId, estado, domiciliarioId, domiciliarioNombre, horaToma } = req.body || {};
+      const { pedidoId, estado, domiciliarioId, domiciliarioNombre, horaToma, horaEnCamino } = req.body || {};
 
       if (!pedidoId || !estado)
         return res.status(400).json({ ok: false, error: 'Faltan pedidoId o estado' });
 
       const update = { estado };
-      if (horaToma) update.horaToma = horaToma;
+      if (horaToma)    update.horaToma    = horaToma;
+      if (horaEnCamino) update.horaEnCamino = horaEnCamino;
 
       if (domiciliarioId) {
         const idWilResuelto = await resolverIdWil(domiciliarioId);
@@ -594,62 +611,215 @@ export default async function handler(req, res) {
   }
 
   /* ════════════════════════════════════════
+     PATCH /api/foto?recurso=adjuntar-foto
+     ─────────────────────────────────────
+     Guarda fotos de factura o comprobantes de tardanza
+     en el pedido correspondiente.
+
+     Body:
+       {
+         pedidoId:      "01AB",
+         tipo:          "facturas" | "comprobantesTardanza",
+         fotos:         ["base64...", "base64...", ...],  // array de strings base64
+         valorFactura:  1500,    // solo para tipo "facturas" (opcional)
+         nota:          "...",   // solo para tipo "comprobantesTardanza" (opcional)
+       }
+
+     Las fotos anteriores del mismo tipo se REEMPLAZAN con el nuevo array
+     (el cliente ya acumula localmente antes de llamar).
+     Los demás campos del pedido no se tocan.
+  ════════════════════════════════════════ */
+  if (recurso === 'adjuntar-foto' && req.method === 'PATCH') {
+    try {
+      const { pedidoId, tipo, fotos, valorFactura, nota } = req.body || {};
+
+      if (!pedidoId)
+        return res.status(400).json({ ok: false, error: 'Falta pedidoId' });
+
+      if (!tipo || !['facturas', 'comprobantesTardanza'].includes(tipo))
+        return res.status(400).json({ ok: false, error: 'tipo debe ser "facturas" o "comprobantesTardanza"' });
+
+      const fotosArr = Array.isArray(fotos) ? fotos.filter(f => typeof f === 'string' && f.length > 0) : [];
+
+      const ahora = new Date();
+      let update  = {};
+
+      if (tipo === 'facturas') {
+        // Guardar fotos de factura + valor ingresado por el domi
+        update = {
+          'facturas.fotos':       fotosArr,
+          'facturas.guardadoEn':  ahora,
+        };
+        // Solo pisar valorFactura si viene en el body
+        if (valorFactura !== undefined && valorFactura !== null && valorFactura !== '') {
+          const valorNum = Number(valorFactura);
+          if (!isNaN(valorNum)) update['facturas.valorFactura'] = valorNum;
+        }
+      } else {
+        // comprobantesTardanza: fotos + nota del domi
+        update = {
+          'comprobantesTardanza.fotos':       fotosArr,
+          'comprobantesTardanza.guardadoEn':  ahora,
+        };
+        if (nota !== undefined && nota !== null) {
+          update['comprobantesTardanza.nota'] = String(nota).trim().slice(0, 500);
+        }
+      }
+
+      const pedido = await Pedido.findOneAndUpdate(
+        { idPedido: pedidoId },
+        { $set: update },
+        {
+          new: true,
+          projection: {
+            idPedido: 1, estado: 1,
+            facturas: 1,
+            comprobantesTardanza: 1,
+            tiempoExtra: 1,
+            'formulaMedica.url': 1,
+            'comprobanteImg.url': 1,
+          },
+        }
+      );
+
+      if (!pedido)
+        return res.status(404).json({ ok: false, error: 'Pedido no encontrado: ' + pedidoId });
+
+      // Devolver resumen sin los base64 (pueden ser muy pesados)
+      const respuesta = pedido.toObject();
+      if (respuesta.facturas?.fotos)              respuesta.facturas.cantidadFotos = respuesta.facturas.fotos.length, delete respuesta.facturas.fotos;
+      if (respuesta.comprobantesTardanza?.fotos)  respuesta.comprobantesTardanza.cantidadFotos = respuesta.comprobantesTardanza.fotos.length, delete respuesta.comprobantesTardanza.fotos;
+
+      console.log(`[adjuntar-foto] pedido=${pedidoId} tipo=${tipo} fotos=${fotosArr.length}`);
+      return res.status(200).json({ ok: true, data: respuesta });
+    } catch (e) {
+      console.error('[PATCH adjuntar-foto]', e.message);
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
+  /* ════════════════════════════════════════
+     PATCH /api/foto?recurso=tiempo-extra
+     ─────────────────────────────────────
+     Guarda el tiempo extra de tardanza en el pedido.
+     El cronómetro se detiene en el cliente al llegar a
+     un múltiplo de 15 min → cada intervalo = $2 000.
+
+     Body:
+       {
+         pedidoId: "01AB",
+         tiempoExtra: {
+           segundos:   900,    // total de segundos corridos
+           costoExtra: 2000,   // segundos / 900 * 2000
+           intervalos: 1,      // cuántos bloques de 15 min completados
+           nota:       "...",  // opcional
+         }
+       }
+  ════════════════════════════════════════ */
+  if (recurso === 'tiempo-extra' && req.method === 'PATCH') {
+    try {
+      const { pedidoId, tiempoExtra } = req.body || {};
+
+      if (!pedidoId)
+        return res.status(400).json({ ok: false, error: 'Falta pedidoId' });
+
+      if (!tiempoExtra || typeof tiempoExtra !== 'object')
+        return res.status(400).json({ ok: false, error: 'Falta objeto tiempoExtra' });
+
+      const segundos   = Number(tiempoExtra.segundos   ?? 0);
+      const costoExtra = Number(tiempoExtra.costoExtra ?? 0);
+      const intervalos = Number(tiempoExtra.intervalos ?? 0);
+      const nota       = String(tiempoExtra.nota       ?? '').trim().slice(0, 500);
+
+      if (isNaN(segundos) || segundos < 0)
+        return res.status(400).json({ ok: false, error: 'tiempoExtra.segundos inválido' });
+
+      const ahora = new Date();
+
+      const pedido = await Pedido.findOneAndUpdate(
+        { idPedido: pedidoId },
+        {
+          $set: {
+            'tiempoExtra.segundos':   segundos,
+            'tiempoExtra.costoExtra': costoExtra,
+            'tiempoExtra.intervalos': intervalos,
+            'tiempoExtra.nota':       nota,
+            'tiempoExtra.guardadoEn': ahora,
+          }
+        },
+        {
+          new: true,
+          projection: {
+            idPedido: 1, estado: 1,
+            tiempoExtra: 1,
+            facturas: 1,
+            comprobantesTardanza: 1,
+            'formulaMedica.url': 1,
+            'comprobanteImg.url': 1,
+          },
+        }
+      );
+
+      if (!pedido)
+        return res.status(404).json({ ok: false, error: 'Pedido no encontrado: ' + pedidoId });
+
+      // Devolver sin base64
+      const respuesta = pedido.toObject();
+      if (respuesta.facturas?.fotos)             respuesta.facturas.cantidadFotos = respuesta.facturas.fotos.length, delete respuesta.facturas.fotos;
+      if (respuesta.comprobantesTardanza?.fotos) respuesta.comprobantesTardanza.cantidadFotos = respuesta.comprobantesTardanza.fotos.length, delete respuesta.comprobantesTardanza.fotos;
+
+      console.log(`[tiempo-extra] pedido=${pedidoId} segundos=${segundos} costo=${costoExtra} intervalos=${intervalos}`);
+      return res.status(200).json({ ok: true, data: respuesta });
+    } catch (e) {
+      console.error('[PATCH tiempo-extra]', e.message);
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
+  /* ════════════════════════════════════════
      PATCH /api/foto?recurso=ubicacion-domi
-     Actualiza la ubicación del domiciliario y sus pedidos activos
-  ═══════════════════════════════════════ */
+  ════════════════════════════════════════ */
   if (recurso === 'ubicacion-domi' && req.method === 'PATCH') {
     try {
       const { domiId, lat, lng } = req.body || {};
 
-      // Validaciones mejoradas
-      if (!domiId) {
+      if (!domiId)
         return res.status(400).json({ ok: false, error: 'Falta domiId' });
-      }
-      
-      if (lat === undefined || lat === null || lng === undefined || lng === null) {
+
+      if (lat === undefined || lat === null || lng === undefined || lng === null)
         return res.status(400).json({ ok: false, error: 'Faltan lat o lng' });
-      }
 
       const latNum = Number(lat);
       const lngNum = Number(lng);
-      
-      if (isNaN(latNum) || isNaN(lngNum)) {
+
+      if (isNaN(latNum) || isNaN(lngNum))
         return res.status(400).json({ ok: false, error: 'lat y lng deben ser números válidos' });
-      }
 
       const ahora  = new Date();
-      const coords = { 
-        lat: latNum, 
-        lng: lngNum, 
-        actualizadoEn: ahora 
-      };
-      
-      const idWil = domiId.toUpperCase().trim();
+      const coords = { lat: latNum, lng: lngNum, actualizadoEn: ahora };
+      const idWil  = domiId.toUpperCase().trim();
 
-      // 1. Actualizar ubicación del domiciliario
       const domiActualizado = await Domiciliario.findOneAndUpdate(
-        { idWil }, 
+        { idWil },
         { ubicacion: coords },
         { new: true }
       );
 
-      if (!domiActualizado) {
+      if (!domiActualizado)
         return res.status(404).json({ ok: false, error: 'Domiciliario no encontrado' });
-      }
 
-      // 2. Actualizar coordenadas en pedidos activos (no entregados ni cancelados)
       const pedidosActualizados = await Pedido.updateMany(
-        { 
+        {
           domiciliarioId: idWil,
           estado: { $nin: ['Entregado', 'Cancelado', 'Completado'] }
         },
         { domiCoords: coords }
       );
 
-      console.log(`[UBICACIÓN] ${idWil} -> lat:${latNum}, lng:${lngNum} | Pedidos actualizados: ${pedidosActualizados.modifiedCount}`);
+      console.log(`[UBICACIÓN] ${idWil} -> lat:${latNum}, lng:${lngNum} | Pedidos: ${pedidosActualizados.modifiedCount}`);
 
-      return res.status(200).json({ 
-        ok: true, 
+      return res.status(200).json({
+        ok: true,
         coords,
         pedidosActualizados: pedidosActualizados.modifiedCount
       });
@@ -661,58 +831,46 @@ export default async function handler(req, res) {
 
   /* ════════════════════════════════════════
      GET /api/foto?recurso=ubicacion
-     Consulta la ubicación actual de un pedido o domiciliario
-     Uso: 
-       - ?pedidoId=XXX  (devuelve ubicación del pedido o su domiciliario)
-       - ?domiId=XXX    (devuelve ubicación actual del domiciliario)
-  ═══════════════════════════════════════ */
+  ════════════════════════════════════════ */
   if (recurso === 'ubicacion' && req.method === 'GET') {
     try {
       const { pedidoId, domiId } = req.query;
-      
+
       if (pedidoId) {
-        // Buscar por pedido
         const pedido = await Pedido.findOne(
           { idPedido: pedidoId },
           { domiciliarioId: 1, domiCoords: 1, estado: 1 }
         ).lean();
-        
-        if (!pedido) {
+
+        if (!pedido)
           return res.status(404).json({ ok: false, error: 'Pedido no encontrado' });
-        }
-        
-        // Si el pedido tiene coordenadas recientes (menos de 30 segundos), devolverlas
+
         if (pedido.domiCoords?.lat && pedido.domiCoords?.lng) {
-          const actualizadoHace = pedido.domiCoords.actualizadoEn 
+          const actualizadoHace = pedido.domiCoords.actualizadoEn
             ? Math.floor((Date.now() - new Date(pedido.domiCoords.actualizadoEn)) / 1000)
             : null;
-            
-          // Si la ubicación tiene menos de 60 segundos, es confiable
           const esReciente = actualizadoHace !== null && actualizadoHace < 60;
-            
-          return res.status(200).json({ 
-            ok: true, 
+          return res.status(200).json({
+            ok: true,
             ubicacion: pedido.domiCoords,
             estado: pedido.estado,
             actualizadoHaceSegundos: actualizadoHace,
-                esReciente
+            esReciente
           });
         }
-        
-        // Si no tiene coordenadas en el pedido, buscar ubicación actual del domiciliario
+
         if (pedido.domiciliarioId) {
           const domi = await Domiciliario.findOne(
             { idWil: pedido.domiciliarioId },
             { ubicacion: 1, nombre: 1 }
           ).lean();
-          
+
           if (domi?.ubicacion?.lat) {
-            const actualizadoHace = domi.ubicacion.actualizadoEn 
+            const actualizadoHace = domi.ubicacion.actualizadoEn
               ? Math.floor((Date.now() - new Date(domi.ubicacion.actualizadoEn)) / 1000)
               : null;
-              
-            return res.status(200).json({ 
-              ok: true, 
+            return res.status(200).json({
+              ok: true,
               ubicacion: domi.ubicacion,
               domiciliarioNombre: domi.nombre,
               fuente: 'domiciliario',
@@ -720,49 +878,39 @@ export default async function handler(req, res) {
             });
           }
         }
-        
-        return res.status(200).json({ 
-          ok: true, 
+
+        return res.status(200).json({
+          ok: true,
           ubicacion: null,
           mensaje: 'No hay ubicación disponible para este pedido'
         });
       }
-      
+
       if (domiId) {
-        // Buscar directamente por domiciliario
         const domi = await Domiciliario.findOne(
           { idWil: domiId.toUpperCase().trim() },
           { ubicacion: 1, nombre: 1, activo: 1 }
         ).lean();
-        
-        if (!domi) {
+
+        if (!domi)
           return res.status(404).json({ ok: false, error: 'Domiciliario no encontrado' });
-        }
-        
-        if (!domi.activo) {
-          return res.status(200).json({ 
-            ok: true, 
-            ubicacion: null,
-            mensaje: 'Domiciliario inactivo'
-          });
-        }
-        
-        const actualizadoHace = domi.ubicacion?.actualizadoEn 
+
+        if (!domi.activo)
+          return res.status(200).json({ ok: true, ubicacion: null, mensaje: 'Domiciliario inactivo' });
+
+        const actualizadoHace = domi.ubicacion?.actualizadoEn
           ? Math.floor((Date.now() - new Date(domi.ubicacion.actualizadoEn)) / 1000)
           : null;
-        
-        return res.status(200).json({ 
-          ok: true, 
+
+        return res.status(200).json({
+          ok: true,
           ubicacion: domi.ubicacion || null,
           nombre: domi.nombre,
           actualizadoHaceSegundos: actualizadoHace
         });
       }
-      
-      return res.status(400).json({ 
-        ok: false, 
-        error: 'Se requiere pedidoId o domiId' 
-      });
+
+      return res.status(400).json({ ok: false, error: 'Se requiere pedidoId o domiId' });
     } catch (e) {
       console.error('[GET ubicacion]', e.message);
       return res.status(500).json({ ok: false, error: e.message });
@@ -771,44 +919,44 @@ export default async function handler(req, res) {
 
   /* ════════════════════════════════════════
      POST /api/foto?recurso=debug-ubicacion
-     SOLO PARA DEPURACIÓN - Actualiza ubicación manualmente
-     Uso: { "pedidoId": "01AB", "lat": 4.7110, "lng": -74.0721 }
-  ═══════════════════════════════════════ */
+  ════════════════════════════════════════ */
   if (recurso === 'debug-ubicacion' && req.method === 'POST') {
     try {
       const { pedidoId, lat, lng } = req.body;
-      
-      if (!pedidoId || lat === undefined || lng === undefined) {
+
+      if (!pedidoId || lat === undefined || lng === undefined)
         return res.status(400).json({ ok: false, error: 'Faltan pedidoId, lat o lng' });
-      }
-      
+
       const pedido = await Pedido.findOneAndUpdate(
         { idPedido: pedidoId },
-        { 
-          domiCoords: { 
-            lat: Number(lat), 
-            lng: Number(lng), 
-            actualizadoEn: new Date() 
-          } 
+        {
+          domiCoords: {
+            lat: Number(lat),
+            lng: Number(lng),
+            actualizadoEn: new Date()
+          }
         },
         { new: true, projection: { 'formulaMedica.data': 0, 'comprobanteImg.data': 0 } }
       );
-      
-      if (!pedido) {
+
+      if (!pedido)
         return res.status(404).json({ ok: false, error: 'Pedido no encontrado' });
-      }
-      
-      return res.status(200).json({ 
-        ok: true, 
+
+      return res.status(200).json({
+        ok: true,
         mensaje: 'Ubicación actualizada manualmente (debug)',
-        data: pedido 
+        data: pedido
       });
     } catch (e) {
       console.error('[POST debug-ubicacion]', e.message);
       return res.status(500).json({ ok: false, error: e.message });
     }
   }
- if (recurso === 'calificacion' && req.method === 'PATCH') {
+
+  /* ════════════════════════════════════════
+     PATCH /api/foto?recurso=calificacion
+  ════════════════════════════════════════ */
+  if (recurso === 'calificacion' && req.method === 'PATCH') {
     try {
       const { pedidoId, estrellas, comentario } = req.body || {};
       if (!pedidoId || !estrellas)
@@ -832,6 +980,6 @@ export default async function handler(req, res) {
 
   return res.status(400).json({
     ok: false,
-    error: `Recurso no válido: "${recurso}". Usa: pedidos | domiciliarios | asignar | estado | foto | formula | ubicacion-domi | ubicacion | debug-ubicacion | calificacion`,
+    error: `Recurso no válido: "${recurso}". Usa: pedidos | domiciliarios | asignar | estado | foto | formula | comprobante | ubicacion-domi | ubicacion | debug-ubicacion | calificacion | adjuntar-foto | tiempo-extra`,
   });
 }
