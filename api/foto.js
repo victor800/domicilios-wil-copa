@@ -67,17 +67,17 @@ const Pedido = mongoose.models.Pedido || mongoose.model('Pedido',
 
     /* ── FACTURAS (fotos + valor ingresado por el domi) ── */
     facturas: {
-      valorFactura: { type: Number, default: null },   // valor digitado por el domi
-      fotos:        { type: [String], default: [] },   // base64 de cada foto
-      guardadoEn:   { type: Date,   default: null },
-    },
-
-    /* ── COMPROBANTES DE TARDANZA (fotos + nota del domi) ── */
-    comprobantesTardanza: {
-      nota:       { type: String, default: '' },
-      fotos:      { type: [String], default: [] },     // base64 de cada foto
-      guardadoEn: { type: Date,   default: null },
-    },
+  valorFactura: { type: Number, default: null },
+  fotos:        { type: [mongoose.Schema.Types.Mixed], default: [] }, // Buffer
+  mimes:        { type: [String], default: [] },                      // ← nuevo
+  guardadoEn:   { type: Date, default: null },
+},
+comprobantesTardanza: {
+  nota:       { type: String, default: '' },
+  fotos:      { type: [mongoose.Schema.Types.Mixed], default: [] },   // Buffer
+  mimes:      { type: [String], default: [] },                        // ← nuevo
+  guardadoEn: { type: Date, default: null },
+},
 
     /* ── TIEMPO EXTRA POR TARDANZA ── */
     tiempoExtra: {
@@ -660,23 +660,35 @@ export default async function handler(req, res) {
     try {
       const { pedidoId, tipo, fotos, valorFactura, nota } = req.body || {};
 
-      if (!pedidoId)
-        return res.status(400).json({ ok: false, error: 'Falta pedidoId' });
+if (!pedidoId)
+  return res.status(400).json({ ok: false, error: 'Falta pedidoId' });
 
-      if (!tipo || !['facturas', 'comprobantesTardanza'].includes(tipo))
-        return res.status(400).json({ ok: false, error: 'tipo debe ser "facturas" o "comprobantesTardanza"' });
+if (!tipo || !['facturas', 'comprobantesTardanza'].includes(tipo))
+  return res.status(400).json({ ok: false, error: 'tipo debe ser "facturas" o "comprobantesTardanza"' });
 
-      const fotosArr = Array.isArray(fotos) ? fotos.filter(f => typeof f === 'string' && f.length > 0) : [];
+// ← REEMPLAZAR la línea anterior por esto:
+const fotosArr = [];
+const mimesArr = [];
+if (Array.isArray(fotos)) {
+  for (const f of fotos) {
+    if (typeof f !== 'string' || !f.length) continue;
+    const match = f.match(/^data:([^;]+);base64,(.+)$/s);
+    const mime  = match ? match[1] : 'image/jpeg';
+    const raw   = match ? match[2] : f;
+    fotosArr.push(Buffer.from(raw, 'base64'));
+    mimesArr.push(mime);
+  }
+}
 
-      const ahora = new Date();
-      let update  = {};
+const ahora = new Date();
+let update  = {};
 
-      if (tipo === 'facturas') {
-        // Guardar fotos de factura + valor ingresado por el domi
-        update = {
-          'facturas.fotos':       fotosArr,
-          'facturas.guardadoEn':  ahora,
-        };
+if (tipo === 'facturas') {
+  update = {
+    'facturas.fotos':      fotosArr,
+    'facturas.mimes':      mimesArr,   // ← agregar
+    'facturas.guardadoEn': ahora,
+  };
         // Solo pisar valorFactura si viene en el body
         if (valorFactura !== undefined && valorFactura !== null && valorFactura !== '') {
           const valorNum = Number(valorFactura);
@@ -1050,17 +1062,25 @@ if (recurso === 'factura-foto' && req.method === 'GET') {
     if (!id || !/^[a-f\d]{24}$/i.test(id))
       return res.status(400).json({ ok: false, error: 'id inválido' });
 
-    const pedido = await Pedido.findById(id, { facturas: 1 }).lean();
+    const pedido = await Pedido.findById(id, { 'facturas.fotos': 1, 'facturas.mimes': 1 }).lean();
     const fotos  = pedido?.facturas?.fotos || [];
+    const mimes  = pedido?.facturas?.mimes || [];
     const i      = Number(idx ?? 0);
 
-    if (!fotos[i])
-      return res.status(404).json({ ok: false, error: 'Foto no encontrada' });
+    if (!fotos[i]) return res.status(404).json({ ok: false, error: 'Foto no encontrada' });
 
-    // El Base64 ya está guardado como string — convertir a Buffer
-    const b64  = fotos[i].replace(/[\s\r\n]/g, '');
-    const buf  = Buffer.from(b64, 'base64');
-    const mime = b64.startsWith('/9j/') ? 'image/jpeg' : 'image/png';
+    const raw  = fotos[i];
+    const mime = mimes[i] || 'image/jpeg';
+
+    let buf;
+    if (Buffer.isBuffer(raw))   buf = raw;
+    else if (raw?.buffer)       buf = Buffer.from(raw.buffer);
+    else if (typeof raw === 'string') {
+      // legacy base64
+      buf = Buffer.from(raw.replace(/^data:[^;]+;base64,/, ''), 'base64');
+    } else {
+      buf = Buffer.from(Object.values(raw));
+    }
 
     res.setHeader('Content-Type', mime);
     res.setHeader('Cache-Control', 'public, max-age=86400');
@@ -1080,16 +1100,24 @@ if (recurso === 'tardanza-foto' && req.method === 'GET') {
     if (!id || !/^[a-f\d]{24}$/i.test(id))
       return res.status(400).json({ ok: false, error: 'id inválido' });
 
-    const pedido = await Pedido.findById(id, { comprobantesTardanza: 1 }).lean();
+    const pedido = await Pedido.findById(id, { 'comprobantesTardanza.fotos': 1, 'comprobantesTardanza.mimes': 1 }).lean();
     const fotos  = pedido?.comprobantesTardanza?.fotos || [];
+    const mimes  = pedido?.comprobantesTardanza?.mimes || [];
     const i      = Number(idx ?? 0);
 
-    if (!fotos[i])
-      return res.status(404).json({ ok: false, error: 'Foto no encontrada' });
+    if (!fotos[i]) return res.status(404).json({ ok: false, error: 'Foto no encontrada' });
 
-    const b64  = fotos[i].replace(/[\s\r\n]/g, '');
-    const buf  = Buffer.from(b64, 'base64');
-    const mime = b64.startsWith('/9j/') ? 'image/jpeg' : 'image/png';
+    const raw  = fotos[i];
+    const mime = mimes[i] || 'image/jpeg';
+
+    let buf;
+    if (Buffer.isBuffer(raw))   buf = raw;
+    else if (raw?.buffer)       buf = Buffer.from(raw.buffer);
+    else if (typeof raw === 'string') {
+      buf = Buffer.from(raw.replace(/^data:[^;]+;base64,/, ''), 'base64');
+    } else {
+      buf = Buffer.from(Object.values(raw));
+    }
 
     res.setHeader('Content-Type', mime);
     res.setHeader('Cache-Control', 'public, max-age=86400');
