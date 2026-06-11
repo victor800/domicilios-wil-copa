@@ -1407,6 +1407,8 @@ async function loadPedidos(){
         vu:it.precioUnit??0,
         vtotal:it.subtotal??0,
       })),
+      _domiCoords: p.domiCoords?.lat ? { lat: p.domiCoords.lat, lng: p.domiCoords.lng } : null,
+  _domiCoordsTs: p.domiCoords?.actualizadoEn || null,
     }));
   }catch(e){console.warn('[loadPedidos]:',e.message);allPedidos=[];}
 }
@@ -2557,16 +2559,16 @@ let _mapaInterval  = null;
 
 /* ── Extrae coords de un pedido (todos los formatos posibles) ── */
 function extraerCoordsDelPedido(p) {
+  // ← ESTE ES EL CAMPO REAL del schema
+  if (p.domiCoords?.lat && p.domiCoords?.lng)
+    return { lat: parseFloat(p.domiCoords.lat), lng: parseFloat(p.domiCoords.lng), ts: p.domiCoords.actualizadoEn || null };
+  
+  // fallbacks (los puedes dejar por si acaso)
   if (p.ubicacion?.lat && p.ubicacion?.lng)
     return { lat: parseFloat(p.ubicacion.lat), lng: parseFloat(p.ubicacion.lng), ts: p.ubicacion.ts || null };
   if (p.domiLat && p.domiLng)
     return { lat: parseFloat(p.domiLat), lng: parseFloat(p.domiLng), ts: p.domiTs || null };
-  if (p._domiCoords?.lat && p._domiCoords?.lng)
-    return { lat: parseFloat(p._domiCoords.lat), lng: parseFloat(p._domiCoords.lng), ts: p._domiCoordsTs || null };
-  if (typeof p.coords === 'string' && p.coords.includes(',')) {
-    const [lat, lng] = p.coords.split(',').map(Number);
-    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng, ts: null };
-  }
+  
   return null;
 }
 
@@ -2930,7 +2932,7 @@ function initMapaRastreo() {
 
   if (!_mapaRastreo) {
     _mapaRastreo = L.map('mapa-rastreo', { zoomControl: true })
-      .setView([11.0041, -74.8070], 13);          // ← Barranquilla por defecto
+      .setView([6.2442, -75.5812], 13);         // ← Barranquilla por defecto
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>',
       maxZoom: 19,
