@@ -3110,51 +3110,6 @@ function actualizarCardsYLista(domisConCoords) {
   }
 }
  
-/* ── Inicializar mapa ── */
-function initMapaRastreo() {
-  const contenedor = document.getElementById('mapa-rastreo');
-  if (!contenedor) return;
- 
-  if (!_mapaRastreo) {
-    _mapaRastreo = L.map('mapa-rastreo', { zoomControl: true })
-      .setView([6.2442, -75.5812], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>',
-      maxZoom: 19,
-    }).addTo(_mapaRastreo);
-  }
- 
-  setTimeout(() => _mapaRastreo.invalidateSize(), 200);
-  actualizarMapaRastreo();
- 
-  if (_mapaInterval) clearInterval(_mapaInterval);
-  _mapaInterval = setInterval(() => {
-    // En lugar de re-fetch pesado, simplemente re-renderizar con allPedidos actualizado
-    actualizarMapaRastreo();
-  }, 12000);
-}
-
-/* ── Inicializar mapa ── */
-function initMapaRastreo() {
-  const contenedor = document.getElementById('mapa-rastreo');
-  if (!contenedor) return;
-
-  if (!_mapaRastreo) {
-    _mapaRastreo = L.map('mapa-rastreo', { zoomControl: true })
-      .setView([6.2442, -75.5812], 13);  // Medellín por defecto
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>',
-      maxZoom: 19
-    }).addTo(_mapaRastreo);
-  }
-
-  setTimeout(() => _mapaRastreo.invalidateSize(), 200);
-  actualizarMapaRastreo();
-
-  if (_mapaInterval) clearInterval(_mapaInterval);
-  _mapaInterval = setInterval(actualizarMapaRastreo, 12000);  // ← 12 segundos
-}
-
 /* ════ CALIFICACIONES ════ */
 let califsData = [];
 
