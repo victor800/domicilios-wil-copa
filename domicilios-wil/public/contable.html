@@ -2541,11 +2541,12 @@ function renderListaDomis(){
 }
 
 /* ════════════════════════════════════════════════════════
-   RASTREO EN TIEMPO REAL — versión corregida
-   · Cada 10s → fetch /api/pedidos (pedidos activos)
-   · Lee p.domiLat / p.domiLng / p.domiTs  (o anidado p.ubicacion.*)
-   · Historial de puntos por domi → polyline de recorrido
-   · Marcador con icono radar pulsante
+   RASTREO EN TIEMPO REAL — versión corregida (fix completo)
+   · cada 10s → fetch /api/foto?recurso=pedidos (coords frescas)
+   · getCoordsFromPedidos()  ← función que faltaba
+   · UNA sola initMapaRastreo + UNA sola actualizarMapaRastreo
+   · historial de puntos por domi → polyline de recorrido
+   · marcador con icono radar pulsante
 ════════════════════════════════════════════════════════ */
 
 let _mapaRastreo   = null;
@@ -2554,21 +2555,14 @@ let _mapaPolylines = {};          // { domiKey: L.polyline }
 let _mapaHistorial = {};          // { domiKey: [[lat,lng], ...] }
 let _mapaInterval  = null;
 
-/* ── Extraer coords de un pedido (varios formatos posibles) ── */
+/* ── Extrae coords de un pedido (todos los formatos posibles) ── */
 function extraerCoordsDelPedido(p) {
-  // Formato 1: p.ubicacion.lat / p.ubicacion.lng
-  if (p.ubicacion?.lat && p.ubicacion?.lng) {
+  if (p.ubicacion?.lat && p.ubicacion?.lng)
     return { lat: parseFloat(p.ubicacion.lat), lng: parseFloat(p.ubicacion.lng), ts: p.ubicacion.ts || null };
-  }
-  // Formato 2: p.domiLat / p.domiLng (campo plano)
-  if (p.domiLat && p.domiLng) {
+  if (p.domiLat && p.domiLng)
     return { lat: parseFloat(p.domiLat), lng: parseFloat(p.domiLng), ts: p.domiTs || null };
-  }
-  // Formato 3: p._domiCoords.lat / .lng (legacy interno)
-  if (p._domiCoords?.lat && p._domiCoords?.lng) {
+  if (p._domiCoords?.lat && p._domiCoords?.lng)
     return { lat: parseFloat(p._domiCoords.lat), lng: parseFloat(p._domiCoords.lng), ts: p._domiCoordsTs || null };
-  }
-  // Formato 4: p.coords como "lat,lng"
   if (typeof p.coords === 'string' && p.coords.includes(',')) {
     const [lat, lng] = p.coords.split(',').map(Number);
     if (!isNaN(lat) && !isNaN(lng)) return { lat, lng, ts: null };
@@ -2576,34 +2570,29 @@ function extraerCoordsDelPedido(p) {
   return null;
 }
 
-/* ── Fetch periódico de coordenadas ── */
+/* ── Fetch de coordenadas frescas desde el backend ── */
 async function fetchCoordenadas() {
   try {
-    // Pedimos los pedidos activos con sus coordenadas
-    // El backend ya los tiene en /api/foto?recurso=pedidos
-    // Hacemos un fetch ligero con timestamp para evitar caché
     const res  = await fetch('/api/foto?recurso=pedidos&limit=500&_t=' + Date.now());
     const json = await res.json();
-    if (!json.ok) return;
+    if (!json.ok) return false;
 
     const estadosActivos = new Set(['asignado', 'proceso', 'encamino']);
 
-    // Actualizar allPedidos con las coordenadas frescas
     (json.data || []).forEach(raw => {
-      const id  = raw.idPedido || String(raw._id);
-      const idx = allPedidos.findIndex(p => p.id === id);
+      const id     = raw.idPedido || String(raw._id);
       const coords = extraerCoordsDelPedido(raw);
+      const idx    = allPedidos.findIndex(p => p.id === id);
 
       if (idx >= 0) {
-        // Actualizar coordenadas en el pedido existente
         if (coords) {
-          allPedidos[idx]._domiCoords = { lat: coords.lat, lng: coords.lng };
+          allPedidos[idx]._domiCoords   = { lat: coords.lat, lng: coords.lng };
           allPedidos[idx]._domiCoordsTs = coords.ts;
         }
         allPedidos[idx].estado    = normEstado(raw.estado || '');
         allPedidos[idx].estadoRaw = raw.estado || '';
-      } else if (coords) {
-        // Pedido nuevo con coords: agregar al array
+        allPedidos[idx].domi      = raw.domiciliarioNombre || allPedidos[idx].domi;
+      } else if (coords && estadosActivos.has(normEstado(raw.estado || ''))) {
         allPedidos.push({
           id, estado: normEstado(raw.estado || ''), estadoRaw: raw.estado || '',
           domi: raw.domiciliarioNombre || '', cliente: raw.nombre || '',
@@ -2612,11 +2601,12 @@ async function fetchCoordenadas() {
           total: raw.total ?? 0, fecha: raw.fecha || '', hora: raw.hora || '',
           comercio: raw.comercio || '', imagen: '', tipoEntrega: raw.modoEntrega || '',
           facturas: raw.facturas || {}, tiempoExtra: raw.tiempoExtra || {},
-          _prods: [], _domiCoords: { lat: coords.lat, lng: coords.lng }, _domiCoordsTs: coords.ts,
+          _prods: [],
+          _domiCoords: { lat: coords.lat, lng: coords.lng },
+          _domiCoordsTs: coords.ts,
         });
       }
     });
-
     return true;
   } catch(e) {
     console.warn('[fetchCoordenadas]:', e.message);
@@ -2624,62 +2614,61 @@ async function fetchCoordenadas() {
   }
 }
 
-/* ── Construir datos agrupados por domiciliario ── */
-function getDomisConCoordenadas() {
+/* ── FUNCIÓN QUE FALTABA: agrupa pedidos activos por domiciliario ── */
+function getCoordsFromPedidos() {
   const estadosActivos = new Set(['asignado', 'proceso', 'encamino']);
   const mapa = {};
 
   allPedidos
     .filter(p => estadosActivos.has(p.estado) && p._domiCoords?.lat && p._domiCoords?.lng)
     .forEach(p => {
-      const key = (p.domi || 'Sin nombre').trim();
-      if (!key || key === 'Sin nombre') return;
+      const key = (p.domi || '').trim();
+      if (!key) return;
+
       if (!mapa[key]) {
         mapa[key] = {
-          nombre:  key,
-          domiId:  p.domiciliarioId || '',
-          coords:  [p._domiCoords.lat, p._domiCoords.lng],
-          ts:      p._domiCoordsTs,
-          pedidos: [],
+          nombre:       key,
+          domiId:       p.domiciliarioId || '',
+          coords:       [p._domiCoords.lat, p._domiCoords.lng],
+          actualizadoEn: p._domiCoordsTs,
+          pedidos:      [],
         };
       }
       mapa[key].pedidos.push(p);
-      // Guardar la posición más reciente
-      if (!mapa[key].ts || (p._domiCoordsTs && p._domiCoordsTs > mapa[key].ts)) {
-        mapa[key].coords = [p._domiCoords.lat, p._domiCoords.lng];
-        mapa[key].ts     = p._domiCoordsTs;
+      /* conservar la posición más reciente */
+      if (!mapa[key].actualizadoEn ||
+          (p._domiCoordsTs && p._domiCoordsTs > mapa[key].actualizadoEn)) {
+        mapa[key].coords        = [p._domiCoords.lat, p._domiCoords.lng];
+        mapa[key].actualizadoEn = p._domiCoordsTs;
       }
     });
 
   return Object.values(mapa);
 }
 
-/* ── Actualizar historial de recorrido ── */
+/* ── Actualizar historial de recorrido (polyline) ── */
 function actualizarHistorial(domisConCoords) {
-  const MAX_PUNTOS = 60; // máximo ~10 minutos de historial (1 punto cada 10s)
+  const MAX_PUNTOS = 60;
   domisConCoords.forEach(d => {
     if (!_mapaHistorial[d.nombre]) _mapaHistorial[d.nombre] = [];
     const hist  = _mapaHistorial[d.nombre];
     const nuevo = d.coords;
-    // Solo agregar si el punto cambió (evitar duplicados)
     const ultimo = hist[hist.length - 1];
     if (!ultimo || ultimo[0] !== nuevo[0] || ultimo[1] !== nuevo[1]) {
       hist.push(nuevo);
       if (hist.length > MAX_PUNTOS) hist.shift();
     }
   });
-  // Limpiar historial de domis que ya no están activos
   const activos = new Set(domisConCoords.map(d => d.nombre));
   Object.keys(_mapaHistorial).forEach(k => { if (!activos.has(k)) delete _mapaHistorial[k]; });
 }
 
-/* ── Construir HTML del icono radar ── */
+/* ── HTML del icono radar pulsante ── */
 function buildRadarIcon(fotoUrl, iniciales, color) {
   const avatar = fotoUrl
     ? `<img src="${fotoUrl}" alt="${iniciales}"
          style="position:relative;z-index:2;width:42px;height:42px;border-radius:50%;
-                object-fit:cover;border:3px solid ${color};
-                box-shadow:0 2px 10px ${color}88;"
+                object-fit:cover;border:3px solid ${color};box-shadow:0 2px 10px ${color}88;"
          onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
     : '';
   const fallback = `<div style="display:${fotoUrl ? 'none' : 'flex'};position:relative;z-index:2;
@@ -2712,26 +2701,29 @@ function buildPopupHTML(d, color, iniciales, fotoUrl) {
   const stColors = { pendiente:'#d97706', asignado:'#7c3aed', proceso:'#2563eb', encamino:'#22c55e' };
   const stLbls   = { pendiente:'Pendiente', asignado:'Asignado', proceso:'En proceso', encamino:'🛵 En camino' };
   const pedsLibres = allPedidos.filter(p => p.estado === 'pendiente' && !p.domi);
-  const seg = d.ts ? Math.floor((Date.now() - new Date(d.ts)) / 1000) : null;
+  const seg = d.actualizadoEn ? Math.floor((Date.now() - new Date(d.actualizadoEn)) / 1000) : null;
   const tsStr = seg !== null ? (seg < 60 ? `hace ${seg}s` : `hace ${Math.floor(seg/60)}m`) : 'sin timestamp';
+
   const pedHtml = d.pedidos.length
     ? d.pedidos.slice(0, 4).map(p => {
-        const est = p.estado; const c = stColors[est] || '#d97706';
+        const c = stColors[p.estado] || '#d97706';
         return `<div style="font-size:10px;padding:5px 0;border-top:1px solid #e5edef;display:flex;align-items:center;gap:6px;">
           <div style="width:7px;height:7px;border-radius:50%;background:${c};flex-shrink:0;"></div>
           <div style="flex:1;min-width:0;">
             <b>#${p.id}</b>
-            <span style="color:${c};background:${c}22;padding:1px 6px;border-radius:99px;font-size:8px;font-weight:800;margin-left:3px;">${stLbls[est]||est}</span>
+            <span style="color:${c};background:${c}22;padding:1px 6px;border-radius:99px;font-size:8px;font-weight:800;margin-left:3px;">${stLbls[p.estado]||p.estado}</span>
             — ${p.cliente||'–'}<br>
             <span style="color:#6e979c;">📍 ${(p.direccion||'').substring(0,34)}</span>
           </div>
         </div>`;
       }).join('')
     : '<div style="font-size:10px;color:#aaa;padding:5px 0;border-top:1px solid #e5edef;font-style:italic;">Sin pedidos activos</div>';
+
+  const selId = 'popup-sel-' + d.nombre.replace(/\W/g, '_');
   const asignarHtml = pedsLibres.length
     ? `<div style="margin-top:8px;border-top:1px solid #e5edef;padding-top:8px;">
         <div style="font-size:8px;font-weight:800;color:#6e979c;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;">Asignar pedido libre</div>
-        <select id="popup-sel-${d.nombre.replace(/\W/g,'_')}"
+        <select id="${selId}"
           style="width:100%;background:#f8fafc;border:1.5px solid #d8e5e8;border-radius:7px;
                  padding:5px 8px;font-size:10px;font-weight:700;color:#0a1e21;outline:none;
                  font-family:'Plus Jakarta Sans',sans-serif;margin-bottom:5px;">
@@ -2740,15 +2732,15 @@ function buildPopupHTML(d, color, iniciales, fotoUrl) {
             `<option value="${p.id}">#${p.id} · ${p.cliente||'?'} · ${(p.direccion||'').substring(0,22)}</option>`
           ).join('')}
         </select>
-        <button onclick="asignarDesdeMapaPopup('${d.domiId||d.nombre}','${d.nombre}','popup-sel-${d.nombre.replace(/\W/g,'_')}')"
+        <button onclick="asignarDesdeMapaPopup('${d.domiId||d.nombre}','${d.nombre}','${selId}')"
           style="width:100%;background:#28B9C1;color:#071e22;border:none;border-radius:7px;
                  padding:7px 10px;font-size:10px;font-weight:800;cursor:pointer;
-                 font-family:'Plus Jakarta Sans',sans-serif;display:flex;align-items:center;
-                 justify-content:center;gap:5px;">
-          <span style="font-size:14px;">✓</span> Asignar a ${d.nombre.split(' ')[0]}
+                 font-family:'Plus Jakarta Sans',sans-serif;">
+          ✓ Asignar a ${d.nombre.split(' ')[0]}
         </button>
       </div>`
     : '<div style="margin-top:6px;font-size:9px;color:#aaa;border-top:1px solid #e5edef;padding-top:6px;">Sin pedidos pendientes</div>';
+
   return `
     <div style="font-family:'Plus Jakarta Sans',sans-serif;min-width:240px;padding:4px;">
       <div style="display:flex;align-items:center;gap:9px;margin-bottom:9px;">
@@ -2760,7 +2752,7 @@ function buildPopupHTML(d, color, iniciales, fotoUrl) {
           <div style="font-size:9px;color:#6e979c;">${d.pedidos.length} activo${d.pedidos.length!==1?'s':''} · GPS ${tsStr}</div>
         </div>
       </div>
-      <div style="margin-bottom:4px;">${pedHtml}</div>
+      ${pedHtml}
       ${asignarHtml}
       <div style="margin-top:6px;font-size:8px;color:#aaa;padding-top:4px;border-top:1px solid #e5edef;">
         📡 ${d.coords[0].toFixed(5)}, ${d.coords[1].toFixed(5)}
@@ -2768,94 +2760,30 @@ function buildPopupHTML(d, color, iniciales, fotoUrl) {
     </div>`;
 }
 
-/* ── Actualizar marcadores y polylines en el mapa ── */
-function actualizarMapaRastreo() {
-  if (!_mapaRastreo) return;
-
-  const tsEl = document.getElementById('rastreo-mapa-ts');
-  if (tsEl) tsEl.textContent = 'Act: ' + new Date().toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
-
-  const domis  = getDomisConCoordenadas();
-  const bounds = [];
-  const activos = new Set(domis.map(d => d.nombre));
-  actualizarHistorial(domis);
-
-  domis.forEach((d, idx) => {
-    bounds.push(d.coords);
-    const driver    = allDrivers.find(dr =>
-      dr.idWil === d.domiId || dr.id === d.domiId ||
-      (dr.nombre || '').toLowerCase() === d.nombre.toLowerCase()
-    );
-    const fotoUrl   = driver?.foto || '';
-    const iniciales = d.nombre.split(' ').slice(0, 2).map(p => p[0] || '').join('').toUpperCase();
-    const color     = PALETA[idx % PALETA.length];
-    const popup     = buildPopupHTML(d, color, iniciales, fotoUrl);
-    const icon      = L.divIcon({
-      className: '',
-      html: buildRadarIcon(fotoUrl, iniciales, color),
-      iconSize: [62, 62], iconAnchor: [31, 31], popupAnchor: [0, -38],
-    });
-
-    if (_mapaMarkers[d.nombre]) {
-      _mapaMarkers[d.nombre].setLatLng(d.coords).setIcon(icon).setPopupContent(popup);
-    } else {
-      _mapaMarkers[d.nombre] = L.marker(d.coords, { icon })
-        .addTo(_mapaRastreo)
-        .bindPopup(popup, { maxWidth: 290 });
-    }
-
-    // Polyline del recorrido
-    const hist = _mapaHistorial[d.nombre] || [];
-    if (hist.length >= 2) {
-      if (_mapaPolylines[d.nombre]) {
-        _mapaPolylines[d.nombre].setLatLngs(hist);
-      } else {
-        _mapaPolylines[d.nombre] = L.polyline(hist, {
-          color, weight: 3, opacity: 0.7, dashArray: '8,6', lineJoin: 'round',
-        }).addTo(_mapaRastreo);
-      }
-    }
-  });
-
-  // Limpiar marcadores/polylines de domis que ya no están activos
-  Object.keys(_mapaMarkers).forEach(k => {
-    if (!activos.has(k)) {
-      _mapaMarkers[k].remove();   delete _mapaMarkers[k];
-      _mapaPolylines[k]?.remove(); delete _mapaPolylines[k];
-    }
-  });
-
-  if (bounds.length === 1)      _mapaRastreo.setView(bounds[0], 15);
-  else if (bounds.length > 1)   _mapaRastreo.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
-
-  actualizarCardsYLista(domis);
-}
-
-/* ── Cards y lista lateral ── */
+/* ── Cards laterales y lista de pedidos activos ── */
 function actualizarCardsYLista(domis) {
-  const cardsEl = document.getElementById('rastreo-domis-cards');
-  const listaEl = document.getElementById('rastreo-lista-activos');
+  const cardsEl  = document.getElementById('rastreo-domis-cards');
+  const listaEl  = document.getElementById('rastreo-lista-activos');
   const stColors = { pendiente:'#d97706', asignado:'#7c3aed', proceso:'#2563eb', encamino:'#22c55e' };
   const lblMap   = { pendiente:'Pendiente', asignado:'Asignado', proceso:'En proceso', encamino:'🛵 En camino' };
 
   if (cardsEl) {
     if (!domis.length) {
       cardsEl.innerHTML = `<div style="color:rgba(255,255,255,.35);font-size:11px;padding:8px 0;grid-column:1/-1;">
-        Sin domiciliarios con GPS activo. Las coordenadas se actualizan cuando el domi envía su posición en pedidos Asignado, En Proceso o En Camino.
-      </div>`;
+        Sin domiciliarios con GPS activo. Las coordenadas se actualizan cuando el domi envía su posición desde pedidos Asignado, En Proceso o En Camino.</div>`;
     } else {
       cardsEl.innerHTML = domis.map((d, idx) => {
         const driver    = allDrivers.find(dr =>
           dr.idWil === d.domiId || dr.id === d.domiId ||
-          (dr.nombre || '').toLowerCase() === d.nombre.toLowerCase()
+          (dr.nombre||'').toLowerCase() === d.nombre.toLowerCase()
         );
         const fotoUrl   = driver?.foto || '';
-        const iniciales = d.nombre.split(' ').slice(0, 2).map(p => p[0]||'').join('').toUpperCase();
+        const iniciales = d.nombre.split(' ').slice(0,2).map(p=>p[0]||'').join('').toUpperCase();
         const color     = PALETA[idx % PALETA.length];
         const enCamino  = d.pedidos.filter(p => p.estado === 'encamino').length;
-        const seg       = d.ts ? Math.floor((Date.now() - new Date(d.ts)) / 1000) : null;
-        const tsStr     = seg !== null ? (seg < 60 ? `hace ${seg}s` : `hace ${Math.floor(seg/60)}m`) : '';
         const puntos    = (_mapaHistorial[d.nombre] || []).length;
+        const seg       = d.actualizadoEn ? Math.floor((Date.now() - new Date(d.actualizadoEn)) / 1000) : null;
+        const tsStr     = seg !== null ? (seg < 60 ? `GPS hace ${seg}s` : `GPS hace ${Math.floor(seg/60)}m`) : '';
         return `<div style="background:rgba(255,255,255,.07);border:1.5px solid ${color}55;border-radius:12px;
              padding:10px 12px;display:flex;align-items:center;gap:9px;cursor:pointer;transition:border-color .15s;"
              onmouseover="this.style.borderColor='${color}'"
@@ -2868,7 +2796,7 @@ function actualizarCardsYLista(domis) {
           <div style="flex:1;min-width:0;">
             <div style="font-size:11px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${d.nombre}</div>
             <div style="font-size:9px;color:rgba(255,255,255,.5);margin-top:2px;">${d.pedidos.length} activos · ${enCamino} en camino · ${puntos} pts GPS</div>
-            ${tsStr ? `<div style="font-size:8px;color:rgba(255,255,255,.3);margin-top:1px;">📡 GPS ${tsStr} · ${d.coords[0].toFixed(4)}, ${d.coords[1].toFixed(4)}</div>` : ''}
+            ${tsStr ? `<div style="font-size:8px;color:rgba(255,255,255,.3);margin-top:1px;">${tsStr} · ${d.coords[0].toFixed(4)}, ${d.coords[1].toFixed(4)}</div>` : ''}
           </div>
           <div style="width:9px;height:9px;border-radius:50%;background:#22c55e;animation:bk 1.4s infinite;flex-shrink:0;"></div>
         </div>`;
@@ -2882,7 +2810,7 @@ function actualizarCardsYLista(domis) {
       listaEl.innerHTML = `<div class="empty-state"><div class="es-ico">✅</div><p style="color:var(--text3);">Sin pedidos activos</p></div>`;
     } else {
       listaEl.innerHTML = activos.slice(0, 20).map(p => {
-        const color = stColors[p.estado] || '#d97706';
+        const color    = { pendiente:'#d97706', asignado:'#7c3aed', proceso:'#2563eb', encamino:'#22c55e' }[p.estado] || '#d97706';
         const tieneGps = !!p._domiCoords?.lat;
         return `<div style="background:var(--white);border:1.5px solid var(--border);border-radius:11px;padding:9px 12px;margin-bottom:6px;display:flex;align-items:center;gap:9px;">
           <div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;animation:bk 2s infinite;"></div>
@@ -2907,35 +2835,121 @@ function actualizarCardsYLista(domis) {
   }
 }
 
-/* ── Inicializar mapa + ciclo de actualización ── */
+/* ── Actualizar marcadores y polylines en el mapa (UNA SOLA VEZ) ── */
+function actualizarMapaRastreo() {
+  if (!_mapaRastreo) return;
+
+  const tsEl = document.getElementById('rastreo-mapa-ts');
+  if (tsEl) tsEl.textContent = 'Act: ' + new Date().toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+
+  /* ← AQUÍ se usa getCoordsFromPedidos (ya definida arriba) */
+  const domis   = getCoordsFromPedidos();
+  const bounds  = [];
+  const activos = new Set(domis.map(d => d.nombre));
+
+  actualizarHistorial(domis);
+
+  domis.forEach((d, idx) => {
+    bounds.push(d.coords);
+    const driver    = allDrivers.find(dr =>
+      dr.idWil === d.domiId || dr.id === d.domiId ||
+      (dr.nombre||'').toLowerCase() === d.nombre.toLowerCase()
+    );
+    const fotoUrl   = driver?.foto || '';
+    const iniciales = d.nombre.split(' ').slice(0,2).map(p=>p[0]||'').join('').toUpperCase();
+    const color     = PALETA[idx % PALETA.length];
+    const popup     = buildPopupHTML(d, color, iniciales, fotoUrl);
+    const icon      = L.divIcon({
+      className: '',
+      html: buildRadarIcon(fotoUrl, iniciales, color),
+      iconSize: [62,62], iconAnchor: [31,31], popupAnchor: [0,-38],
+    });
+
+    if (_mapaMarkers[d.nombre]) {
+      _mapaMarkers[d.nombre].setLatLng(d.coords).setIcon(icon).setPopupContent(popup);
+    } else {
+      _mapaMarkers[d.nombre] = L.marker(d.coords, { icon })
+        .addTo(_mapaRastreo)
+        .bindPopup(popup, { maxWidth: 290 });
+    }
+
+    /* Polyline del recorrido */
+    const hist = _mapaHistorial[d.nombre] || [];
+    if (hist.length >= 2) {
+      if (_mapaPolylines[d.nombre]) {
+        _mapaPolylines[d.nombre].setLatLngs(hist);
+      } else {
+        _mapaPolylines[d.nombre] = L.polyline(hist, {
+          color, weight: 3, opacity: 0.7, dashArray: '8,6', lineJoin: 'round',
+        }).addTo(_mapaRastreo);
+      }
+    }
+  });
+
+  /* Limpiar domis que ya no están activos */
+  Object.keys(_mapaMarkers).forEach(k => {
+    if (!activos.has(k)) {
+      _mapaMarkers[k].remove();    delete _mapaMarkers[k];
+      _mapaPolylines[k]?.remove(); delete _mapaPolylines[k];
+    }
+  });
+
+  if (bounds.length === 1)      _mapaRastreo.setView(bounds[0], 15);
+  else if (bounds.length > 1)   _mapaRastreo.fitBounds(bounds, { padding:[60,60], maxZoom:16 });
+
+  actualizarCardsYLista(domis);
+}
+
+/* ── Asignar pedido desde popup del mapa ── */
+async function asignarDesdeMapaPopup(domiId, domiNombre, selId) {
+  const sel = document.getElementById(selId);
+  if (!sel || !sel.value) { showToast('w', 'Selecciona un pedido', 'Elige un pedido de la lista'); return; }
+  const pedidoId = sel.value;
+  try {
+    const r = await fetch('/api/foto?recurso=asignar', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pedidoId, domiciliarioId: domiId, domiciliarioNombre: domiNombre }),
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error);
+    const p = allPedidos.find(x => x.id === pedidoId);
+    if (p) { p.estado = 'asignado'; p.estadoRaw = 'Asignado'; p.domi = domiNombre; }
+    showToast('s', `✓ Pedido #${pedidoId} asignado`, `→ ${domiNombre}`);
+    actualizarMapaRastreo();
+    renderPendientesRT();
+    renderTablaPedidos();
+    updateSbBadges();
+  } catch(e) { showToast('e', 'Error al asignar', e.message.substring(0,80)); }
+}
+
+/* ── Inicializar mapa (UNA SOLA FUNCIÓN) ── */
 function initMapaRastreo() {
   const contenedor = document.getElementById('mapa-rastreo');
   if (!contenedor) return;
 
-  // Inicializar Leaflet solo una vez
   if (!_mapaRastreo) {
     _mapaRastreo = L.map('mapa-rastreo', { zoomControl: true })
-      .setView([6.2442, -75.5812], 13);
+      .setView([11.0041, -74.8070], 13);          // ← Barranquilla por defecto
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>',
       maxZoom: 19,
     }).addTo(_mapaRastreo);
   }
 
-  // Invalidar tamaño (el div puede estar oculto al init)
+  /* Invalidar tamaño por si el div estaba oculto */
   setTimeout(() => _mapaRastreo.invalidateSize(), 250);
 
-  // Primera carga inmediata
+  /* Carga inmediata */
   fetchCoordenadas().then(() => actualizarMapaRastreo());
 
-  // Ciclo cada 10 segundos: fetch + actualizar
+  /* Ciclo: fetch + actualizar cada 10 segundos */
   if (_mapaInterval) clearInterval(_mapaInterval);
   _mapaInterval = setInterval(async () => {
     await fetchCoordenadas();
     actualizarMapaRastreo();
   }, 10000);
 }
-
 /* ── Asignar desde popup ── */
 async function asignarDesdeMapaPopup(domiId, domiNombre, selId) {
   const sel = document.getElementById(selId);
