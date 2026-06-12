@@ -73,28 +73,12 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 /* ══════════ CARDS ══════════ */
 .paso-card{margin:0 16px;background:#fff;border-radius:var(--r-xl);border:1.5px solid #e2e8f0;box-shadow:var(--sh);overflow:hidden;animation:fadeUp .24s cubic-bezier(.22,1,.36,1) both}
 .card-hdr{padding:13px 15px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #f1f5f9}
-.card-hdr.green{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-bottom-color:#bbf7d0}
 .card-hdr.blue{background:linear-gradient(90deg,#f0f4ff,#fff);border-bottom-color:#e0e7ff}
 .card-hdr-ico{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
-.card-hdr-ico.green{background:rgba(22,163,74,.15)}
 .card-hdr-ico.blue{background:rgba(30,45,74,.1)}
 .card-hdr-lbl{font-size:13px;font-weight:800}
-.card-hdr-lbl.green{color:#14532d}
 .card-hdr-lbl.blue{color:#1e293b}
-.card-hdr-sub{font-size:10.5px;font-weight:500;margin-top:1px;line-height:1.4;color:#166534}
 .card-body{padding:15px;display:flex;flex-direction:column;gap:12px}
-
-/* ══════════ GPS ══════════ */
-.gps-btn{width:100%;padding:13px 16px;border-radius:13px;border:none;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:all .18s;box-shadow:0 4px 18px rgba(22,163,74,.38)}
-.gps-btn:active{transform:scale(.97)}
-.gps-btn:disabled{opacity:.65;cursor:default}
-.gps-result{display:none;margin-top:11px;border:1.5px solid #86efac;border-radius:13px;background:#f0fdf4;padding:12px 14px}
-.gps-result.show{display:block;animation:fadeIn .25s ease}
-.gps-row{display:flex;align-items:flex-start;gap:8px;font-size:12px;font-weight:600;color:#14532d;margin-bottom:6px;line-height:1.55}
-.dist-badge{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#1e2d4a,#2d4070);color:#fff;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:900;margin-top:8px;box-shadow:0 2px 10px rgba(30,45,74,.3)}
-.spin-el{display:none;width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;animation:spin .7s linear infinite;flex-shrink:0}
-.gps-btn.loading .spin-el{display:block}
-.gps-btn.loading .btn-ico,.gps-btn.loading .btn-txt{display:none}
 
 /* ══════════ FORM ══════════ */
 .wf{display:flex;flex-direction:column;gap:5px;position:relative}
@@ -406,33 +390,7 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
       <div class="step-item" id="st2"><div class="step-dot">3</div><span class="step-lbl">Confirmado</span></div>
     </div>
 
-    <!-- GPS -->
-    <div class="paso-card">
-      <div class="card-hdr green">
-        <div class="card-hdr-ico green">📍</div>
-        <div>
-          <div class="card-hdr-lbl green">Ubicación del remitente</div>
-          <div class="card-hdr-sub">Opcional pero ayuda a calcular la tarifa</div>
-        </div>
-      </div>
-      <div class="card-body" style="gap:0;padding:13px 15px">
-        <button class="gps-btn" id="gpsBtn" onclick="capturarGPS()">
-          <span class="sym f btn-ico" style="font-size:19px">my_location</span>
-          <span class="btn-txt">Capturar mi ubicación GPS</span>
-          <div class="spin-el"></div>
-        </button>
-        <div class="gps-result" id="gpsResult">
-          <div class="gps-row"><span>📍</span><span id="gpsDirTxt">—</span></div>
-          <div class="gps-row"><span style="opacity:.6">🗺️</span><span id="gpsCoordTxt" style="font-size:10.5px;opacity:.7">—</span></div>
-          <div class="dist-badge" id="gpsDistBadge">
-            <span class="sym f" style="font-size:13px">delivery_dining</span>
-            <span id="gpsDistTxt">Calculando…</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- FORMULARIO -->
+    <!-- FORMULARIO DE DATOS -->
     <div class="paso-card">
       <div class="card-hdr blue">
         <div class="card-hdr-ico blue">📋</div>
@@ -444,10 +402,6 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
         <div class="wf">
           <label>Tu nombre *</label>
           <input type="text" id="fNombre" placeholder="¿Cómo te llamamos?" autocomplete="name" oninput="checkForm()"/>
-        </div>
-        <div class="wf">
-          <label>Tu teléfono *</label>
-          <input type="tel" id="fTelEnvio" placeholder="Número del remitente" autocomplete="tel" oninput="checkForm()"/>
         </div>
 
         <div class="divider-lbl">Recogida</div>
@@ -465,16 +419,16 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
         </div>
 
         <div class="wf">
-          <label>Dirección / Punto de recogida</label>
-          <input type="text" id="fComercio" placeholder="Nombre del comercio, calle, referencia…"/>
-          <span class="wf-note">Dónde el domiciliario recoge el paquete</span>
-        </div>
-        <div class="wf">
-          <label>Teléfono de recogida</label>
-          <input type="tel" id="fTelRecogida" placeholder="Número de quien entrega al domiciliario" autocomplete="tel"/>
+          <label>Dirección de recogida</label>
+          <input type="text" id="fComercio" placeholder="Calle, nombre del lugar, referencia…"/>
         </div>
 
-        <div class="divider-lbl">Destino</div>
+        <div class="wf">
+          <label>Teléfono de recogida *</label>
+          <input type="tel" id="fTelEnvio" placeholder="Número de quien entrega al domiciliario" autocomplete="tel" oninput="checkForm()"/>
+        </div>
+
+        <div class="divider-lbl">Entrega</div>
 
         <div class="wf" id="wf-barrio-entrega">
           <label>Barrio de entrega *</label>
@@ -489,16 +443,13 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
         </div>
 
         <div class="wf">
-          <label>Referencia del destino</label>
-          <textarea id="fReferencia" rows="2" placeholder="Ej: Casa azul con reja negra, piso 3 apto 401…"></textarea>
+          <label>Dirección de entrega</label>
+          <textarea id="fReferencia" rows="2" placeholder="Calle, referencia, piso, apto…"></textarea>
         </div>
-        <div class="wf">
-          <label>Nombre de quien recibe *</label>
-          <input type="text" id="fNombreEntrega" placeholder="Nombre del destinatario" oninput="checkForm()"/>
-        </div>
+
         <div class="wf">
           <label>Teléfono de entrega *</label>
-          <input type="tel" id="fTelEntrega" placeholder="Número de quien recibe el paquete" autocomplete="tel" oninput="checkForm()"/>
+          <input type="tel" id="fTelEntrega" placeholder="Número de quien recibe" autocomplete="tel" oninput="checkForm()"/>
         </div>
 
         <div class="divider-lbl">Paquete</div>
@@ -677,23 +628,17 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 /* ════════════════════════════════════════════
    CONFIG
 ════════════════════════════════════════════ */
-var API_URL  = '/api/foto?recurso=pedidos';
-var API_IMG  = '/api/foto?recurso=comprobantes'; // endpoint para subir imagen
-var WIL_WA   = '573023452213';
-var WIL_LAT  = 6.3459291;
-var WIL_LNG  = -75.512814;
-var WIL_CUENTA = '55329692468'; // 
-
-/* ── GPS STATE ── */
-var gps = { lat:null, lng:null, direccion:'', distKm:null, distRealKm:null, tiempoSeg:null };
+var API_URL    = '/api/foto?recurso=pedidos';
+var WIL_WA     = '573023452213';
+var WIL_CUENTA = '55329692468';
 
 /* ── BARRIOS STATE ── */
 var barrioSel = { recogida: { nombre:'', precio:0 }, entrega: { nombre:'', precio:0 } };
 
 /* ── PAGO STATE ── */
-var metodoPago = 'transferencia';
-var comprobanteFile = null;     // File object original
-var comprobanteB64  = null;     // base64 para envío
+var metodoPago     = 'transferencia';
+var comprobanteFile = null;
+var comprobanteB64  = null;
 var comprobanteMime = null;
 
 /* ── PEDIDO ENVIADO ── */
@@ -757,19 +702,13 @@ function norm(s) {
 function esc(t){ return (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function v(id){ var e=document.getElementById(id); return e?(e.value||'').trim():''; }
 function fmtCOP(n){ return n>0?'$'+n.toLocaleString('es-CO'):'Por cotizar'; }
-function fmtKm(km){ return km<0.1?Math.round(km*1000)+' m':km<1?(km*1000).toFixed(0)+' m':km.toFixed(1)+' km'; }
-function fmtMin(s){ var m=Math.round(s/60); return m<60?m+' min':Math.floor(m/60)+'h '+(m%60)+' min'; }
-function haversineKm(la1,lo1,la2,lo2){
-  var R=6371,dL=(la2-la1)*Math.PI/180,dO=(lo2-lo1)*Math.PI/180,
-      a=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dO/2)*Math.sin(dO/2);
-  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-}
 function calcTarifa() {
   return Math.max(barrioSel.recogida.precio, barrioSel.entrega.precio);
 }
 
 /* ════════════════════════════════════════════
    AUTOCOMPLETE BARRIOS
+   — Si el barrio no está en la lista, abre cotización
 ════════════════════════════════════════════ */
 function buscarBarrio(campo, txt) {
   txt = (txt||'').trim();
@@ -787,11 +726,18 @@ function buscarBarrio(campo, txt) {
     return q.split(' ').every(function(w){ return w.length>1 && n.indexOf(w)!==-1; });
   });
   var res = exactas.concat(empiezan).concat(contienen).concat(porPal).slice(0,9);
+
   if (!res.length) {
-    sugEl.innerHTML='<div class="wil-sug-empty">Sin coincidencias para "'+esc(txt)+'"</div>';
+    /* Barrio no encontrado → ofrecer cotización fuera de Copacabana */
+    sugEl.innerHTML =
+      '<div class="wil-sug-item" style="background:#fffbeb;color:#92400e;font-size:12px;" '
+      + 'onmousedown="abrirCotDesdeBarrio(\''+esc(txt)+'\')">'
+      + '🚚 <strong>Barrio no encontrado</strong> — Cotizar envío fuera de Copacabana'
+      + '</div>';
     sugEl.style.display='block';
     return;
   }
+
   function resaltar(nombre, q) {
     var n = norm(nombre);
     var idx = n.indexOf(q);
@@ -819,66 +765,23 @@ function cerrarSugs(campo) {
   }, 180);
 }
 
+/* Abre cotización prellenando destino con lo que escribió el usuario */
+function abrirCotDesdeBarrio(txt) {
+  document.getElementById('cotDestino').value = txt || '';
+  abrirCot();
+}
+
 /* ════════════════════════════════════════════
    VALIDACIÓN
 ════════════════════════════════════════════ */
 function checkForm() {
-  var ok = v('fNombre') && v('fTelEnvio')
+  var ok = v('fNombre')
+        && v('fTelEnvio')
         && barrioSel.recogida.nombre
         && barrioSel.entrega.nombre
-        && v('fNombreEntrega') && v('fTelEntrega')
+        && v('fTelEntrega')
         && v('fDescripcion');
   document.getElementById('btnContinuar').disabled = !ok;
-}
-
-/* ════════════════════════════════════════════
-   GPS
-════════════════════════════════════════════ */
-function capturarGPS() {
-  var btn = document.getElementById('gpsBtn');
-  if (!navigator.geolocation) { toast('GPS no disponible en tu dispositivo.','location_off'); return; }
-  gps = { lat:null,lng:null,direccion:'',distKm:null,distRealKm:null,tiempoSeg:null };
-  btn.disabled=true; btn.classList.add('loading');
-  navigator.geolocation.getCurrentPosition(function(pos){
-    var lat=pos.coords.latitude, lng=pos.coords.longitude;
-    gps.lat=lat; gps.lng=lng;
-    var dl=haversineKm(lat,lng,WIL_LAT,WIL_LNG);
-    gps.distKm=dl;
-    document.getElementById('gpsDistTxt').textContent=fmtKm(dl)+' — calculando ruta…';
-    document.getElementById('gpsCoordTxt').textContent=lat.toFixed(6)+', '+lng.toFixed(6);
-    document.getElementById('gpsResult').classList.add('show');
-    btn.disabled=false; btn.classList.remove('loading');
-    btn.innerHTML='<span class="sym f btn-ico" style="font-size:19px">check_circle</span><span class="btn-txt">Ubicación capturada ✓</span><div class="spin-el"></div>';
-    btn.style.background='linear-gradient(135deg,#14532d,#15803d)';
-    fetch('https://router.project-osrm.org/route/v1/driving/'+lng.toFixed(6)+','+lat.toFixed(6)+';'+WIL_LNG.toFixed(6)+','+WIL_LAT.toFixed(6)+'?overview=false')
-      .then(function(r){return r.json();}).then(function(d){
-        if(d.code==='Ok'&&d.routes[0]){
-          gps.distRealKm=d.routes[0].distance/1000;
-          gps.tiempoSeg=d.routes[0].duration;
-          document.getElementById('gpsDistTxt').textContent=fmtKm(gps.distRealKm)+' por carretera (~'+fmtMin(gps.tiempoSeg)+') desde WIL';
-          toast('📍 '+fmtKm(gps.distRealKm)+' · '+fmtMin(gps.tiempoSeg),'check_circle');
-        }
-      }).catch(function(){
-        document.getElementById('gpsDistTxt').textContent=fmtKm(dl)+' en línea recta desde WIL';
-      });
-    document.getElementById('gpsDirTxt').textContent='Identificando zona…';
-    fetch('https://nominatim.openstreetmap.org/reverse?lat='+lat+'&lon='+lng+'&format=json&accept-language=es',{headers:{'User-Agent':'DomiciliosWIL/1.0'}})
-      .then(function(r){return r.json();}).then(function(d){
-        var a=d.address||{};
-        gps.direccion=[(a.road||a.street||''),(a.hamlet||a.village||a.neighbourhood||a.suburb||''),(a.municipality||a.city||a.town||''),(a.county||'')].filter(Boolean).join(', ');
-        document.getElementById('gpsDirTxt').textContent=gps.direccion||lat.toFixed(5)+', '+lng.toFixed(5);
-      }).catch(function(){
-        gps.direccion=lat.toFixed(5)+', '+lng.toFixed(5);
-        document.getElementById('gpsDirTxt').textContent=gps.direccion;
-      });
-  }, function(err){
-    btn.disabled=false; btn.classList.remove('loading');
-    btn.innerHTML='<span class="sym f btn-ico" style="font-size:19px">my_location</span><span class="btn-txt">Reintentar GPS</span><div class="spin-el"></div>';
-    var msg='No se pudo capturar el GPS.';
-    if(err.code===1) msg='Permiso de ubicación denegado. Actívalo en ajustes.';
-    if(err.code===3) msg='Tiempo agotado. Verifica señal GPS.';
-    toast(msg,'location_off');
-  }, {enableHighAccuracy:true,timeout:15000,maximumAge:0});
 }
 
 /* ════════════════════════════════════════════
@@ -923,8 +826,7 @@ function handleFile(file) {
 
   var reader = new FileReader();
   reader.onload = function(e) {
-    comprobanteB64 = e.target.result.split(',')[1]; // solo base64 sin prefijo
-    // preview
+    comprobanteB64 = e.target.result.split(',')[1];
     var prev = document.getElementById('uploadPreview');
     if (file.type.startsWith('image/')) {
       prev.src = e.target.result;
@@ -935,7 +837,6 @@ function handleFile(file) {
     var okEl = document.getElementById('uploadOk');
     document.getElementById('uploadOkTxt').textContent = file.name+' ('+Math.round(file.size/1024)+' KB)';
     okEl.classList.add('show');
-    // cambiar zona
     var zone = document.getElementById('uploadZone');
     zone.querySelector('.upload-lbl').textContent = 'Cambiar comprobante';
     zone.querySelector('.upload-sub').textContent = 'Toca para reemplazar';
@@ -949,13 +850,12 @@ function handleFile(file) {
    NAVEGACIÓN
 ════════════════════════════════════════════ */
 function irResumen() {
-  if (!v('fNombre'))          { toast('Escribe tu nombre.','person'); return; }
-  if (!v('fTelEnvio'))        { toast('Escribe tu teléfono.','phone'); return; }
-  if (!barrioSel.recogida.nombre){ toast('Selecciona el barrio de recogida.','location_on'); return; }
-  if (!barrioSel.entrega.nombre) { toast('Selecciona el barrio de entrega.','location_on'); return; }
-  if (!v('fNombreEntrega'))   { toast('Escribe el nombre de quien recibe.','person'); return; }
-  if (!v('fTelEntrega'))      { toast('Escribe el teléfono de entrega.','phone'); return; }
-  if (!v('fDescripcion'))     { toast('Describe el paquete.','inventory_2'); return; }
+  if (!v('fNombre'))               { toast('Escribe tu nombre.','person'); return; }
+  if (!v('fTelEnvio'))             { toast('Escribe el teléfono de recogida.','phone'); return; }
+  if (!barrioSel.recogida.nombre)  { toast('Selecciona el barrio de recogida.','location_on'); return; }
+  if (!barrioSel.entrega.nombre)   { toast('Selecciona el barrio de entrega.','location_on'); return; }
+  if (!v('fTelEntrega'))           { toast('Escribe el teléfono de entrega.','phone'); return; }
+  if (!v('fDescripcion'))          { toast('Describe el paquete.','inventory_2'); return; }
 
   poblarTicket();
   document.getElementById('view1').classList.remove('active');
@@ -1012,23 +912,22 @@ function poblarTicket() {
     : 'Por cotizar';
 
   var html = ''
-    + fila('👤','Remitente', esc(v('fNombre'))+' · '+esc(v('fTelEnvio')))
+    + fila('👤','Remitente', esc(v('fNombre')))
     + fila('📍','Barrio recogida', esc(barrioSel.recogida.nombre), true)
-    + (v('fComercio') ? fila('🏪','Punto recogida', esc(v('fComercio'))) : '')
-    + (v('fTelRecogida') ? fila('📞','Tel. recogida', esc(v('fTelRecogida'))) : '')
+    + (v('fComercio')   ? fila('🏠','Dirección recogida', esc(v('fComercio'))) : '')
+    + fila('📞','Tel. recogida', esc(v('fTelEnvio')))
     + fila('🎯','Barrio entrega', esc(barrioSel.entrega.nombre), true)
-    + fila('👤','Destinatario', esc(v('fNombreEntrega'))+' · '+esc(v('fTelEntrega')))
-    + (v('fReferencia') ? fila('🏡','Referencia', esc(v('fReferencia'))) : '')
-    + filaPkg('📦','Contenido del envío', esc(v('fDescripcion')));
+    + (v('fReferencia') ? fila('🏡','Dirección entrega', esc(v('fReferencia'))) : '')
+    + fila('📞','Tel. entrega', esc(v('fTelEntrega')))
+    + filaPkg('📦','Contenido', esc(v('fDescripcion')));
 
   document.getElementById('ticketBody').innerHTML = html;
 }
 
 /* ════════════════════════════════════════════
-   ENVIAR A MONGODB (con imagen opcional)
+   ENVIAR A MONGODB
 ════════════════════════════════════════════ */
 async function enviarPedido() {
-  // Validación pago
   if (metodoPago === 'transferencia' && !comprobanteB64) {
     toast('Adjunta el comprobante de transferencia.','attach_file');
     return;
@@ -1043,7 +942,6 @@ async function enviarPedido() {
   var fecha  = now.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
   var hora   = now.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
 
-  /* ── Payload principal ── */
   var payload = {
     modoEntrega:  'paqueteria',
     sede:         'paqueteria',
@@ -1082,11 +980,8 @@ async function enviarPedido() {
     metodoPago:   metodoPago,
     /* Comprobante */
     comprobanteImg: comprobanteB64
-      ? `data:${comprobanteMime || 'image/jpeg'};base64,${comprobanteB64}`
-      : null,
-    /* GPS - CORREGIDO: usar 'coords' en lugar de 'coordsRemitente' */
-    coords: gps.lat ? { lat: gps.lat, lng: gps.lng } : null,
-    distanciaKm: gps.distRealKm || gps.distKm || null,
+      ? 'data:'+(comprobanteMime || 'image/jpeg')+';base64,'+comprobanteB64
+      : null
   };
 
   try {
@@ -1102,38 +997,29 @@ async function enviarPedido() {
     pedidoCodigo = data.data.idPedido || '—';
     document.getElementById('codigoRastreo').textContent = pedidoCodigo;
 
-    /* Inyectar fila de comprobante en panel transferencia */
-    if (metodoPago === 'transferencia' && data.data.comprobanteImg?.url) {
+    if (metodoPago === 'transferencia' && data.data.comprobanteImg && data.data.comprobanteImg.url) {
       var urlComp = data.data.comprobanteImg.url;
       if (!document.getElementById('comp-url-fila')) {
-        var fila = document.createElement('div');
-        fila.id = 'comp-url-fila';
-        fila.style.cssText = 'margin:0 12px 14px;display:flex;align-items:flex-start;gap:9px;'
+        var filaEl = document.createElement('div');
+        filaEl.id = 'comp-url-fila';
+        filaEl.style.cssText = 'margin:0 12px 14px;display:flex;align-items:flex-start;gap:9px;'
           + 'background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:11px;padding:10px 12px';
-        fila.innerHTML = '<span style="font-size:18px;flex-shrink:0;margin-top:1px">🧾</span>'
+        filaEl.innerHTML = '<span style="font-size:18px;flex-shrink:0;margin-top:1px">🧾</span>'
           + '<div style="flex:1;min-width:0">'
           + '<div style="font-size:9.5px;font-weight:700;color:#64748b;text-transform:uppercase;'
           + 'letter-spacing:.05em;margin-bottom:3px">Comprobante de pago</div>'
           + '<div style="font-size:11.5px;font-weight:700;color:#0284c7;word-break:break-all">'
           + urlComp + '</div></div>';
-        document.getElementById('panelTransf').appendChild(fila);
+        document.getElementById('panelTransf').appendChild(filaEl);
       }
     }
 
     document.getElementById('overlayExito').classList.add('show');
 
-    /* Steps → paso 3 */
     document.getElementById('st0b').classList.add('done');
     document.getElementById('st1b').classList.remove('active');
     document.getElementById('st1b').classList.add('done');
     document.getElementById('st2b').classList.add('active');
-
-    // Mostrar en consola que se guardaron las coordenadas
-    if (gps.lat) {
-      console.log('✅ Coordenadas guardadas:', gps.lat, gps.lng);
-    } else {
-      console.log('⚠️ No se capturaron coordenadas GPS');
-    }
 
   } catch(err) {
     toast('Error al enviar: '+err.message, 'error');
