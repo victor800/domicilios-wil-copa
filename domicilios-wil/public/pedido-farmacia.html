@@ -11,6 +11,8 @@
  <script src="wil-fix-dedup-unitprice.js"></script>
  <script src="wil-chat-checkout-patch.js"></script>
  <script src="wil-formula-medica.js"></script>
+  <script src="wil-stock-formula-medica.js"></script>
+
 
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -6980,10 +6982,451 @@ function _escJSN(s) {
   return (s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"');
 }
 
+
+
+
 console.log('[WIL] ✅ wil-formula-medica.js v4.1 — banner + visor lightbox zoom/pan + campo formulaMedica OK');
+
+
 </script>
 
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   WIL — wil-stock-formula-medica.js  (v5 — fix multi-botón Caja/Unidad)
+   ───────────────────────────────────────────────────────────────────
+   Conecta la columna H ("Formula") de las hojas de STOCK
+   (STOCK_DROGUERIA_EXPERTOS / STOCK_DROGUERIA_CENTRAL) con el sistema
+   de fórmula médica que ya existe en wil-formula-medica.js.
+
+   CAMBIOS v4:
+   1) El badge ahora dice "Fórmula médica" (antes solo decía "Fórmula").
+   2) FIX REAL de duplicados: en v3 se declaraba el mapa
+      _wilFormulaNombreMap para resolver el caso de un mismo producto
+      con dos tarjetas en el grid (una con imagen, otra sin imagen,
+      cada una con su propia key en `cache`), pero ese mapa nunca se
+      usaba en el resto del código — por eso solo se marcaba UNA de
+      las dos tarjetas. Ahora, cuando la columna H dice "Sí" para un
+      producto, se recorre TODO `cache` y se marcan TODAS las
+      entradas cuyo nombre normalizado coincida (sin importar
+      laboratorio, key, ni si tienen imagen o no), y además se
+      vuelve a chequear esa coincidencia por nombre al momento de
+      pintar el badge en cada tarjeta del grid.
+
+   CAMBIOS v5:
+   3) FIX tarjetas con MÁS DE UN botón de compra (ej. "Caja x30" +
+      "Unidad", cada uno con su propio precio y su propia key). Antes
+      solo se revisaba el PRIMER botón de la tarjeta (querySelector),
+      así que si la fórmula quedaba marcada en la otra variante de
+      empaque, la tarjeta entera se quedaba sin badge y sin
+      protección. Ahora se revisan TODOS los botones de la tarjeta; si
+      CUALQUIERA de las variantes (caja o unidad) requiere fórmula
+      médica, se muestra el badge UNA vez y se protegen TODOS los
+      botones de esa tarjeta (caja y unidad) para que pasen por el
+      popup de fórmula antes de agregarse al carrito.
+═══════════════════════════════════════════════════════════════════ */
+(function (W) {
+  'use strict';
+
+  /* ── Detector de "sí" igual que wil-formula-medica.js ── */
+  function esFormula(v) {
+    return /^(s[ií]|yes|1|true)$/i.test(String(v || '').trim());
+  }
+
+  /*
+   * _wilFormulaNombreMap — mapa secundario indexado por NOMBRE normalizado
+   * (sin laboratorio, sin acentos, sin espacios extra). Esto es lo que
+   * permite detectar TODAS las variantes de tarjeta (con foto / sin foto,
+   * duplicados de catálogo, etc.) que correspondan al mismo producto.
+   *    key  → nombre.toLowerCase().trim() normalizado
+   *    value → true / false  (true = requiere fórmula médica)
+   */
+  if (typeof window._wilFormulaNombreMap === 'undefined') {
+    window._wilFormulaNombreMap = {};
+  }
+
+  function normNombre(s) {
+    return String(s || '').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .replace(/\s+/g, ' ').trim();
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     1. INTERCEPT FETCH — captura el CSV de STOCK cuando se descarga
+  ══════════════════════════════════════════════════════════════ */
+  var _origFetch = window.fetch;
+  var _ultimoCsvStock = null;
+
+  window.fetch = function (url, opts) {
+    var p = _origFetch.apply(this, arguments);
+    try {
+      if (typeof url === 'string' &&
+          url.indexOf('docs.google.com/spreadsheets') !== -1 &&
+          (url.indexOf('STOCK_DROGUERIA_EXPERTOS') !== -1 ||
+           url.indexOf('STOCK_DROGUERIA_CENTRAL')  !== -1)) {
+        p.then(function (res) {
+          try {
+            res.clone().text().then(function (txt) {
+              _ultimoCsvStock = txt;
+              /* Esperamos 250 ms para que loadSheet termine de poblar cache */
+              setTimeout(aplicarFormulaSobreStock, 250);
+            }).catch(function () {});
+          } catch (e) {}
+        }).catch(function () {});
+      }
+    } catch (e) {}
+    return p;
+  };
+
+  /* ── Parser CSV (reutiliza _parseCsvLineNP si existe) ── */
+  function parseCsvLine(line) {
+    if (typeof window._parseCsvLineNP === 'function') return window._parseCsvLineNP(line);
+    var cols = [], cur = '', inQ = false;
+    for (var i = 0; i < line.length; i++) {
+      var ch = line[i];
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    cols.push(cur.trim());
+    return cols.map(function (c) { return c.replace(/^"|"$/g, '').replace(/\r/g, '').trim(); });
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     2. LEER CSV Y MARCAR cache + _wilFormulaMap + _wilFormulaNombreMap
+        — AHORA marca TODAS las entradas de cache que coincidan por
+          nombre normalizado, no solo la primera que encuentre.
+  ══════════════════════════════════════════════════════════════ */
+  function aplicarFormulaSobreStock() {
+    if (!_ultimoCsvStock || _ultimoCsvStock.trim().length < 5) return;
+    if (typeof window.cache !== 'object') return;
+
+    var lines = _ultimoCsvStock.trim().split('\n').filter(Boolean);
+    if (lines.length < 2) return;
+
+    /* Detectar columnas por encabezado, o fallback a posición */
+    var hdr = parseCsvLine(lines[0]);
+    var idxNombre = -1, idxLab = -1, idxFormula = -1;
+    hdr.forEach(function (h, i) {
+      var hn = String(h || '').toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '');
+      if (hn.indexOf('descrip') !== -1 || hn === 'nombre') idxNombre = i;
+      else if (hn.indexOf('laborat') !== -1) idxLab = i;
+      else if (hn.indexOf('formula') !== -1) idxFormula = i;
+    });
+    if (idxNombre < 0) idxNombre = 0;
+    if (idxLab    < 0) idxLab    = 1;
+    if (idxFormula < 0) idxFormula = 7; // columna H si no hay encabezado "formula"
+
+    var rows = lines.slice(1).filter(Boolean);
+    var totalMarcados = 0;
+    var totalProductosFormula = 0;
+
+    rows.forEach(function (line) {
+      var cols   = parseCsvLine(line);
+      var nombre = (cols[idxNombre] || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+      var lab    = (cols[idxLab]    || '').trim();
+      var valFm  = (cols[idxFormula] || '').trim();
+      if (!nombre) return;
+
+      var requiere   = esFormula(valFm);
+      var keyExacta  = nombre + '|||' + lab;
+      var nombreNorm = normNombre(nombre);
+
+      /* Guardamos siempre en el mapa por nombre normalizado.
+         Esto es lo que permite que CUALQUIER tarjeta (con foto, sin
+         foto, duplicada, con key distinta) se pueda marcar al pintar
+         el grid, aunque su `key` exacta en cache no coincida. */
+      window._wilFormulaNombreMap[nombreNorm] = requiere;
+
+      if (requiere) totalProductosFormula++;
+
+      /* Recorremos TODO cache y marcamos TODAS las coincidencias
+         (por key exacta O por nombre normalizado), no solo la primera. */
+      for (var k in window.cache) {
+        if (!window.cache.hasOwnProperty(k)) continue;
+        var c = window.cache[k];
+        if (!c) continue;
+
+        var coincideKey    = (k === keyExacta);
+        var coincideNombre = (normNombre(c.desc) === nombreNorm);
+
+        if (coincideKey || coincideNombre) {
+          c.formula = requiere;
+          window._wilFormulaMap[k] = requiere;
+          if (requiere) totalMarcados++;
+        }
+      }
+    });
+
+    if (totalMarcados > 0) {
+      console.log('[WIL][stock-formula] ' + totalProductosFormula +
+        ' producto(s) con fórmula médica requerida en columna H → ' +
+        totalMarcados + ' tarjeta(s) marcadas en cache (incluye duplicados con/sin foto).');
+    }
+
+    /* Si el grid ya está pintado en pantalla, repintamos inmediatamente */
+    repintarGridVisible();
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     3. REPINTAR GRID VISIBLE
+        — aplica badge + reemplaza botón en artículos ya renderizados
+  ══════════════════════════════════════════════════════════════ */
+  /* Calcula si una `key` de cache requiere fórmula médica, en cascada:
+     cache.formula → _wilFormulaMap[key] → _wilFormulaNombreMap[nombre]. */
+  function requiereFormulaParaKey(key) {
+    var it = window.cache[key];
+    if (it) {
+      return !!(it.formula ||
+        window._wilFormulaMap[key] ||
+        window._wilFormulaNombreMap[normNombre(it.desc)]);
+    }
+    return !!window._wilFormulaMap[key];
+  }
+
+  function aplicarBadgeEnArticulo(art) {
+    /* Buscar TODOS los botones de compra de la tarjeta. Algunas tarjetas
+       tienen más de un botón (ej. "Caja x30" + "Unidad"), cada uno con su
+       propia key. Antes solo se revisaba el PRIMERO (querySelector), así
+       que si la fórmula quedaba marcada en la otra variante, la tarjeta
+       entera se quedaba sin badge y sin protección. */
+    var btns = art.querySelectorAll(
+      'button[onclick*="addToCart"], button[onclick*="sadd"], button[onclick*="wilSaddConFormula"]'
+    );
+    if (!btns.length) return;
+
+    var infoBtns      = [];
+    var requiereTarjeta = false;
+
+    btns.forEach(function (btn) {
+      var oc  = btn.getAttribute('onclick') || '';
+      var m   = oc.match(/['"]([^'"]+)['"]/);
+      var key = m ? m[1] : null;
+      if (!key) return;
+
+      var requiere = requiereFormulaParaKey(key);
+      if (requiere) requiereTarjeta = true;
+      infoBtns.push({ btn: btn, oc: oc, key: key });
+    });
+
+    /* Si NINGUNA variante (caja, unidad, etc.) requiere fórmula, no hacemos nada */
+    if (!requiereTarjeta) return;
+
+    /* ── Badge sobre la imagen (una sola vez por tarjeta) ── */
+    var imgZone = art.querySelector(
+      'div[style*="height:84px"], div[style*="height: 84px"], .wil-card-img, figure'
+    );
+    if (!imgZone) {
+      /* Fallback: primer div hijo del artículo */
+      imgZone = art.firstElementChild;
+    }
+    if (imgZone && !imgZone.querySelector('.wil-fm-badge')) {
+      imgZone.style.position = 'relative';
+      var badge = document.createElement('div');
+      badge.className = 'wil-fm-badge';
+      badge.style.cssText =
+        'position:absolute;bottom:6px;left:6px;z-index:6;display:flex;' +
+        'align-items:center;gap:3px;background:rgba(220,38,38,.92);color:#fff;' +
+        'font-size:6.5px;font-weight:900;text-transform:uppercase;letter-spacing:.04em;' +
+        'padding:2px 6px;border-radius:99px;box-shadow:0 2px 6px rgba(220,38,38,.4);' +
+        'white-space:nowrap;pointer-events:none;line-height:1;';
+      badge.innerHTML = '💊 Fórmula médica';
+      imgZone.appendChild(badge);
+    }
+
+    /* ── Reemplazar TODOS los botones de la tarjeta (caja Y unidad) para
+       que pasen por el popup de fórmula, sin importar cuál de las dos
+       variantes fue la que detectó el "Sí" en la columna H. ── */
+    infoBtns.forEach(function (info) {
+      if (info.oc.indexOf('wilSaddConFormulaStock') !== -1) return; // ya parcheado
+      var it   = window.cache[info.key];
+      var desc = it ? it.desc   : '';
+      var lab  = it ? it.lab    : '';
+      var pr   = it ? (it.precio || it.pUnit || 0) : 0;
+      info.btn.setAttribute('onclick',
+        "wilSaddConFormulaStock('" + info.key.replace(/'/g, "\\'")  + "','" +
+        desc.replace(/'/g, "\\'") + "','" +
+        lab.replace(/'/g, "\\'")  + "'," + pr + ")");
+    });
+  }
+
+  function repintarGridVisible() {
+    /* res-grid (búsqueda principal) */
+    var grid = document.getElementById('res-grid');
+    if (grid) {
+      grid.querySelectorAll('article').forEach(aplicarBadgeEnArticulo);
+    }
+    /* cats-res-grid (categorías) */
+    var cGrid = document.getElementById('cats-res-grid');
+    if (cGrid) {
+      cGrid.querySelectorAll('article').forEach(aplicarBadgeEnArticulo);
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     4. PATCH renderResults / renderSheetCards
+        — se llaman tras cada búsqueda; después de que terminen
+          aplicamos los badges sobre los artículos recién pintados
+  ══════════════════════════════════════════════════════════════ */
+  function patchRenderResults() {
+    /* renderResults es la función que pinta res-grid tras una búsqueda */
+    if (typeof window.renderResults === 'function' &&
+        !window.renderResults._stockFmPatched) {
+      var _origRR = window.renderResults;
+      window.renderResults = function () {
+        var r = _origRR.apply(this, arguments);
+        /* Pequeño delay para que el DOM se haya pintado */
+        setTimeout(repintarGridVisible, 80);
+        return r;
+      };
+      window.renderResults._stockFmPatched = true;
+    }
+
+    /* renderSheetCards es otra función que puede pintar tarjetas de stock */
+    if (typeof window.renderSheetCards === 'function' &&
+        !window.renderSheetCards._stockFmPatched) {
+      var _origRSC = window.renderSheetCards;
+      window.renderSheetCards = function () {
+        var r = _origRSC.apply(this, arguments);
+        setTimeout(repintarGridVisible, 80);
+        return r;
+      };
+      window.renderSheetCards._stockFmPatched = true;
+    }
+
+    /* _wilPatchGrid (usado por wil-formula-medica.js en el flujo de ofertas) */
+    if (typeof window._wilPatchGrid === 'function' &&
+        !window._wilPatchGrid._stockFmPatched) {
+      var _origPG = window._wilPatchGrid;
+      window._wilPatchGrid = function (items) {
+        var r = _origPG.apply(this, arguments);
+        setTimeout(repintarGridVisible, 80);
+        return r;
+      };
+      window._wilPatchGrid._stockFmPatched = true;
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     5. PATCH renderCatResGrid (vista Categorías)
+  ══════════════════════════════════════════════════════════════ */
+  function patchRenderCatResGrid() {
+    if (typeof window.renderCatResGrid !== 'function') return false;
+    if (window.renderCatResGrid._stockFmPatched) return true;
+
+    var _orig = window.renderCatResGrid;
+    window.renderCatResGrid = function (items, q, accentColor) {
+      var r = _orig.apply(this, arguments);
+      setTimeout(repintarGridVisible, 80);
+      return r;
+    };
+    window.renderCatResGrid._stockFmPatched = true;
+    return true;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     6. wilSaddConFormulaStock — abre popup de fórmula para STOCK
+  ══════════════════════════════════════════════════════════════ */
+  window.wilSaddConFormulaStock = function (key, desc, lab, precio) {
+    if (typeof window._fmPendiente === 'undefined') window._fmPendiente = null;
+    window._fmPendienteStock = { key: key, desc: desc, lab: lab, precio: precio };
+    if (typeof window._wilAbrirPopupFM === 'function') {
+      window._fmPendiente = { key: key, desc: desc, lab: lab, precio: precio };
+      window._wilAbrirPopupFM();
+    } else {
+      console.warn('[WIL][stock-formula] Popup de fórmula médica no disponible.');
+    }
+  };
+
+  /* ══════════════════════════════════════════════════════════════
+     7. PATCH wilGuardarConFormula — al guardar, usa addToCart(key)
+        en vez de sadd() para respetar el stock real
+  ══════════════════════════════════════════════════════════════ */
+  function patchGuardarConFormula() {
+    if (typeof window.wilGuardarConFormula !== 'function') return false;
+    if (window.wilGuardarConFormula._stockFmPatched) return true;
+
+    var _origGuardar = window.wilGuardarConFormula;
+    window.wilGuardarConFormula = function () {
+      var pendienteStock = window._fmPendienteStock;
+      var base64Antes    = window._fmBase64;
+
+      if (!pendienteStock || !base64Antes) {
+        window._fmPendienteStock = null;
+        return _origGuardar.apply(this, arguments);
+      }
+
+      /* Flujo STOCK: usar addToCart para respetar inventario */
+      window._wilFormulaAdjuntada = {
+        base64:   base64Antes,
+        fileName: (typeof window._fmFileName !== 'undefined' && window._fmFileName) || 'formula.jpg'
+      };
+      window._comprobanteBase64 = base64Antes;
+      window._comprobanteVerif  = true;
+
+      var ov = document.getElementById('wil-fm-ov');
+      if (ov) ov.style.display = 'none';
+      document.body.style.overflow = '';
+
+      var p = pendienteStock;
+      window._fmPendienteStock = null;
+      window._fmPendiente      = null;
+
+      if (typeof window.addToCart === 'function') {
+        window.addToCart(p.key, null);
+      } else if (typeof window.sadd === 'function') {
+        window.sadd(p.key, p.desc, p.lab, p.precio, null);
+      }
+
+      if (typeof window.wilMostrarBannerFormula === 'function') {
+        window.wilMostrarBannerFormula(window._fmFileName || 'formula.jpg', base64Antes);
+      }
+
+      window._fmBase64    = null;
+      window._fmFileName  = '';
+    };
+
+    window.wilGuardarConFormula._stockFmPatched = true;
+    return true;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     8. INIT — polling hasta que las dependencias existan
+  ══════════════════════════════════════════════════════════════ */
+  function init() {
+    if (typeof window._wilFormulaMap === 'undefined') window._wilFormulaMap = {};
+
+    var tries = 0;
+    var t = setInterval(function () {
+      tries++;
+      patchRenderResults();       // <-- parchea renderResults/renderSheetCards
+      var ok1 = patchRenderCatResGrid();
+      var ok2 = patchGuardarConFormula();
+      if ((ok1 && ok2) || tries > 60) clearInterval(t);
+    }, 250);
+
+    /* Si loadSheet ya corrió antes de que este script cargara, forzamos lectura */
+    setTimeout(aplicarFormulaSobreStock, 1500);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    setTimeout(init, 0);
+  }
+
+  console.log('[WIL] ✅ wil-stock-formula-medica.js v4 cargado — badge "Fórmula médica" + fix real de duplicados (con/sin foto)');
+
+}(window));
+  </script>
 
 
 </body>
 </html>
+
+
+
+
