@@ -596,6 +596,28 @@ var calculoResult = null;
 var debounceT = {};
 var popupYaMostrado = false;
 
+/* ── Área Metropolitana de Medellín ── */
+var METRO_BBOX = {
+  lonMin: -75.7500, latMin: 6.0500,
+  lonMax: -75.4800, latMax: 6.4500
+};
+function enAreaMetro(lat, lon) {
+  return lat >= METRO_BBOX.latMin && lat <= METRO_BBOX.latMax
+      && lon >= METRO_BBOX.lonMin && lon <= METRO_BBOX.lonMax;
+}
+function buildLabel(d) {
+  var a = d.address || {};
+  var partes = [
+    a.road || a.pedestrian || a.path || a.highway,
+    a.house_number,
+    a.suburb || a.neighbourhood || a.city_district || a.quarter,
+    a.city || a.town || a.municipality || a.county
+  ].filter(Boolean);
+  return partes.length >= 2
+    ? partes.join(', ')
+    : d.display_name.split(',').slice(0, 3).join(', ').trim();
+}
+
 /* ══════════════════════════════════════════
    TOAST
 ══════════════════════════════════════════ */
@@ -715,45 +737,89 @@ function usarGPS() {
    AUTOCOMPLETE
 ══════════════════════════════════════════ */
 async function geocodificar(txt) {
-  var q = encodeURIComponent(txt+', Colombia');
-  var url = 'https://nominatim.openstreetmap.org/search?q='+q
-          + '&format=json&limit=6&countrycodes=co&accept-language=es&addressdetails=1';
-  var r = await fetch(url, {headers:{'User-Agent':'DomiciliosWIL/1.0','Accept-Language':'es'}});
-  return await r.json();
+  var vb = METRO_BBOX.lonMin+','+METRO_BBOX.latMax
+         +','+METRO_BBOX.lonMax+','+METRO_BBOX.latMin;
+  var url = 'https://nominatim.openstreetmap.org/search'
+    + '?q=' + encodeURIComponent(txt + ', Antioquia, Colombia')
+    + '&format=json&limit=8&countrycodes=co&accept-language=es&addressdetails=1'
+    + '&viewbox=' + vb + '&bounded=1';
+  var r = await fetch(url, { headers: { 'User-Agent':'DomiciliosWIL/1.0', 'Accept-Language':'es' } });
+  var data = await r.json();
+  return (data || []).filter(function(item) {
+    return enAreaMetro(parseFloat(item.lat), parseFloat(item.lon));
+  });
 }
 
 function autoDir(campo, txt) {
-  txt = (txt||'').trim();
-  var sugEl = document.getElementById('sugs-'+campo);
-  if(!(campo==='recogida' && dirSel.recogida.esGPS && txt===document.getElementById('fDirRecogida').value)){
+  txt = (txt || '').trim();
+  var inputId = campo === 'recogida' ? 'fDirRecogida' : 'fDirEntrega';
+  var sugEl   = document.getElementById('sugs-' + campo);
+
+  if (!(campo === 'recogida' && dirSel.recogida.esGPS
+        && txt === document.getElementById(inputId).value)) {
     dirSel[campo] = { display:'', lat:null, lng:null, esGPS:false };
     checkForm();
   }
-  if(!txt || txt.length<3){ sugEl.style.display='none'; return; }
+
+  if (!txt || txt.length < 3) { sugEl.style.display = 'none'; return; }
+
   clearTimeout(debounceT[campo]);
-  debounceT[campo] = setTimeout(async function(){
-    sugEl.innerHTML = '<div class="wil-sug-empty">Buscando…</div>';
+  debounceT[campo] = setTimeout(async function() {
+    sugEl.innerHTML = '<div class="wil-sug-empty">Buscando en Medellín y área metro…</div>';
     sugEl.style.display = 'block';
     try {
       var res = await geocodificar(txt);
-      if(!res||!res.length){
-        sugEl.innerHTML = '<div class="wil-sug-empty">Sin resultados — intenta con más detalle</div>';
+      if (!res || !res.length) {
+        sugEl.innerHTML = '<div class="wil-sug-empty">Sin resultados en el área metro — escribe más detalle</div>';
+        sugEl._res = [];
         return;
       }
       sugEl._res = res;
-      sugEl.innerHTML = res.slice(0,6).map(function(r,i){
-        var p = r.display_name.split(',');
-        return '<div class="wil-sug-item" onmousedown="selDir(\''+campo+'\','+i+',event)">'
-          +'<span class="sug-ico">📍</span>'
-          +'<span class="sug-txt">'
-          +'<span class="sug-main">'+esc(p[0].trim())+'</span>'
-          +'<span class="sug-sub">'+esc(p.slice(1,3).join(',').trim())+'</span>'
-          +'</span></div>';
+      sugEl.innerHTML = res.slice(0, 6).map(function(r, i) {
+        var label    = buildLabel(r);
+        var sublabel = r.display_name.split(',').slice(1, 4).join(',').trim();
+        return '<div class="wil-sug-item" onmousedown="selDir(\'' + campo + '\',' + i + ',event)">'
+          + '<span class="sug-ico">📍</span>'
+          + '<span class="sug-txt">'
+          + '<span class="sug-main">' + esc(label) + '</span>'
+          + '<span class="sug-sub">'  + esc(sublabel) + '</span>'
+          + '</span></div>';
       }).join('');
-    } catch(e){
+    } catch(e) {
       sugEl.innerHTML = '<div class="wil-sug-empty">Error de red — intenta de nuevo</div>';
     }
   }, 430);
+}
+
+function selDir(campo, idx, e) {
+  if (e) e.preventDefault();
+  var sugEl   = document.getElementById('sugs-' + campo);
+  var inputId = campo === 'recogida' ? 'fDirRecogida' : 'fDirEntrega';
+  var r       = (sugEl._res || [])[idx];
+  if (!r) return;
+
+  var label = buildLabel(r);       // legible para el input
+  var lat   = parseFloat(r.lat);
+  var lng   = parseFloat(r.lon);
+
+  document.getElementById(inputId).value = label;  // muestra en el input
+
+  dirSel[campo] = {
+    display: r.display_name,   // completo para ticket y WhatsApp
+    lat:     lat,
+    lng:     lng,
+    esGPS:   false
+  };
+
+  sugEl.style.display = 'none';
+  checkForm();
+}
+
+function cerrarSugs(campo) {
+  setTimeout(function() {
+    var el = document.getElementById('sugs-' + campo);
+    if (el) el.style.display = 'none';
+  }, 200);
 }
 
 function selDir(campo, idx, e) {
