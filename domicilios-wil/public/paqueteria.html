@@ -589,8 +589,8 @@ var API_GEMINI_PROXY = '/api/productos?_ruta=gemini-distancia';
    STATE
 ══════════════════════════════════════════ */
 var dirSel = {
-  recogida: { display:'', lat:null, lng:null, esGPS:false },
-  entrega:  { display:'', lat:null, lng:null, esGPS:false }
+  recogida: { display:'', label:'', lat:null, lng:null, esGPS:false },
+  entrega:  { display:'', label:'', lat:null, lng:null, esGPS:false }
 };
 var calculoResult = null;
 var debounceT = {};
@@ -605,17 +605,39 @@ function enAreaMetro(lat, lon) {
   return lat >= METRO_BBOX.latMin && lat <= METRO_BBOX.latMax
       && lon >= METRO_BBOX.lonMin && lon <= METRO_BBOX.lonMax;
 }
+
+/*
+  buildLabel: construye la etiqueta legible para el INPUT
+  Ejemplo: "Cra. 47 #51-69, Copacabana, Antioquia"
+*/
 function buildLabel(d) {
   var a = d.address || {};
-  var partes = [
-    a.road || a.pedestrian || a.path || a.highway,
-    a.house_number,
-    a.suburb || a.neighbourhood || a.city_district || a.quarter,
-    a.city || a.town || a.municipality || a.county
-  ].filter(Boolean);
+
+  /* Nombre de la vía: prioriza road, luego pedestrian, path, highway */
+  var road = a.road || a.pedestrian || a.path || a.highway || '';
+
+  /* Número: house_number si existe */
+  var num = a.house_number ? ' #' + a.house_number : '';
+
+  /* Barrio / sector */
+  var barrio = a.suburb || a.neighbourhood || a.city_district || a.quarter || '';
+
+  /* Ciudad / municipio */
+  var ciudad = a.city || a.town || a.municipality || a.county || '';
+
+  /* Departamento */
+  var depto = a.state || '';
+
+  var partes = [];
+  if (road) partes.push(road + num);
+  if (barrio && barrio !== ciudad) partes.push(barrio);
+  if (ciudad) partes.push(ciudad);
+  if (depto && depto !== ciudad) partes.push(depto);
+
+  /* Si logramos al menos vía + ciudad, usamos eso; si no, fallback a display_name truncado */
   return partes.length >= 2
     ? partes.join(', ')
-    : d.display_name.split(',').slice(0, 3).join(', ').trim();
+    : d.display_name.split(',').slice(0, 4).join(', ').trim();
 }
 
 /* ══════════════════════════════════════════
@@ -686,16 +708,9 @@ function usarGPS() {
           { headers:{'User-Agent':'DomiciliosWIL/1.0'} }
         );
         var d = await r.json();
-        var addr = d.address || {};
-        var partes = [
-          addr.road || addr.pedestrian || addr.path,
-          addr.house_number,
-          addr.suburb || addr.neighbourhood || addr.city_district,
-          addr.city || addr.town || addr.municipality || addr.county
-        ].filter(Boolean);
-        var label = partes.length ? partes.join(', ') : d.display_name.split(',').slice(0,3).join(', ');
+        var label = buildLabel(d);
         document.getElementById('fDirRecogida').value = label;
-        dirSel.recogida = { display: d.display_name||label, lat: lat, lng: lng, esGPS: true };
+        dirSel.recogida = { display: d.display_name||label, label: label, lat: lat, lng: lng, esGPS: true };
         btn.classList.remove('loading');
         btn.classList.add('ok');
         btn.innerHTML = '<span class="sym f">my_location</span>';
@@ -706,7 +721,7 @@ function usarGPS() {
       } catch(e) {
         var raw = lat.toFixed(5)+', '+lng.toFixed(5);
         document.getElementById('fDirRecogida').value = raw;
-        dirSel.recogida = { display: raw, lat: lat, lng: lng, esGPS: true };
+        dirSel.recogida = { display: raw, label: raw, lat: lat, lng: lng, esGPS: true };
         btn.classList.remove('loading');
         btn.classList.add('ok');
         btn.innerHTML = '<span class="sym f">my_location</span>';
@@ -726,7 +741,6 @@ function usarGPS() {
       document.getElementById('gpsNote').innerHTML =
         '<span class="gps-badge error">⚠️ '+(msgs[err.code]||'Error GPS')+'</span>';
       toast(msgs[err.code]||'Error al obtener GPS','error');
-      /* Resetear flag para que pueda intentar de nuevo */
       popupYaMostrado = false;
     },
     { enableHighAccuracy:true, timeout:12000, maximumAge:0 }
@@ -755,9 +769,10 @@ function autoDir(campo, txt) {
   var inputId = campo === 'recogida' ? 'fDirRecogida' : 'fDirEntrega';
   var sugEl   = document.getElementById('sugs-' + campo);
 
+  /* Si el GPS ya está capturado y el texto coincide, no resetear */
   if (!(campo === 'recogida' && dirSel.recogida.esGPS
         && txt === document.getElementById(inputId).value)) {
-    dirSel[campo] = { display:'', lat:null, lng:null, esGPS:false };
+    dirSel[campo] = { display:'', label:'', lat:null, lng:null, esGPS:false };
     checkForm();
   }
 
@@ -777,7 +792,7 @@ function autoDir(campo, txt) {
       sugEl._res = res;
       sugEl.innerHTML = res.slice(0, 6).map(function(r, i) {
         var label    = buildLabel(r);
-        var sublabel = r.display_name.split(',').slice(1, 4).join(',').trim();
+        var sublabel = r.display_name.split(',').slice(2, 5).join(',').trim();
         return '<div class="wil-sug-item" onmousedown="selDir(\'' + campo + '\',' + i + ',event)">'
           + '<span class="sug-ico">📍</span>'
           + '<span class="sug-txt">'
@@ -791,6 +806,11 @@ function autoDir(campo, txt) {
   }, 430);
 }
 
+/* ══════════════════════════════════════════
+   selDir — ÚNICA DEFINICIÓN
+   - label  → dirección legible para el input (buildLabel)
+   - display → display_name completo para ticket y WhatsApp
+══════════════════════════════════════════ */
 function selDir(campo, idx, e) {
   if (e) e.preventDefault();
   var sugEl   = document.getElementById('sugs-' + campo);
@@ -798,14 +818,16 @@ function selDir(campo, idx, e) {
   var r       = (sugEl._res || [])[idx];
   if (!r) return;
 
-  var label = buildLabel(r);       // legible para el input
+  var label = buildLabel(r);          // "Cra. 47 #51-69, Copacabana, Antioquia"
   var lat   = parseFloat(r.lat);
   var lng   = parseFloat(r.lon);
 
-  document.getElementById(inputId).value = label;  // muestra en el input
+  /* Mostrar la dirección COMPLETA legible en el campo de texto */
+  document.getElementById(inputId).value = label;
 
   dirSel[campo] = {
-    display: r.display_name,   // completo para ticket y WhatsApp
+    display: r.display_name,  // completo para WhatsApp
+    label:   label,           // legible para ticket y resumen visual
     lat:     lat,
     lng:     lng,
     esGPS:   false
@@ -819,25 +841,6 @@ function cerrarSugs(campo) {
   setTimeout(function() {
     var el = document.getElementById('sugs-' + campo);
     if (el) el.style.display = 'none';
-  }, 200);
-}
-
-function selDir(campo, idx, e) {
-  if(e) e.preventDefault();
-  var sugEl = document.getElementById('sugs-'+campo);
-  var r = (sugEl._res||[])[idx];
-  if(!r) return;
-  var label = r.display_name.split(',')[0].trim();
-  document.getElementById(campo==='recogida'?'fDirRecogida':'fDirEntrega').value = label;
-  dirSel[campo] = { display: r.display_name, lat: parseFloat(r.lat), lng: parseFloat(r.lon), esGPS:false };
-  sugEl.style.display='none';
-  checkForm();
-}
-
-function cerrarSugs(campo){
-  setTimeout(function(){
-    var el=document.getElementById('sugs-'+campo);
-    if(el) el.style.display='none';
   }, 200);
 }
 
@@ -862,7 +865,6 @@ function irResumen(){
   if(!v('fNombre'))        { toast('Escribe tu nombre','person'); return; }
   if(!v('fTelEnvio'))      { toast('Escribe tu teléfono','phone'); return; }
   if(!dirSel.recogida.lat) {
-    /* Si no tiene GPS aún, mostrar popup en vez de toast */
     popupYaMostrado = false;
     popupMostrar();
     return;
@@ -945,11 +947,14 @@ async function iniciarCalculo(){
     document.getElementById('metricEta').textContent    = fmtMin(res.min);
     document.getElementById('metricTarifa').textContent = fmtCOP(res.tarifa);
 
-    var origenLabel  = dirSel.recogida.display.split(',').slice(0,2).join(', ');
-    var destinoLabel = dirSel.entrega.display.split(',').slice(0,2).join(', ');
-    document.getElementById('routeOrigenVal').textContent  = dirSel.recogida.display.split(',')[0];
+    /* Usar label completo legible para la card de ruta y verificación */
+    var origenLabel  = dirSel.recogida.label || dirSel.recogida.display;
+    var destinoLabel = dirSel.entrega.label  || dirSel.entrega.display;
+
+    /* Card de ruta — mostrar label completo */
+    document.getElementById('routeOrigenVal').textContent  = origenLabel;
     document.getElementById('routeOrigenSub').textContent  = 'Tel: '+v('fTelRecogida')+(dirSel.recogida.esGPS?' · 📍 GPS':'');
-    document.getElementById('routeDestinoVal').textContent = dirSel.entrega.display.split(',')[0];
+    document.getElementById('routeDestinoVal').textContent = destinoLabel;
     document.getElementById('routeDestinoSub').textContent = 'Tel: '+v('fTelEntrega');
 
     poblarTicket(res);
@@ -1014,13 +1019,18 @@ function poblarTicket(res){
   document.getElementById('tarifaVal').textContent = fmtCOP(res.tarifa);
   document.getElementById('tarifaSub').textContent =
     fmtKm(res.km)+' · '+fmtMin(res.min)+' en moto · Sujeta a confirmación';
+
+  /* Usar label completo (buildLabel) para recogida y entrega en el ticket */
+  var recLabel = dirSel.recogida.label || dirSel.recogida.display;
+  var entLabel = dirSel.entrega.label  || dirSel.entrega.display;
+
   document.getElementById('ticketBody').innerHTML = ''
     + fila('👤','Remitente', esc(v('fNombre')))
     + fila('📱','Teléfono', esc(v('fTelEnvio')))
-    + fila('📍','Recogida', esc(dirSel.recogida.display.split(',').slice(0,2).join(', ')), true)
+    + fila('📍','Recogida', esc(recLabel), true)
     + (dirSel.recogida.esGPS ? fila('🛰️','Origen', 'Capturado por GPS') : '')
     + fila('📞','Tel. recogida', esc(v('fTelRecogida')))
-    + fila('🎯','Entrega', esc(dirSel.entrega.display.split(',').slice(0,2).join(', ')), true)
+    + fila('🎯','Entrega', esc(entLabel), true)
     + fila('📞','Tel. entrega', esc(v('fTelEntrega')))
     + filaPkg('📦','Paquete', esc(v('fDescripcion')));
 }
@@ -1037,6 +1047,10 @@ function enviarWA(){
   var verKm  = document.getElementById('iaGeminiVal').textContent;
   var verOk  = document.getElementById('iaBadge').textContent;
 
+  /* Para WA usar label legible completo */
+  var recLabel = dirSel.recogida.label || dirSel.recogida.display;
+  var entLabel = dirSel.entrega.label  || dirSel.entrega.display;
+
   var msg = [
     '🚚 *COTIZACIÓN PAQUETERÍA — Domicilios WIL*',
     '📅 '+fh,
@@ -1047,12 +1061,12 @@ function enviarWA(){
     '• Teléfono: '+v('fTelEnvio'),
     '',
     '📍 *RECOGIDA'+(dirSel.recogida.esGPS?' (GPS)':'')+'*',
-    '• Dirección: '+dirSel.recogida.display.split(',').slice(0,3).join(', '),
+    '• Dirección: '+recLabel,
     '• Coordenadas: '+dirSel.recogida.lat.toFixed(6)+', '+dirSel.recogida.lng.toFixed(6),
     '• Tel: '+v('fTelRecogida'),
     '',
     '🎯 *ENTREGA*',
-    '• Dirección: '+dirSel.entrega.display.split(',').slice(0,3).join(', '),
+    '• Dirección: '+entLabel,
     '• Coordenadas: '+dirSel.entrega.lat.toFixed(6)+', '+dirSel.entrega.lng.toFixed(6),
     '• Tel: '+v('fTelEntrega'),
     '',
@@ -1082,10 +1096,9 @@ function enviarWA(){
 }
 
 /* ══════════════════════════════════════════
-   INIT — popup al cargar la página
+   INIT
 ══════════════════════════════════════════ */
 window.addEventListener('load', function(){
-  /* Solo mostrar si no tiene GPS ya capturado */
   if(!dirSel.recogida.lat) {
     setTimeout(popupMostrar, 800);
   }
