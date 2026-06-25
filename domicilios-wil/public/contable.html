@@ -2080,8 +2080,7 @@ function renderTablaPedidos(){
       <td>${p.id}</td>
       <td><b>${p.cliente||'–'}</b><br><span style="font-size:8px;color:var(--text3);">${p.tel||''}</span></td>
       <td style="font-size:9px;color:var(--text2);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.direccion||'–'}</td>
-      <td>${p.domi?`<span style="font-size:10px;font-weight:700;">${p.domi}</span>`:`<span style="font-size:9px;font-weight:800;color:var(--red);background:var(--red-l);padding:1px 6px;border-radius:99px;">Sin asignar</span>`}</td>
-      <td><span class="stag ${p.estado}">${stLbl[p.estado]||p.estado}</span></td>
+     <td>${p.domi?`<span style="font-size:10px;font-weight:700;">${p.domi}</span>`:`<button class="tf-badge-btn" style="color:var(--green);background:var(--green-l);border-color:rgba(22,163,74,.2);" onclick="event.stopPropagation();abrirAsignarRapido('${p.id.replace(/'/g,"\\'")}')"><span class="material-symbols-rounded">person_add</span>Asignar</button>`}</td>
       <td style="font-size:9px;color:var(--text2);">${p.comercio||'–'}</td>
       <td>${esTf?`<span class="tf-badge-btn" onclick="event.stopPropagation();openTfModal('${p.id}','${safeEsc(imgUrl)}','${meta}')"><span class="material-symbols-rounded">receipt_long</span>Transf.</span>`:`<span style="font-size:9px;">${p.metodo||'–'}</span>`}</td>
       <td style="font-family:'DM Mono',monospace;font-size:10px;font-weight:700;">${subtotal>0?fmtMoney(subtotal):'–'}</td>
@@ -2290,6 +2289,22 @@ function abrirModalPedCont(id){
           <div class="comms-title"><span class="material-symbols-rounded" style="font-size:12px;color:var(--teal);">chat</span>Comunicación</div>
           <button class="comms-btn wa" onclick="window.open('${waLink}${waMsg}','_blank')"><span class="material-symbols-rounded">whatsapp</span>Confirmar pedido</button>
         </div>`:''}
+        ${!p.domi && p.estado!=='entregado' && p.estado!=='cancelado' ? `
+<div style="background:linear-gradient(135deg,#dcfce7,#f0fdf4);border:1.5px solid rgba(22,163,74,.25);border-radius:12px;padding:12px;">
+  <div style="font-size:8px;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:.11em;margin-bottom:8px;display:flex;align-items:center;gap:4px;">
+    <span class="material-symbols-rounded" style="font-size:13px;">person_add</span>Asignar domiciliario
+  </div>
+  <select id="modal-asignar-sel-${p.id}" style="width:100%;background:var(--white);border:1.5px solid var(--border);border-radius:9px;padding:8px 10px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;color:var(--text);outline:none;margin-bottom:8px;">
+    <option value="">— Selecciona domiciliario —</option>
+    ${allDrivers.filter(d=>d.activo!==false).map(d=>{
+      const idVal=d.idWil||d.id||'';
+      return `<option value="${safeEsc(idVal)}|${safeEsc(d.nombre)}">${d.nombre}${d.zona?' · '+d.zona:''}</option>`;
+    }).join('')}
+  </select>
+  <button class="btn btn-green" style="width:100%;justify-content:center;" onclick="confirmarAsignarDesdeModal('${p.id.replace(/'/g,"\\'")}')">
+    <span class="material-symbols-rounded">check_circle</span>Asignar pedido
+  </button>
+</div>` : ''}
         <button onclick="cerrarModalPedCont()" style="width:100%;background:var(--bg2);color:var(--text2);border:1.5px solid var(--border);border-radius:10px;padding:9px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;"><span class="material-symbols-rounded" style="font-size:13px;">close</span>Cerrar</button>
       </div>
       <div class="inv-right">
@@ -2923,6 +2938,91 @@ async function asignarDesdeMapaPopup(domiId, domiNombre, selId) {
     renderTablaPedidos();
     updateSbBadges();
   } catch(e) { showToast('e', 'Error al asignar', e.message.substring(0,80)); }
+}
+
+
+
+/* ════ ASIGNAR DOMICILIARIO A PEDIDO (desde tabla / modal) ════ */
+async function asignarDomiAPedido(pedidoId, domiciliarioId, domiciliarioNombre){
+  try{
+    const r=await fetch('/api/foto?recurso=asignar',{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({pedidoId,domiciliarioId,domiciliarioNombre})
+    });
+    const j=await r.json();
+    if(!j.ok) throw new Error(j.error);
+    const p=allPedidos.find(x=>x.id===pedidoId);
+    if(p){p.estado='asignado';p.estadoRaw='Asignado';p.domi=domiciliarioNombre;}
+    showToast('s',`✓ Pedido #${pedidoId} asignado`,`→ ${domiciliarioNombre}`);
+    renderTablaPedidos();renderPendientesRT();updateSbBadges();
+    if(_mapaRastreo) actualizarMapaRastreo();
+    return true;
+  }catch(e){
+    showToast('e','Error al asignar',e.message.substring(0,80));
+    return false;
+  }
+}
+
+/* Modal rápido: lista de domiciliarios activos para asignar */
+function abrirAsignarRapido(pedidoId){
+  const p=allPedidos.find(x=>x.id===pedidoId);if(!p) return;
+  const activos=allDrivers.filter(d=>d.activo!==false);
+  if(!activos.length){showToast('w','Sin domiciliarios activos','Registra o activa un domiciliario primero');return;}
+  const opciones=activos.map(d=>{
+    const idVal=d.idWil||d.id||'';
+    return `<option value="${safeEsc(idVal)}|${safeEsc(d.nombre)}">${d.nombre}${d.zona?' · '+d.zona:''}</option>`;
+  }).join('');
+  const html=`
+    <div class="modal-overlay show" id="modal-asignar-rapido" onclick="if(event.target===this)document.getElementById('modal-asignar-rapido').remove()">
+      <div class="modal-box" style="width:min(420px,100%);">
+        <div class="modal-hdr">
+          <div class="modal-hdr-ico" style="background:var(--green-l);color:var(--green);">
+            <span class="material-symbols-rounded">person_add</span>
+          </div>
+          <h3>Asignar domiciliario</h3>
+          <button class="modal-close" onclick="document.getElementById('modal-asignar-rapido').remove()">
+            <span class="material-symbols-rounded" style="font-size:14px;">close</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div style="background:var(--bg);border:1.5px solid var(--border);border-radius:11px;padding:10px 12px;margin-bottom:14px;">
+            <div style="font-size:9px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px;">Pedido #${p.id}</div>
+            <div style="font-size:13px;font-weight:800;color:var(--text);">${p.cliente||'–'}</div>
+            <div style="font-size:10px;color:var(--text2);margin-top:2px;">📍 ${(p.direccion||'Sin dirección').substring(0,60)}</div>
+          </div>
+          <div class="field">
+            <label><span class="material-symbols-rounded">delivery_dining</span>Domiciliario disponible *</label>
+            <select id="asignar-rapido-sel">
+              <option value="">— Selecciona —</option>
+              ${opciones}
+            </select>
+          </div>
+          <button class="btn btn-green" style="width:100%;justify-content:center;" onclick="confirmarAsignarRapido('${p.id.replace(/'/g,"\\'")}')">
+            <span class="material-symbols-rounded">check_circle</span>Confirmar asignación
+          </button>
+        </div>
+      </div>
+    </div>`;
+  const existing=document.getElementById('modal-asignar-rapido');if(existing)existing.remove();
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+
+async function confirmarAsignarRapido(pedidoId){
+  const sel=document.getElementById('asignar-rapido-sel');
+  if(!sel||!sel.value){showToast('w','Selecciona un domiciliario','Elige uno de la lista');return;}
+  const [domiId,domiNombre]=sel.value.split('|');
+  const ok=await asignarDomiAPedido(pedidoId,domiId,domiNombre);
+  if(ok){const modal=document.getElementById('modal-asignar-rapido');if(modal)modal.remove();}
+}
+
+/* Asignar desde el modal de detalle del pedido (abrirModalPedCont) */
+async function confirmarAsignarDesdeModal(pedidoId){
+  const sel=document.getElementById('modal-asignar-sel-'+pedidoId);
+  if(!sel||!sel.value){showToast('w','Selecciona un domiciliario','Elige uno de la lista');return;}
+  const [domiId,domiNombre]=sel.value.split('|');
+  const ok=await asignarDomiAPedido(pedidoId,domiId,domiNombre);
+  if(ok){cerrarModalPedCont();setTimeout(()=>abrirModalPedCont(pedidoId),80);}
 }
 
 /* ── Inicializar mapa (UNA SOLA FUNCIÓN) ── */
