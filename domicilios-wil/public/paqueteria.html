@@ -245,14 +245,6 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
           <label>Nombre completo *</label>
           <input type="text" id="fNombre" placeholder="Nombre y apellido" autocomplete="name" oninput="checkForm()"/>
         </div>
-        <div class="wf">
-          <label>Teléfono *</label>
-          <input type="tel" id="fTelRemitente" placeholder="Tu número de contacto" autocomplete="tel" oninput="checkForm()"/>
-        </div>
-        <div class="wf">
-          <label>Email</label>
-          <input type="email" id="fEmail" placeholder="email@ejemplo.com" autocomplete="email"/>
-        </div>
       </div>
     </div>
 
@@ -297,10 +289,6 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
           <label>Descripción del contenido *</label>
           <textarea id="fDescripcion" rows="3" placeholder="Tipo, tamaño, peso aproximado, características especiales…" oninput="checkForm()"></textarea>
           <span class="wf-note">⚠️ Máximo 30 kg · Sin líquidos ni materiales peligrosos</span>
-        </div>
-        <div class="wf">
-          <label>Valor declarado (COP)</label>
-          <input type="number" id="fValor" placeholder="Valor estimado del paquete" min="0"/>
         </div>
         <div class="wf">
           <label>Notas especiales</label>
@@ -439,10 +427,7 @@ var METRO_BBOX  = { lonMin: -75.7500, latMin: 6.0500, lonMax: -75.4800, latMax: 
 
 var formData = {
   nombre: '',
-  telRemitente: '',
-  email: '',
   descripcion: '',
-  valor: '',
   notas: '',
   recogidas: [],
   entregas: []
@@ -490,14 +475,12 @@ function fmtKm(n){ return n.toFixed(1)+' km'; }
 function fmtMin(m){ if(m<60) return Math.round(m)+' min'; return Math.floor(m/60)+'h '+(Math.round(m%60)||'')+'min'; }
 
 function agregarRecogida() {
-  var idx = formData.recogidas.length;
-  formData.recogidas.push({ display:'', label:'', lat:null, lng:null, apto:'', tel:'', ref:'' });
+  formData.recogidas.push({ display:'', label:'', lat:null, lng:null, barrio:'', apto:'', tel:'', ref:'' });
   renderRecogidas();
 }
 
 function agregarEntrega() {
-  var idx = formData.entregas.length;
-  formData.entregas.push({ display:'', label:'', lat:null, lng:null, apto:'', tel:'', ref:'' });
+  formData.entregas.push({ display:'', label:'', lat:null, lng:null, barrio:'', apto:'', tel:'', ref:'' });
   renderEntregas();
 }
 
@@ -516,7 +499,6 @@ function removerEntrega(idx) {
 function renderRecogidas() {
   var html = '';
   for (var i = 0; i < formData.recogidas.length; i++) {
-    var r = formData.recogidas[i];
     html += '<div class="bloque-direccion">'
       + '<div class="bloque-direccion-hdr">'
       + '<span class="bloque-direccion-num">Recogida ' + (i+1) + '</span>'
@@ -536,6 +518,10 @@ function renderRecogidas() {
       + 'autocomplete="off"/>'
       + '<div class="wil-sugs" id="sugs-recogida-'+i+'"></div>'
       + '</div>'
+      + '</div>'
+      + '<div class="bloque-direccion-full wf">'
+      + '<label>Barrio *</label>'
+      + '<input type="text" id="recog_barrio_'+i+'" placeholder="Ej. Laureles, El Poblado…" autocomplete="off" oninput="checkForm()"/>'
       + '</div>'
       + '<div class="wf">'
       + '<label>Apto / Local / Número</label>'
@@ -558,7 +544,6 @@ function renderRecogidas() {
 function renderEntregas() {
   var html = '';
   for (var i = 0; i < formData.entregas.length; i++) {
-    var e = formData.entregas[i];
     html += '<div class="bloque-direccion">'
       + '<div class="bloque-direccion-hdr">'
       + '<span class="bloque-direccion-num">Entrega ' + (i+1) + '</span>'
@@ -578,6 +563,11 @@ function renderEntregas() {
       + 'autocomplete="off"/>'
       + '<div class="wil-sugs" id="sugs-entrega-'+i+'"></div>'
       + '</div>'
+      + '</div>'
+      /* ── CAMPO BARRIO EN ENTREGA ── */
+      + '<div class="bloque-direccion-full wf">'
+      + '<label>Barrio *</label>'
+      + '<input type="text" id="entr_barrio_'+i+'" placeholder="Ej. Belén, Envigado, Sabaneta…" autocomplete="off" oninput="checkForm()"/>'
       + '</div>'
       + '<div class="wf">'
       + '<label>Apto / Local / Número</label>'
@@ -612,10 +602,8 @@ async function geocodificar(txt) {
 
 function autoDir(campo, idx, txt) {
   txt = (txt || '').trim();
-  var inputId = campo === 'recogida' ? 'recog_dir_'+idx : 'entr_dir_'+idx;
-  var sugEl   = document.getElementById('sugs-'+campo+'-'+idx);
-  var arr     = campo === 'recogida' ? formData.recogidas : formData.entregas;
-  
+  var sugEl = document.getElementById('sugs-'+campo+'-'+idx);
+
   if (!txt || txt.length < 3) { sugEl.style.display = 'none'; return; }
 
   clearTimeout(debounceT[campo+idx]);
@@ -658,8 +646,8 @@ function selDir(campo, idx, sugIdx, e) {
 
   document.getElementById(inputId).value = label;
   var arr = campo === 'recogida' ? formData.recogidas : formData.entregas;
-  arr[idx] = { display: r.display_name, label: label, lat: lat, lng: lng, apto:'', tel:'', ref:'' };
-  
+  arr[idx] = { display: r.display_name, label: label, lat: lat, lng: lng, barrio:'', apto:'', tel:'', ref:'' };
+
   sugEl.style.display = 'none';
   checkForm();
 }
@@ -672,38 +660,39 @@ function cerrarSugs(campo, idx) {
 }
 
 function checkForm(){
-  var ok = v('fNombre') && v('fTelRemitente') && v('fDescripcion')
+  var ok = v('fNombre') && v('fDescripcion')
         && formData.recogidas.length > 0 && formData.entregas.length > 0;
-  
+
   if (ok) {
     for (var i = 0; i < formData.recogidas.length; i++) {
-      if (!formData.recogidas[i].lat || !v('recog_tel_'+i)) ok = false;
+      if (!formData.recogidas[i].lat || !v('recog_tel_'+i) || !v('recog_barrio_'+i)) ok = false;
     }
     for (var i = 0; i < formData.entregas.length; i++) {
-      if (!formData.entregas[i].lat || !v('entr_tel_'+i)) ok = false;
+      /* ── VALIDACIÓN BARRIO EN ENTREGA ── */
+      if (!formData.entregas[i].lat || !v('entr_tel_'+i) || !v('entr_barrio_'+i)) ok = false;
     }
   }
-  
+
   document.getElementById('btnContinuar').disabled = !ok;
 }
 
 function irResumen(){
-  formData.nombre = v('fNombre');
-  formData.telRemitente = v('fTelRemitente');
-  formData.email = v('fEmail');
+  formData.nombre      = v('fNombre');
   formData.descripcion = v('fDescripcion');
-  formData.valor = v('fValor');
-  formData.notas = v('fNotas');
+  formData.notas       = v('fNotas');
 
   for (var i = 0; i < formData.recogidas.length; i++) {
-    formData.recogidas[i].apto = v('recog_apto_'+i);
-    formData.recogidas[i].tel = v('recog_tel_'+i);
-    formData.recogidas[i].ref = v('recog_ref_'+i);
+    formData.recogidas[i].barrio = v('recog_barrio_'+i);
+    formData.recogidas[i].apto   = v('recog_apto_'+i);
+    formData.recogidas[i].tel    = v('recog_tel_'+i);
+    formData.recogidas[i].ref    = v('recog_ref_'+i);
   }
   for (var i = 0; i < formData.entregas.length; i++) {
-    formData.entregas[i].apto = v('entr_apto_'+i);
-    formData.entregas[i].tel = v('entr_tel_'+i);
-    formData.entregas[i].ref = v('entr_ref_'+i);
+    /* ── GUARDAR BARRIO EN ENTREGA ── */
+    formData.entregas[i].barrio = v('entr_barrio_'+i);
+    formData.entregas[i].apto   = v('entr_apto_'+i);
+    formData.entregas[i].tel    = v('entr_tel_'+i);
+    formData.entregas[i].ref    = v('entr_ref_'+i);
   }
 
   document.getElementById('view1').classList.remove('active');
@@ -742,28 +731,26 @@ async function iniciarCalculo(){
 
   try {
     var totalKm = 0, totalMin = 0;
-    
-    // Calcular distancia entre todos los puntos en orden
+
     var todosLos = [];
     formData.recogidas.forEach(function(r) { todosLos.push({tipo:'recogida',dir:r}); });
-    formData.entregas.forEach(function(e) { todosLos.push({tipo:'entrega',dir:e}); });
+    formData.entregas.forEach(function(e)  { todosLos.push({tipo:'entrega',dir:e}); });
 
     for (var i = 0; i < todosLos.length - 1; i++) {
       var tramo = await calcularRutaOSRM(
-        todosLos[i].dir.lat, todosLos[i].dir.lng,
+        todosLos[i].dir.lat,   todosLos[i].dir.lng,
         todosLos[i+1].dir.lat, todosLos[i+1].dir.lng
       );
-      totalKm += tramo.km;
+      totalKm  += tramo.km;
       totalMin += tramo.min;
     }
 
     calculoResult = { km: totalKm, min: totalMin, tarifa: Math.ceil(totalKm * TARIFA_KM / 100) * 100 };
 
-    document.getElementById('metricKm').textContent = fmtKm(calculoResult.km);
-    document.getElementById('metricEta').textContent = fmtMin(calculoResult.min);
+    document.getElementById('metricKm').textContent    = fmtKm(calculoResult.km);
+    document.getElementById('metricEta').textContent   = fmtMin(calculoResult.min);
     document.getElementById('metricTarifa').textContent = fmtCOP(calculoResult.tarifa);
 
-    // Visualizar ruta
     var rutaHTML = '';
     for (var i = 0; i < todosLos.length; i++) {
       var item = todosLos[i];
@@ -804,28 +791,29 @@ function poblarTicket(res){
   document.getElementById('tarifaVal').textContent = fmtCOP(res.tarifa);
   document.getElementById('tarifaSub').textContent = fmtKm(res.km)+' · '+fmtMin(res.min)+' estimado';
 
-  var html = fila('👤','Remitente',esc(formData.nombre))
-    + fila('📱','Teléfono',esc(formData.telRemitente));
+  var html = fila('👤','Remitente',esc(formData.nombre));
 
   formData.recogidas.forEach(function(r,i) {
     html += '<div style="margin-top:6px;padding-top:6px;border-top:1px dashed #f1f5f9"></div>'
       + fila('📍','Recogida '+(i+1),esc(r.label),true);
-    if(r.apto) html += fila('🏢','Apto',esc(r.apto));
+    if(r.barrio) html += fila('🏘️','Barrio',esc(r.barrio));
+    if(r.apto)   html += fila('🏢','Apto',esc(r.apto));
     html += fila('📞','Tel',esc(r.tel));
-    if(r.ref) html += fila('ℹ️','Ref',esc(r.ref));
+    if(r.ref)    html += fila('ℹ️','Ref',esc(r.ref));
   });
 
   formData.entregas.forEach(function(e,i) {
     html += '<div style="margin-top:6px;padding-top:6px;border-top:1px dashed #f1f5f9"></div>'
       + fila('🎯','Entrega '+(i+1),esc(e.label),true);
-    if(e.apto) html += fila('🏢','Apto',esc(e.apto));
+    /* ── BARRIO EN TICKET DE ENTREGA ── */
+    if(e.barrio) html += fila('🏘️','Barrio',esc(e.barrio));
+    if(e.apto)   html += fila('🏢','Apto',esc(e.apto));
     html += fila('📞','Tel',esc(e.tel));
-    if(e.ref) html += fila('ℹ️','Ref',esc(e.ref));
+    if(e.ref)    html += fila('ℹ️','Ref',esc(e.ref));
   });
 
   html += '<div style="margin-top:6px;padding-top:6px;border-top:1px dashed #f1f5f9"></div>'
     + fila('📦','Paquete',esc(formData.descripcion));
-  if(formData.valor) html += fila('💵','Valor',fmtCOP(formData.valor));
   if(formData.notas) html += fila('📝','Notas',esc(formData.notas));
 
   document.getElementById('ticketBody').innerHTML = html;
@@ -843,32 +831,32 @@ function enviarWA(){
     '',
     '👤 *REMITENTE*',
     '• '+formData.nombre,
-    '• Tel: '+formData.telRemitente,
-    formData.email ? '• Email: '+formData.email : '',
     ''
   ];
 
   formData.recogidas.forEach(function(r,i) {
     msg.push('📍 *RECOGIDA '+(i+1)+'*');
     msg.push('• '+r.label);
-    if(r.apto) msg.push('• Apto: '+r.apto);
+    if(r.barrio) msg.push('• Barrio: '+r.barrio);
+    if(r.apto)   msg.push('• Apto: '+r.apto);
     msg.push('• Tel: '+r.tel);
-    if(r.ref) msg.push('• Ref: '+r.ref);
+    if(r.ref)    msg.push('• Ref: '+r.ref);
     msg.push('');
   });
 
   formData.entregas.forEach(function(e,i) {
     msg.push('🎯 *ENTREGA '+(i+1)+'*');
     msg.push('• '+e.label);
-    if(e.apto) msg.push('• Apto: '+e.apto);
+    /* ── BARRIO EN MENSAJE WHATSAPP ENTREGA ── */
+    if(e.barrio) msg.push('• Barrio: '+e.barrio);
+    if(e.apto)   msg.push('• Apto: '+e.apto);
     msg.push('• Tel: '+e.tel);
-    if(e.ref) msg.push('• Ref: '+e.ref);
+    if(e.ref)    msg.push('• Ref: '+e.ref);
     msg.push('');
   });
 
   msg.push('📦 *PAQUETE*');
   msg.push('• '+formData.descripcion);
-  if(formData.valor) msg.push('• Valor: '+fmtCOP(formData.valor));
   if(formData.notas) msg.push('• Notas: '+formData.notas);
   msg.push('');
   msg.push('━━━━━━━━━━━━━━━━━━');
