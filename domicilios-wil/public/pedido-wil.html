@@ -14029,5 +14029,42 @@ return '<div class="cat-real-pill" style="cursor:pointer;flex-shrink:0;">' +
 </script>
 
 
+<script>
+/* ── FIX DEFINITIVO SCROLL VEREDAL ── */
+(function() {
+  function fixVeredalScroll() {
+    var sheet = document.getElementById('wil-veredal-sheet');
+    var body  = sheet ? sheet.querySelector('.wv-sheet-body') : null;
+    if (!sheet || !body) return;
+
+    /* Forzar estilos directamente en el DOM */
+    sheet.style.cssText += ';max-height:92dvh!important;height:auto!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;';
+
+    body.style.cssText += ';flex:1 1 auto!important;min-height:0!important;overflow-y:scroll!important;-webkit-overflow-scrolling:touch!important;overscroll-behavior-y:contain!important;max-height:none!important;padding-bottom:60px!important;';
+
+    /* Asegurar que nada dentro bloquee el scroll */
+    var children = body.children;
+    for (var i = 0; i < children.length; i++) {
+      children[i].style.flexShrink = '0';
+      children[i].style.maxHeight  = 'none';
+    }
+  }
+
+  /* Aplicar cada vez que se abre el modal */
+  var origAbrir = window.wvAbrir;
+  window.wvAbrir = function() {
+    if (typeof origAbrir === 'function') origAbrir.apply(this, arguments);
+    setTimeout(fixVeredalScroll, 50);
+    setTimeout(fixVeredalScroll, 200); /* doble por si renderiza tarde */
+  };
+
+  /* También al cargar por si ya estaba abierto */
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(fixVeredalScroll, 300);
+  });
+})();
+</script>
+
+
 </body>
 </html>
