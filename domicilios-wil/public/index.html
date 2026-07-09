@@ -1098,6 +1098,7 @@ html, body {
     <span class="material-symbols-outlined">lock</span>
   </div>
 </button>
+<a id="linkLoginDomi" href="wilapp://login" style="display:none" aria-hidden="true"></a>
 
       <button type="button" class="corp-btn" onclick="window.location.href='postulacion.html'">
         <div class="corp-btn-left">
@@ -1461,13 +1462,28 @@ function normHoraCliente(s) {
 
 
 function irAlLoginDomi() {
-  var esAndroid = /android/i.test(navigator.userAgent);
-  if (esAndroid) {
-    window.location = 'wilapp://login';
-  } else {
-    // En PC o iOS sigue yendo al HTML por ahora
-    window.location.href = 'domi-login.html';
+  var yaSeFue = false;
+
+  function marcarSeFue() {
+    yaSeFue = true;
   }
+  document.addEventListener('visibilitychange', marcarSeFue, { once: true });
+  window.addEventListener('pagehide', marcarSeFue, { once: true });
+  window.addEventListener('blur', marcarSeFue, { once: true });
+
+  // Disparo real de clic sobre el <a>, no solo asignación por JS —
+  // esto es lo que hace que Chrome/Android entreguen el control a la app de forma confiable.
+  var link = document.getElementById('linkLoginDomi');
+  link.click();
+
+  // Si en 1.5s seguimos aquí, la app no tomó el control (no instalada, versión vieja, o
+  // estamos en un dispositivo sin la app, ej. PC). Ya NO existe domi-login.html — en vez
+  // de romper, avisamos en la misma página.
+  setTimeout(function () {
+    if (!yaSeFue) {
+      mostrarAvisoAppNoDisponible();
+    }
+  }, 1500);
 }
 
 function mostrarOverlayNoDisp(bloque) {
