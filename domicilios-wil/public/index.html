@@ -1504,6 +1504,40 @@ function mostrarOverlayNoDisp(bloque) {
     hour: '2-digit', minute: '2-digit', hour12: true
   });
 
+function mostrarAvisoAppNoDisponible() {
+  const viejo = document.getElementById('wil-app-no-disp');
+  if (viejo) viejo.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'wil-app-no-disp';
+  overlay.style.cssText = `
+    position:fixed;inset:0;z-index:99999;
+    display:flex;align-items:center;justify-content:center;
+    background:rgba(0,32,28,.75);backdrop-filter:blur(6px);
+    padding:24px;
+  `;
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:24px;padding:28px 24px;max-width:340px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:'Plus Jakarta Sans',sans-serif;">
+      <div style="font-size:40px;margin-bottom:12px;">📲</div>
+      <h3 style="font-weight:800;font-size:18px;color:#00453d;margin-bottom:8px;">
+        Necesitas instalar la app
+      </h3>
+      <p style="font-size:13.5px;color:#3f4946;line-height:1.5;margin-bottom:20px;">
+        El panel de domiciliario funciona dentro de la app Domicilios WIL. Instálala desde Play Store y vuelve a tocar este botón.
+      </p>
+      <a href="https://play.google.com/store/apps/details?id=com.domicilioswil.app" target="_blank" style="display:block;background:#00453d;color:#fff;padding:14px;border-radius:16px;font-weight:700;text-decoration:none;margin-bottom:8px;">
+        ⬇️ Ir a Play Store
+      </a>
+      <button onclick="document.getElementById('wil-app-no-disp').remove()" style="background:transparent;border:none;color:#6f7976;font-weight:600;font-size:13px;padding:8px;">
+        Cerrar
+      </button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+  
+
   const motivo = bloque.motivo || 'El servicio no está disponible en este momento.';
 
   const overlay = document.createElement('div');
