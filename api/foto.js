@@ -122,7 +122,7 @@ const Foto = mongoose.models.Foto || mongoose.model('Foto',
 /* ══ CORS ══ */
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin',  '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
@@ -522,6 +522,69 @@ export default async function handler(req, res) {
       if (e.code === 11000)
         return res.status(409).json({ ok: false, error: 'Ya existe un domiciliario con ese ID.' });
       console.error('[POST domiciliarios]', e.message);
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
+  /* ════════════════════════════════════════
+     PATCH /api/foto?recurso=domiciliarios&id=<idWil>
+     Body: { nombre?, tel?, zona?, rol?, activo?, password? }
+  ════════════════════════════════════════ */
+  if (recurso === 'domiciliarios' && req.method === 'PATCH') {
+    try {
+      const { id } = req.query;
+      if (!id) return res.status(400).json({ ok: false, error: 'Falta id' });
+
+      const idWil = id.toUpperCase().trim();
+      const { nombre, tel, zona, rol, activo, password, foto } = req.body || {};
+
+      const update = {};
+      if (nombre !== undefined) update.nombre = String(nombre).trim();
+      if (tel    !== undefined) update.tel    = tel;
+      if (zona   !== undefined) update.zona   = zona;
+      if (rol    !== undefined) update.rol    = rol;
+      if (foto   !== undefined) update.foto   = foto;
+      if (activo !== undefined) update.activo = !!activo;
+
+      if (password) {
+        const bcrypt = await import('bcryptjs');
+        update.password = await bcrypt.default.hash(password, 12);
+      }
+
+      const actualizado = await Domiciliario.findOneAndUpdate(
+        { idWil },
+        update,
+        { new: true, projection: { password: 0, __v: 0 } }
+      ).lean();
+
+      if (!actualizado)
+        return res.status(404).json({ ok: false, error: 'Domiciliario no encontrado: ' + idWil });
+
+      return res.status(200).json({ ok: true, data: actualizado });
+    } catch (e) {
+      console.error('[PATCH domiciliarios]', e.message);
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
+  /* ════════════════════════════════════════
+     DELETE /api/foto?recurso=domiciliarios&id=<idWil>
+  ════════════════════════════════════════ */
+  if (recurso === 'domiciliarios' && req.method === 'DELETE') {
+    try {
+      const { id } = req.query;
+      if (!id) return res.status(400).json({ ok: false, error: 'Falta id' });
+
+      const idWil = id.toUpperCase().trim();
+
+      const eliminado = await Domiciliario.findOneAndDelete({ idWil });
+
+      if (!eliminado)
+        return res.status(404).json({ ok: false, error: 'Domiciliario no encontrado: ' + idWil });
+
+      return res.status(200).json({ ok: true, data: { idWil } });
+    } catch (e) {
+      console.error('[DELETE domiciliarios]', e.message);
       return res.status(500).json({ ok: false, error: e.message });
     }
   }
