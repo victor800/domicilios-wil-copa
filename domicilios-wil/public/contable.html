@@ -2534,6 +2534,7 @@ function renderListaDomis(){
     allDrivers.map(d=>{
       const fotoUrl=d.foto||'';
       const iniciales=(d.nombre||'?').split(' ').slice(0,2).map(p=>p[0]).join('').toUpperCase();
+      const idVal=(d.idWil||d.id||'');
       const avatarHTML=fotoUrl
         ?`<img src="${fotoUrl}" alt="${d.nombre}"
              style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--teal);display:block;margin:0 auto;"
@@ -2549,12 +2550,134 @@ function renderListaDomis(){
         </div>
         <div style="width:100%;">
           <div style="font-size:13px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;">${d.nombre}</div>
-          <div style="font-size:9px;font-weight:700;color:var(--teal-d);font-family:'DM Mono',monospace;margin-bottom:5px;">${d.idWil||d.id||'—'}</div>
+          <div style="font-size:9px;font-weight:700;color:var(--teal-d);font-family:'DM Mono',monospace;margin-bottom:5px;">${idVal||'—'}</div>
           ${d.tel?`<div style="display:flex;align-items:center;justify-content:center;gap:4px;font-size:9px;font-weight:700;color:var(--text2);"><span class="material-symbols-rounded" style="font-size:12px;color:var(--teal);">phone</span>${d.tel}</div>`:''}
         </div>
         <span style="font-size:8px;font-weight:800;padding:3px 10px;border-radius:99px;background:${d.activo!==false?'var(--green-l)':'var(--red-l)'};color:${d.activo!==false?'var(--green)':'var(--red)'};">${d.activo!==false?'● Activo':'○ Inactivo'}</span>
+        <div style="display:flex;gap:6px;width:100%;margin-top:2px;">
+          <button class="btn btn-ghost btn-sm" style="flex:1;justify-content:center;" onclick="abrirEditarDomiciliario('${safeEsc(idVal)}')">
+            <span class="material-symbols-rounded" style="font-size:13px;">edit</span>Editar
+          </button>
+          <button class="btn btn-red btn-sm" style="flex:1;justify-content:center;" onclick="eliminarDomiciliario('${safeEsc(idVal)}','${safeEsc(d.nombre)}')">
+            <span class="material-symbols-rounded" style="font-size:13px;">delete</span>Eliminar
+          </button>
+        </div>
       </div>`;
     }).join('') + `</div>`;
+}
+
+/* ── Editar domiciliario ── */
+function abrirEditarDomiciliario(idVal){
+  const d=allDrivers.find(x=>(x.idWil||x.id)===idVal);
+  if(!d){showToast('e','No encontrado','No se encontró el domiciliario');return;}
+  const html=`
+    <div class="modal-overlay show" id="modal-editar-domi" onclick="if(event.target===this)document.getElementById('modal-editar-domi').remove()">
+      <div class="modal-box" style="width:min(440px,100%);">
+        <div class="modal-hdr">
+          <div class="modal-hdr-ico" style="background:var(--teal-m);color:var(--teal-d);">
+            <span class="material-symbols-rounded">edit</span>
+          </div>
+          <h3>Editar domiciliario</h3>
+          <button class="modal-close" onclick="document.getElementById('modal-editar-domi').remove()">
+            <span class="material-symbols-rounded" style="font-size:14px;">close</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="field">
+            <label><span class="material-symbols-rounded">badge</span>ID WIL</label>
+            <input id="ed-id" type="text" value="${safeEsc(idVal)}" disabled style="opacity:.6;">
+          </div>
+          <div class="field">
+            <label><span class="material-symbols-rounded">person</span>Nombre completo *</label>
+            <input id="ed-nombre" type="text" value="${safeEsc(d.nombre||'')}">
+          </div>
+          <div class="field">
+            <label><span class="material-symbols-rounded">phone</span>Teléfono</label>
+            <input id="ed-tel" type="tel" value="${safeEsc(d.tel||'')}" inputmode="numeric">
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label><span class="material-symbols-rounded">map</span>Zona</label>
+              <input id="ed-zona" type="text" value="${safeEsc(d.zona||'')}">
+            </div>
+            <div class="field">
+              <label><span class="material-symbols-rounded">work</span>Rol</label>
+              <select id="ed-rol">
+                <option value="domiciliario" ${d.rol==='domiciliario'||!d.rol?'selected':''}>Domiciliario</option>
+                <option value="coordinador" ${d.rol==='coordinador'?'selected':''}>Coordinador</option>
+                <option value="admin" ${d.rol==='admin'?'selected':''}>Admin</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label><span class="material-symbols-rounded">lock</span>Nueva clave (opcional)</label>
+            <input id="ed-password" type="password" placeholder="Dejar en blanco para no cambiarla">
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--border);margin-top:4px;margin-bottom:14px;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;">
+              <div id="ed-activo-track" onclick="toggleActivoEd()" style="position:relative;width:38px;height:22px;background:${d.activo!==false?'var(--teal)':'var(--border)'};border-radius:99px;transition:background .2s;cursor:pointer;flex-shrink:0;">
+                <div id="ed-activo-thumb" style="position:absolute;top:3px;left:${d.activo!==false?'19px':'3px'};width:16px;height:16px;background:#fff;border-radius:50%;transition:left .2s;"></div>
+              </div>
+              <span style="font-size:11px;font-weight:700;color:var(--text2);">Cuenta activa</span>
+            </label>
+            <input type="hidden" id="ed-activo" value="${d.activo!==false?'true':'false'}">
+          </div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="guardarEdicionDomiciliario('${safeEsc(idVal)}')">
+            <span class="material-symbols-rounded">save</span>Guardar cambios
+          </button>
+        </div>
+      </div>
+    </div>`;
+  const existing=document.getElementById('modal-editar-domi');if(existing)existing.remove();
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+
+function toggleActivoEd(){
+  const inp=document.getElementById('ed-activo');const track=document.getElementById('ed-activo-track');const thumb=document.getElementById('ed-activo-thumb');
+  const isOn=inp.value==='true';
+  inp.value=isOn?'false':'true';
+  track.style.background=isOn?'var(--border)':'var(--teal)';
+  thumb.style.left=isOn?'3px':'19px';
+}
+
+async function guardarEdicionDomiciliario(idVal){
+  const nombre=document.getElementById('ed-nombre')?.value.trim();
+  const tel=document.getElementById('ed-tel')?.value.trim();
+  const zona=document.getElementById('ed-zona')?.value.trim();
+  const rol=document.getElementById('ed-rol')?.value;
+  const password=document.getElementById('ed-password')?.value.trim();
+  const activo=document.getElementById('ed-activo')?.value==='true';
+  if(!nombre){showToast('w','Falta el nombre','El nombre es obligatorio');return;}
+  const payload={idWil:idVal,nombre,tel,zona,rol,activo};
+  if(password){
+    if(password.length<6){showToast('w','Clave muy corta','Mínimo 6 caracteres');return;}
+    payload.password=password;
+  }
+  try{
+    const r=await fetch(`/api/foto?recurso=domiciliarios&id=${encodeURIComponent(idVal)}`,{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
+    });
+    const j=await r.json();if(!j.ok) throw new Error(j.error||'Error al guardar');
+    const idx=allDrivers.findIndex(x=>(x.idWil||x.id)===idVal);
+    if(idx>=0) allDrivers[idx]={...allDrivers[idx],nombre,tel,zona,rol,activo};
+    showToast('s','✓ Domiciliario actualizado',nombre);
+    document.getElementById('modal-editar-domi')?.remove();
+    renderListaDomis();poblarDomis('b-domi');poblarDomis('m-domi');
+  }catch(e){showToast('e','Error al guardar',e.message.substring(0,80));}
+}
+
+/* ── Eliminar domiciliario ── */
+async function eliminarDomiciliario(idVal,nombre){
+  if(!confirm(`¿Eliminar a ${nombre||idVal}? Esta acción no se puede deshacer.`)) return;
+  try{
+    const r=await fetch(`/api/foto?recurso=domiciliarios&id=${encodeURIComponent(idVal)}`,{method:'DELETE'});
+    const j=await r.json();if(!j.ok) throw new Error(j.error||'Error al eliminar');
+    allDrivers=allDrivers.filter(x=>(x.idWil||x.id)!==idVal);
+    showToast('s','Domiciliario eliminado',nombre||idVal);
+    renderListaDomis();poblarDomis('b-domi');poblarDomis('m-domi');
+  }catch(e){showToast('e','Error al eliminar',e.message.substring(0,80));}
 }
 
 /* ════════════════════════════════════════════════════════
