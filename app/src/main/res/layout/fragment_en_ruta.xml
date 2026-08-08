@@ -1,0 +1,804 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0F172A">
+
+    <!-- PROGRESS -->
+    <ProgressBar
+        android:id="@+id/progressBar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:visibility="gone"/>
+
+    <!-- ESTADO VACÍO -->
+    <LinearLayout
+        android:id="@+id/layoutVacio"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="32dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🛵"
+            android:textSize="56sp"
+            android:layout_marginBottom="16dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Sin pedido activo"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="#F1F5F9"
+            android:layout_marginBottom="8dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Cuando tomes un pedido aparecerá aquí con el mapa y los detalles."
+            android:textSize="13sp"
+            android:textColor="#64748B"
+            android:gravity="center"/>
+    </LinearLayout>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/layoutContenido"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- ══ MAPA ══ -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="260dp">
+
+                <org.maplibre.android.maps.MapView
+                    android:id="@+id/mapView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    app:maplibre_cameraZoom="12"/>
+
+                <TextView
+                    android:id="@+id/tvEta"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|start"
+                    android:layout_margin="10dp"
+                    android:visibility="gone"
+                    android:text="🛵 —"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:textColor="#F1F5F9"
+                    android:background="@drawable/bg_eta_badge"
+                    android:paddingHorizontal="10dp"
+                    android:paddingVertical="6dp"
+                    android:elevation="4dp"/>
+
+                <LinearLayout
+                    android:id="@+id/layoutZoomControls"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|end"
+                    android:layout_marginEnd="10dp"
+                    android:layout_marginBottom="52dp"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:background="@drawable/bg_zoom_panel"
+                    android:elevation="6dp"
+                    android:padding="4dp">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnZoomIn"
+                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:text="+"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        android:textColor="#F1F5F9"
+                        android:minWidth="0dp"
+                        android:minHeight="0dp"
+                        android:padding="0dp"
+                        app:cornerRadius="8dp"
+                        app:backgroundTint="#1E293B"/>
+
+                    <TextView
+                        android:id="@+id/tvZoomLevel"
+                        android:layout_width="36dp"
+                        android:layout_height="wrap_content"
+                        android:text="14"
+                        android:textSize="10sp"
+                        android:textColor="#94A3B8"
+                        android:gravity="center"
+                        android:paddingVertical="2dp"/>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnZoomOut"
+                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:text="−"
+                        android:textSize="22sp"
+                        android:textStyle="bold"
+                        android:textColor="#F1F5F9"
+                        android:minWidth="0dp"
+                        android:minHeight="0dp"
+                        android:padding="0dp"
+                        app:cornerRadius="8dp"
+                        app:backgroundTint="#1E293B"/>
+                </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMiUbicacion"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_gravity="bottom|start"
+                    android:layout_marginStart="10dp"
+                    android:layout_marginBottom="10dp"
+                    android:text="📍"
+                    android:textSize="16sp"
+                    android:textColor="#FFFFFF"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:padding="0dp"
+                    app:backgroundTint="#1E293B"
+                    app:cornerRadius="20dp"
+                    android:elevation="4dp"/>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnNavegar"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:layout_gravity="bottom|end"
+                    android:layout_margin="10dp"
+                    android:text="🗺 Navegar"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    app:backgroundTint="#16A34A"
+                    app:cornerRadius="20dp"
+                    android:elevation="4dp"
+                    android:paddingHorizontal="16dp"/>
+
+            </FrameLayout>
+
+            <!-- ══ CARDS ══ -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <!-- ══════════════════════════════════════════════
+                     CARD PRINCIPAL — steps rediseñados
+                     ══════════════════════════════════════════════ -->
+                <androidx.cardview.widget.CardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:cardBackgroundColor="#1E293B"
+                    app:cardCornerRadius="16dp"
+                    app:cardElevation="0dp"
+                    android:layout_marginBottom="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <!-- Fila: label + badge estado -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:layout_marginBottom="8dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Pedido activo"
+                                android:textSize="11sp"
+                                android:textColor="#64748B"
+                                android:textAllCaps="true"
+                                android:letterSpacing="0.08"/>
+
+                            <TextView
+                                android:id="@+id/tvEstadoBadge"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="en ruta"
+                                android:textSize="11sp"
+                                android:textStyle="bold"
+                                android:paddingHorizontal="10dp"
+                                android:paddingVertical="4dp"
+                                android:background="@drawable/bg_badge_estado"
+                                android:textColor="#2563EB"/>
+                        </LinearLayout>
+
+                        <!-- Nombre del cliente -->
+                        <TextView
+                            android:id="@+id/tvNombreCliente"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="–"
+                            android:textSize="20sp"
+                            android:textStyle="bold"
+                            android:textColor="#F1F5F9"
+                            android:layout_marginBottom="20dp"/>
+
+                        <!-- ══════════════════════════════════
+                             STEPS CIRCULARES REDISEÑADOS
+                             ══════════════════════════════════ -->
+                        <RelativeLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="4dp">
+
+                            <!-- BARRA CONECTORA izquierda (Step0 → Step1) -->
+                            <ProgressBar
+                                android:id="@+id/progressConector01"
+                                style="?android:attr/progressBarStyleHorizontal"
+                                android:layout_width="0dp"
+                                android:layout_height="3dp"
+                                android:max="100"
+                                android:progress="0"
+                                android:progressBackgroundTint="#1E3A5F"
+                                android:progressTint="#3B82F6"
+                                android:layout_alignTop="@+id/colStep0"
+                                android:layout_marginTop="26dp"
+                                android:layout_toEndOf="@+id/colStep0"
+                                android:layout_toStartOf="@+id/colStep1"/>
+
+                            <!-- BARRA CONECTORA derecha (Step1 → Step2) -->
+                            <ProgressBar
+                                android:id="@+id/progressConector12"
+                                style="?android:attr/progressBarStyleHorizontal"
+                                android:layout_width="0dp"
+                                android:layout_height="3dp"
+                                android:max="100"
+                                android:progress="0"
+                                android:progressBackgroundTint="#1E3A5F"
+                                android:progressTint="#3B82F6"
+                                android:layout_alignTop="@+id/colStep1"
+                                android:layout_marginTop="26dp"
+                                android:layout_toEndOf="@+id/colStep1"
+                                android:layout_toStartOf="@+id/colStep2"/>
+
+                            <!-- ── STEP 0: En ruta ── -->
+                            <LinearLayout
+                                android:id="@+id/colStep0"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:gravity="center_horizontal"
+                                android:layout_alignParentStart="true"
+                                android:layout_marginStart="4dp">
+
+                                <FrameLayout
+                                    android:layout_width="38dp"
+                                    android:layout_height="38dp"
+                                    android:layout_gravity="center_horizontal">
+
+                                    <View
+                                        android:id="@+id/radarRing0a"
+                                        android:layout_width="72dp"
+                                        android:layout_height="72dp"
+                                        android:layout_gravity="center"
+                                        android:background="@drawable/bg_radar_ring"
+                                        android:visibility="gone"
+                                        android:alpha="0.6"/>
+
+                                    <View
+                                        android:id="@+id/radarRing0b"
+                                        android:layout_width="88dp"
+                                        android:layout_height="88dp"
+                                        android:layout_gravity="center"
+                                        android:background="@drawable/bg_radar_ring"
+                                        android:visibility="gone"
+                                        android:alpha="0.35"/>
+
+                                    <ImageButton
+                                        android:id="@+id/btnStep0"
+                                        android:layout_width="38dp"
+                                        android:layout_height="38dp"
+                                        android:layout_gravity="center"
+                                        android:src="@drawable/ic_moped"
+                                        android:background="@drawable/bg_step_active"
+                                        android:contentDescription="Paso en ruta"
+                                        android:padding="12dp"/>
+                                </FrameLayout>
+
+                                <TextView
+                                    android:id="@+id/tvStepEnRuta"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="En ruta"
+                                    android:textSize="10sp"
+                                    android:textStyle="bold"
+                                    android:textColor="#60A5FA"
+                                    android:layout_marginTop="6dp"
+                                    android:gravity="center"/>
+
+                                <TextView
+                                    android:id="@+id/tvHoraEnRuta"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:textSize="9sp"
+                                    android:textColor="#475569"
+                                    android:gravity="center"
+                                    android:layout_marginTop="2dp"
+                                    android:visibility="gone"/>
+                            </LinearLayout>
+
+                            <!-- ── STEP 1: En camino ── -->
+                            <LinearLayout
+                                android:id="@+id/colStep1"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:gravity="center_horizontal"
+                                android:layout_centerHorizontal="true">
+
+                                <FrameLayout
+                                    android:layout_width="56dp"
+                                    android:layout_height="56dp"
+                                    android:layout_gravity="center_horizontal">
+
+                                    <View
+                                        android:id="@+id/radarRing1a"
+                                        android:layout_width="72dp"
+                                        android:layout_height="72dp"
+                                        android:layout_gravity="center"
+                                        android:background="@drawable/bg_radar_ring"
+                                        android:visibility="gone"
+                                        android:alpha="0.6"/>
+
+                                    <View
+                                        android:id="@+id/radarRing1b"
+                                        android:layout_width="88dp"
+                                        android:layout_height="88dp"
+                                        android:layout_gravity="center"
+                                        android:background="@drawable/bg_radar_ring"
+                                        android:visibility="gone"
+                                        android:alpha="0.35"/>
+
+                                    <ImageButton
+                                        android:id="@+id/btnStep1"
+                                        android:layout_width="38dp"
+                                        android:layout_height="38dp"
+                                        android:layout_gravity="center"
+                                        android:src="@drawable/ic_directions_bike"
+                                        android:background="@drawable/bg_step_inactive"
+                                        android:contentDescription="Paso en camino"
+                                        android:padding="12dp"
+                                        android:enabled="false"/>
+                                </FrameLayout>
+
+                                <TextView
+                                    android:id="@+id/tvStepEnCamino"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="En camino"
+                                    android:textSize="10sp"
+                                    android:textColor="#475569"
+                                    android:layout_marginTop="6dp"
+                                    android:gravity="center"/>
+
+                                <TextView
+                                    android:id="@+id/tvHoraEnCamino"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:textSize="9sp"
+                                    android:textColor="#475569"
+                                    android:gravity="center"
+                                    android:layout_marginTop="2dp"
+                                    android:visibility="gone"/>
+                            </LinearLayout>
+
+                            <!-- ── STEP 2: Entregado ── -->
+                            <LinearLayout
+                                android:id="@+id/colStep2"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:gravity="center_horizontal"
+                                android:layout_alignParentEnd="true"
+                                android:layout_marginEnd="4dp">
+
+                                <FrameLayout
+                                    android:layout_width="56dp"
+                                    android:layout_height="56dp"
+                                    android:layout_gravity="center_horizontal">
+
+                                    <View
+                                        android:id="@+id/radarRing2a"
+                                        android:layout_width="72dp"
+                                        android:layout_height="72dp"
+                                        android:layout_gravity="center"
+                                        android:background="@drawable/bg_radar_ring_green"
+                                        android:visibility="gone"
+                                        android:alpha="0.6"/>
+
+                                    <View
+                                        android:id="@+id/radarRing2b"
+                                        android:layout_width="88dp"
+                                        android:layout_height="88dp"
+                                        android:layout_gravity="center"
+                                        android:background="@drawable/bg_radar_ring_green"
+                                        android:visibility="gone"
+                                        android:alpha="0.35"/>
+
+                                    <ImageButton
+                                        android:id="@+id/btnStep2"
+                                        android:layout_width="38dp"
+                                        android:layout_height="38dp"
+                                        android:layout_gravity="center"
+                                        android:src="@drawable/ic_check"
+                                        android:background="@drawable/bg_step_inactive"
+                                        android:contentDescription="Entregar pedido"
+                                        android:padding="12dp"
+                                        android:enabled="false"/>
+                                </FrameLayout>
+
+                                <TextView
+                                    android:id="@+id/tvStepEntregado"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Entregado"
+                                    android:textSize="10sp"
+                                    android:textColor="#475569"
+                                    android:layout_marginTop="6dp"
+                                    android:gravity="center"/>
+
+                                <TextView
+                                    android:id="@+id/tvHoraEntregado"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:textSize="9sp"
+                                    android:textColor="#475569"
+                                    android:gravity="center"
+                                    android:layout_marginTop="2dp"
+                                    android:visibility="gone"/>
+                            </LinearLayout>
+
+                        </RelativeLayout>
+                        <!-- FIN STEPS CIRCULARES -->
+
+                        <!-- Barra de progreso ETA -->
+                        <ProgressBar
+                            android:id="@+id/progressEta"
+                            style="?android:attr/progressBarStyleHorizontal"
+                            android:layout_width="match_parent"
+                            android:layout_height="6dp"
+                            android:max="100"
+                            android:progress="10"
+                            android:progressDrawable="@drawable/progress_eta"
+                            android:layout_marginTop="16dp"
+                            android:layout_marginBottom="6dp"/>
+
+                        <TextView
+                            android:id="@+id/tvEtaProgreso"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Calculando ruta…"
+                            android:textSize="12sp"
+                            android:textColor="#94A3B8"
+                            android:gravity="center"
+                            android:layout_marginBottom="16dp"/>
+
+                        <!-- Botón principal unificado -->
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnAccionPrincipal"
+                            android:layout_width="match_parent"
+                            android:layout_height="50dp"
+                            android:text="🛵 Ponerme en camino"
+                            android:textColor="#FFFFFF"
+                            android:textSize="15sp"
+                            android:textStyle="bold"
+                            app:backgroundTint="#1E3A8A"
+                            app:cornerRadius="12dp"
+                            android:layout_marginBottom="8dp"/>
+
+                        <!-- Botón: Ver detalle completo -->
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnVerDetalle"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="42dp"
+                            android:text="Ver detalle completo"
+                            android:textColor="#38BDF8"
+                            app:strokeColor="#38BDF8"
+                            app:cornerRadius="10dp"/>
+
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <!-- ══ CARD CRONÓMETRO ══ -->
+                <androidx.cardview.widget.CardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:cardBackgroundColor="#1E293B"
+                    app:cardCornerRadius="16dp"
+                    app:cardElevation="0dp"
+                    android:layout_marginBottom="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="⏱ TARDANZA EN COMPRAS"
+                            android:textSize="10sp"
+                            android:textColor="#475569"
+                            android:textAllCaps="true"
+                            android:letterSpacing="0.08"
+                            android:layout_marginBottom="12dp"/>
+
+                        <LinearLayout
+                            android:id="@+id/layoutCronometro"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:gravity="center"
+                            android:visibility="gone"
+                            android:layout_marginBottom="12dp">
+
+                            <TextView
+                                android:id="@+id/tvCronometro"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="00:00:00"
+                                android:textSize="40sp"
+                                android:textStyle="bold"
+                                android:textColor="#38BDF8"
+                                android:fontFamily="monospace"
+                                android:layout_marginBottom="6dp"/>
+
+                            <TextView
+                                android:id="@+id/tvCostoExtra"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Sin cobro extra aún"
+                                android:textSize="12sp"
+                                android:textColor="#F59E0B"/>
+                        </LinearLayout>
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Si el comercio demora en preparar el pedido, inicia el cronómetro. Cada 15 min se cobra +$2.000."
+                            android:textSize="12sp"
+                            android:textColor="#475569"
+                            android:layout_marginBottom="12dp"/>
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnCronometro"
+                            android:layout_width="match_parent"
+                            android:layout_height="44dp"
+                            android:text="⏱ Iniciar tardanza"
+                            android:textColor="#FFFFFF"
+                            app:backgroundTint="#D97706"
+                            app:cornerRadius="10dp"/>
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <!-- ══ CARD FACTURAS ══ -->
+                <androidx.cardview.widget.CardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:cardBackgroundColor="#1E293B"
+                    app:cardCornerRadius="16dp"
+                    app:cardElevation="0dp"
+                    android:layout_marginBottom="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:layout_marginBottom="4dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="🧾 FACTURAS"
+                                android:textSize="10sp"
+                                android:textColor="#475569"
+                                android:textAllCaps="true"
+                                android:letterSpacing="0.08"/>
+
+                            <com.google.android.material.switchmaterial.SwitchMaterial
+                                android:id="@+id/switchFacturas"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:checked="false"/>
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/layoutFacturasContent"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:visibility="gone"
+                            android:layout_marginTop="10dp">
+
+                            <com.google.android.material.textfield.TextInputLayout
+                                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="Valor total de la factura ($)"
+                                android:layout_marginBottom="10dp"
+                                app:boxStrokeColor="#22C55E"
+                                app:hintTextColor="#22C55E"
+                                app:startIconDrawable="@android:drawable/ic_menu_edit"
+                                app:startIconTint="#22C55E">
+
+                                <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/etValorFactura"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:textColor="#F1F5F9"
+                                    android:inputType="numberDecimal"
+                                    android:maxLines="1"/>
+                            </com.google.android.material.textfield.TextInputLayout>
+
+                            <com.google.android.material.chip.ChipGroup
+                                android:id="@+id/chipGroupFacturas"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginBottom="10dp"/>
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnAgregarFactura"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="match_parent"
+                                android:layout_height="42dp"
+                                android:text="+ Adjuntar foto factura"
+                                android:textColor="#22C55E"
+                                app:strokeColor="#22C55E"
+                                app:cornerRadius="10dp"/>
+
+                            <!-- NUEVO: Botón guardar factura -->
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnGuardarFactura"
+                                android:layout_width="match_parent"
+                                android:layout_height="42dp"
+                                android:text="💾 Guardar factura"
+                                android:textColor="#FFFFFF"
+                                app:backgroundTint="#1E3A8A"
+                                app:cornerRadius="10dp"
+                                android:layout_marginTop="8dp"/>
+
+                        </LinearLayout>
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <!-- ══ CARD COMPROBANTE TARDANZA ══ -->
+                <androidx.cardview.widget.CardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:cardBackgroundColor="#1E293B"
+                    app:cardCornerRadius="16dp"
+                    app:cardElevation="0dp"
+                    android:layout_marginBottom="24dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:layout_marginBottom="4dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="📸 COMPROBANTE DE TARDANZA"
+                                android:textSize="10sp"
+                                android:textColor="#475569"
+                                android:textAllCaps="true"
+                                android:letterSpacing="0.08"/>
+
+                            <com.google.android.material.switchmaterial.SwitchMaterial
+                                android:id="@+id/switchTardanza"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:checked="false"/>
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/layoutTardanzaContent"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:visibility="gone"
+                            android:layout_marginTop="10dp">
+
+                            <com.google.android.material.chip.ChipGroup
+                                android:id="@+id/chipGroupTardanza"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginBottom="10dp"/>
+
+                            <com.google.android.material.textfield.TextInputLayout
+                                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="Nota de tardanza (opcional)"
+                                android:layout_marginBottom="10dp"
+                                app:boxStrokeColor="#F59E0B"
+                                app:hintTextColor="#F59E0B">
+
+                                <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/etNotaTardanza"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:textColor="#F1F5F9"
+                                    android:inputType="textMultiLine"
+                                    android:minLines="2"/>
+                            </com.google.android.material.textfield.TextInputLayout>
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnAgregarTardanza"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="match_parent"
+                                android:layout_height="42dp"
+                                android:text="+ Adjuntar comprobante"
+                                android:textColor="#F59E0B"
+                                app:strokeColor="#F59E0B"
+                                app:cornerRadius="10dp"/>
+
+                            <!-- NUEVO: Botón guardar tardanza -->
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnGuardarTardanza"
+                                android:layout_width="match_parent"
+                                android:layout_height="42dp"
+                                android:text="💾 Guardar tardanza"
+                                android:textColor="#FFFFFF"
+                                app:backgroundTint="#92400E"
+                                app:cornerRadius="10dp"
+                                android:layout_marginTop="8dp"/>
+
+                        </LinearLayout>
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+            </LinearLayout>
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
