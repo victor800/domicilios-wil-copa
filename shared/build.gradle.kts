@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
+
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
     id("com.android.library")
@@ -15,6 +17,7 @@ kotlin {
     }
 
     if (isMac) {
+        val xcf = XCFramework("shared")
         listOf(
             iosX64(),
             iosArm64(),
@@ -23,6 +26,7 @@ kotlin {
             iosTarget.binaries.framework {
                 baseName = "shared"
                 isStatic = true
+                xcf.add(this)
             }
         }
     }
@@ -50,15 +54,18 @@ kotlin {
             }
         }
         if (isMac) {
+            val iosX64Main by getting
+            val iosArm64Main by getting
+            val iosSimulatorArm64Main by getting
             val iosMain by creating {
                 dependsOn(commonMain)
+                iosX64Main.dependsOn(this)
+                iosArm64Main.dependsOn(this)
+                iosSimulatorArm64Main.dependsOn(this)
                 dependencies {
                     implementation("io.ktor:ktor-client-darwin:2.3.11")
                 }
             }
-            val iosX64Main by getting { dependsOn(iosMain) }
-            val iosArm64Main by getting { dependsOn(iosMain) }
-            val iosSimulatorArm64Main by getting { dependsOn(iosMain) }
         }
     }
 }
