@@ -12,6 +12,7 @@
  <script src="wil-chat-checkout-patch.js"></script>
  <script src="wil-formula-medica.js"></script>
   <script src="wil-stock-formula-medica.js"></script>
+     <script src="wil-formula-whatsapp.js"></script>
 
 
 <style>
@@ -7422,6 +7423,57 @@ console.log('[WIL] ✅ wil-formula-medica.js v4.1 — banner + visor lightbox zo
 
 }(window));
   </script>
+
+   <script>
+
+  /* ═══════════════════════════════════════════════════════════════
+   WIL — wil-formula-whatsapp.js
+   La app YA NO recibe ni sube fórmulas médicas.
+   Los productos con fórmula se agregan al carrito normalmente
+   (con su badge "Fórmula médica") y el regente de la droguería
+   pide la receta por WhatsApp antes de despachar.
+
+   CARGAR AL FINAL, justo antes de </body>, DESPUÉS de todos los
+   demás scripts (wil-formula-medica y wil-stock-formula-medica).
+═══════════════════════════════════════════════════════════════ */
+(function (W) {
+  'use strict';
+
+  var avisado = false;
+
+  function avisoFormula() {
+    if (avisado) return;
+    avisado = true;
+    /* Se muestra después del toast "Agregado" del carrito */
+    setTimeout(function () {
+      if (typeof W.mostrarToastFarmacia === 'function') {
+        W.mostrarToastFarmacia('💊 El regente te pedirá la fórmula por WhatsApp');
+      }
+    }, 3100);
+  }
+
+  /* Ofertas, Nuevo_Producto y resultados de búsqueda */
+  W.wilSaddConFormula = function (key, desc, lab, precio) {
+    W.sadd(key, desc, lab, precio, null);
+    avisoFormula();
+  };
+
+  /* Productos del STOCK (columna H = Sí) */
+  W.wilSaddConFormulaStock = function (key, desc, lab, precio) {
+    W.addToCart(key, null);
+    avisoFormula();
+  };
+
+  /* Anula cualquier ruta que todavía intente abrir la subida de fórmula */
+  W._wilAbrirPopupFM        = function () {};
+  W.wilGuardarConFormula    = function () {};
+  W.wilMostrarBannerFormula = function () {};
+  W._wilFormulaAdjuntada    = null;
+
+  console.log('[WIL] ✅ Fórmula médica: sin subida, puente por WhatsApp');
+})(window);
+
+ </script>
 
 
 </body>
