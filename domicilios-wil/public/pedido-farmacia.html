@@ -7539,6 +7539,190 @@ console.log('[WIL] ✅ wil-formula-medica.js v4.1 — banner + visor lightbox zo
 </style>
 
 
+<!-- ═══ WIL — CARD CONTADOR DE PRODUCTOS (auto-rotativa) ═══ -->
+<script>
+(function () {
+  'use strict';
+  if (window.__wilCounter) return;
+  window.__wilCounter = true;
+
+  /* ── CSS ── */
+  var st = document.createElement('style');
+  st.textContent =
+    '.wcnt{position:relative;margin:14px 16px 0;height:104px;border-radius:20px;overflow:hidden;' +
+    'background:linear-gradient(135deg,#003f87,#1a56db,#3b82f6);background-size:200% 200%;' +
+    'animation:gradF 6s ease infinite;box-shadow:0 6px 22px rgba(0,63,135,.30);cursor:pointer}' +
+    '.wcnt::before,.wcnt::after{content:"";position:absolute;border-radius:50%;background:rgba(255,255,255,.09);pointer-events:none}' +
+    '.wcnt::before{width:130px;height:130px;right:-30px;top:-50px}' +
+    '.wcnt::after{width:80px;height:80px;left:-20px;bottom:-34px}' +
+    '.wcnt-s{position:absolute;inset:0;padding:14px 18px 22px;display:flex;align-items:center;justify-content:space-between;gap:12px;' +
+    'opacity:0;transform:translateY(14px);transition:opacity .45s ease,transform .45s ease;pointer-events:none}' +
+    '.wcnt-s.on{opacity:1;transform:none;pointer-events:auto}' +
+    '.wcnt-tag{display:inline-flex;align-items:center;gap:5px;font-size:9px;font-weight:900;text-transform:uppercase;' +
+    'letter-spacing:.08em;color:#fff;background:rgba(255,255,255,.2);padding:3px 10px;border-radius:99px;margin-bottom:5px}' +
+    '.wcnt-dot{width:6px;height:6px;border-radius:50%;background:#4ade80;animation:dotPulse 1.4s ease infinite}' +
+    '.wcnt-num{font-family:"Manrope",sans-serif;font-size:34px;font-weight:900;color:#fff;letter-spacing:-.03em;line-height:1;' +
+    'display:flex;align-items:baseline;gap:7px}' +
+    '.wcnt-num small{font-size:13px;font-weight:800;letter-spacing:0;opacity:.92}' +
+    '.wcnt-sub{font-size:10.5px;font-weight:600;color:rgba(255,255,255,.78);margin-top:4px}' +
+    '.wcnt-ico{width:52px;height:52px;border-radius:16px;background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.28);' +
+    'display:flex;align-items:center;justify-content:center;flex-shrink:0;backdrop-filter:blur(4px)}' +
+    '.wcnt-ico .sym{font-size:28px;color:#fff}' +
+    '.wcnt-dots{position:absolute;left:0;right:0;bottom:8px;display:flex;justify-content:center;gap:5px;z-index:3}' +
+    '.wcnt-dots i{width:6px;height:6px;border-radius:99px;background:rgba(255,255,255,.4);transition:.3s}' +
+    '.wcnt-dots i.on{width:18px;background:#fff}' +
+    '.wcnt-plus{position:absolute;top:10px;right:12px;z-index:4;background:#4ade80;color:#064e3b;font-family:"Manrope",sans-serif;' +
+    'font-size:11px;font-weight:900;padding:4px 11px;border-radius:99px;box-shadow:0 3px 12px rgba(74,222,128,.55);' +
+    'display:none;animation:fadeScaleIn .35s ease}' +
+    '.wcnt.pulse{animation:gradF 6s ease infinite,wcntPop .7s ease}' +
+    '@keyframes wcntPop{0%{transform:scale(1)}35%{transform:scale(1.035)}100%{transform:scale(1)}}';
+  document.head.appendChild(st);
+
+  /* ── HTML ── */
+  var box = document.createElement('div');
+  box.className = 'wcnt';
+  box.id = 'wcnt';
+  box.innerHTML =
+    '<div class="wcnt-plus" id="wcnt-plus"></div>' +
+
+    '<div class="wcnt-s on" data-go="search">' +
+      '<div><div class="wcnt-tag"><span class="wcnt-dot"></span>En vivo</div>' +
+      '<div class="wcnt-num"><span id="wcnt-total">0</span><small>productos disponibles</small></div>' +
+      '<div class="wcnt-sub">Inventario real · se actualiza solo</div></div>' +
+      '<div class="wcnt-ico"><span class="sym symf">inventory_2</span></div>' +
+    '</div>' +
+
+    '<div class="wcnt-s" data-go="nuevos">' +
+      '<div><div class="wcnt-tag">✨ Novedades</div>' +
+      '<div class="wcnt-num"><span id="wcnt-nuevos">0</span><small>productos nuevos</small></div>' +
+      '<div class="wcnt-sub">Recién llegados al catálogo</div></div>' +
+      '<div class="wcnt-ico"><span class="sym symf">new_releases</span></div>' +
+    '</div>' +
+
+    '<div class="wcnt-s" data-go="ofertas">' +
+      '<div><div class="wcnt-tag">🏷️ Promociones</div>' +
+      '<div class="wcnt-num"><span id="wcnt-ofertas">0</span><small>ofertas activas</small></div>' +
+      '<div class="wcnt-sub">Aprovecha antes de que se acaben</div></div>' +
+      '<div class="wcnt-ico"><span class="sym symf">local_offer</span></div>' +
+    '</div>' +
+
+    '<div class="wcnt-dots"><i class="on"></i><i></i><i></i></div>';
+
+  var anchor = document.querySelector('.fm-notice');
+  if (anchor) anchor.insertAdjacentElement('afterend', box);
+  else {
+    var home = document.getElementById('v-home-content');
+    if (home) home.insertBefore(box, home.firstChild);
+  }
+
+  /* ── Rotación automática ── */
+  var slides = box.querySelectorAll('.wcnt-s');
+  var dots   = box.querySelectorAll('.wcnt-dots i');
+  var idx = 0, timer = null, paused = false;
+
+  function show(i) {
+    idx = (i + slides.length) % slides.length;
+    slides.forEach(function (s, k) { s.classList.toggle('on', k === idx); });
+    dots.forEach(function (d, k) { d.classList.toggle('on', k === idx); });
+  }
+  function start() {
+    clearInterval(timer);
+    timer = setInterval(function () { if (!paused) show(idx + 1); }, 4200);
+  }
+  box.addEventListener('touchstart', function () { paused = true; }, { passive: true });
+  box.addEventListener('touchend',   function () { paused = false; start(); }, { passive: true });
+  box.addEventListener('mouseenter', function () { paused = true; });
+  box.addEventListener('mouseleave', function () { paused = false; });
+  box.addEventListener('click', function () {
+    var go = slides[idx].getAttribute('data-go');
+    if (go === 'search' && typeof window.openSearch === 'function') window.openSearch('');
+    else {
+      var t = document.getElementById(go === 'ofertas' ? 'promos-section' : 'sec-populares');
+      if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+  start();
+
+  /* ── Conteo animado ── */
+  function fmt(n) { return Math.round(n).toLocaleString('es-CO'); }
+  function animate(el, from, to) {
+    if (!el) return;
+    var t0 = null, dur = 900;
+    function step(ts) {
+      if (!t0) t0 = ts;
+      var p = Math.min((ts - t0) / dur, 1), e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmt(from + (to - from) * e);
+      if (p < 1) requestAnimationFrame(step); else el.textContent = fmt(to);
+    }
+    requestAnimationFrame(step);
+  }
+
+  /* ── Cálculo de productos reales (sin duplicados, sin agotados) ── */
+  function norm(s) {
+    return typeof window.nrm === 'function' ? window.nrm(s) : String(s || '').toLowerCase().trim();
+  }
+  function compute() {
+    var seen = {}, total = 0, nuevos = 0, npSeen = {};
+    (window.allData || []).forEach(function (it) {
+      if (!it || !it.key || String(it.key).indexOf('static_') === 0) return;
+      if (it.stock !== undefined && it.stock <= 0) return;
+      var k = norm(it.desc);
+      if (!k || seen[k]) return;
+      seen[k] = 1; total++;
+    });
+    (window._searchAllData || []).forEach(function (it) {
+      if (!it || !it.key || String(it.key).indexOf('np_raw_') !== 0) return;
+      var k = norm(it.desc);
+      if (!k || npSeen[k]) return;
+      npSeen[k] = 1; nuevos++;
+      if (!seen[k]) { seen[k] = 1; total++; }
+    });
+    var ofertas = Object.keys(window._ofertasMap || {}).length;
+    return { total: total, nuevos: nuevos, ofertas: ofertas };
+  }
+
+  var shown = { total: 0, nuevos: 0, ofertas: 0 };
+  var baseline = null, lastRaw = -1, plusTimer = null;
+
+  function showPlus(n) {
+    var p = document.getElementById('wcnt-plus');
+    if (!p) return;
+    p.textContent = '+' + n + (n === 1 ? ' nuevo' : ' nuevos');
+    p.style.display = 'block';
+    box.classList.remove('pulse'); void box.offsetWidth; box.classList.add('pulse');
+    show(0); paused = true;
+    clearTimeout(plusTimer);
+    plusTimer = setTimeout(function () { p.style.display = 'none'; paused = false; }, 6000);
+  }
+
+  setInterval(function () {
+    var c = compute();
+    if (!c.total) return;
+
+    /* Espera a que el conteo se estabilice (stock + nuevos ya cargados) */
+    if (baseline === null) {
+      if (c.total === lastRaw) baseline = c.total;
+      lastRaw = c.total;
+    } else if (c.total > baseline) {
+      showPlus(c.total - baseline);
+      baseline = c.total;
+    } else if (c.total < baseline) {
+      baseline = c.total;
+    }
+
+    ['total', 'nuevos', 'ofertas'].forEach(function (k) {
+      if (c[k] !== shown[k]) {
+        animate(document.getElementById('wcnt-' + k), shown[k], c[k]);
+        shown[k] = c[k];
+      }
+    });
+  }, 1500);
+
+  console.log('[WIL] ✅ card contador de productos activa');
+})();
+</script>
+
+
 
 
 </body>
