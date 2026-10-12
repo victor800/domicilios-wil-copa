@@ -7546,6 +7546,128 @@ console.log('[WIL] ✅ wil-formula-medica.js v4.1 — banner + visor lightbox zo
 }
 </style>
 
+<script id="wil-bg-fix">
+(function () {
+  'use strict';
+  var TOL = 40;          // tolerancia de color (sube a 50 si queda borde gris)
+  var MAXW = 480;        // ancho máximo de procesamiento
+  var UNIFORM = 22;      // máx. variación del borde para considerarlo "fondo liso"
+  var SEL = '.ocard-img img,#promos-track img,#res-grid img,#cats-res-grid img,#popup-oferta-body img';
+  var queue = [], running = 0, MAXPAR = 2;
+
+  function limpiar(img, done) {
+    var im = new Image();
+    im.crossOrigin = 'anonymous';
+    im.onerror = done;
+    im.onload = function () {
+      try {
+        var w = im.naturalWidth, h = im.naturalHeight;
+        if (!w || !h) return done();
+        var s = Math.min(1, MAXW / w);
+        w = Math.round(w * s); h = Math.round(h * s);
+        var c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        var x = c.getContext('2d', { willReadFrequently: true });
+        x.drawImage(im, 0, 0, w, h);
+        var d = x.getImageData(0, 0, w, h), p = d.data;
+
+        /* 1. color del borde */
+        var n = 0, R = 0, G = 0, B = 0, i;
+        function pix(px, py) {
+          i = (py * w + px) * 4;
+          R += p[i]; G += p[i + 1]; B += p[i + 2]; n++;
+        }
+        for (var a = 0; a < w; a += 2) { pix(a, 0); pix(a, h - 1); }
+        for (var b = 0; b < h; b += 2) { pix(0, b); pix(w - 1, b); }
+        R /= n; G /= n; B /= n;
+
+        /* 2. ¿borde uniforme? */
+        var dev = 0, k = 0;
+        function chk(px, py) {
+          i = (py * w + px) * 4;
+          dev += Math.max(Math.abs(p[i] - R), Math.abs(p[i + 1] - G), Math.abs(p[i + 2] - B));
+          k++;
+        }
+        for (a = 0; a < w; a += 2) { chk(a, 0); chk(a, h - 1); }
+        for (b = 0; b < h; b += 2) { chk(0, b); chk(w - 1, b); }
+        if (dev / k > UNIFORM) return done();            // fondo no liso → no tocar
+        if (R > 246 && G > 246 && B > 246) return done(); // ya es blanco
+
+        /* 3. flood fill desde los bordes */
+        function match(idx) {
+          var o = idx * 4;
+          return p[o + 3] > 0 &&
+            Math.abs(p[o] - R) <= TOL &&
+            Math.abs(p[o + 1] - G) <= TOL &&
+            Math.abs(p[o + 2] - B) <= TOL;
+        }
+        var vis = new Uint8Array(w * h), st = new Int32Array(w * h), sp = 0, removed = 0;
+        function push(idx) { if (!vis[idx] && match(idx)) { vis[idx] = 1; st[sp++] = idx; } }
+        for (a = 0; a < w; a++) { push(a); push((h - 1) * w + a); }
+        for (b = 0; b < h; b++) { push(b * w); push(b * w + w - 1); }
+        while (sp) {
+          var q = st[--sp], px = q % w, py = (q / w) | 0;
+          p[q * 4 + 3] = 0; removed++;
+          if (px > 0) push(q - 1);
+          if (px < w - 1) push(q + 1);
+          if (py > 0) push(q - w);
+          if (py < h - 1) push(q + w);
+        }
+        var ratio = removed / (w * h);
+        if (ratio < 0.02 || ratio > 0.93) return done();  // nada que limpiar o se comió el producto
+
+        /* 4. suavizar borde: píxeles pegados al fondo borrado → semitransparentes */
+        for (var yy = 1; yy < h - 1; yy++) for (var xx = 1; xx < w - 1; xx++) {
+          var id = yy * w + xx;
+          if (p[id * 4 + 3] === 0) continue;
+          if (p[(id - 1) * 4 + 3] === 0 || p[(id + 1) * 4 + 3] === 0 ||
+              p[(id - w) * 4 + 3] === 0 || p[(id + w) * 4 + 3] === 0) p[id * 4 + 3] = 170;
+        }
+
+        x.putImageData(d, 0, 0);
+        c.toBlob(function (blob) {
+          if (blob) img.src = URL.createObjectURL(blob);
+          done();
+        }, 'image/png');
+      } catch (e) { done(); }   // CORS bloqueado u otro error → deja la imagen original
+    };
+    im.src = img.currentSrc || img.src;
+  }
+
+  function pump() {
+    while (running < MAXPAR && queue.length) {
+      var img = queue.shift();
+      running++;
+      limpiar(img, function () { running--; pump(); });
+    }
+  }
+
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      io.unobserve(e.target);
+      queue.push(e.target); pump();
+    });
+  }, { rootMargin: '200px' });
+
+  function registrar(img) {
+    if (img.dataset.wbg || !/^https?:/.test(img.currentSrc || img.src || '')) return;
+    img.dataset.wbg = '1';
+    io.observe(img);
+  }
+  function escanear(root) {
+    if (root.nodeType !== 1) return;
+    if (root.matches && root.matches(SEL)) registrar(root);
+    root.querySelectorAll && root.querySelectorAll(SEL).forEach(registrar);
+  }
+
+  new MutationObserver(function (ms) {
+    ms.forEach(function (m) { m.addedNodes.forEach(escanear); });
+  }).observe(document.body, { childList: true, subtree: true });
+  escanear(document.body);
+})();
+</script>
+
 
 </body>
 </html>
