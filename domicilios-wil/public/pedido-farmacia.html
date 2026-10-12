@@ -7716,10 +7716,69 @@ console.log('[WIL] ✅ wil-formula-medica.js v4.1 — banner + visor lightbox zo
         shown[k] = c[k];
       }
     });
-  }, 1500);
+  }, 600);
 
   console.log('[WIL] ✅ card contador de productos activa');
 })();
+</script>
+
+<!-- ═══ WIL — VIGILANTE EN VIVO (nuevos productos y ofertas inmediatos) ═══ -->
+<script>
+(function (W) {
+  'use strict';
+  if (W.__wilLive) return;
+  W.__wilLive = true;
+
+  var EVERY = 8000;   // cada cuánto revisa (ms)
+  var BASE  = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID_OFERTAS + '/gviz/tq?tqx=out:csv&sheet=';
+
+  /* Los nombres van con una letra codificada (%5F / %4F) para que el
+     interceptor de perf-boost NO los sirva desde caché y vayan directo a la red */
+  var HOJAS = [
+    { name: 'Nuevo_Producto', url: 'Nuevo%5FProducto', fn: 'loadNuevoProducto',    last: null },
+    { name: 'Ofertas',        url: '%4Fertas',         fn: 'loadOfertasCarrusel', last: null }
+  ];
+
+  function revisar(h) {
+    return fetch(BASE + h.url + '&cachebust=' + Date.now(), { cache: 'no-store', signal: AbortSignal.timeout(10000) })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+      .then(function (txt) {
+        if (!txt || txt.trim().length < 5) return;
+
+        if (h.last === null) { h.last = txt; return; }   // primera lectura: solo referencia
+        if (txt === h.last) return;                       // sin cambios
+
+        h.last = txt;
+
+        /* Dejar el CSV fresco en la caché local para que la recarga no
+           sirva datos viejos ni se renderice dos veces */
+        try { localStorage.setItem('wil_csv_' + h.name, txt); } catch (e) {}
+
+        /* Forzar la recarga real saltándose el gate de 5 min */
+        if (typeof W[h.fn] === 'function') {
+          W.__wilBypass = h.fn;
+          W[h.fn]();
+        }
+        console.log('[WIL][live] cambio detectado en ' + h.name);
+      })
+      .catch(function (e) { console.warn('[WIL][live]', h.name, e.message); });
+  }
+
+  function ciclo() {
+    if (document.hidden) return;
+    HOJAS.forEach(revisar);
+  }
+
+  setInterval(ciclo, EVERY);
+
+  /* Al volver a la pestaña/app, revisa de inmediato */
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) ciclo();
+  });
+
+  ciclo();
+  console.log('[WIL] ✅ vigilante en vivo activo (cada ' + (EVERY / 1000) + 's)');
+})(window);
 </script>
 
 
