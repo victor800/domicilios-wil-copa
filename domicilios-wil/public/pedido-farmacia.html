@@ -2,29 +2,24 @@
 <html lang="es">
 <head>
 
-<link rel="preconnect" href="https://docs.google.com">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="preconnect" href="https://drive.google.com">
-<link rel="preconnect" href="https://wsrv.nl">
-<link rel="preconnect" href="https://lh3.googleusercontent.com">
+<!-- FILE: farmacias-wil.html  (dentro de <head>) -->
+<script src="wil-perf-boost.js"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0..1&display=swap" rel="stylesheet"/>
+
+<script src="wil-farmacia-barrio-checkout.js"></script>
+<script src="wil-farmacia-envio-tercero.js"></script>
+<script src="wil-fix-dedup-unitprice.js"></script>
+<script src="wil-chat-checkout-patch.js"></script>
+<script src="wil-formula-medica.js"></script>
+<script src="wil-stock-formula-medica.js"></script>
+<script src="wil-formula-whatsapp.js"></script>
 
 
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
 <title>Farmacias WIL</title>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-<script src="wil-farmacia-barrio-checkout.js"></script>
- <script src="wil-farmacia-envio-tercero.js"></script>
- <script src="wil-fix-dedup-unitprice.js"></script>
- <script src="wil-chat-checkout-patch.js"></script>
- <script src="wil-formula-medica.js"></script>
- <script src="wil-stock-formula-medica.js"></script>
- <script src="wil-formula-whatsapp.js"></script>
-<script src="wil-perf-boost.js"></script>
-
-
 
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -7004,58 +6999,13 @@ console.log('[WIL] ✅ wil-formula-medica.js v4.1 — banner + visor lightbox zo
 
 
 <script>
-/* ═══════════════════════════════════════════════════════════════════
-   WIL — wil-stock-formula-medica.js  (v5 — fix multi-botón Caja/Unidad)
-   ───────────────────────────────────────────────────────────────────
-   Conecta la columna H ("Formula") de las hojas de STOCK
-   (STOCK_DROGUERIA_EXPERTOS / STOCK_DROGUERIA_CENTRAL) con el sistema
-   de fórmula médica que ya existe en wil-formula-medica.js.
-
-   CAMBIOS v4:
-   1) El badge ahora dice "Fórmula médica" (antes solo decía "Fórmula").
-   2) FIX REAL de duplicados: en v3 se declaraba el mapa
-      _wilFormulaNombreMap para resolver el caso de un mismo producto
-      con dos tarjetas en el grid (una con imagen, otra sin imagen,
-      cada una con su propia key en `cache`), pero ese mapa nunca se
-      usaba en el resto del código — por eso solo se marcaba UNA de
-      las dos tarjetas. Ahora, cuando la columna H dice "Sí" para un
-      producto, se recorre TODO `cache` y se marcan TODAS las
-      entradas cuyo nombre normalizado coincida (sin importar
-      laboratorio, key, ni si tienen imagen o no), y además se
-      vuelve a chequear esa coincidencia por nombre al momento de
-      pintar el badge en cada tarjeta del grid.
-
-   CAMBIOS v5:
-   3) FIX tarjetas con MÁS DE UN botón de compra (ej. "Caja x30" +
-      "Unidad", cada uno con su propio precio y su propia key). Antes
-      solo se revisaba el PRIMER botón de la tarjeta (querySelector),
-      así que si la fórmula quedaba marcada en la otra variante de
-      empaque, la tarjeta entera se quedaba sin badge y sin
-      protección. Ahora se revisan TODOS los botones de la tarjeta; si
-      CUALQUIERA de las variantes (caja o unidad) requiere fórmula
-      médica, se muestra el badge UNA vez y se protegen TODOS los
-      botones de esa tarjeta (caja y unidad) para que pasen por el
-      popup de fórmula antes de agregarse al carrito.
-═══════════════════════════════════════════════════════════════════ */
+/* FILE: /wil-stock-formula-medica.js  v6 (optimizado: sin bucle filas × cache) */
 (function (W) {
   'use strict';
 
-  /* ── Detector de "sí" igual que wil-formula-medica.js ── */
-  function esFormula(v) {
-    return /^(s[ií]|yes|1|true)$/i.test(String(v || '').trim());
-  }
+  function esFormula(v) { return /^(s[ií]|yes|1|true)$/i.test(String(v || '').trim()); }
 
-  /*
-   * _wilFormulaNombreMap — mapa secundario indexado por NOMBRE normalizado
-   * (sin laboratorio, sin acentos, sin espacios extra). Esto es lo que
-   * permite detectar TODAS las variantes de tarjeta (con foto / sin foto,
-   * duplicados de catálogo, etc.) que correspondan al mismo producto.
-   *    key  → nombre.toLowerCase().trim() normalizado
-   *    value → true / false  (true = requiere fórmula médica)
-   */
-  if (typeof window._wilFormulaNombreMap === 'undefined') {
-    window._wilFormulaNombreMap = {};
-  }
+  if (typeof W._wilFormulaNombreMap === 'undefined') W._wilFormulaNombreMap = {};
 
   function normNombre(s) {
     return String(s || '').toLowerCase()
@@ -7064,13 +7014,12 @@ console.log('[WIL] ✅ wil-formula-medica.js v4.1 — banner + visor lightbox zo
       .replace(/\s+/g, ' ').trim();
   }
 
-  /* ══════════════════════════════════════════════════════════════
-     1. INTERCEPT FETCH — captura el CSV de STOCK cuando se descarga
-  ══════════════════════════════════════════════════════════════ */
-  var _origFetch = window.fetch;
+  /* ── 1. Intercepta fetch del STOCK ── */
+  var _origFetch = W.fetch;
   var _ultimoCsvStock = null;
+  var _ultimoProcesado = null;
 
-  window.fetch = function (url, opts) {
+  W.fetch = function (url) {
     var p = _origFetch.apply(this, arguments);
     try {
       if (typeof url === 'string' &&
@@ -7081,7 +7030,6 @@ console.log('[WIL] ✅ wil-formula-medica.js v4.1 — banner + visor lightbox zo
           try {
             res.clone().text().then(function (txt) {
               _ultimoCsvStock = txt;
-              /* Esperamos 250 ms para que loadSheet termine de poblar cache */
               setTimeout(aplicarFormulaSobreStock, 250);
             }).catch(function () {});
           } catch (e) {}
@@ -7091,9 +7039,8 @@ console.log('[WIL] ✅ wil-formula-medica.js v4.1 — banner + visor lightbox zo
     return p;
   };
 
-  /* ── Parser CSV (reutiliza _parseCsvLineNP si existe) ── */
   function parseCsvLine(line) {
-    if (typeof window._parseCsvLineNP === 'function') return window._parseCsvLineNP(line);
+    if (typeof W._parseCsvLineNP === 'function') return W._parseCsvLineNP(line);
     var cols = [], cur = '', inQ = false;
     for (var i = 0; i < line.length; i++) {
       var ch = line[i];
@@ -7105,136 +7052,103 @@ console.log('[WIL] ✅ wil-formula-medica.js v4.1 — banner + visor lightbox zo
     return cols.map(function (c) { return c.replace(/^"|"$/g, '').replace(/\r/g, '').trim(); });
   }
 
-  /* ══════════════════════════════════════════════════════════════
-     2. LEER CSV Y MARCAR cache + _wilFormulaMap + _wilFormulaNombreMap
-        — AHORA marca TODAS las entradas de cache que coincidan por
-          nombre normalizado, no solo la primera que encuentre.
-  ══════════════════════════════════════════════════════════════ */
+  /* ── 2. Marca cache en O(n) con índice por nombre ── */
   function aplicarFormulaSobreStock() {
     if (!_ultimoCsvStock || _ultimoCsvStock.trim().length < 5) return;
-    if (typeof window.cache !== 'object') return;
+    if (typeof W.cache !== 'object') return;
+    if (_ultimoProcesado === _ultimoCsvStock) { repintarGridVisible(); return; }
+    _ultimoProcesado = _ultimoCsvStock;
 
     var lines = _ultimoCsvStock.trim().split('\n').filter(Boolean);
     if (lines.length < 2) return;
 
-    /* Detectar columnas por encabezado, o fallback a posición */
     var hdr = parseCsvLine(lines[0]);
     var idxNombre = -1, idxLab = -1, idxFormula = -1;
     hdr.forEach(function (h, i) {
       var hn = String(h || '').toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]/g, '');
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
       if (hn.indexOf('descrip') !== -1 || hn === 'nombre') idxNombre = i;
       else if (hn.indexOf('laborat') !== -1) idxLab = i;
       else if (hn.indexOf('formula') !== -1) idxFormula = i;
     });
     if (idxNombre < 0) idxNombre = 0;
-    if (idxLab    < 0) idxLab    = 1;
-    if (idxFormula < 0) idxFormula = 7; // columna H si no hay encabezado "formula"
+    if (idxLab < 0) idxLab = 1;
+    if (idxFormula < 0) idxFormula = 7;
 
-    var rows = lines.slice(1).filter(Boolean);
-    var totalMarcados = 0;
-    var totalProductosFormula = 0;
-
-    rows.forEach(function (line) {
-      var cols   = parseCsvLine(line);
-      var nombre = (cols[idxNombre] || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
-      var lab    = (cols[idxLab]    || '').trim();
-      var valFm  = (cols[idxFormula] || '').trim();
-      if (!nombre) return;
-
-      var requiere   = esFormula(valFm);
-      var keyExacta  = nombre + '|||' + lab;
-      var nombreNorm = normNombre(nombre);
-
-      /* Guardamos siempre en el mapa por nombre normalizado.
-         Esto es lo que permite que CUALQUIER tarjeta (con foto, sin
-         foto, duplicada, con key distinta) se pueda marcar al pintar
-         el grid, aunque su `key` exacta en cache no coincida. */
-      window._wilFormulaNombreMap[nombreNorm] = requiere;
-
-      if (requiere) totalProductosFormula++;
-
-      /* Recorremos TODO cache y marcamos TODAS las coincidencias
-         (por key exacta O por nombre normalizado), no solo la primera. */
-      for (var k in window.cache) {
-        if (!window.cache.hasOwnProperty(k)) continue;
-        var c = window.cache[k];
-        if (!c) continue;
-
-        var coincideKey    = (k === keyExacta);
-        var coincideNombre = (normNombre(c.desc) === nombreNorm);
-
-        if (coincideKey || coincideNombre) {
-          c.formula = requiere;
-          window._wilFormulaMap[k] = requiere;
-          if (requiere) totalMarcados++;
-        }
-      }
-    });
-
-    if (totalMarcados > 0) {
-      console.log('[WIL][stock-formula] ' + totalProductosFormula +
-        ' producto(s) con fórmula médica requerida en columna H → ' +
-        totalMarcados + ' tarjeta(s) marcadas en cache (incluye duplicados con/sin foto).');
+    /* Índice único: nombreNorm → [keys de cache] */
+    var porNombre = Object.create(null);
+    var k, c, nn;
+    for (k in W.cache) {
+      if (!Object.prototype.hasOwnProperty.call(W.cache, k)) continue;
+      c = W.cache[k];
+      if (!c) continue;
+      nn = c._nn || (c._nn = normNombre(c.desc));
+      (porNombre[nn] || (porNombre[nn] = [])).push(k);
     }
 
-    /* Si el grid ya está pintado en pantalla, repintamos inmediatamente */
+    var total = 0;
+    for (var r = 1; r < lines.length; r++) {
+      var cols   = parseCsvLine(lines[r]);
+      var nombre = (cols[idxNombre] || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+      if (!nombre) continue;
+      var lab      = (cols[idxLab] || '').trim();
+      var requiere = esFormula(cols[idxFormula]);
+      var nNorm    = normNombre(nombre);
+
+      W._wilFormulaNombreMap[nNorm] = requiere;
+      if (!requiere) {
+        /* solo desmarcar si ya estaba en el mapa por key exacta */
+        var kx0 = nombre + '|||' + lab;
+        if (W.cache[kx0]) { W.cache[kx0].formula = false; W._wilFormulaMap[kx0] = false; }
+        continue;
+      }
+
+      var keys = porNombre[nNorm] || [];
+      var kx = nombre + '|||' + lab;
+      if (W.cache[kx] && keys.indexOf(kx) === -1) keys.push(kx);
+
+      for (var i = 0; i < keys.length; i++) {
+        W.cache[keys[i]].formula = true;
+        W._wilFormulaMap[keys[i]] = true;
+        total++;
+      }
+    }
+
+    if (total) console.log('[WIL][stock-formula] ' + total + ' tarjeta(s) con fórmula médica marcadas');
     repintarGridVisible();
   }
 
-  /* ══════════════════════════════════════════════════════════════
-     3. REPINTAR GRID VISIBLE
-        — aplica badge + reemplaza botón en artículos ya renderizados
-  ══════════════════════════════════════════════════════════════ */
-  /* Calcula si una `key` de cache requiere fórmula médica, en cascada:
-     cache.formula → _wilFormulaMap[key] → _wilFormulaNombreMap[nombre]. */
+  /* ── 3. Badge + botones protegidos ── */
   function requiereFormulaParaKey(key) {
-    var it = window.cache[key];
+    var it = W.cache[key];
     if (it) {
-      return !!(it.formula ||
-        window._wilFormulaMap[key] ||
-        window._wilFormulaNombreMap[normNombre(it.desc)]);
+      return !!(it.formula || W._wilFormulaMap[key] ||
+                W._wilFormulaNombreMap[it._nn || normNombre(it.desc)]);
     }
-    return !!window._wilFormulaMap[key];
+    return !!W._wilFormulaMap[key];
   }
 
   function aplicarBadgeEnArticulo(art) {
-    /* Buscar TODOS los botones de compra de la tarjeta. Algunas tarjetas
-       tienen más de un botón (ej. "Caja x30" + "Unidad"), cada uno con su
-       propia key. Antes solo se revisaba el PRIMERO (querySelector), así
-       que si la fórmula quedaba marcada en la otra variante, la tarjeta
-       entera se quedaba sin badge y sin protección. */
     var btns = art.querySelectorAll(
       'button[onclick*="addToCart"], button[onclick*="sadd"], button[onclick*="wilSaddConFormula"]'
     );
     if (!btns.length) return;
 
-    var infoBtns      = [];
-    var requiereTarjeta = false;
-
+    var infoBtns = [], requiereTarjeta = false;
     btns.forEach(function (btn) {
-      var oc  = btn.getAttribute('onclick') || '';
-      var m   = oc.match(/['"]([^'"]+)['"]/);
+      var oc = btn.getAttribute('onclick') || '';
+      var m = oc.match(/['"]([^'"]+)['"]/);
       var key = m ? m[1] : null;
       if (!key) return;
-
-      var requiere = requiereFormulaParaKey(key);
-      if (requiere) requiereTarjeta = true;
+      if (requiereFormulaParaKey(key)) requiereTarjeta = true;
       infoBtns.push({ btn: btn, oc: oc, key: key });
     });
-
-    /* Si NINGUNA variante (caja, unidad, etc.) requiere fórmula, no hacemos nada */
     if (!requiereTarjeta) return;
 
-    /* ── Badge sobre la imagen (una sola vez por tarjeta) ── */
     var imgZone = art.querySelector(
       'div[style*="height:84px"], div[style*="height: 84px"], .wil-card-img, figure'
-    );
-    if (!imgZone) {
-      /* Fallback: primer div hijo del artículo */
-      imgZone = art.firstElementChild;
-    }
+    ) || art.firstElementChild;
+
     if (imgZone && !imgZone.querySelector('.wil-fm-badge')) {
       imgZone.style.position = 'relative';
       var badge = document.createElement('div');
@@ -7249,189 +7163,99 @@ console.log('[WIL] ✅ wil-formula-medica.js v4.1 — banner + visor lightbox zo
       imgZone.appendChild(badge);
     }
 
-    /* ── Reemplazar TODOS los botones de la tarjeta (caja Y unidad) para
-       que pasen por el popup de fórmula, sin importar cuál de las dos
-       variantes fue la que detectó el "Sí" en la columna H. ── */
     infoBtns.forEach(function (info) {
-      if (info.oc.indexOf('wilSaddConFormulaStock') !== -1) return; // ya parcheado
-      var it   = window.cache[info.key];
-      var desc = it ? it.desc   : '';
-      var lab  = it ? it.lab    : '';
-      var pr   = it ? (it.precio || it.pUnit || 0) : 0;
+      if (info.oc.indexOf('wilSaddConFormulaStock') !== -1) return;
+      var it = W.cache[info.key];
+      var desc = it ? it.desc : '', lab = it ? it.lab : '';
+      var pr = it ? (it.precio || it.pUnit || 0) : 0;
       info.btn.setAttribute('onclick',
-        "wilSaddConFormulaStock('" + info.key.replace(/'/g, "\\'")  + "','" +
-        desc.replace(/'/g, "\\'") + "','" +
-        lab.replace(/'/g, "\\'")  + "'," + pr + ")");
+        "wilSaddConFormulaStock('" + info.key.replace(/'/g, "\\'") + "','" +
+        desc.replace(/'/g, "\\'") + "','" + lab.replace(/'/g, "\\'") + "'," + pr + ")");
     });
   }
 
   function repintarGridVisible() {
-    /* res-grid (búsqueda principal) */
-    var grid = document.getElementById('res-grid');
-    if (grid) {
-      grid.querySelectorAll('article').forEach(aplicarBadgeEnArticulo);
-    }
-    /* cats-res-grid (categorías) */
-    var cGrid = document.getElementById('cats-res-grid');
-    if (cGrid) {
-      cGrid.querySelectorAll('article').forEach(aplicarBadgeEnArticulo);
-    }
+    var g = document.getElementById('res-grid');
+    if (g) g.querySelectorAll('article').forEach(aplicarBadgeEnArticulo);
+    var cg = document.getElementById('cats-res-grid');
+    if (cg) cg.querySelectorAll('article').forEach(aplicarBadgeEnArticulo);
   }
 
-  /* ══════════════════════════════════════════════════════════════
-     4. PATCH renderResults / renderSheetCards
-        — se llaman tras cada búsqueda; después de que terminen
-          aplicamos los badges sobre los artículos recién pintados
-  ══════════════════════════════════════════════════════════════ */
-  function patchRenderResults() {
-    /* renderResults es la función que pinta res-grid tras una búsqueda */
-    if (typeof window.renderResults === 'function' &&
-        !window.renderResults._stockFmPatched) {
-      var _origRR = window.renderResults;
-      window.renderResults = function () {
-        var r = _origRR.apply(this, arguments);
-        /* Pequeño delay para que el DOM se haya pintado */
-        setTimeout(repintarGridVisible, 80);
-        return r;
-      };
-      window.renderResults._stockFmPatched = true;
-    }
-
-    /* renderSheetCards es otra función que puede pintar tarjetas de stock */
-    if (typeof window.renderSheetCards === 'function' &&
-        !window.renderSheetCards._stockFmPatched) {
-      var _origRSC = window.renderSheetCards;
-      window.renderSheetCards = function () {
-        var r = _origRSC.apply(this, arguments);
-        setTimeout(repintarGridVisible, 80);
-        return r;
-      };
-      window.renderSheetCards._stockFmPatched = true;
-    }
-
-    /* _wilPatchGrid (usado por wil-formula-medica.js en el flujo de ofertas) */
-    if (typeof window._wilPatchGrid === 'function' &&
-        !window._wilPatchGrid._stockFmPatched) {
-      var _origPG = window._wilPatchGrid;
-      window._wilPatchGrid = function (items) {
-        var r = _origPG.apply(this, arguments);
-        setTimeout(repintarGridVisible, 80);
-        return r;
-      };
-      window._wilPatchGrid._stockFmPatched = true;
-    }
-  }
-
-  /* ══════════════════════════════════════════════════════════════
-     5. PATCH renderCatResGrid (vista Categorías)
-  ══════════════════════════════════════════════════════════════ */
-  function patchRenderCatResGrid() {
-    if (typeof window.renderCatResGrid !== 'function') return false;
-    if (window.renderCatResGrid._stockFmPatched) return true;
-
-    var _orig = window.renderCatResGrid;
-    window.renderCatResGrid = function (items, q, accentColor) {
-      var r = _orig.apply(this, arguments);
+  /* ── 4. Patches de render ── */
+  function wrapAfter(name) {
+    var f = W[name];
+    if (typeof f !== 'function' || f._stockFmPatched) return false;
+    var w = function () {
+      var r = f.apply(this, arguments);
       setTimeout(repintarGridVisible, 80);
       return r;
     };
-    window.renderCatResGrid._stockFmPatched = true;
+    w._stockFmPatched = true;
+    for (var p in f) { if (Object.prototype.hasOwnProperty.call(f, p)) w[p] = f[p]; }
+    W[name] = w;
     return true;
   }
 
-  /* ══════════════════════════════════════════════════════════════
-     6. wilSaddConFormulaStock — abre popup de fórmula para STOCK
-  ══════════════════════════════════════════════════════════════ */
-  window.wilSaddConFormulaStock = function (key, desc, lab, precio) {
-    if (typeof window._fmPendiente === 'undefined') window._fmPendiente = null;
-    window._fmPendienteStock = { key: key, desc: desc, lab: lab, precio: precio };
-    if (typeof window._wilAbrirPopupFM === 'function') {
-      window._fmPendiente = { key: key, desc: desc, lab: lab, precio: precio };
-      window._wilAbrirPopupFM();
-    } else {
-      console.warn('[WIL][stock-formula] Popup de fórmula médica no disponible.');
+  W.wilSaddConFormulaStock = function (key, desc, lab, precio) {
+    W._fmPendienteStock = { key: key, desc: desc, lab: lab, precio: precio };
+    if (typeof W._wilAbrirPopupFM === 'function') {
+      W._fmPendiente = { key: key, desc: desc, lab: lab, precio: precio };
+      W._wilAbrirPopupFM();
     }
   };
 
-  /* ══════════════════════════════════════════════════════════════
-     7. PATCH wilGuardarConFormula — al guardar, usa addToCart(key)
-        en vez de sadd() para respetar el stock real
-  ══════════════════════════════════════════════════════════════ */
   function patchGuardarConFormula() {
-    if (typeof window.wilGuardarConFormula !== 'function') return false;
-    if (window.wilGuardarConFormula._stockFmPatched) return true;
+    if (typeof W.wilGuardarConFormula !== 'function') return false;
+    if (W.wilGuardarConFormula._stockFmPatched) return true;
 
-    var _origGuardar = window.wilGuardarConFormula;
-    window.wilGuardarConFormula = function () {
-      var pendienteStock = window._fmPendienteStock;
-      var base64Antes    = window._fmBase64;
+    var _orig = W.wilGuardarConFormula;
+    W.wilGuardarConFormula = function () {
+      var pend = W._fmPendienteStock, b64 = W._fmBase64;
+      if (!pend || !b64) { W._fmPendienteStock = null; return _orig.apply(this, arguments); }
 
-      if (!pendienteStock || !base64Antes) {
-        window._fmPendienteStock = null;
-        return _origGuardar.apply(this, arguments);
-      }
-
-      /* Flujo STOCK: usar addToCart para respetar inventario */
-      window._wilFormulaAdjuntada = {
-        base64:   base64Antes,
-        fileName: (typeof window._fmFileName !== 'undefined' && window._fmFileName) || 'formula.jpg'
-      };
-      window._comprobanteBase64 = base64Antes;
-      window._comprobanteVerif  = true;
+      W._wilFormulaAdjuntada = { base64: b64, fileName: (W._fmFileName) || 'formula.jpg' };
+      W._comprobanteBase64 = b64;
+      W._comprobanteVerif = true;
 
       var ov = document.getElementById('wil-fm-ov');
       if (ov) ov.style.display = 'none';
       document.body.style.overflow = '';
 
-      var p = pendienteStock;
-      window._fmPendienteStock = null;
-      window._fmPendiente      = null;
+      W._fmPendienteStock = null;
+      W._fmPendiente = null;
 
-      if (typeof window.addToCart === 'function') {
-        window.addToCart(p.key, null);
-      } else if (typeof window.sadd === 'function') {
-        window.sadd(p.key, p.desc, p.lab, p.precio, null);
-      }
+      if (typeof W.addToCart === 'function') W.addToCart(pend.key, null);
+      else if (typeof W.sadd === 'function') W.sadd(pend.key, pend.desc, pend.lab, pend.precio, null);
 
-      if (typeof window.wilMostrarBannerFormula === 'function') {
-        window.wilMostrarBannerFormula(window._fmFileName || 'formula.jpg', base64Antes);
-      }
+      if (typeof W.wilMostrarBannerFormula === 'function')
+        W.wilMostrarBannerFormula(W._fmFileName || 'formula.jpg', b64);
 
-      window._fmBase64    = null;
-      window._fmFileName  = '';
+      W._fmBase64 = null;
+      W._fmFileName = '';
     };
-
-    window.wilGuardarConFormula._stockFmPatched = true;
+    W.wilGuardarConFormula._stockFmPatched = true;
     return true;
   }
 
-  /* ══════════════════════════════════════════════════════════════
-     8. INIT — polling hasta que las dependencias existan
-  ══════════════════════════════════════════════════════════════ */
   function init() {
-    if (typeof window._wilFormulaMap === 'undefined') window._wilFormulaMap = {};
-
+    if (typeof W._wilFormulaMap === 'undefined') W._wilFormulaMap = {};
     var tries = 0;
     var t = setInterval(function () {
       tries++;
-      patchRenderResults();       // <-- parchea renderResults/renderSheetCards
-      var ok1 = patchRenderCatResGrid();
-      var ok2 = patchGuardarConFormula();
-      if ((ok1 && ok2) || tries > 60) clearInterval(t);
+      var a = wrapAfter('renderResults');
+      var b = wrapAfter('renderSheetCards');
+      var c = wrapAfter('_wilPatchGrid');
+      var d = wrapAfter('renderCatResGrid');
+      var e = patchGuardarConFormula();
+      if ((d && e) || tries > 60) clearInterval(t);
     }, 250);
-
-    /* Si loadSheet ya corrió antes de que este script cargara, forzamos lectura */
     setTimeout(aplicarFormulaSobreStock, 1500);
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    setTimeout(init, 0);
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else setTimeout(init, 0);
 
-  console.log('[WIL] ✅ wil-stock-formula-medica.js v4 cargado — badge "Fórmula médica" + fix real de duplicados (con/sin foto)');
-
+  console.log('[WIL] ✅ wil-stock-formula-medica.js v6 (índice O(n))');
 }(window));
   </script>
 
@@ -7487,71 +7311,58 @@ console.log('[WIL] ✅ wil-formula-medica.js v4.1 — banner + visor lightbox zo
  </script>
 
   <script>
-
-/* ═══════════════════════════════════════════════════════════════
-   WIL — wil-perf-boost.js  v2
-   CARGAR **PRIMERO** DENTRO DE <head> (antes de los otros scripts).
-   NO pegar copia al final del body.
-
-   1. Descarga Ofertas y Nuevo_Producto DE INMEDIATO (en paralelo a
-      todo lo demás) y las pinta desde localStorage si ya las tenía.
-   2. Imágenes lh3.googleusercontent.com/d/ID → se piden a ~400px
-      (=w400) en vez del original de varios MB. En el popup, 800px.
-      El link guardado en la hoja NO se modifica.
-   3. loading="lazy" + decoding="async" en todas las <img>.
-   4. Elimina el render oculto de 60 tarjetas (sheet-scroll).
-   5. Refresco automático cada 5 min (antes 60 s), nunca en pestaña oculta.
-   6. Primeras imágenes del carrusel de ofertas con prioridad alta.
-
-   Para revertir el redimensionado: RESIZE_LH3 = false
-═══════════════════════════════════════════════════════════════ */
+/* FILE: /wil-perf-boost.js  v3
+   CARGAR PRIMERO en <head>. No pegar copia inline. */
 (function (W) {
   'use strict';
-  if (W.__wilPerfV2) return;
-  W.__wilPerfV2 = true;
+  if (W.__wilPerfV3 || W.__wilPerfV2) return;
+  W.__wilPerfV3 = true;
 
-  var IMG_W       = 400;    // ancho de las tarjetas
-  var IMG_W_POPUP = 800;    // ancho en el popup de detalle
+  var IMG_W       = 400;
+  var IMG_W_POPUP = 800;
   var RESIZE_LH3  = true;   // false = no tocar links lh3
-  var USE_PROXY   = false;  // true = imágenes NO-Google por wsrv.nl
+  var WEBP        = true;   // lh3 soporta -rw (webp)
   var REFRESH     = 5 * 60 * 1000;
 
   var SHEET_ID = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
-  var BASE = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID +
-             '/gviz/tq?tqx=out:csv&sheet=';
+  var BASE = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/gviz/tq?tqx=out:csv&sheet=';
 
-  /* ── 1. URL de imagen optimizada ───────────────────────────── */
+  /* ── CSS: no renderizar secciones fuera de pantalla ── */
+  try {
+    var st = document.createElement('style');
+    st.textContent =
+      '#v-home-content>div[style*="margin-top:22px"]{content-visibility:auto;contain-intrinsic-size:auto 330px}' +
+      '.ocard-img img{background:#f3f4f6}';
+    (document.head || document.documentElement).appendChild(st);
+  } catch (e) {}
+
+  /* ── URL de imagen optimizada ── */
+  function lh3(id, w) {
+    return 'https://lh3.googleusercontent.com/d/' + id + '=w' + w + (WEBP ? '-rw' : '');
+  }
   function optImg(u, w) {
     try {
       u = String(u || '').replace(/&amp;/g, '&').trim();
-      if (!/^https?:\/\//i.test(u)) return u;          // data:, blob:, vacío
+      if (!/^https?:\/\//i.test(u)) return u;
       if (/wsrv\.nl/i.test(u)) return u;
+      if (!RESIZE_LH3) return u;
 
+      var m;
       if (/lh3\.googleusercontent\.com\/d\//i.test(u)) {
-        if (RESIZE_LH3 && !/=[ws]\d+/.test(u)) return u + '=w' + w;
-        return u;
+        if (/=[ws]\d+/.test(u)) return u;
+        m = u.match(/lh3\.googleusercontent\.com\/d\/([\w-]+)/i);
+        return m ? lh3(m[1], w) : u;
       }
-
-      var id = null, m;
+      var id = null;
       if (/drive\.(usercontent\.)?google\.com\/(uc|open|download|thumbnail)/i.test(u) &&
           (m = u.match(/[?&]id=([\w-]+)/))) id = m[1];
       else if ((m = u.match(/drive\.google\.com\/file\/d\/([\w-]+)/i))) id = m[1];
       else if ((m = u.match(/docs\.google\.com\/uc\?[^#]*[?&]?id=([\w-]+)/i))) id = m[1];
-      if (id) return RESIZE_LH3
-        ? 'https://lh3.googleusercontent.com/d/' + id + '=w' + w
-        : 'https://lh3.googleusercontent.com/d/' + id;
-
-      if (/googleusercontent\.com\//i.test(u))
-        return RESIZE_LH3 ? u.replace(/=[ws]\d+[^\/]*$/, '') + '=w' + w : u;
-
-      if (USE_PROXY)
-        return 'https://wsrv.nl/?url=' + encodeURIComponent(u) +
-               '&w=' + w + '&output=webp&q=75';
-      return u;
+      return id ? lh3(id, w) : u;
     } catch (e) { return u; }
   }
 
-  /* ── 2. Toda <img> creada con innerHTML → lazy + tamaño reducido ── */
+  /* ── Toda <img> creada con innerHTML → lazy + tamaño reducido ── */
   var d = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
   if (d && d.set && !Element.prototype.__wilImg) {
     Object.defineProperty(Element.prototype, 'innerHTML', {
@@ -7575,18 +7386,14 @@ console.log('[WIL] ✅ wil-formula-medica.js v4.1 — banner + visor lightbox zo
     Element.prototype.__wilImg = true;
   }
 
-  /* ── 3. Prefetch inmediato + caché stale-while-revalidate ───── */
+  /* ── Prefetch inmediato + caché stale-while-revalidate ── */
   var _fetch = W.fetch.bind(W);
-  var PRE = {};   // promesas de descarga ya iniciadas
-  var HOT = {};   // texto fresco listo para el repintado
+  var PRE = {}, HOT = {};
 
   ['Ofertas', 'Nuevo_Producto'].forEach(function (n) {
     try {
       var p = _fetch(BASE + n + '&cachebust=' + Date.now(), { cache: 'no-store' })
-        .then(function (r) {
-          if (!r.ok) throw new Error('HTTP ' + r.status);
-          return r.text();
-        });
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); });
       p.catch(function () {});
       PRE[n] = p;
     } catch (e) {}
@@ -7595,7 +7402,6 @@ console.log('[WIL] ✅ wil-formula-medica.js v4.1 — banner + visor lightbox zo
   function mkResp(t) {
     return new Response(t, { status: 200, headers: { 'Content-Type': 'text/csv' } });
   }
-
   function scheduleReload(name, text) {
     HOT[name] = text;
     setTimeout(function () {
@@ -7605,17 +7411,13 @@ console.log('[WIL] ✅ wil-formula-medica.js v4.1 — banner + visor lightbox zo
   }
 
   W.fetch = function (url, opts) {
-    var mm = (typeof url === 'string' &&
-              url.indexOf('docs.google.com/spreadsheets') !== -1)
+    var mm = (typeof url === 'string' && url.indexOf('docs.google.com/spreadsheets') !== -1)
       ? url.match(/[?&]sheet=(Ofertas|Nuevo_Producto)(?:&|$)/) : null;
     if (!mm) return _fetch.apply(this, arguments);
 
     var name = mm[1], ck = 'wil_csv_' + name, cached = null;
 
-    if (HOT[name]) {                       // repintado con datos ya descargados
-      var hot = HOT[name]; HOT[name] = null;
-      return Promise.resolve(mkResp(hot));
-    }
+    if (HOT[name]) { var hot = HOT[name]; HOT[name] = null; return Promise.resolve(mkResp(hot)); }
 
     try { cached = localStorage.getItem(ck); } catch (e) {}
 
@@ -7640,7 +7442,7 @@ console.log('[WIL] ✅ wil-formula-medica.js v4.1 — banner + visor lightbox zo
     return done.then(mkResp);
   };
 
-  /* ── 4. Parches que dependen de funciones de la página ──────── */
+  /* ── Parches que dependen de funciones de la página ── */
   function gate(name) {
     var orig = W[name];
     if (typeof orig !== 'function' || orig._wilGate) return;
@@ -7664,12 +7466,10 @@ console.log('[WIL] ✅ wil-formula-medica.js v4.1 — banner + visor lightbox zo
       var r = ro.apply(this, arguments);
       try {
         var t = document.getElementById('promos-track');
-        if (t) {
-          [].slice.call(t.querySelectorAll('img')).slice(0, 3).forEach(function (i) {
-            i.loading = 'eager';
-            i.setAttribute('fetchpriority', 'high');
-          });
-        }
+        if (t) [].slice.call(t.querySelectorAll('img')).slice(0, 3).forEach(function (i) {
+          i.loading = 'eager';
+          i.setAttribute('fetchpriority', 'high');
+        });
       } catch (e) {}
       return r;
     };
@@ -7688,9 +7488,8 @@ console.log('[WIL] ✅ wil-formula-medica.js v4.1 — banner + visor lightbox zo
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', onReady);
   else onReady();
 
-  console.log('[WIL] ⚡ perf-boost v2 — prefetch + caché + imágenes ' + IMG_W + 'px');
+  console.log('[WIL] ⚡ perf-boost v3');
 })(window);
-
  </script>
 
 
