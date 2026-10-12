@@ -1,6 +1,15 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+
+<link rel="preconnect" href="https://docs.google.com">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://drive.google.com">
+<link rel="preconnect" href="https://wsrv.nl">
+<link rel="preconnect" href="https://lh3.googleusercontent.com">
+
+
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
 <title>Farmacias WIL</title>
@@ -11,8 +20,10 @@
  <script src="wil-fix-dedup-unitprice.js"></script>
  <script src="wil-chat-checkout-patch.js"></script>
  <script src="wil-formula-medica.js"></script>
-  <script src="wil-stock-formula-medica.js"></script>
-     <script src="wil-formula-whatsapp.js"></script>
+ <script src="wil-stock-formula-medica.js"></script>
+ <script src="wil-formula-whatsapp.js"></script>
+<script src="wil-perf-boost.js"></script>
+
 
 
 <style>
@@ -7471,6 +7482,168 @@ console.log('[WIL] ✅ wil-formula-medica.js v4.1 — banner + visor lightbox zo
   W._wilFormulaAdjuntada    = null;
 
   console.log('[WIL] ✅ Fórmula médica: sin subida, puente por WhatsApp');
+})(window);
+
+ </script>
+
+  <script>
+
+
+
+ /* ═══════════════════════════════════════════════════════════════
+   WIL — wil-perf-boost.js  v1
+   CARGAR AL FINAL, justo antes de </body> (después de todos los
+   demás scripts).
+
+   Qué hace:
+   1. Imágenes: loading="lazy" + decoding="async" automático y
+      redimensiona (~500px, webp) vía thumbnail de Drive / wsrv.nl.
+   2. Elimina el render de 60 tarjetas ocultas (display:none) que
+      descargaban 60 imágenes sin que nadie las viera.
+   3. Ofertas y Nuevo_Producto: se pintan al instante desde
+      localStorage (stale-while-revalidate) y se actualizan en
+      segundo plano solo si cambió algo.
+   4. Refresco automático: de cada 60 s a cada 5 min (y nunca con
+      la pestaña oculta) → no vuelve a pintar todo cada minuto.
+   5. Primeras 2 imágenes del carrusel de ofertas con prioridad alta.
+═══════════════════════════════════════════════════════════════ */
+(function (W) {
+  'use strict';
+
+  var IMG_W     = 500;    // ancho máximo de las imágenes de tarjeta
+  var USE_PROXY = true;   // false = no pasar imágenes por wsrv.nl
+  var REFRESH   = 5 * 60 * 1000;
+
+  /* ── 1. Optimizar URL de imagen ───────────────────────────── */
+  function optImg(u) {
+    try {
+      u = String(u || '').replace(/&amp;/g, '&').trim();
+      if (!/^https?:\/\//i.test(u)) return u;                 // data:, blob:, vacío
+      if (/wsrv\.nl|lh3\.googleusercontent\.com/i.test(u)) return u;
+
+      /* Drive: cualquier formato de link → CDN de imágenes de Google con tamaño */
+      var id = null, m;
+      if (/drive\.(usercontent\.)?google\.com\/(uc|open|download|thumbnail)/i.test(u) &&
+          (m = u.match(/[?&]id=([\w-]+)/))) id = m[1];
+      else if ((m = u.match(/drive\.google\.com\/file\/d\/([\w-]+)/i))) id = m[1];
+      else if ((m = u.match(/docs\.google\.com\/uc\?[^#]*[?&]?id=([\w-]+)/i))) id = m[1];
+      if (id) return 'https://lh3.googleusercontent.com/d/' + id + '=w' + IMG_W;
+
+      if (/googleusercontent\.com\//i.test(u))
+        return u.replace(/=[ws]\d+[^\/]*$/, '') + '=w' + IMG_W;
+
+      if (USE_PROXY)
+        return 'https://wsrv.nl/?url=' + encodeURIComponent(u) +
+               '&w=' + IMG_W + '&output=webp&q=75';
+      return u;
+    } catch (e) { return u; }
+  }
+
+  /* ── 2. Todas las <img> creadas con innerHTML → lazy + optimizadas ── */
+  var d = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
+  if (d && d.set && !Element.prototype.__wilImg) {
+    Object.defineProperty(Element.prototype, 'innerHTML', {
+      configurable: true,
+      enumerable: d.enumerable,
+      get: d.get,
+      set: function (v) {
+        if (typeof v === 'string' && v.indexOf('<img') !== -1) {
+          v = v.replace(/<img\b([^>]*)>/g, function (all, attrs) {
+            if (/\bloading=/.test(attrs)) return all;
+            attrs = attrs.replace(/\bsrc="([^"]+)"/, function (a, u) {
+              return 'src="' + optImg(u).replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '"';
+            });
+            return '<img loading="lazy" decoding="async"' + attrs + '>';
+          });
+        }
+        d.set.call(this, v);
+      }
+    });
+    Element.prototype.__wilImg = true;
+  }
+
+  /* ── 3. Quitar el render oculto de 60 tarjetas (sheet-scroll) ── */
+  W.renderSheetCards = function () {};
+
+  /* ── 4. Stale-while-revalidate para Ofertas y Nuevo_Producto ── */
+  var _fetch = W.fetch;
+  W.fetch = function (url, opts) {
+    if (typeof url === 'string' &&
+        url.indexOf('docs.google.com/spreadsheets') !== -1) {
+      var mm = url.match(/[?&]sheet=(Ofertas|Nuevo_Producto)(?:&|$)/);
+      if (mm) {
+        var name   = mm[1];
+        var ck     = 'wil_csv_' + name;
+        var cached = null;
+        try { cached = localStorage.getItem(ck); } catch (e) {}
+
+        var net = _fetch.apply(this, arguments).then(function (r) {
+          if (r && r.ok) {
+            r.clone().text().then(function (t) {
+              if (!t || t.trim().length < 5) return;
+              try { localStorage.setItem(ck, t); } catch (e) {}
+              if (cached && t !== cached) {            // cambió algo → repintar una vez
+                setTimeout(function () {
+                  var fn = name === 'Ofertas' ? 'loadOfertasCarrusel' : 'loadNuevoProducto';
+                  if (typeof W[fn] === 'function') { W.__wilBypass = fn; W[fn](); }
+                }, 50);
+              }
+            }).catch(function () {});
+          }
+          return r;
+        });
+
+        if (cached) {
+          net.catch(function () {});
+          return Promise.resolve(new Response(cached, { status: 200, statusText: 'OK' }));
+        }
+        return net;
+      }
+    }
+    return _fetch.apply(this, arguments);
+  };
+
+  /* ── 5. Frenar el refresco cada 60 s ──────────────────────── */
+  function gate(name) {
+    var orig = W[name];
+    if (typeof orig !== 'function' || orig._wilGate) return;
+    var last = 0;
+    var g = function () {
+      var now = Date.now();
+      if (W.__wilBypass === name) { W.__wilBypass = null; }
+      else if (last && (document.hidden || now - last < REFRESH)) { return; }
+      last = now;
+      return orig.apply(this, arguments);
+    };
+    g._wilGate = true;
+    g._fmv4 = orig._fmv4;
+    W[name] = g;
+  }
+  gate('loadOfertasCarrusel');
+  gate('loadNuevoProducto');
+
+  /* ── 6. Primeras imágenes del carrusel: prioridad alta ────── */
+  var ro = W.renderOfertasCarrusel;
+  if (typeof ro === 'function' && !ro._wilEager) {
+    var nr = function () {
+      var r = ro.apply(this, arguments);
+      try {
+        var t = document.getElementById('promos-track');
+        if (t) {
+          [].slice.call(t.querySelectorAll('img')).slice(0, 2).forEach(function (i) {
+            i.loading = 'eager';
+            i.setAttribute('fetchpriority', 'high');
+          });
+        }
+      } catch (e) {}
+      return r;
+    };
+    nr._wilEager = true;
+    nr._fmv4 = ro._fmv4;
+    W.renderOfertasCarrusel = nr;
+  }
+
+  console.log('[WIL] ⚡ wil-perf-boost.js — lazy images, SWR cache, sin render oculto');
 })(window);
 
  </script>
