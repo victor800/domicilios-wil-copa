@@ -7311,28 +7311,54 @@ console.log('[WIL] ✅ wil-formula-medica.js v4.1 — banner + visor lightbox zo
  </script>
 
   <script>
-/* FILE: /wil-perf-boost.js  v3
-   CARGAR PRIMERO en <head>. No pegar copia inline. */
+/* FILE: /wil-perf-boost.js  v4
+   CARGAR PRIMERO en <head>. No pegar copia inline.
+   v4: fondo blanco unificado + fusión de fotos con el contenedor */
 (function (W) {
   'use strict';
-  if (W.__wilPerfV3 || W.__wilPerfV2) return;
-  W.__wilPerfV3 = true;
+  if (W.__wilPerfV4) return;
+  W.__wilPerfV4 = true;
 
   var IMG_W       = 400;
   var IMG_W_POPUP = 800;
   var RESIZE_LH3  = true;   // false = no tocar links lh3
   var WEBP        = true;   // lh3 soporta -rw (webp)
+  var BLEND       = true;   // false = desactiva la fusión de fondo
   var REFRESH     = 5 * 60 * 1000;
 
   var SHEET_ID = '1-pX8D71WTt9e8SYPHt_gVxBRvbjBUyDqb5XWRRPGUUU';
   var BASE = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/gviz/tq?tqx=out:csv&sheet=';
 
-  /* ── CSS: no renderizar secciones fuera de pantalla ── */
+  /* ── CSS: rendimiento + fondo blanco + fusión de imágenes ── */
   try {
-    var st = document.createElement('style');
-    st.textContent =
+    var css =
+      /* no renderizar secciones fuera de pantalla */
       '#v-home-content>div[style*="margin-top:22px"]{content-visibility:auto;contain-intrinsic-size:auto 330px}' +
-      '.ocard-img img{background:#f3f4f6}';
+
+      /* contenedores de imagen: SIEMPRE blanco puro */
+      '.ocard-img,' +
+      '#promos-track>div>div:first-child,' +
+      '#res-grid div[style*="height:180px"],' +
+      '#res-grid div[style*="height:130px"],' +
+      '#res-grid div[style*="height:110px"],' +
+      '#cats-res-grid article>div:first-child,' +
+      '#popup-oferta-body>div:first-child' +
+      '{background:#fff!important;isolation:isolate}' +
+
+      /* sin cuadro gris detrás de la foto */
+      '.ocard-img img,#promos-track img,#res-grid img,#cats-res-grid img,#popup-oferta-body img' +
+      '{background:#fff!important;image-rendering:auto}';
+
+    if (BLEND) {
+      css +=
+        /* funde el fondo blanco/gris claro de la foto con el contenedor */
+        '.ocard-img img,#promos-track img,#res-grid img,#cats-res-grid img,#popup-oferta-body img' +
+        '{mix-blend-mode:multiply;filter:brightness(1.05) contrast(1.04)}';
+    }
+
+    var st = document.createElement('style');
+    st.id = 'wil-perf-css';
+    st.textContent = css;
     (document.head || document.documentElement).appendChild(st);
   } catch (e) {}
 
@@ -7488,7 +7514,7 @@ console.log('[WIL] ✅ wil-formula-medica.js v4.1 — banner + visor lightbox zo
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', onReady);
   else onReady();
 
-  console.log('[WIL] ⚡ perf-boost v3');
+  console.log('[WIL] ⚡ perf-boost v4 (fondo blanco + blend)');
 })(window);
  </script>
 
