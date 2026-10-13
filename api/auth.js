@@ -4,6 +4,7 @@ import Domiciliario  from '../lib/Domiciliario.js'
 import Cliente       from '../lib/Cliente.js'
 import mongoose      from 'mongoose'
 import bcrypt        from 'bcryptjs'
+import jwt           from 'jsonwebtoken'
 
 /* ══ CORS ══ */
 function setCors(res) {
@@ -176,6 +177,11 @@ export default async function handler(req, res) {
       rol:    usuario.rol,
       tel:    usuario.tel  || '',
       foto:   usuario.foto || '',
+      token:  jwt.sign(
+        { id: usuario.idWil, rol: usuario.rol },
+        process.env.JWT_SECRET,
+        { expiresIn: '12h' }
+      ),
     })
 
   } catch (err) {
