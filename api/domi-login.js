@@ -1,6 +1,7 @@
 // pages/api/domi-login.js
 import { dbConnect }  from '../lib/db.js'
 import Domiciliario   from '../lib/Domiciliario.js'
+import jwt            from 'jsonwebtoken'
 
 // ─── Construye la URL de la foto ─────────────────────────────────────────────
 // Si el doc tiene foto en BD  →  /icons/Robinson.jpeg
@@ -45,6 +46,11 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       ok:   true,
+      token: jwt.sign(
+        { id: domi.idWil, rol: domi.rol || 'domiciliario' },
+        process.env.JWT_SECRET,
+        { expiresIn: '12h' }
+      ),
       domi: {
         id:     domi.idWil,
         nombre: domi.nombre,

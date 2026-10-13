@@ -1,5 +1,6 @@
 // api/pedidos.js
 const { google } = require('googleapis');
+const jwt        = require('jsonwebtoken');
 
 function pn(v) { return parseInt((v||'0').toString().replace(/[^0-9]/g,'')) || 0; }
 
@@ -8,6 +9,21 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  /* ══ VERIFICACIÓN DE SESIÓN ══
+     Mientras ENFORCE_AUTH no sea 'true' solo registra el intento (no rompe nada).
+     Cuando las páginas ya envíen el token, pon ENFORCE_AUTH=true en Vercel. */
+  const h  = req.headers.authorization || '';
+  const tk = h.startsWith('Bearer ') ? h.slice(7) : null;
+  let sesion = null;
+  try { sesion = tk ? jwt.verify(tk, process.env.JWT_SECRET) : null; } catch (_) {}
+  const autorizado = !!sesion && ['admin', 'domiciliario'].includes(sesion.rol);
+
+  if (!autorizado) {
+    console.warn('[pedidos] acceso SIN token válido');
+    if (process.env.ENFORCE_AUTH === 'true')
+      return res.status(401).json({ error: 'No autorizado' });
+  }
 
   try {
     const tienda = (req.query.tienda || 'EXPERTOS').toUpperCase();
