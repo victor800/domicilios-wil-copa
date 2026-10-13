@@ -1,10 +1,10 @@
 // api/pedidos.js
-const { google } = require('googleapis');
-const jwt        = require('jsonwebtoken');
+import { google } from 'googleapis';
+import jwt        from 'jsonwebtoken';
 
 function pn(v) { return parseInt((v||'0').toString().replace(/[^0-9]/g,'')) || 0; }
 
-module.exports = async (req, res) => {
+export default async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
