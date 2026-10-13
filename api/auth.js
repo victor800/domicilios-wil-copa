@@ -90,6 +90,31 @@ async function loginCliente(req, res) {
 }
 
 /* ══════════════════════════════════════════════════════════
+   Eliminar cuenta de cliente
+   POST /api/auth?recurso=eliminar-cliente
+══════════════════════════════════════════════════════════ */
+async function eliminarCliente(req, res) {
+  const { email, password } = req.body || {}
+
+  if (!email || !password)
+    return res.status(400).json({ error: 'Correo y contraseña son obligatorios.' })
+
+  const cliente = await Cliente.findOne({ email: email.toLowerCase().trim() })
+
+  if (!cliente)
+    return res.status(401).json({ error: 'Correo o contraseña incorrectos.' })
+
+  const ok = await cliente.compararPassword(password)
+  if (!ok)
+    return res.status(401).json({ error: 'Correo o contraseña incorrectos.' })
+
+  await Cliente.deleteOne({ _id: cliente._id })
+  console.log('[auth-cliente] cuenta eliminada:', cliente.email)
+
+  return res.status(200).json({ ok: true })
+}
+
+/* ══════════════════════════════════════════════════════════
    HANDLER PRINCIPAL — lógica original intacta
 ══════════════════════════════════════════════════════════ */
 export default async function handler(req, res) {
@@ -108,6 +133,9 @@ export default async function handler(req, res) {
 
     if (req.query.recurso === 'login-cliente')
       return await loginCliente(req, res)
+
+    if (req.query.recurso === 'eliminar-cliente')
+      return await eliminarCliente(req, res)
 
     /* ── ORIGINAL: login admin / domiciliario (sin cambios) ── */
     const { idWil, password, rol } = req.body
