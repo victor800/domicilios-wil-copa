@@ -11014,6 +11014,369 @@ function toggleProdFormula() {
 </script>
 
 
+  <!-- ═══════════════════════════════════════════════════════════════
+     PARCHE FINAL — PRODUCTOS RÁPIDO
+     PÉGALO COMO LO ÚLTIMO DE TU ARCHIVO, justo antes de </body>
+     (después de todos los demás scripts). No borres nada.
+═══════════════════════════════════════════════════════════════ -->
+<style>
+#prod-pag-rapida{display:flex;align-items:center;justify-content:center;gap:6px;padding:16px 0 8px;flex-wrap:wrap;}
+#prod-paginacion{display:none !important;}
+</style>
+<script>
+/* ═══ PRODUCTOS RÁPIDO — ANULA LOS PARCHES VIEJOS ═══ */
+(function () {
+  'use strict';
+  const POR_PAG = 24;
+  let pag = 1;
+
+  const norm = s => (s || '').toString().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  function thumb(src) {
+    if (src && src.includes('lh3.googleusercontent.com/d/') && !src.includes('=w'))
+      return src + '=w400';
+    return src;
+  }
+
+  function getLista() {
+    const q  = norm(document.getElementById('prod-search')?.value).trim();
+    const sc = norm(document.getElementById('prod-seccion-filter')?.value).trim();
+    let list = prodFilter === 'activo'   ? productos.filter(p => p.estado === 'activo')
+             : prodFilter === 'inactivo' ? productos.filter(p => p.estado === 'inactivo')
+             : productos;
+    if (q)  list = list.filter(p =>
+      norm(p.nombre).includes(q) || norm(p.lab).includes(q) || norm(p.desc).includes(q));
+    if (sc) list = list.filter(p => norm(p.seccion) === sc);
+    return list;
+  }
+
+  function cardHTML(p) {
+    const src = resolveImgSrc(p.img);
+    const imgHTML = src
+      ? `<img class="ofert-img" src="${thumb(src)}" data-full="${src}" alt="" loading="lazy" decoding="async"
+           style="cursor:zoom-in;" onerror="this.style.display='none'">`
+      : `<div class="ofert-img-placeholder" style="background:#faf5ff;"><span class="material-symbols-rounded" style="color:#a78bfa;">image</span><span>Sin imagen</span></div>`;
+    const act = p.estado === 'activo';
+    return `<div class="ofert-card prod-card-wrap" style="border-color:#ede9fe;">
+      <div class="prod-img-actions">
+        <button class="pia-edit" onclick="event.stopPropagation();openProdModal('${p.id}')" title="Editar"><span class="material-symbols-rounded" style="font-size:14px;">edit</span></button>
+        <button class="pia-pause" onclick="event.stopPropagation();toggleProducto('${p.id}')" title="${act ? 'Pausar' : 'Activar'}"><span class="material-symbols-rounded" style="font-size:14px;">${act ? 'pause' : 'play_arrow'}</span></button>
+        <button class="pia-del" onclick="event.stopPropagation();deleteProducto('${p.id}')" title="Eliminar"><span class="material-symbols-rounded" style="font-size:14px;">delete</span></button>
+      </div>
+      <div class="prod-estado-pill ${p.estado}">${act ? '✦ Activo' : '⏸ Inactivo'}</div>
+      <div class="ofert-img-wrap" style="background:#faf5ff;">${imgHTML}</div>
+      <div class="ofert-body">
+        <div class="ofert-lab" style="color:#7c3aed;"><span class="material-symbols-rounded" style="font-size:12px;">science</span>${p.lab || ''}</div>
+        <div class="ofert-name">${p.nombre || ''}</div>
+        <div class="ofert-desc-text">${p.desc || '<span style="color:var(--text3);font-style:italic;">Sin descripción</span>'}</div>
+        <div class="ofert-price-box" style="background:#faf5ff;border-color:#ddd6fe;">
+          <div><div class="ofert-price-lbl">Precio</div><div class="ofert-price" style="color:#7c3aed;">${fmtPrecio(p.precio)}</div></div>
+          <span style="font-size:9px;font-weight:800;padding:3px 9px;border-radius:99px;background:#ede9fe;color:#6d28d9;">${p.seccion || 'General'}</span>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function barHTML(total, totalPags) {
+    if (totalPags <= 1) return '';
+    const desde = (pag - 1) * POR_PAG + 1, hasta = Math.min(pag * POR_PAG, total);
+    let ini = Math.max(1, pag - 2), fin = Math.min(totalPags, ini + 4);
+    if (fin - ini < 4) ini = Math.max(1, fin - 4);
+    let h = `<button class="ppag-btn" ${pag === 1 ? 'disabled' : ''} onclick="__ppag(${pag - 1})">← Ant</button>`;
+    if (ini > 1) { h += `<button class="ppag-btn" onclick="__ppag(1)">1</button>`; if (ini > 2) h += `<span class="ppag-sep">…</span>`; }
+    for (let i = ini; i <= fin; i++) h += `<button class="ppag-btn${i === pag ? ' on' : ''}" onclick="__ppag(${i})">${i}</button>`;
+    if (fin < totalPags) { if (fin < totalPags - 1) h += `<span class="ppag-sep">…</span>`; h += `<button class="ppag-btn" onclick="__ppag(${totalPags})">${totalPags}</button>`; }
+    h += `<button class="ppag-btn" ${pag === totalPags ? 'disabled' : ''} onclick="__ppag(${pag + 1})">Sig →</button>`;
+    h += `<span class="ppag-info">${desde}–${hasta} de ${total}</span>`;
+    return h;
+  }
+
+  function getBar() {
+    let bar = document.getElementById('prod-pag-rapida');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'prod-pag-rapida';
+      const grid = document.getElementById('prod-grid');
+      grid.parentElement.insertBefore(bar, grid.nextSibling);
+    }
+    return bar;
+  }
+
+  function render() {
+    const grid = document.getElementById('prod-grid');
+    if (!grid) return;
+
+    const act = productos.filter(p => p.estado === 'activo').length;
+    const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+    set('pst-total', productos.length);
+    set('pst-activos', act);
+    set('pst-inactivos', productos.length - act);
+    set('nb-prod', act || '0');
+
+    const list = getLista();
+    const total = list.length;
+    const totalPags = Math.max(1, Math.ceil(total / POR_PAG));
+    if (pag > totalPags) pag = totalPags;
+    set('prod-count', total + ' producto' + (total !== 1 ? 's' : ''));
+
+    if (!total) {
+      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;min-width:100%;"><div class="ico" style="font-size:40px;opacity:.2;">🔍</div><p>Sin productos</p></div>`;
+      getBar().innerHTML = '';
+      return;
+    }
+
+    grid.innerHTML = list.slice((pag - 1) * POR_PAG, pag * POR_PAG).map(cardHTML).join('');
+    getBar().innerHTML = barHTML(total, totalPags);
+    window.initProdCarousel();
+  }
+
+  /* Lightbox por delegación */
+  function lbHandler(e) {
+    const im = e.target.closest('img[data-full]');
+    if (im) openLbox(im.dataset.full);
+  }
+
+  /* Reemplaza el #prod-grid por un nodo limpio: así los MutationObserver
+     viejos quedan pegados al nodo anterior (huérfano) y dejan de actuar. */
+  function adoptarGrid() {
+    const old = document.getElementById('prod-grid');
+    if (!old || old._wilFast) return;
+    const nuevo = old.cloneNode(false);
+    nuevo._wilFast = true;
+    old.replaceWith(nuevo);
+    nuevo.addEventListener('click', lbHandler);
+    document.querySelectorAll('#prod-paginacion').forEach(e => e.remove());
+    render();
+  }
+
+  window.initProdCarousel = function () {
+    const grid = document.getElementById('prod-grid');
+    const dots = document.getElementById('prod-dots');
+    if (!grid || !dots) return;
+    const cards = grid.querySelectorAll('.ofert-card');
+    if (window.innerWidth > 768 || cards.length <= 1) { dots.style.display = 'none'; grid.onscroll = null; return; }
+    dots.style.display = 'flex';
+    dots.innerHTML = Array.from(cards).map((_, i) =>
+      `<div class="prod-dot${i === 0 ? ' on' : ''}" onclick="scrollProdTo(${i})"></div>`).join('');
+    let t;
+    grid.onscroll = () => {
+      clearTimeout(t);
+      t = setTimeout(() => {
+        const idx = Math.round(grid.scrollLeft / (cards[0].offsetWidth + 14));
+        dots.querySelectorAll('.prod-dot').forEach((d, i) => d.classList.toggle('on', i === idx));
+      }, 60);
+    };
+  };
+
+  /* ── Reemplazos de las funciones viejas ── */
+  window.renderProductos = render;
+
+  let deb;
+  window.filterProductosBusqueda = function () {
+    clearTimeout(deb);
+    deb = setTimeout(() => { pag = 1; render(); }, 200);
+  };
+  window.filterProductos = function (f, btn) {
+    prodFilter = f; pag = 1;
+    document.querySelectorAll('#prod-tabs .tab').forEach(t => t.classList.remove('on'));
+    if (btn) btn.classList.add('on');
+    render();
+  };
+  /* Marcas para que el parche viejo no vuelva a envolverlas */
+  window.filterProductos._v3 = true;
+  window.filterProductosBusqueda._v3 = true;
+  window.renderProductos._rapido = true;
+  window.renderProductos._movPag = true;
+
+  window.__ppag = function (n) {
+    pag = n; render();
+    document.querySelector('#pg-productos .pghdr')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
+
+  window.toggleProducto = function (id) {
+    const p = productos.find(x => x.id === id); if (!p) return;
+    p.estado = p.estado === 'activo' ? 'inactivo' : 'activo';
+    render();
+    showToast('i', p.estado === 'activo' ? 'Activado' : 'Pausado', p.nombre);
+    sendProductoToSheet(p, 'toggle').catch(() => showToast('e', 'No se pudo sincronizar', p.nombre));
+  };
+
+  window.deleteProducto = function (id) {
+    if (!confirm('¿Eliminar este producto?')) return;
+    const p = productos.find(x => x.id === id); if (!p) return;
+    productos = productos.filter(x => x.id !== id);
+    if (typeof pubZoneIds !== 'undefined') pubZoneIds.delete(id);
+    render();
+    showToast('i', 'Producto eliminado', '');
+    sendProductoToSheet(p, 'eliminar').catch(() => showToast('e', 'No se pudo eliminar en el sheet', p.nombre));
+  };
+
+  /* ── saveProducto: igual al original pero SIN recargar todo el sheet ── */
+  window.saveProducto = async function () {
+    const nombre  = document.getElementById('pm-nombre').value.trim();
+    const lab     = document.getElementById('pm-lab').value.trim();
+    const precio  = document.getElementById('pm-precio').value.trim();
+    const desc    = document.getElementById('pm-desc').value.trim();
+    const estado  = document.getElementById('pm-estado').value;
+    const seccion = document.getElementById('pm-seccion').value;
+
+    if (!nombre) { showToast('w','Falta nombre','Ingresa el nombre del producto'); return; }
+    if (!lab)    { showToast('w','Falta laboratorio','Ingresa el laboratorio'); return; }
+    if (!precio) { showToast('w','Falta precio','Ingresa el precio'); return; }
+
+    const btn = document.querySelector('#modal-prod .om-btn-save');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-symbols-rounded" style="animation:spin .8s linear infinite">progress_activity</span> Guardando…';
+
+    const imgCaptura = currentProdImgB64 || null;
+    const fecha = new Date().toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' });
+    const pid = prodEditId || ('PRD-' + Date.now());
+
+    let imgFinal = null;
+    if (imgCaptura && imgCaptura.startsWith('data:image')) {
+      imgFinal = imgCaptura;
+    } else if (prodEditId) {
+      const prev = productos.find(x => x.id === prodEditId);
+      if (prev && prev.img) imgFinal = prev.img;
+    }
+
+    const formulaProd = document.getElementById('pm-formula')?.value || 'no';
+    const prodData = { id: pid, nombre, lab, precio, desc, estado, seccion, fecha, img: imgFinal, formula: formulaProd };
+    prodData._imgBase64 = imgCaptura && imgCaptura.startsWith('data:image') ? imgCaptura : null;
+
+    const eraEdicion = !!prodEditId;
+    if (prodEditId) {
+      const idx = productos.findIndex(x => x.id === prodEditId);
+      if (idx > -1) productos[idx] = prodData;
+    } else {
+      productos.unshift(prodData);
+    }
+
+    render();
+    closeProdModal();
+    showToast('i', 'Guardando en Nuevo_Producto…', 'Enviando☁️');
+
+    window._imgNombreActual = (window._imgNombrePendiente ||
+      nombre.replace(/[^a-zA-Z0-9áéíóúñ_]/g, '_').substring(0, 40)) + '_' + pid;
+    window._imgNombrePendiente = null;
+
+    try {
+      const res = await sendProductoToSheet(prodData, eraEdicion ? 'editar' : 'crear', imgCaptura);
+      if (res && res.imagen && res.imagen.startsWith('https://')) {
+        const local = productos.find(o => o.id === pid);
+        if (local) { local.img = res.imagen; delete local._imgBase64; }
+        showToast('s', '¡Producto guardado!', 'Imagen almacenada ✓');
+      } else if (res && res.ok !== false) {
+        showToast('s', 'Producto guardado', 'Sincronizado ✓');
+      } else {
+        showToast('e', 'Error en el script', res?.error || 'Revisa el Script');
+      }
+    } catch (e) {
+      showToast('e', 'Error de red', e.message.substring(0, 80));
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-symbols-rounded">save</span>Guardar producto';
+      currentProdImgB64 = null;
+    }
+
+    render();
+    updateBadges();
+  };
+
+  /* ── Imágenes más livianas: 800px y calidad 0.72 ── */
+  window.handleProdImgUpload = function (e) {
+    const file = e.target.files[0]; if (!file) return;
+    if (file.size > 8*1024*1024) { showToast('e','Imagen muy grande','Máximo 8 MB.'); return; }
+    const proc = document.getElementById('pm-img-processing');
+    proc.style.display = 'flex';
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        let W = img.width, H = img.height;
+        const MAX = 800;
+        if (W > MAX || H > MAX) { const r = Math.min(MAX/W, MAX/H); W = Math.round(W*r); H = Math.round(H*r); }
+        const canvas = document.createElement('canvas');
+        canvas.width = W; canvas.height = H;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, W, H);
+        ctx.drawImage(img, 0, 0, W, H);
+        currentProdImgB64 = canvas.toDataURL('image/jpeg', 0.72);
+        window._imgNombrePendiente = file.name
+          .replace(/\.[^.]+$/, '')
+          .replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ_\-]/g, '_')
+          .substring(0, 40);
+        proc.style.display = 'none';
+        const prev = document.getElementById('pm-img-preview');
+        prev.src = currentProdImgB64;
+        prev.style.display = 'block';
+        document.getElementById('pm-img-placeholder').style.display = 'none';
+        document.getElementById('pm-img-change').style.display = 'flex';
+        showToast('s','¡Imagen lista!','Procesada correctamente ✨');
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  window.handleImgUpload = function (e) {
+    const file = e.target.files[0]; if (!file) return;
+    if (file.size > 8*1024*1024) { showToast('e','Imagen muy grande','Máximo 8 MB.'); return; }
+    const proc = document.getElementById('om-img-processing');
+    proc.style.display = 'flex';
+    document.getElementById('om-img-filename').textContent = '📎 ' + file.name;
+    document.getElementById('om-img-filename').style.display = 'block';
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        let W = img.width, H = img.height;
+        const MAX = 800;
+        if (W > MAX || H > MAX) { const r = Math.min(MAX/W, MAX/H); W = Math.round(W*r); H = Math.round(H*r); }
+        const canvas = document.createElement('canvas');
+        canvas.width = W; canvas.height = H;
+        canvas.getContext('2d').drawImage(img, 0, 0, W, H);
+        const result = canvas.toDataURL('image/jpeg', 0.72);
+        currentImgB64 = result;
+        window._imgNombrePendiente = file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_\-áéíóúñÁÉÍÓÚÑ]/g, '_').substring(0, 50);
+        proc.style.display = 'none';
+        const prev = document.getElementById('om-img-preview');
+        prev.src = result; prev.style.display = 'block';
+        document.getElementById('om-img-placeholder').style.display = 'none';
+        document.getElementById('om-img-change').style.display = 'flex';
+        document.getElementById('om-img-url-box').classList.remove('show');
+        showToast('s','¡Imagen lista!','Fondo blanco aplicado ✨');
+      };
+      img.onerror = () => { proc.style.display = 'none'; showToast('e','Error al cargar imagen','Archivo puede estar dañado.'); };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  /* ── doRefresh: ignora el 2º setInterval duplicado (automático) ── */
+  const _dr = window.doRefresh;
+  let _ultimo = 0, _corriendo = false;
+  if (_dr && !_dr._wil) {
+    window.doRefresh = async function (showToasts) {
+      const auto = (showToasts === false);
+      const ahora = Date.now();
+      if (auto && (_corriendo || ahora - _ultimo < 3000)) return;
+      _corriendo = true; _ultimo = ahora;
+      try { return await _dr.apply(this, arguments); }
+      finally { _corriendo = false; }
+    };
+    window.doRefresh._wil = true;
+  }
+
+  /* Primer render, y luego se aísla el grid de los observers viejos */
+  render();
+  setTimeout(adoptarGrid, 1500);
+  console.log('[PARCHE FINAL] ✅ productos rápido activo');
+})();
+</script>
+  
 
 
 
