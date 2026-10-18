@@ -10,7 +10,7 @@ import jwt           from 'jsonwebtoken'
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin',  '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -61,11 +61,7 @@ async function loginCliente(req, res) {
   if (!email || !password)
     return res.status(400).json({ error: 'Correo y contraseña son obligatorios.' })
 
-  console.log('[auth-cliente] email recibido:', email.toLowerCase().trim())
-
   const cliente = await Cliente.findOne({ email: email.toLowerCase().trim() })
-
-  console.log('[auth-cliente] encontrado:', cliente ? cliente.email : 'NO ENCONTRADO')
 
   if (!cliente)
     return res.status(401).json({ error: 'Correo o contraseña incorrectos.' })
@@ -74,7 +70,6 @@ async function loginCliente(req, res) {
     return res.status(403).json({ error: 'Cuenta inactiva. Contacta al administrador.' })
 
   const ok = await cliente.compararPassword(password)
-  console.log('[auth-cliente] password ok:', ok)
 
   if (!ok)
     return res.status(401).json({ error: 'Correo o contraseña incorrectos.' })
@@ -110,13 +105,34 @@ async function eliminarCliente(req, res) {
     return res.status(401).json({ error: 'Correo o contraseña incorrectos.' })
 
   await Cliente.deleteOne({ _id: cliente._id })
-  console.log('[auth-cliente] cuenta eliminada:', cliente.email)
 
   return res.status(200).json({ ok: true })
 }
 
 /* ══════════════════════════════════════════════════════════
-   HANDLER PRINCIPAL — lógica original intacta
+   Verificar token de admin (la firma SÍ se valida aquí)
+   POST /api/auth?recurso=verificar
+   Header: Authorization: Bearer <token>
+══════════════════════════════════════════════════════════ */
+function verificarToken(req, res) {
+  const header = req.headers.authorization || ''
+  const token  = header.startsWith('Bearer ') ? header.slice(7) : ''
+
+  if (!token || !process.env.JWT_SECRET)
+    return res.status(401).json({ ok: false, error: 'Sin sesión.' })
+
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET)
+    if (payload.rol !== 'admin')
+      return res.status(403).json({ ok: false, error: 'Sin permisos de administrador.' })
+    return res.status(200).json({ ok: true, id: payload.id, rol: payload.rol })
+  } catch (e) {
+    return res.status(401).json({ ok: false, error: 'Sesión inválida o expirada.' })
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   HANDLER PRINCIPAL
 ══════════════════════════════════════════════════════════ */
 export default async function handler(req, res) {
   setCors(res)
@@ -127,6 +143,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Método no permitido' })
 
   try {
+    /* No necesita base de datos: solo valida la firma del token */
+    if (req.query.recurso === 'verificar')
+      return verificarToken(req, res)
+
     await dbConnect()
 
     if (req.query.recurso === 'register')
@@ -138,14 +158,19 @@ export default async function handler(req, res) {
     if (req.query.recurso === 'eliminar-cliente')
       return await eliminarCliente(req, res)
 
-    /* ── ORIGINAL: login admin / domiciliario (sin cambios) ── */
-    const { idWil, password, rol } = req.body
+    /* ── Login admin / domiciliario ── */
+    const { idWil, password, rol } = req.body || {}
 
     if (!idWil || !password || !rol)
       return res.status(400).json({ error: 'Faltan datos requeridos' })
 
     if (!['admin', 'domiciliario'].includes(rol))
       return res.status(400).json({ error: 'Rol inválido' })
+
+    if (!process.env.JWT_SECRET) {
+      console.error('[auth] Falta la variable de entorno JWT_SECRET')
+      return res.status(500).json({ error: 'Servidor mal configurado (JWT_SECRET).' })
+    }
 
     console.log('[auth] BD conectada:', mongoose.connection.db.databaseName)
     console.log('[auth] idWil recibido:', idWil.toUpperCase().trim())
@@ -170,15 +195,19 @@ export default async function handler(req, res) {
 
     await Modelo.findByIdAndUpdate(usuario._id, { ultimoAcceso: new Date() })
 
+    /* El rol del token sale del modelo que autenticó (admin/domiciliario),
+       aunque el documento no tenga el campo "rol" guardado. */
+    const rolFinal = rol === 'admin' ? 'admin' : (usuario.rol || 'domiciliario')
+
     return res.status(200).json({
       ok:     true,
       id:     usuario.idWil,
       nombre: usuario.nombre,
-      rol:    usuario.rol,
+      rol:    rolFinal,
       tel:    usuario.tel  || '',
       foto:   usuario.foto || '',
       token:  jwt.sign(
-        { id: usuario.idWil, rol: usuario.rol },
+        { id: usuario.idWil, rol: rolFinal },
         process.env.JWT_SECRET,
         { expiresIn: '12h' }
       ),

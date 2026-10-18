@@ -247,7 +247,7 @@ function togglePass(){
   if(inp.type==='password'){inp.type='text';ico.textContent='visibility_off';}
   else{inp.type='password';ico.textContent='visibility';}
 }
- 
+
 /* ── MENSAJES ── */
 function showErr(txt){
   document.getElementById('msgErrTxt').textContent=txt||'ID o clave incorrectos.';
@@ -268,7 +268,7 @@ function clearMsgs(){
   document.getElementById('msgErr').classList.remove('show');
   document.getElementById('msgOk').classList.remove('show');
 }
- 
+
 /* ── ESTADO BOTÓN ── */
 function setLoading(v){
   var btn=document.getElementById('btnLogin');
@@ -280,51 +280,79 @@ function setLoading(v){
   ico.style.display=v?'none':'inline-block';
   document.getElementById('btnTxt').textContent=v?'Validando…':'Ingresar al panel';
 }
- 
+
 /* ── LOGIN ── */
 var _busy = false;
- 
+
+/* AbortSignal.timeout no existe en Safari/iOS viejo: usar AbortController */
+function fetchConTimeout(url, opts, ms){
+  var ctrl = new AbortController();
+  var t = setTimeout(function(){ ctrl.abort(); }, ms);
+  opts.signal = ctrl.signal;
+  return fetch(url, opts).finally(function(){ clearTimeout(t); });
+}
+
 async function handleLogin(){
   if(_busy) return;
   clearMsgs();
- 
+
   var rawId = document.getElementById('inputUser').value.trim();
   var rawPw = document.getElementById('inputPass').value.trim();
- 
+
   if(!rawId){ document.getElementById('inputUser').focus(); showErr('Ingresa tu ID.'); return; }
   if(!rawPw){ document.getElementById('inputPass').focus(); showErr('Ingresa tu clave.'); return; }
- 
+
   _busy = true;
   setLoading(true);
- 
+
   try {
-    var res = await fetch('/api/auth', {
+    var res = await fetchConTimeout('/api/auth', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ idWil: rawId, password: rawPw, rol: 'admin' }),
-      signal:  AbortSignal.timeout(12000),
-    });
- 
-    var data = await res.json();
- 
+      body:    JSON.stringify({ idWil: rawId, password: rawPw, rol: 'admin' })
+    }, 12000);
+
+    var data = {};
+    try { data = await res.json(); } catch(e) { data = {}; }
+
     if(!res.ok){
       showErr(data.error || 'ID o clave incorrectos.');
       setLoading(false);
       _busy = false;
       return;
     }
- 
+
     // ✅ Acceso confirmado — guardar sesión
-    sessionStorage.setItem('wil_admin', JSON.stringify({
-      id:      data.id,
-      nombre:  data.nombre,
-      rol:     data.rol,
-      loginAt: new Date().toISOString(),
-    }));
- 
-    showOk('¡Hola ' + (data.nombre.split(' ')[0] || data.id) + '! Acceso correcto. Ingresando…');
+    // El guard de panel-administrador.html lee 'wil_token' (localStorage o sessionStorage)
+    var token = data.token || data.accessToken || data.jwt || '';
+
+    if(!token){
+      showErr('El servidor no devolvió token de sesión. Revisa /api/auth.');
+      setLoading(false);
+      _busy = false;
+      return;
+    }
+
+    try {
+      localStorage.setItem('wil_token', token);
+      sessionStorage.setItem('wil_token', token);
+      sessionStorage.setItem('wil_admin', JSON.stringify({
+        id:      data.id,
+        nombre:  data.nombre,
+        rol:     data.rol,
+        loginAt: new Date().toISOString()
+      }));
+    } catch(e) {
+      showErr('El navegador bloqueó el almacenamiento. Desactiva el modo privado.');
+      setLoading(false);
+      _busy = false;
+      return;
+    }
+
+    var primerNombre = ((data.nombre || '').split(' ')[0]) || data.id || '';
+    showOk('¡Hola ' + primerNombre + '! Acceso correcto. Ingresando…');
     setTimeout(function(){ location.href = 'panel-administrador.html'; }, 1400);
- 
+
   } catch(e) {
     var msg = 'Error de conexión. Intenta de nuevo.';
     if(e.name==='TimeoutError'||e.name==='AbortError') msg='Tiempo agotado. Verifica tu conexión.';
@@ -333,8 +361,8 @@ async function handleLogin(){
     _busy = false;
   }
 }
- 
-document.addEventListener('keydown', function(e){ if(e.key==='Enter') handleLogin(); });
+/* El Enter ya está manejado en cada input (onkeydown). Se eliminó el listener global
+   para evitar que handleLogin se dispare dos veces. */
 </script>
 </body>
 </html>
